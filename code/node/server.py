@@ -1,19 +1,21 @@
 """Generic business node: one FastAPI app, started once per config in data/nodes/.
 
-Usage: python -m node.server --config data/nodes/hotel-rheinblick.json [--port 8001]
+Usage: python -m node.server --config data/nodes/hotel-rheinblick.json [--port 4001]
 
 Every response is a signed envelope from this node's key (keys/<node_id>.json).
-Tools answer only from the config's "facts".
+Tools and the /agent endpoint answer only from the config's "facts".
 """
 
 import argparse
 import json
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from aps import load_signing_key, sign_envelope
+from node.agent import NodeAgent
 
 
 class AvailabilityRequest(BaseModel):
@@ -21,10 +23,16 @@ class AvailabilityRequest(BaseModel):
     guests: int = 1
 
 
+class AgentRequest(BaseModel):
+    question: str
+    context: dict = {}
+
+
 def create_app(config: dict) -> FastAPI:
     node_id = config["node_id"]
     facts = config.get("facts", {})
     signing_key = load_signing_key(node_id)
+    node_agent = NodeAgent(config)
     app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
@@ -57,6 +65,10 @@ def create_app(config: dict) -> FastAPI:
             "policies": facts.get("policies", {}),
         })
 
+    @app.post("/agent")
+    async def agent(req: AgentRequest) -> dict:
+        return signed(await node_agent.answer(req.question, req.context))
+
     return app
 
 
@@ -67,6 +79,7 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--port", type=int)
     args = parser.parse_args()
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # OPENAI_API_KEY for /agent
     config = json.loads(Path(args.config).read_text())
     uvicorn.run(create_app(config), host="0.0.0.0", port=args.port or config["port"])
 
