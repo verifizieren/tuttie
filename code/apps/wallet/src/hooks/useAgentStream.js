@@ -2,11 +2,13 @@
 // Server-Sent Events at /events) folded into the wallet's view (lib/activity.js).
 //
 // There is one conversation at a time. Opening the wallet picks it up only while it still
-// runs (Tuttie working, an approval waiting); otherwise Tuttie starts fresh. The stream replays
-// the timeline on connect; those events were already folded from /history, so they are skipped.
-import { useEffect, useMemo, useReducer } from "react";
+// runs (Tuttie working, an approval waiting); a finished one goes into the history on this
+// device (lib/history.js) and Tuttie starts fresh. The stream replays the timeline on connect;
+// those events were already folded from /history, so they are skipped.
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { applyEvent, EMPTY, finished, startTurn } from "../lib/activity.js";
 import { resetConversation } from "../lib/api.js";
+import { archive, loadCurrent, loadHistory, saveCurrent } from "../lib/history.js";
 
 function reducer(state, action) {
   switch (action.type) {
@@ -29,14 +31,20 @@ async function timeline() {
 
 export default function useAgentStream() {
   const [state, dispatch] = useReducer(reducer, EMPTY);
+  const [history, setHistory] = useState(loadHistory);
 
   useEffect(() => {
     let stream = null, closed = false;
     (async () => {
       const events = await timeline();
-      let resumed = events.reduce(applyEvent, EMPTY), replayed = events.length;
-      if (events.length && finished(resumed)) {
-        await resetConversation().catch(() => {});
+      const current = loadCurrent();
+      let resumed = events.reduce(applyEvent, { ...EMPTY, id: current?.id || null, turns: current?.turns || [] });
+      let replayed = events.length;
+      if (!events.length || finished(resumed)) {
+        if (events.length) {
+          setHistory(archive(resumed));
+          await resetConversation().catch(() => {});
+        }
         resumed = EMPTY;
         replayed = 0;
       }
@@ -52,16 +60,20 @@ export default function useAgentStream() {
     return () => { closed = true; stream?.close(); };
   }, []);
 
+  // Keep what the server does not: this conversation's id and the user's own messages.
+  useEffect(() => { saveCurrent(state); }, [state.id, state.turns.length]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const actions = useMemo(() => ({
     /** The user said something: a new turn in this conversation. */
     say: said => dispatch({ type: "say", said }),
     /** The user liked some hotels on the cards. */
     pick: nodeIds => dispatch({ type: "pick", nodeIds }),
-    /** Start a new conversation (the server forgets the current one). */
-    newConversation: async () => {
+    /** Put this conversation into the history and start a new one (the server forgets it). */
+    newConversation: async snapshot => {
+      if (snapshot.turns.length) setHistory(archive(snapshot));
       dispatch({ type: "reset" });
       await resetConversation().catch(() => {});
     },
   }), []);
-  return [state, actions];
+  return [state, actions, history];
 }
