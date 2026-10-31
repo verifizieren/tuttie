@@ -52,6 +52,7 @@ class PortRouter(httpx.AsyncBaseTransport):
         self.transports = {port: httpx.ASGITransport(app=app) for port, app in apps.items()}
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        """Hand the request to the app on its port."""
         return await self.transports[request.url.port].handle_async_request(request)
 
 
@@ -104,6 +105,7 @@ async def run(offers: list[dict], budget: float) -> list[tuttie.Outcome]:
 
 
 def main() -> None:
+    """Parse the strategy numbers, run the negotiations and print each hotel's story."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--budget", type=float, default=200, help="Tuttie's private limit in CHF")
     parser.add_argument("--opening", type=float, default=tuttie.OPENING_DISCOUNT, help="Tuttie's opening discount")

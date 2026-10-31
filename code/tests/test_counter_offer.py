@@ -103,3 +103,11 @@ def test_hotel_without_limits_keeps_its_price():
     envelope = client.post("/tools/counter_offer",
                            json={"counter": counter(offer, 1, 50), "offer": offer, "last": None}).json()
     assert envelope["payload"]["type"] == "rejection"
+
+
+def test_a_counter_about_another_offer_is_refused():
+    """A counter signed for offer A cannot be used to bargain over offer B of the same hotel."""
+    client = TestClient(node_app(RHEINBLICK))
+    offer_a, offer_b = signed_offer(offer_id="of-a"), signed_offer(offer_id="of-b")
+    reply = ask(client, offer_b, counter(offer_a, 1, 160))["payload"]
+    assert reply["status"] == "refused" and reply["reason"] == "counter is about another offer"

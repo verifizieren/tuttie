@@ -143,3 +143,23 @@ def test_signed_payloads_that_are_not_objects_are_refused_not_crashing(payload):
         assert response.status_code == 200 and reason in response.json()["payload"]["reason"]
     with pytest.raises(AgreementInvalid, match="not a valid agreement"):
         AgreementRedeemer(RHEINBLICK, load_public_key(RHEINBLICK)).check(odd_offer)
+
+
+def test_hotel_lookup_of_an_unknown_node_finds_nothing(monkeypatch):
+    """The registry answers 404 for an unknown node: the counter's sender is then unknown."""
+    import httpx
+
+    real_client = httpx.AsyncClient
+    transport = httpx.MockTransport(lambda request: httpx.Response(404, json={"detail": "unknown node"}))
+    monkeypatch.setattr(hotel.httpx, "AsyncClient", lambda **kwargs: real_client(transport=transport, **kwargs))
+    assert asyncio.run(hotel.registry_lookup("ch.nobody.agent")) is None
+
+
+def test_a_final_price_within_the_budget_is_accepted_with_a_matching_counter():
+    """The hotel's last word fits the budget: Tuttie's next counter is exactly that price."""
+    agreement = {"tool": "counter_offer", "type": "agreement", "request_id": "rq-neg1",
+                 "offer_id": "of-hotel-rheinblick-1", "round": 2, "item": "double room 2026-11-14", "price_chf": 175,
+                 "includes": [], "conditions": ["best rate, non-refundable"], "valid_until": "2099-01-01T00:00:00Z"}
+    outcome = negotiate([counter(175, final=True), agreement], limit=180)
+    assert outcome.status == "agreed" and outcome.price_chf == 175 and outcome.rounds == 2
+    assert [step["own_chf"] for step in outcome.history] == [162, 175]  # opened 10 % below 180, then matched

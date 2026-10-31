@@ -49,6 +49,8 @@ Lookup = Callable[[str], Awaitable[dict | None]]
 
 
 class CounterOfferRequest(BaseModel):
+    """One bargaining round, stateless: three signed envelopes (see the module docstring)."""
+
     counter: dict           # signed envelope from the user agent, payload: Counter
     offer: dict             # this hotel's signed envelope, payload: Offer
     last: dict | None = None  # this hotel's signed previous Counter (rounds 2 and later)
