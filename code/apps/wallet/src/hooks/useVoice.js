@@ -2,7 +2,9 @@
 // (token from POST /voice/token), send the microphone, play Tuttie's voice, and pass both voice
 // levels to the face, so its eyes pulse while Tuttie speaks and open up while the user talks.
 // Speech becomes a message to the same Tuttie as typing (code/voice/agent.py); without voice
-// configured on the server the wallet simply stays text-only.
+// configured on the server the wallet simply stays text-only. What Tuttie says also arrives
+// as text, word by word in step with its voice (LiveKit's "lk.transcription" streams), so the
+// wallet can show an answer as it is spoken.
 import { useEffect, useRef, useState } from "react";
 
 const LEVEL_MS = 50;  // how often the voice levels go to the face
@@ -13,11 +15,14 @@ const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: t
 /**
  * @param active  voice mode is on (the card is open and the user is not typing)
  * @param face    ref to the TuttieFace (src/lib/face.js)
+ * @param onSpeech  ({ id, text, done }) => void: Tuttie's words so far, as it speaks them
  * @returns { state, unlockAudio, muted, toggleMute }: state is "off" | "connecting" | "live" |
  *          "unavailable"; call unlockAudio() from a tap if the browser blocked Tuttie's voice;
  *          muted keeps the microphone off (e.g. in a noisy room) until toggled again
  */
-export default function useVoice(active, face) {
+export default function useVoice(active, face, onSpeech) {
+  const speech = useRef(onSpeech);
+  speech.current = onSpeech;
   const [state, setState] = useState("off");
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
@@ -40,6 +45,21 @@ export default function useVoice(active, face) {
         document.body.appendChild(audio);
       });
       lk.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
+      // Tuttie's words, in step with its voice. The user's own words come on the same topic,
+      // marked with the user's microphone track: those are skipped.
+      lk.registerTextStreamHandler("lk.transcription", async reader => {
+        const track = reader.info.attributes?.["lk.transcribed_track_id"];
+        const mine = [...lk.localParticipant.trackPublications.values()].some(p => p.trackSid === track);
+        if (mine) return;
+        const id = reader.info.id;
+        let text = "";
+        speech.current?.({ id, text, done: false });
+        for await (const chunk of reader) {
+          text += chunk;
+          speech.current?.({ id, text, done: false });
+        }
+        speech.current?.({ id, text, done: true });
+      });
       const response = await fetch("/voice/token", { method: "POST" });
       if (!response.ok) throw new Error("voice is not configured");
       const { url, token } = await response.json();
