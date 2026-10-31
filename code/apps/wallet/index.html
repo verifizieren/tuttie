@@ -30,6 +30,11 @@
          --stack: calc(var(--top) + var(--head) + 12px);
          padding: var(--top) 16px var(--bottom); }
 
+  /* Installed on the home screen: keep the whole app a bit further down from the status bar /
+     Dynamic Island, whichever status bar style iOS applied. */
+  @media (display-mode: standalone) { .app { --top: calc(env(safe-area-inset-top, 0px) + 28px); } }
+  .standalone .app { --top: calc(env(safe-area-inset-top, 0px) + 28px); }
+
   .head { display: flex; justify-content: space-between; align-items: center; height: var(--head); padding: 0 4px;
           transition: opacity .4s var(--ease), transform .5s var(--ease); }
   .head h1 { margin: 0; font-size: clamp(28px, 8.5vw, 34px); font-weight: 700; letter-spacing: -.01em; }
@@ -137,6 +142,7 @@
   const said = document.getElementById("said");
   const input = document.getElementById("text");
   const face = new TuttieFace(document.getElementById("eyes"));
+  if (navigator.standalone) document.documentElement.classList.add("standalone");  // iOS home screen app
 
   // Size the app to the visible viewport and keep the page pinned (keyboard-safe on phones).
   function fitViewport() {
