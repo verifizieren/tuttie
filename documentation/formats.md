@@ -95,15 +95,19 @@ Key ids: authority issuer ids, node ids, and `user` (signs approvals).
 ```json
 {
   "step": 3,
-  "kind": "registry | a2t | a2a | marketplace | payment | approval | answer",
+  "kind": "registry | a2t | a2a | marketplace | payment | approval | answer | thinking",
   "node_id": "ch.basel.hotel-rheinblick",
   "node_name": "Hotel Rheinblick",
   "seals": [{ "issuer": "handelsregister-bs", "tier": "gold", "valid": true }],
-  "status": "verified | broken | pending | approved | declined",
+  "status": "verified | broken | pending | approved | declined | info",
   "summary": "get_availability: double room 14 Nov, CHF 180",
   "detail": {}
 }
 ```
+
+`thinking` events carry a reasoning summary of the assistant's LLM in `summary`
+(usually `"**Title**\n\nbody"`), with `status: "info"` and no node. The SSE stream also
+sends a named `reset` event when a new demo starts; the UI then clears itself.
 
 ## A2A reply (structured, never free text)
 
