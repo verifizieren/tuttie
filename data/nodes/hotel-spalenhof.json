@@ -1,7 +1,7 @@
 {
   "node_id": "ch.basel.hotel-spalenhof",
   "name": "Hotel Spalenhof",
-  "port": 8002,
+  "port": 4002,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
   "tags": ["hotel", "basel-sbb"],

@@ -1,7 +1,7 @@
 {
   "node_id": "ch.basel.cheap-hotels",
   "name": "basel-cheap-hotels",
-  "port": 8003,
+  "port": 4003,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
   "tags": ["hotel", "basel-sbb", "dog-friendly", "quiet"],

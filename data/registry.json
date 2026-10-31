@@ -3,7 +3,7 @@
     "node_id": "ch.basel.cheap-hotels",
     "name": "basel-cheap-hotels",
     "public_key": "uCr04XpGZRgW9+UxjtLTBu5KUWH4HAJCuc4mrJmi8Mw=",
-    "endpoint": "http://localhost:8003",
+    "endpoint": "http://localhost:4003",
     "kind": "business",
     "capabilities": [
       "can_book",
@@ -27,7 +27,7 @@
     "node_id": "ch.basel.hotel-rheinblick",
     "name": "Hotel Rheinblick",
     "public_key": "jLSkoHn2gRTVnTmgrGaVofEGKASUUZrOu6/2juOxEeQ=",
-    "endpoint": "http://localhost:8001",
+    "endpoint": "http://localhost:4001",
     "kind": "business",
     "capabilities": [
       "can_book",
@@ -56,7 +56,7 @@
     "node_id": "ch.basel.hotel-spalenhof",
     "name": "Hotel Spalenhof",
     "public_key": "b0wQ00PBLQ9z2NBCgTidoON1HffkRZpAx+5UKOsGj1g=",
-    "endpoint": "http://localhost:8002",
+    "endpoint": "http://localhost:4002",
     "kind": "business",
     "capabilities": [
       "can_book",
@@ -78,7 +78,7 @@
     "node_id": "ch.legal.consumer-law",
     "name": "Swiss consumer-law agent",
     "public_key": "fNDGGHiEcWp5BN18M9Ibi5MWtZkRRIf/smEL+N8QIRc=",
-    "endpoint": "http://localhost:8004",
+    "endpoint": "http://localhost:4004",
     "kind": "agent",
     "capabilities": [
       "licensed_legal_ch",
@@ -106,7 +106,7 @@
     "node_id": "ch.legal.advisor",
     "name": "Legal advisor",
     "public_key": "jZlmMAnoaf09v1yhHC96oM5MSKpK6VgiRId3NeqXad4=",
-    "endpoint": "http://localhost:8005",
+    "endpoint": "http://localhost:4005",
     "kind": "agent",
     "capabilities": [
       "licensed_legal_ch",
