@@ -19,6 +19,17 @@ def test_every_service_gets_a_short_unique_name():
     assert len(names) == len(set(names))
 
 
+def test_voice_adds_livekit_and_the_agent_only_when_configured(monkeypatch, tmp_path):
+    server = tmp_path / "livekit-server"
+    server.write_text("")
+    monkeypatch.setattr(run_all, "LIVEKIT_SERVER", server)
+    keys = {"LIVEKIT_API_KEY": "k", "LIVEKIT_API_SECRET": "s", "LIVEKIT_NODE_IP": "1.2.3.4"}
+    assert [n for n, _ in run_all.services(keys)][-1] == "livekit"
+    assert [n for n, _ in run_all.services({**keys, "ELEVENLABS_KEY": "e"})][-2:] == ["livekit", "voice"]
+    assert "--node-ip" in dict(run_all.services(keys))["livekit"]
+    assert "livekit" not in dict(run_all.services({"ELEVENLABS_KEY": "e"}))  # no LiveKit keys: text only
+
+
 def test_no_warning_with_a_key_in_env_file_or_environment(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=sk-test-123\n")

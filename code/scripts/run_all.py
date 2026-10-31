@@ -1,5 +1,8 @@
 """Start the registry, the marketplace, one node server per config and the assistant; Ctrl+C stops them all.
 
+With voice configured in code/.env (LiveKit keys, ELEVENLABS_KEY), it also starts the
+self-hosted LiveKit server (code/voice/livekit.yaml) and Tuttie's voice agent (voice/agent.py).
+
 Every line a service prints is prefixed with its name (`[registry]`, `[gaestehaus-am-rhein]`,
 `[tuttie]`, ...), coloured in a terminal, so twelve services in one window stay readable.
 Before starting, it warns if there is no OpenAI key: everything starts without one, but Tuttie
@@ -16,17 +19,30 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parent.parent
+LIVEKIT_SERVER = Path(os.environ.get("LIVEKIT_SERVER", Path.home() / ".local" / "livekit" / "livekit-server"))
 COLOURS = [31, 32, 33, 34, 35, 36, 91, 92, 93, 94, 95, 96]  # ANSI foreground colours
 
 
-def services() -> list[tuple[str, list[str]]]:
-    """(name, command) for every service, in start order."""
+def services(voice: dict | None = None) -> list[tuple[str, list[str]]]:
+    """(name, command) for every service, in start order.
+
+    `voice` holds the voice settings (from code/.env); with LiveKit keys and an installed
+    LiveKit server it adds the LiveKit server, and with an ElevenLabs key the voice agent.
+    """
     found = [("registry", [sys.executable, "-m", "registry.app"]),
              ("marketplace", [sys.executable, "-m", "marketplace.app"])]
     for path in sorted((ROOT / "data" / "nodes").glob("*.json")):
         name = path.stem.removeprefix("hotel-").removeprefix("basel-")
         found.append((name, [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]))
     found.append(("tuttie", [sys.executable, "-m", "assistant.app"]))
+    voice = voice or {}
+    if voice.get("LIVEKIT_API_KEY") and voice.get("LIVEKIT_API_SECRET") and LIVEKIT_SERVER.exists():
+        command = [str(LIVEKIT_SERVER), "--config", "voice/livekit.yaml"]
+        if voice.get("LIVEKIT_NODE_IP"):
+            command += ["--node-ip", voice["LIVEKIT_NODE_IP"]]
+        found.append(("livekit", command))
+        if voice.get("ELEVENLABS_KEY"):
+            found.append(("voice", [sys.executable, "-m", "voice.agent", "start"]))
     return found
 
 
@@ -58,10 +74,13 @@ def main() -> None:
     """Start all services, show their output with names, stop all of them on Ctrl+C or when one exits."""
     if warning := key_warning():
         print(warning, file=sys.stderr)
-    to_start = services()
+    settings = {**(dotenv_values(ROOT / ".env") if (ROOT / ".env").exists() else {}), **os.environ}
+    to_start = services(settings)
     width = max(len(name) for name, _ in to_start)
     colourful = sys.stdout.isatty() and "NO_COLOR" not in os.environ
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}  # lines appear when printed, not when a buffer fills
+    if settings.get("LIVEKIT_API_KEY"):  # the LiveKit server takes its key pair from the environment
+        env["LIVEKIT_KEYS"] = f"{settings['LIVEKIT_API_KEY']}: {settings['LIVEKIT_API_SECRET']}"
     processes: list[tuple[str, subprocess.Popen]] = []
     for index, (name, cmd) in enumerate(to_start):
         process = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
