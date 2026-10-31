@@ -212,6 +212,12 @@ Why things are the way they are, so nobody has to rediscover them:
   Rhein (Kleinbasel) was never woken, so the pitch story (Anna wins) could not happen.
 - **Wallet face while busy:** in the thinking, posted, negotiating and booking phases the eyes
   move through a few thinking looks with glances (`THINKING` in `lib/activity.js`).
+- **Seals in the wallet** (`apps/wallet/src/components/Seals.jsx`): issuer marks instead of
+  dots. Gold = Swiss flag, "Handelsregister · Basel-Stadt" and the business's UID (timeline
+  events carry `uid`; shown only inside a valid gold seal); blue = Adobe logo and name. Tap a
+  hotel for its seals as an iOS-style grouped list with a checkmark-seal badge; the approval
+  sheet shows them too. Businesses never asked are listed: forged seal in red, no valid seal
+  grey and struck through.
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
