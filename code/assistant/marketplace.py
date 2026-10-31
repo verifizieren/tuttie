@@ -59,6 +59,8 @@ class MarketDesk:
         self.market_url = market_url.rstrip("/")
         self.agent_id = agent_id
         self.offer_wait_s = offer_wait_s
+        self.last_request: dict | None = None    # the last posted request (public part)
+        self.last_shortlist: list[dict] = []     # its shortlisted offers, with their signed envelopes
 
     async def find(self, date: str, requirements: list[str] | None = None, tags: list[str] | None = None,
                    category: str = "hotel", guests: int = 1, budget_chf: float | None = None) -> dict:
@@ -89,6 +91,7 @@ class MarketDesk:
 
         offers = await self.collect(request.request_id, len(offering), posting["invited"])
         best = shortlist(offers, budget_chf, datetime.now(timezone.utc))
+        self.last_request, self.last_shortlist = request.model_dump(mode="json"), best
         self.bus.emit("marketplace", "verified",
                       f"Shortlist: {len(best)} of {len(offers)} offers fit"
                       + (f" (budget CHF {budget_chf:g}, kept private)" if budget_chf else ""),

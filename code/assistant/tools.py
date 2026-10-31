@@ -17,12 +17,13 @@ from pathlib import Path
 
 import httpx
 
-from aps import evaluate_record, verify_envelope
+from aps import evaluate_record, load_signing_key, verify_envelope
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
 from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
 from assistant.marketplace import MarketDesk
+from sessions import Context
 from assistant.events import EventBus
 
 AUTHORITIES_PATH = Path(__file__).resolve().parent.parent / "data" / "authorities.json"
@@ -57,6 +58,13 @@ SCHEMAS = [
                            "description": "the user's price limit. PRIVATE: it is never posted, only used for the shortlist"},
         },
         ["date"],
+    ),
+    function(
+        "negotiate",
+        "Bargain with every hotel on the last shortlist at once (one subagent each) and return the "
+        "best signed agreement. Use it only when the user asks for a better price or to negotiate.",
+        {"budget_chf": {"type": "number",
+                        "description": "the user's price limit. PRIVATE: only compared by Tuttie's code, never sent"}},
     ),
     function(
         "search_registry",
@@ -190,11 +198,42 @@ class Toolbox:
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
-        tools = {"post_request": self.market.find, "search_registry": self.search_registry,
+        tools = {"post_request": self.market.find, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
+
+    async def negotiate(self, budget_chf: float | None = None) -> dict:
+        """Bargain over the last shortlist with dev member 2's negotiator (code/negotiation/).
+
+        Only the date and the needs are shared with the hotels; the budget is a private context
+        item that the negotiator compares in code and never sends.
+        """
+        # Imported here: negotiation builds on this module (Toolbox, Verified).
+        from negotiation.tuttie import BUDGET_LIMIT, TuttieNegotiator, best
+        from assistant.subagents import SubagentPool
+
+        if not self.market.last_shortlist:
+            return {"error": "post a request first: there is no shortlist to negotiate"}
+        needs = self.market.last_request["constraints"]
+        context = Context().add("date", needs["date"], "public").add("requirements", needs["requirements"], "negotiation")
+        if budget_chf is not None:
+            context.add(BUDGET_LIMIT, budget_chf, "private")
+        negotiator = TuttieNegotiator(SubagentPool(self), self.market.agent_id, load_signing_key(self.market.agent_id))
+        outcomes = await negotiator.negotiate_all(self.market.last_shortlist, context)
+        winner = best(outcomes)
+        names = {o["node_id"]: o["name"] for o in self.market.last_shortlist}
+        summary = (f"Best agreement: {names[winner.node_id]} at CHF {winner.price_chf:g} "
+                   f"(offered CHF {winner.offer_price_chf:g})") if winner else "No hotel agreed within the budget"
+        self.bus.emit("marketplace", "verified" if winner else "declined", summary,
+                      detail={"phase": "agreement", "agreement": winner.agreement if winner else None})
+        return {
+            "outcomes": [{"hotel": names[o.node_id], "status": o.status, "offered_chf": o.offer_price_chf,
+                          "agreed_chf": o.price_chf, "rounds": o.rounds, "reason": o.reason} for o in outcomes],
+            "best": {"hotel": names[winner.node_id], "price_chf": winner.price_chf,
+                     "offer_id": winner.offer_id} if winner else None,
+        }
 
     async def search_registry(self, tags: list[str] | None = None, capability: str = "") -> dict:
         """Find nodes and split them into verified and rejected; each node shows once on the timeline."""
