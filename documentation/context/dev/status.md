@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (owner view can edit and deploy; test and docs review: APS and negotiation at 100 %; pitch story confirmed live with the real LLM; `scripts/check.sh`, named service logs, missing-key warning, Ctrl+C stops within 3 s).
+Last updated: 2026-10-31 (review of the owner view and voice: green, pitch story still live; open points listed under Where to start next).
 
 ## Done
 
@@ -129,9 +129,29 @@ Build order from [goals.md](goals.md):
 4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
+**Review of owner view and voice (dev member 2, 2026-10-31, commits 8763423..6819267):** all
+299 tests green, owner view's JS tests and build green, the pitch story still runs live
+(128, booked, city tax with the mandate). Owner backend (`node/owner.py`, `settings.py`,
+`deployments.py`) is solid: strict validation, floor ≤ room price, atomic versioned writes,
+constant-time token check, tests isolated from local deploys; `negotiation/hotel.py` now reads
+the owner's limits live, once per answer (fine). Open points, none blocking:
+- **Before the pitch:** owner deploys persist (`data/deployments/`, also on the team server)
+  and change the stage numbers. Check `GET /owner/versions` on the server, or remove the
+  folder, before the demo; `test_the_pitch_story_anna_s_guesthouse` only covers the committed config.
+- The owner page on the live site cannot reach a node (port 4009 is closed to the internet,
+  which is right): it works locally only. To show it from the live site, proxy it under the
+  site's origin, still behind the token.
+- One `OWNER_TOKEN` for every node: any owner could read and change every hotel's private
+  limits. Fine for the demo; real owners would sign deploys with their own key (APS).
+- `assistant/voice.py`: `agent_only` compares the secret with `!=`; use
+  `secrets.compare_digest` like `node/owner.py`. `voice_rooms` grows with every
+  `POST /voice/token` (no login needed) and is never pruned.
+- `requirements.txt` gained `livekit`: run `uv pip install -r requirements.txt` (or pip)
+  after pulling, or the assistant and three test files fail to import.
+
 ### Test coverage
 
-287 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
+299 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
