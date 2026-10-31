@@ -1,7 +1,8 @@
 // APS seals the way the wallet shows them: who vouches for a business, with the issuer's mark.
 // Gold = the Swiss commercial register (flag, name and the business's UID), blue = Adobe (logo
 // and name). Only seals the assistant verified are shown as seals; a forged one is shown as
-// forged. The UID is signed into every seal, so it is shown only inside a valid gold seal.
+// forged. The UID is signed into every seal, so it is shown only inside a valid gold seal. A
+// shield marks every verified signature, so the seals read as marks of authenticity.
 
 /** The Swiss flag as a rounded tile. */
 function SwissFlag() {
@@ -33,31 +34,38 @@ function GenericMark() {
   );
 }
 
-/** The scalloped "checkmark seal" badge, tinted by tier. */
+// A shield: the sign that an authority signed for this business.
+const SHIELD = "M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z";
+
+/** The shield with a check, tinted by tier: this authority's signature verified. */
 function SealBadge({ tier }) {
   return (
     <svg className={`seal-badge ${tier}`} viewBox="0 0 24 24" aria-hidden="true">
-      <path d={SCALLOP} />
-      <path d="M7.6 12.3l3 3 5.8-6.2" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={SHIELD} />
+      <path d="M8.2 12.2l2.6 2.6 5-5.4" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// A circle with 12 soft bumps (like Apple's checkmark.seal), built once.
-const SCALLOP = (() => {
-  const n = 12, points = [];
-  for (let i = 0; i < 2 * n; i++) {
-    const r = i % 2 ? 9.2 : 11.4, a = (i * Math.PI) / n;
-    points.push([12 + r * Math.cos(a), 12 + r * Math.sin(a)]);
-  }
-  const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-  const f = p => p.map(v => v.toFixed(2)).join(" ");
-  const at = i => points[i % points.length];
-  // Every point is a curve control, so the edge waves between the outer and inner radius.
-  let d = `M${f(mid(at(0), at(1)))}`;
-  for (let i = 1; i <= points.length; i++) d += ` Q${f(at(i))} ${f(mid(at(i), at(i + 1)))}`;
-  return d + "Z";
-})();
+/** A small shield for the corner of an issuer's tile. */
+function MiniShield({ tier }) {
+  return (
+    <svg className={`mini-shield ${tier}`} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={SHIELD} />
+      <path d="M8.4 12.2l2.5 2.5 4.8-5.2" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The plain shield outline, for headings. */
+export function ShieldIcon() {
+  return (
+    <svg className="shield-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={SHIELD} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8.6 12.2l2.4 2.4 4.6-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 const ISSUERS = {
   "handelsregister-bs": { mark: SwissFlag, name: "Handelsregister", about: "Basel-Stadt" },
@@ -67,14 +75,18 @@ const ISSUERS = {
 
 const issuer = id => ISSUERS[id] || { mark: GenericMark, name: id, about: "Seal" };
 
-/** Small issuer marks for a list row: the flag and/or the Adobe logo. */
+/** Small issuer marks for a list row (the flag and/or the Adobe logo), each with a shield. */
 export function SealMarks({ seals = [], tiers = [] }) {
   // Before an offer arrives only the tier is known; show the tier's issuer.
-  const shown = seals.length ? seals.filter(s => s.valid).map(s => s.issuer)
-    : tiers.map(t => (t === "gold" ? "handelsregister-bs" : t === "blue" ? "adobe" : null)).filter(Boolean);
+  const shown = seals.length ? seals.filter(s => s.valid).map(s => ({ id: s.issuer, tier: s.tier }))
+    : tiers.filter(t => t === "gold" || t === "blue")
+           .map(t => ({ id: t === "gold" ? "handelsregister-bs" : "adobe", tier: t }));
   return (
-    <span className="marks" aria-label={`verified by ${shown.map(id => issuer(id).name).join(", ")}`}>
-      {shown.map((id, i) => { const Mark = issuer(id).mark; return <i key={i}><Mark /></i>; })}
+    <span className="marks" aria-label={`signed by ${shown.map(s => issuer(s.id).name).join(", ")}`}>
+      {shown.map((s, i) => {
+        const Mark = issuer(s.id).mark;
+        return <i key={i}><Mark /><MiniShield tier={s.tier} /></i>;
+      })}
     </span>
   );
 }
@@ -84,7 +96,7 @@ export function SealList({ seals = [], uid = null }) {
   if (!seals.length) return null;
   return (
     <div className="seal-list">
-      <div className="seal-head">Verified by</div>
+      <div className="seal-head"><ShieldIcon /> Signed and verified by</div>
       {seals.map((seal, i) => {
         const { mark: Mark, name, about } = issuer(seal.issuer);
         if (!seal.valid) {
