@@ -66,6 +66,18 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   (`LLM_TIMEOUT_S`, one retry); hotel agents also fall back on Anthropic errors; a hotel never
   offers a room whose note rules out a need (Anna's single for a dog guest), and an unknown room
   choice gets the cheapest real room. Tests: `test_agent_errors.py`, `test_node_agent.py`, `test_llm.py`.
+- API hardening (2026-11-01, branch wip/harden-api): reading endpoints (`/history`,
+  `/approvals/pending`, `/approvals/{id}`, `/reset`, `/identity`) no longer create a
+  conversation, so crawlers and QR previews without cookies cannot fill the store and evict
+  real chats; `/history` names the id the first conversation will get (HMAC of the session) and
+  `/events` with that id or any action creates it. Hotel nodes: `POST /agent/invoke` validates a
+  `posting.created` event (422), accepts only an `offer_url` of the configured market
+  (`MARKETPLACE_URL`, default `http://localhost:4010`; set it on the nodes too if the market
+  moves) and only a fresh request signed by a verified user agent (403), all before the LLM.
+  `get_availability` and `book` refuse (signed) a night that is not `YYYY-MM-DD`, in the past
+  or over a year ahead, and guests outside 1-10. Tests: `test_conversations.py`,
+  `test_node_agent.py`, `test_node_book.py`. Note: tests use the night 2026-11-14 and will fail
+  after it has passed.
 
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified

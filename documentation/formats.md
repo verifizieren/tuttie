@@ -174,7 +174,11 @@ messages | mail | calendar | preferences, then `found`; private items such as th
 never in them). `POST /chat {message, first_tool?}`: `first_tool` (`book` or `negotiate`)
 makes that tool the first step; the wallet sends `book` after the user swiped the cards. A
 booking of an agreed deal is always for the posted night. `GET /history` returns this browser's timeline so far (the same
-events the stream replays). Answers no longer list ignored businesses; the wallet shows them.
+events the stream replays) and its conversation id in `X-Conversation-ID`. Reading never
+creates a conversation: for a browser without one, `/history` answers `[]` with the id its
+first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a decision 404.
+Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does
+following the promised id on `GET /events?conversation_id=<id>`; another id there is a 409. Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
 `assistant/agent.py`, e.g. `excited`, `sorry`); the wallet shows it on Tuttie's face.
 
@@ -251,6 +255,10 @@ Each result is the node's signed envelope as JSON text; the caller verifies it a
 node's registry record like any APS reply. Reading tools are open; the actions take a signed
 call (below) and run only through the action gate (`aps/gate.py`):
 
+- `get_availability {date, guests}`: `date` must be `YYYY-MM-DD`, from today (Swiss time) up
+  to 365 days ahead, `guests` a whole number 1-10; otherwise the signed answer is
+  `{tool: "get_availability", status: "refused", reason}` without rooms. `book` refuses such a
+  `date` the same way.
 - `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
   signed commitments, or its own signed agreement) and asks the gate with
   `Needs("book", scope="book", approval=True, amount_chf=total)`. With an agreement the
@@ -412,6 +420,11 @@ When the marketplace accepts a request it wakes every matching, non-broken busin
 ```
 
 The business can verify the requester itself from `request` (seals, signature, delegation).
+A node checks before its agent thinks: the event must be a valid `PostingCreated` and
+`offer_url` exactly `<MARKETPLACE_URL>/postings/<request_id>/offers` (default
+`http://localhost:4010`, any loopback name counts) or the answer is 422; `request` must be
+signed by `requester_id`, a registered user agent with gold or blue seals, at most 5 minutes
+old and for this `request_id`, or the answer is 403.
 Its answer, e.g. `{"interested": true, "next_tool": "make_offer"}` (plain or as the payload
 of a signed envelope), is recorded but advisory; only a signed offer counts.
 
