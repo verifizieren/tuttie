@@ -22,6 +22,7 @@ from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
 from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
+from assistant.marketplace import MarketDesk
 from assistant.events import EventBus
 
 AUTHORITIES_PATH = Path(__file__).resolve().parent.parent / "data" / "authorities.json"
@@ -40,6 +41,23 @@ def function(name: str, description: str, properties: dict, required: list[str] 
 
 
 SCHEMAS = [
+    function(
+        "post_request",
+        "Post the user's request on the marketplace: matching verified businesses are woken and "
+        "send signed offers; returns the shortlist (verified, within budget, cheapest first). "
+        "Use this first when the user looks for a hotel.",
+        {
+            "date": {"type": "string", "description": "YYYY-MM-DD"},
+            "guests": {"type": "integer"},
+            "requirements": {"type": "array", "items": {"type": "string"},
+                             "description": "public needs, e.g. [\"quiet\", \"dog\", \"arrival around 01:00\"]"},
+            "tags": {"type": "array", "items": {"type": "string", "enum": ["basel-sbb", "kleinbasel"]},
+                     "description": "only the place; everything else (quiet, dog, ...) goes into requirements"},
+            "budget_chf": {"type": "number",
+                           "description": "the user's price limit. PRIVATE: it is never posted, only used for the shortlist"},
+        },
+        ["date"],
+    ),
     function(
         "search_registry",
         "Find nodes on the agent web by tags (all must match) and/or a capability. "
@@ -152,12 +170,14 @@ def summarize(tool: str, payload: dict) -> str:
 class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
-    def __init__(self, http: httpx.AsyncClient, registry_url: str, bus: EventBus, approvals: ApprovalBook):
+    def __init__(self, http: httpx.AsyncClient, registry_url: str, bus: EventBus, approvals: ApprovalBook,
+                 market: MarketDesk | None = None):
         self.http = http
         self.registry_url = registry_url.rstrip("/")
         self.bus = bus
         self.approvals = approvals
         self.authorities = load_authorities()
+        self.market = market or MarketDesk(http, registry_url, bus, self.authorities)
         self.user_public_key = load_public_key("user")  # checks that Tuttie really acts for this user
         self.reset()
 
@@ -170,8 +190,8 @@ class Toolbox:
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
-        tools = {"search_registry": self.search_registry, "call_tool": self.call_tool,
-                 "ask_agent": self.ask_agent, "book": self.book}
+        tools = {"post_request": self.market.find, "search_registry": self.search_registry,
+                 "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
