@@ -30,12 +30,25 @@ python3 -m venv .venv            # or: uv venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env             # add your OPENAI_API_KEY
 ./run.sh                         # registry :4000, nodes :4001-4005, assistant + UI :4040
-.venv/bin/pytest -q              # tests for the APS library and trust gate (no network, no LLM)
+.venv/bin/pytest -q              # tests for APS, the trust gate and booking (no network, no LLM)
 ```
 
-Open <http://localhost:4040>, send the prefilled request, and watch the timeline on the
-right: the scam hotel is rejected in red, and every fact the assistant uses comes from a
-signed, verified response.
+Open <http://localhost:4040> and send the prefilled request. The timeline on the right
+shows what happens:
+
+1. The scam hotel is rejected in red; Hotel Rheinblick verifies as gold.
+2. Signed availability and policies are fetched (A2T).
+3. The assistant asks the hotel's own agent about the 1am arrival with a dog (A2A) and gets
+   a signed, priced commitment.
+4. An approval appears. Press **Phone** and scan the QR code, or open `/phone.html`, then
+   tap Approve. The decision is signed with the user's key.
+5. The hotel checks the signature, recomputes the total from its own signed commitment and
+   confirms the booking. Each claim in the answer carries a seal badge citing its source.
+
+Without a browser: `.venv/bin/python scripts/demo_headless.py [approved|declined]` runs the
+same flow in one process with a simulated phone.
+
+To keep it running on a server, use the systemd user service in `deploy/two-webs.service`.
 
 Or query the agent web directly:
 
