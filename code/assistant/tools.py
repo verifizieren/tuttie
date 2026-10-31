@@ -10,8 +10,8 @@ A business's tools are called over MCP (assistant/mcp_client.py). Reading tools 
 `book` goes out as a call signed with Tuttie's key and carrying the user's delegation
 (aps/call.py), so the hotel knows who asks and that the call is not replayed.
 
-Results carry "source_step", the timeline step that proves them, so the final
-answer can cite its sources.
+Results carry "source_step", the timeline step that proves them, so every fact Tuttie uses
+can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 """
 
 import json
