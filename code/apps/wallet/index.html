@@ -206,8 +206,7 @@
 
   function paint() {
     drag.frame = null;
-    const scale = app.classList.contains("open") ? 1 - Math.min(Math.max(drag.offset, 0), 400) / 4000 : 1;
-    agent.style.transform = `translateY(${drag.offset}px) scale(${scale})`;
+    agent.style.transform = `translateY(${drag.offset}px)`;  // the card keeps its shape, it only moves
   }
 
   agent.addEventListener("pointerdown", e => {
