@@ -26,7 +26,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from apidocs import api_docs  # noqa: E402
 from assistant.conversations import Conversation, Conversations  # noqa: E402
 from assistant.inputs import UserText  # noqa: E402
-from assistant.voice import router as voice_router  # noqa: E402
+from assistant.voice import RoomThrottle, router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
@@ -44,6 +44,7 @@ async def lifespan(app: FastAPI):
     """Keep the conversations and one shared HTTP client for the service's lifetime."""
     async with httpx.AsyncClient(timeout=20) as http:
         app.state.conversations = Conversations(http, REGISTRY_URL)
+        app.state.voice_throttle = RoomThrottle()  # new voice rooms per conversation and client
         app.state.voice_rooms = {}  # LiveKit room -> (session id, conversation id)
         yield
 

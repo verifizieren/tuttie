@@ -78,8 +78,9 @@ def test_voice_rooms_are_bounded(monkeypatch):
     monkeypatch.setattr(voice, "API_KEY", "key")
     monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests")
     monkeypatch.setattr(voice, "MAX_VOICE_ROOMS", 3)
-    with TestClient(app) as client:
-        rooms = [client.post("/voice/token").json()["room"] for _ in range(5)]
+    with TestClient(app):  # runs the service (lifespan) once
+        # One browser each: a single conversation would get its newest room again.
+        rooms = [TestClient(app).post("/voice/token").json()["room"] for _ in range(5)]
         assert list(app.state.voice_rooms) == rooms[-3:]
 
 

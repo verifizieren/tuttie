@@ -142,3 +142,31 @@ def test_short_card_commands_are_not_discarded_as_noise():
 def test_reject_skip_and_similar_short_choices_survive_speech_filter():
     for command in ("Reject", "Skip", "Dislike", "Ablehnen", "Behalten", "No thanks"):
         assert meaningful(command)
+
+
+def test_a_token_loop_gets_429_after_its_share_of_rooms(monkeypatch):
+    """Each new room starts a voice agent job: one conversation gets a few a minute, then 429."""
+    configure(monkeypatch)
+    monkeypatch.setattr(voice, "ROOMS_PER_CONVERSATION_PER_MIN", 3)
+    with TestClient(app) as client:
+        responses = [client.post("/voice/token") for _ in range(5)]
+        assert [r.status_code for r in responses] == [200] * 3 + [429] * 2
+        assert len({r.json()["room"] for r in responses[:3]}) == 3  # never a room twice
+        assert responses[-1].headers["retry-after"] == "60"
+
+
+def test_one_client_address_cannot_open_rooms_without_end(monkeypatch):
+    configure(monkeypatch)
+    monkeypatch.setattr(voice, "ROOMS_PER_CLIENT_PER_MIN", 4)
+    with TestClient(app):  # the service starts with a fresh counter
+        # Cookie-less: every call is a new browser and conversation, from the same address.
+        statuses = [TestClient(app).post("/voice/token").status_code for _ in range(6)]
+    assert statuses == [200] * 4 + [429] * 2
+
+
+def test_the_room_counter_forgets_after_a_minute():
+    counter, owner = voice.RoomThrottle(), ("s", "c")
+    for _ in range(voice.ROOMS_PER_CONVERSATION_PER_MIN):
+        assert counter.allow(owner, "1.2.3.4", now=0)
+    assert not counter.allow(owner, "1.2.3.4", now=1)
+    assert counter.allow(owner, "1.2.3.4", now=61)
