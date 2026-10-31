@@ -1,8 +1,10 @@
 # Voice agent (issues #2, #3)
 
-Talk to Tuttie in the wallet: while Tuttie's card is open (and the user is not typing), the
-wallet joins a LiveKit room for its conversation, sends the microphone and plays Tuttie's
-voice. Tuttie's eyes pulse with its voice and open up while the user talks.
+Talk to Tuttie in the wallet. While the wallet is on screen it is already in a LiveKit room for
+its conversation, with the microphone off, and the voice agent is there too; opening Tuttie's
+card (not typing) only switches the microphone on and Tuttie's voice up, so voice starts at
+once. The wallet tells the agent with a participant attribute (`voice: on|off`); Tuttie speaks
+only while it is on. Tuttie's eyes pulse with its voice and open up while the user talks.
 
 ```
 wallet (hooks/useVoice.js) ──wss /rtc──► assistant (assistant/voice.py, proxy) ──► LiveKit server (:7880)
@@ -24,9 +26,13 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   isolation clean the microphone; a stricter voice detector (threshold .65, at least 0.2 s);
   fragments under two words or noise tags are dropped; only two or more words (0.5 s) interrupt
   Tuttie, and it resumes after a false interruption. The dock's mic button mutes the microphone.
-- Fast: ElevenLabs Flash v2.5 (first words in about 0.3 s), end of turn after 0.3-2 s, hotel
-  agents on a fast model (`AGENT_LLM_MODEL`, default gpt-4.1-mini). A spoken request to Tuttie's
-  answer took about 14 s end to end (context, market, bargaining, answer).
+- Fast: Tuttie and the hotel agents on Claude Haiku 5.5 without thinking (`LLM_MODEL`,
+  `AGENT_LLM_MODEL`; ~1 s per round, against ~2-3 s for a thinking model); ElevenLabs Flash v2.5
+  (first audio in ~0.15 s; Turbo v2.5 is no faster) and Scribe v2 realtime; end of turn after
+  0.3-2 s; the voice model loaded once per worker, two workers kept ready; the wallet joins the
+  room ahead. From starting to speak a hotel request to hearing the answer: about 8 s (context,
+  market, bargaining, answer), was 14 s.
+- Amounts are said in francs ("CHF 128" is spoken as "128 francs").
 - Voice: the demo server uses "Germain" (`TUTTIE_VOICE_ID=XJeDCVLci9KGsGtVpFLM`,
   a library voice, needs a paid plan); without it the free "Eric".
 - The wallet shows each spoken answer word by word in step with the voice (LiveKit
