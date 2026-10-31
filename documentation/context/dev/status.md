@@ -384,6 +384,12 @@ Why things are the way they are, so nobody has to rediscover them:
   publish + subscribe connections): iPhones joined the room but never sent an ICE check with the
   single connection. Chromium verified end to end (fresh browser, spoken request -> answer);
   Firefox can't be tested headless (no audio device).
+- **Goodbye closes the card:** Tuttie's tool `end_conversation` emits a `close` event; the wallet
+  closes the card once the goodbye has arrived and been spoken (`closing` in lib/activity.js; a
+  loaded or resumed chat never closes itself; a new message cancels it). No voice filler for it.
+- **Chat layout:** actions stay in the chat (steps, chosen hotel, booking card, payments); of
+  Tuttie's answers only the current one is shown (the history shows all). While the swipe cards
+  are up they fill the conversation's space alone (`.activity.swiping`), no old answer behind.
 - **iPhone voice:** Safari sets up WebRTC connections only while the page uses the microphone.
   Joining the room ahead with the mic off left iPhones stuck in ICE "checking" (no checks, no
   relay allocation; wallet report `closed while checking`). The first tap now captures the mic,
