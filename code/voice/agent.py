@@ -1,7 +1,7 @@
 """Tuttie's voice: a LiveKit agent that listens and speaks for the user's Tuttie.
 
-It is ears and mouth only, and it keeps quiet: no greeting, a short confirmation as soon as
-the user has asked something, then Tuttie's answer. What the user says (ElevenLabs
+It is ears and mouth only, and it keeps quiet: no greeting, a short filler that matches the
+request only when Tuttie needs a moment (no answer after FILLER_DELAY_S), then Tuttie's answer. What the user says (ElevenLabs
 speech-to-text, Silero voice activity) goes into the same conversation the wallet types into
 (POST /voice/say on the assistant), so every tool call runs exactly as when typing: context,
 signed MCP calls, bargaining, booking. It follows that conversation's timeline (GET
@@ -33,7 +33,7 @@ ASSISTANT_URL = os.environ.get("ASSISTANT_URL", f"http://127.0.0.1:{os.environ.g
 # ElevenLabs voice: TUTTIE_VOICE_ID in code/.env (library voices such as "Germain", XJeDCVLci9KGsGtVpFLM,
 # need a paid ElevenLabs plan). The default "Eric" is one of the free conversational voices.
 VOICE_ID = os.environ.get("TUTTIE_VOICE_ID", "cjVigY5qzO86Huf0OWal")
-TTS_MODEL = "eleven_turbo_v2_5"  # more natural than Flash, still quick
+TTS_MODEL = "eleven_flash_v2_5"  # the fastest ElevenLabs model: the first words come in a fraction of a second
 LANGUAGE = "en"  # Tuttie only speaks English; without this, an accent was heard as German
 MIN_WORDS = 2    # shorter fragments are noise, not a request
 VAD_THRESHOLD = .65  # Silero's default is .5; background voices stay below this more often
@@ -43,8 +43,18 @@ INTERRUPTION = {"mode": "vad", "min_words": 2, "min_duration": .5, "resume_false
 STT_MODEL = "scribe_v2_realtime"
 KEYTERMS = ["Tuttie", "Basel", "Gästehaus am Rhein", "Rheinblick", "Alpina", "Luna", "Kleinbasel"]  # heard right
 
-# A quick confirmation as soon as the user has asked something, varied so it never drones.
-CONFIRMATIONS = ["On it.", "Sure.", "Got it.", "One moment.", "Okay."]
+# A filler that matches what the user asked, only when Tuttie needs a moment; varied so it never drones.
+FILLER_DELAY_S = 1.5
+FILLERS = {
+    "task": ["Let me take a look.", "Sure, let me check.", "On it, one second."],
+    "question": ["Hmm, let me think.", "Good question, one moment."],
+    "other": ["Sure, one moment.", "Okay, give me a second."],
+}
+TASK_WORDS = ("book", "find", "search", "hotel", "room", "reserve", "need", "want", "get me", "pay", "look for")
+QUESTION_WORDS = ("what", "how", "why", "when", "where", "who", "which", "can", "could", "is", "are", "do", "does",
+                  "will", "would", "should")
+# Quick end of turn: answer soon after the user stops (at most 2 s when the model is unsure).
+ENDPOINTING = {"min_delay": .3, "max_delay": 2.0}
 # The only update in between: the user has to act. The answers themselves come from Tuttie.
 UPDATES = {"approval": "Please confirm with Face ID."}
 
@@ -61,6 +71,15 @@ def meaningful(text: str) -> bool:
     """A real request, not a noise tag like "(laughs)" or a stray word from the room."""
     words = re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", text))
     return len(words) >= MIN_WORDS
+
+
+def filler_kind(text: str) -> str:
+    """What kind of request it is, for a filler that fits: a task, a question or anything else."""
+    lowered = text.lower().strip()
+    if any(word in lowered for word in TASK_WORDS):
+        return "task"
+    first = lowered.split()[0] if lowered.split() else ""
+    return "question" if lowered.endswith("?") or first in QUESTION_WORDS else "other"
 
 
 def update_for(event: dict, said: set[str]) -> str | None:
@@ -81,17 +100,28 @@ class Tuttie(Agent):
         self.room = room
         self.http = http
         self.turns = 0
+        self.answers = 0      # Tuttie's answers so far (counted by follow())
+        self.fillers = set()  # pending filler tasks
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         text = (new_message.text_content or "").strip()
         if meaningful(text):  # noise and stray words are not requests
-            self.session.say(CONFIRMATIONS[self.turns % len(CONFIRMATIONS)])
             self.turns += 1
+            task = asyncio.create_task(self.fill_if_slow(text, self.answers))
+            self.fillers.add(task)
+            task.add_done_callback(self.fillers.discard)
             await self.http.post("/voice/say", json={"room": self.room, "text": text})
         raise StopResponse()  # Tuttie answers through the timeline, spoken by follow()
 
+    async def fill_if_slow(self, text: str, answers_before: int) -> None:
+        """Say a fitting filler only if Tuttie has not answered yet and is not speaking."""
+        await asyncio.sleep(FILLER_DELAY_S)
+        if self.answers == answers_before and self.session.agent_state != "speaking":
+            options = FILLERS[filler_kind(text)]
+            self.session.say(options[self.turns % len(options)])
 
-async def follow(session: AgentSession, http: httpx.AsyncClient, room: str) -> None:
+
+async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: str) -> None:
     """Speak every answer and the approval prompt from the conversation's timeline."""
     said: set[str] = set()
     async with http.stream("GET", "/voice/events", params={"room": room}, timeout=None) as stream:
@@ -103,6 +133,7 @@ async def follow(session: AgentSession, http: httpx.AsyncClient, room: str) -> N
             event = json.loads(line[5:])
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
+                agent.answers += 1
                 session.say(spoken(event["summary"]))
             elif prompt := update_for(event, said):
                 session.say(prompt)
@@ -125,10 +156,11 @@ async def entry(ctx: JobContext) -> None:
         stt=elevenlabs.STT(api_key=key, model=STT_MODEL, keyterms=KEYTERMS, language_code=LANGUAGE,
                            tag_audio_events=False),
         tts=elevenlabs.TTS(api_key=key, voice_id=VOICE_ID, model=TTS_MODEL, language=LANGUAGE),
-        turn_handling={"interruption": INTERRUPTION},
+        turn_handling={"interruption": INTERRUPTION, "endpointing": ENDPOINTING},
     )
-    await session.start(Tuttie(ctx.room.name, http), room=ctx.room)
-    follower = asyncio.create_task(follow(session, http, ctx.room.name))
+    agent = Tuttie(ctx.room.name, http)
+    await session.start(agent, room=ctx.room)
+    follower = asyncio.create_task(follow(session, agent, http, ctx.room.name))
 
     async def cleanup() -> None:
         follower.cancel()

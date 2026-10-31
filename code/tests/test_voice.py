@@ -11,7 +11,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import SESSION_COOKIE, app  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from voice.agent import UPDATES, meaningful, spoken, update_for  # noqa: E402
+from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for  # noqa: E402
 
 
 def configure(monkeypatch):
@@ -72,3 +72,9 @@ def test_it_keeps_quiet_except_when_the_user_must_approve():
 def test_noise_and_stray_words_are_not_requests():
     assert meaningful("I want to book something")
     assert not meaningful("Okay.") and not meaningful("(laughs)") and not meaningful("[music] hm")
+
+
+def test_fillers_match_the_request():
+    assert filler_kind("I want to book something") == "task"
+    assert filler_kind("What's the weather like tomorrow?") == "question"
+    assert filler_kind("Tell me a joke") == "other"
