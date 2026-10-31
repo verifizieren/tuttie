@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resumeFailure, startsFresh, viewedChat } from './history.js';
+import { loadCurrent, loadHistory, resumeFailure, startsFresh, viewedChat } from './history.js';
 
 test('an expired chat (404 or 410) gets a clear expiry message', () => {
   for (const status of [404, 410]) {
@@ -35,4 +35,22 @@ test('reopening Tuttie starts fresh only after a finished chat', () => {
   assert.equal(startsFresh({ ...done, approval: { id: 'a1' } }), false);                             // waiting for the user
   assert.equal(startsFresh({ ...done, cards: [{ node_id: 'h' }] }), false);                          // cards to swipe
   assert.equal(startsFresh({ ...done, cards: [{ node_id: 'h' }], picked: ['h'] }), true);            // swiped and answered
+});
+
+test('stored chats of the wrong shape are ignored, never a crash', () => {
+  const store = {};
+  globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  try {
+    store['tuttie.history'] = JSON.stringify({ not: 'a list' });
+    assert.deepEqual(loadHistory(), []);
+    const ok = { id: 'c1', at: 1, title: 'hi', outcome: '', state: { turns: [{ said: 'hi' }] } };
+    store['tuttie.history'] = JSON.stringify([null, 3, { id: 'c2' }, { id: 'c3', state: { turns: [null] } }, ok]);
+    assert.deepEqual(loadHistory(), [ok]);
+    store['tuttie.current'] = JSON.stringify('text');
+    assert.equal(loadCurrent(), null);
+    store['tuttie.current'] = JSON.stringify({ id: 'c1', turns: [{ said: 'hi' }] });
+    assert.equal(loadCurrent().id, 'c1');
+  } finally {
+    delete globalThis.localStorage;
+  }
 });

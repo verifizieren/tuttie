@@ -23,8 +23,17 @@ function write(key, value) {
   } catch { /* storage unavailable: nothing to keep */ }
 }
 
+// Storage written by an older wallet, or edited by hand, may not have the shape the screen
+// expects: anything else is ignored rather than crashing the wallet.
+const isChat = state => Boolean(state) && typeof state === "object" && Array.isArray(state.turns)
+  && state.turns.every(t => t && typeof t === "object");
+const isEntry = entry => Boolean(entry) && typeof entry === "object" && typeof entry.id === "string" && isChat(entry.state);
+
 /** All archived conversations, newest first. */
-export const loadHistory = () => read(KEY, []);
+export function loadHistory() {
+  const list = read(KEY, []);
+  return Array.isArray(list) ? list.filter(isEntry) : [];
+}
 
 /** A short line for the list: the booking, or the start of Tuttie's last answer. */
 function outcome(state) {
@@ -49,7 +58,10 @@ export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.
                                                     deck: state.deck });
 
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
-export const loadCurrent = () => read(CURRENT, null);
+export function loadCurrent() {
+  const current = read(CURRENT, null);
+  return isChat(current) ? current : null;
+}
 
 /** Whether opening Tuttie again after it was swiped down starts a new chat: only once the
  *  current one is over. A chat still running, waiting for an approval or with hotel cards not
