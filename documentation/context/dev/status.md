@@ -75,9 +75,10 @@ Build order from [goals.md](goals.md):
        city tax; if the user allows it (switch on the wallet's approval sheet), the user's
        key signs it and Tuttie pays the tax right after the booking (`may_auto_pay`), no
        second prompt. Otherwise the charge stays open and `pay` asks on the phone.
-     - The wallet shows the booking card with the hotel's checks ("Tuttie is a sealed
-       agent", "Signed by Tuttie", "You let Tuttie book", "The hotel's signed deal",
-       "Approved by you") and the paid city tax.
+     - The wallet's booking card lists what Tuttie checked about the hotel ("Checked by
+       Tuttie": its verified seals, the hotel signed the agreed price / extras, the hotel
+       signed the booking, approved by you) and the paid city tax. The gate's own `checked`
+       (caller, signature, delegation, ...) stays in the signed confirmation.
    - Tests: `test_node_book.py`, `test_node_pay.py`, `test_tools.py`,
      `test_tuttie_market.py`; in-process MCP helpers in `tests/mcp_helpers.py`. Headless
      story: 135 → 128 agreed → approved → booked through the gate → city tax CHF 4 paid
