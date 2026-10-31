@@ -28,6 +28,12 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   Checked in headless Chromium (iPhone 14 Pro) on a test instance: type → deck → swipe →
   approve/decline → booking → follow-up → new chat → history → continue, reloads at the deck
   and at the sheet, close/reopen while working and at the deck, a failing and a slow decision.
+- Backend hardening (2026-10-31): a failed turn (LLM refused, over its usage limit, timed out, or a
+  tool crashed) ends with a friendly answer and the chat stays usable (open tool calls get a
+  result); empty messages are answered without the LLM; LLM calls time out after 40 s
+  (`LLM_TIMEOUT_S`, one retry); hotel agents also fall back on Anthropic errors; a hotel never
+  offers a room whose note rules out a need (Anna's single for a dog guest), and an unknown room
+  choice gets the cheapest real room. Tests: `test_agent_errors.py`, `test_node_agent.py`, `test_llm.py`.
 
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
