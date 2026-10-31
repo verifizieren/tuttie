@@ -132,3 +132,16 @@ def test_demo_registry_verdicts():
     }
     assert "licensed_legal_ch" in evaluate_record(records["ch.legal.consumer-law"], auths)["capabilities"]
     assert "licensed_legal_ch" not in evaluate_record(records["ch.legal.advisor"], auths)["capabilities"]
+
+
+def test_approval_decision_verifies_and_detects_tampering():
+    from aps.approval import sign_decision, verify_decision
+
+    user_key = SigningKey.generate()
+    approval = {"id": "ap-1", "action": "book", "payee_node_id": "ch.test.node", "amount_chf": 195}
+    decision = sign_decision(approval, "approved", user_key)
+    assert verify_decision(decision, public_key_b64(user_key))
+    assert not verify_decision({**decision, "amount_chf": 1}, public_key_b64(user_key))
+    assert not verify_decision(decision, public_key_b64(SigningKey.generate()))
+    with pytest.raises(ValueError):
+        sign_decision(approval, "maybe", user_key)
