@@ -152,6 +152,22 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .seal-row.forged .seal-mark { filter: grayscale(1); opacity: .5; }
 .seal-row.forged b { color: var(--red, #ff453a); }
 
+/* The confirmed booking and the checks behind it. */
+.booking { padding: 14px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--green);
+           animation: rise .45s var(--ease) both; }
+.booking-top { display: flex; align-items: center; gap: 10px; }
+.booking-hotel { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.booking-hotel small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.booking-total { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.booking-id { font-size: 13px; color: var(--muted); margin: 8px 0 12px 48px; }
+.booking-id b { font-family: var(--mono); font-weight: 500; color: var(--text); }
+.check-ok { flex: none; width: 22px; height: 22px; }
+.check-ok circle { fill: var(--green); }
+.check-ok path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.checks .seal-row { padding: 7px 12px; }
+.checks .seal-row + .seal-row::before { left: 45px; }
+.check-ok { width: 20px; height: 20px; }
+
 /* Businesses Tuttie never asked. */
 .hotel.skipped { cursor: default; }
 .hotel.skipped .hotel-line { cursor: default; }

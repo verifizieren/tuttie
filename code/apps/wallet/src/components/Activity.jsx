@@ -2,6 +2,7 @@
 // answered with which offer, the shortlist, the negotiation and Tuttie's answer. Tapping a
 // hotel shows who vouches for it (its seals) and what its offer includes.
 import { useEffect, useRef, useState } from "react";
+import BookingCard from "./BookingCard.jsx";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 function RequestCard({ request }) {
@@ -90,10 +91,10 @@ function order(hotels) {
 export default function Activity({ state }) {
   const box = useRef(null);
   const [openId, setOpenId] = useState(null);
-  // Tuttie's answer comes last; bring it into view when it arrives.
+  // The booking and Tuttie's answer come last; bring them into view when they arrive.
   useEffect(() => {
-    if (state.answer) box.current?.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" });
-  }, [state.answer]);
+    if (state.answer || state.booking) box.current?.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" });
+  }, [state.answer, state.booking]);
 
   if (!state.request && !state.answer) return null;
   return (
@@ -104,6 +105,7 @@ export default function Activity({ state }) {
                   open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
       ))}
       {state.skipped.map((business, i) => <SkippedRow key={i} business={business} />)}
+      {state.booking && <BookingCard booking={state.booking} />}
       {state.answer && <Answer text={state.answer} />}
     </div>
   );
