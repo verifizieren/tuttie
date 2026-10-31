@@ -85,9 +85,19 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
   return { ...state, turns, phase: "thinking", closing: null };
 }
 
-/** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
-export const cleanAnswer = text => String(text ?? "").split("\n").filter(line => !/^\s*Ignored:/i.test(line)).join("\n")
-  .replace(/\s*\[[^\]\n]{0,60}\]/g, "").trim();
+// Notes the model put in square brackets (as voice/agent.py spoken() does for the voice): a
+// citation ([3]), a one-word label ([confirmed]) or an id ([receipt RC-A14786]) is dropped; any
+// other note may be a fact (a fee, a condition), so only its brackets go. Links keep their text.
+const NOTE = /[ \t]?\[([^\]\n]{0,60})\]/g;
+const EMPTY_NOTE = /^(?:\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*)$/;
+export const withoutNotes = text => String(text ?? "").replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1").replace(NOTE, (all, inner) => {
+  const note = inner.trim();
+  return !note || EMPTY_NOTE.test(note) ? "" : (/^[ \t]/.test(all) ? " " : "") + note;
+});
+
+/** Tuttie's answer without bracketed notes (see above) or lines about ignored businesses. */
+export const cleanAnswer = text => withoutNotes(text).split("\n")
+  .filter(line => !/^\s*Ignored:/i.test(line)).join("\n").trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });

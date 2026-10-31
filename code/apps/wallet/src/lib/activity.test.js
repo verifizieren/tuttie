@@ -101,7 +101,22 @@ test('an approval that ends without a decision is not called a decline', () => {
   assert.equal(declined.turns[0].tool.text, 'You declined');
 });
 
-test('notes the model put in square brackets are not shown', () => {
-  assert.equal(cleanAnswer('Booked, total CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3].'),
+test('citation and id notes in square brackets are not shown', () => {
+  assert.equal(cleanAnswer('Booked, total CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3, 4].'),
                'Booked, total CHF 128. Tax paid. Fine.');
+});
+
+test('facts in square brackets stay, without the brackets', () => {
+  assert.equal(cleanAnswer('Total CHF 128 [+ CHF 40 cleaning fee]. Booked [non-refundable].'),
+               'Total CHF 128 + CHF 40 cleaning fee. Booked non-refundable.');
+});
+
+test('an "Ignored:" line is dropped even behind a bracket note', () => {
+  assert.equal(cleanAnswer('Booked.\n[a] Ignored: Scam hotel says hi'), 'Booked.');
+});
+
+test('long runs of spaces are fast', () => {
+  const start = performance.now();
+  cleanAnswer(' '.repeat(50000) + 'x');
+  assert.ok(performance.now() - start < 200);
 });

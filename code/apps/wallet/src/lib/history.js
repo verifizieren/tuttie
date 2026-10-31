@@ -3,6 +3,7 @@
 // or when another conversation is resumed from the history. The server retains the assistant
 // in memory; the snapshot supplies the display and user messages when resuming it.
 // Storage can be missing or full (private mode): then history simply stays empty.
+import { withoutNotes } from "./activity.js";
 
 export const HISTORY_KEY = "tuttie.history";
 export const CURRENT_KEY = "tuttie.current";  // the open conversation's own parts the server does not keep
@@ -39,7 +40,7 @@ export function loadHistory() {
 function outcome(state) {
   if (state.booking) return `Booked ${state.booking.hotel} · CHF ${state.booking.total}`;
   const last = [...state.turns].reverse().find(t => t.answer)?.answer || "";
-  return last.replace(/\*\*/g, "").replace(/\s*\[[^\]\n]{0,60}\]/g, "").split(/(?<=[.!?])\s/)[0].slice(0, 90);
+  return withoutNotes(last.replace(/\*\*/g, "")).split(/(?<=[.!?])\s/)[0].slice(0, 90);
 }
 
 /** Archive a conversation (replacing an earlier copy of the same one); returns the new list. */
