@@ -237,5 +237,10 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Service:** `systemctl --user restart tuttie` deploys Python changes (`run.sh` also
   rebuilds the wallet); logs: `journalctl --user -u tuttie -f`. Do not start `./run.sh` by
   hand on the server, the ports would clash.
-- **Testing on the shared instance:** it has one shared conversation, and `POST /reset`
-  clears everyone's screen; test with `scripts/demo_headless.py` instead.
+- **One conversation per browser:** the assistant gives every browser a `tuttie_session`
+  cookie (`assistant/app.py`) and keeps a `Conversation` per session
+  (`assistant/conversations.py`: own assistant, timeline, approvals, chats; at most 200, the
+  least recently used is dropped; in memory, so a restart starts everyone fresh). `/chat`,
+  `/events`, `/reset` and `/approvals` only touch the caller's conversation; hotels, marketplace
+  and registry stay shared. Each person's run uses the real LLM (cost). For automated tests
+  prefer `scripts/demo_headless.py`.
