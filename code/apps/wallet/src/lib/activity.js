@@ -45,10 +45,33 @@ export function turnOf(state, turnId) {
 /** A conversation that has ended: answered, nothing waiting for the user or still running. */
 export const finished = state => Boolean(state.answer) && !state.approval && state.turns.every(t => t.answer);
 
-/** The user said something: a new turn (and a new conversation if there is none). */
+/** The user said something: a new turn (and a new conversation if there is none). A turn
+ *  typed here remembers the phase before it, in case sending it fails (`dropTurn`). */
 export function startTurn(state, said, id = null, source = "text") {
-  const turn = id ? { id, said, source } : { said };
+  const turn = id ? { id, said, source } : { said, before: state.phase };
   return { ...state, id: state.id || newId(), turns: [...state.turns, turn], phase: "thinking", closing: null };
+}
+
+/** The newest message typed here that has no server turn yet and no answer, with these words. */
+const unsent = (state, said) => state.turns.findLastIndex(t => !t.id && !t.answer && t.said === said);
+
+/** POST /chat accepted a message as turn `id`: bind it now, so its events land in it even if the
+ *  "turn" event is late or was missed. Never twice. */
+export function bindTurn(state, said, id) {
+  if (!id || state.turns.some(t => t.id === id)) return state;
+  const i = unsent(state, said);
+  if (i === -1) return state;
+  return { ...state, turns: state.turns.map((t, n) => (n === i ? { ...t, id } : t)) };
+}
+
+/** Sending a message failed: the server never got it, so it is not a turn. Without this it would
+ *  stay open forever and catch the events of later requests (see `activeTurn`). */
+export function dropTurn(state, said) {
+  const i = unsent(state, said);
+  if (i === -1) return state;
+  const turns = state.turns.filter((_, n) => n !== i);
+  const open = turns.some(t => !t.answer);
+  return { ...state, turns, phase: open ? state.phase : state.turns[i].before || (state.answer ? "done" : "idle") };
 }
 
 /** The server opened a turn ("turn" event): bind it to the message just sent from this wallet

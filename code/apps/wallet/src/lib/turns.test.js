@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, EMPTY, startTurn } from './activity.js';
+import { applyEvent, bindTurn, dropTurn, EMPTY, startTurn } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const opened = (step, turn, said, source = 'text') =>
@@ -59,4 +59,27 @@ test('a charge paid after the booking shows on the booking in its turn', () => {
   const state = [opened(1, 't1', 'Book it'), booked(2, 't1', 'BK-1'), paid].reduce(applyEvent, EMPTY);
   assert.equal(state.turns[0].booking.payments[0].amount, 4);
   assert.equal(state.booking.payments.length, 1);
+});
+
+test('a message that failed to send is dropped, so the next request gets its answer and Tuttie settles', () => {
+  let state = { ...EMPTY, phase: 'done', answer: 'Hello!' };
+  state = startTurn(state, 'Find a hotel');
+  state = dropTurn(state, 'Find a hotel');
+  assert.equal(state.turns.length, 0);
+  assert.equal(state.phase, 'done');
+  state = startTurn(state, 'Find a hotel');
+  state = bindTurn(state, 'Find a hotel', 't1');
+  state = [opened(1, 't1', 'Find a hotel'), answer(2, 't1', 'Found three')].reduce(applyEvent, state);
+  assert.deepEqual(state.turns.map(t => [t.id, t.answer]), [['t1', 'Found three']]);
+  assert.equal(state.phase, 'done');
+  assert.equal(state.answer, 'Found three');
+});
+
+test('the /chat turn id binds the message even when its "turn" event never arrives', () => {
+  let state = startTurn(startTurn(EMPTY, 'Hi'), 'Hi');
+  state = bindTurn(state, 'Hi', 't2');
+  assert.deepEqual(state.turns.map(t => t.id), [undefined, 't2']);  // the newest unsent copy
+  state = applyEvent(state, answer(5, 't2', 'Hello again'));
+  assert.equal(state.turns[1].answer, 'Hello again');
+  assert.equal(bindTurn(state, 'Hi', 't2'), state);  // never twice
 });
