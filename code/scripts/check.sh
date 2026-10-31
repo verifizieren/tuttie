@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The checks before every push, in one command (run from anywhere):
 #   1. all tests (no network, no LLM)
-#   2. the wallet still builds (needs Node.js; skipped with a warning without npm)
+#   2. the wallet's and owner view's own tests pass and both still build (needs Node.js;
+#      skipped with a warning without npm)
 #   3. the whole real flow still runs end to end: scripts/demo_headless.py approved
 #      (real LLM; skipped with a warning without an OpenAI key, or with --no-llm)
 # Stops at the first failure and says which step failed.
@@ -21,11 +22,15 @@ skipped=()
 step "1/3 tests"
 "$PYTHON" -m pytest -q || fail "tests"
 
-step "2/3 wallet build"
+step "2/3 apps: tests and build (wallet, owner)"
+stale() { [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; }
 if command -v npm >/dev/null; then
-  (cd apps/wallet && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run build --silent) || fail "wallet build"
+  for app in wallet owner; do
+    (cd "apps/$app" && { ! stale || npm ci --no-audit --no-fund; } && npm test --silent && npm run build --silent) \
+      || fail "$app tests or build"
+  done
 else
-  echo "npm not found: wallet build skipped"; skipped+=("wallet build")
+  echo "npm not found: app tests and builds skipped"; skipped+=("app builds")
 fi
 
 step "3/3 headless demo (real LLM)"

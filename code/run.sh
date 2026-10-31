@@ -6,9 +6,13 @@ cd "$(dirname "$0")"
 PYTHON="${PYTHON:-.venv/bin/python}"
 export PATH="$HOME/.local/node/bin:$PATH"  # user-level Node.js on the team server
 
+# Install an app's packages when they are missing or package-lock.json changed since (e.g. a
+# teammate added one): otherwise the build fails on the new import.
+stale() { [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; }
+
 if command -v npm >/dev/null; then
   for app in wallet owner; do
-    (cd "apps/$app" && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npm run build --silent)
+    (cd "apps/$app" && { ! stale || npm ci --no-audit --no-fund; } && npm run build --silent)
   done
 else
   echo "warning: npm not found, serving the last app builds (apps/*/dist) if there are any" >&2
