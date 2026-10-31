@@ -118,10 +118,14 @@ def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
     assert (offer["room_type"], offer["date"], offer["rate"]) == ("double", "2026-11-14", "best rate, non-refundable")
 
 
-@pytest.mark.parametrize("choice", [{"room_type": "penthouse"}, {"room_type": "double", "add_ons": ["free-spa"]},
-                                    {"add_ons": []}])
-def test_no_offer_for_unknown_rooms_or_add_ons(choice):
+@pytest.mark.parametrize("choice", [{"room_type": "double", "add_ons": ["free-spa"]}, {"add_ons": []}])
+def test_no_offer_for_unknown_add_ons_or_an_invalid_choice(choice):
     assert asyncio.run(agent_with(HOTELS["medium"], choice).make_offer(POSTING)) is None
+
+
+def test_an_unknown_room_gets_the_cheapest_real_room_instead_of_no_offer():
+    offer = asyncio.run(agent_with(HOTELS["medium"], {"room_type": "penthouse"}).make_offer(POSTING))
+    assert offer["item"].startswith("double ")  # Rheinblick's cheapest room, priced from the config
 
 
 def test_a_new_posting_decides_and_chooses_the_offer_in_one_llm_call():
