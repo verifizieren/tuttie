@@ -259,6 +259,20 @@ Why things are the way they are, so nobody has to rediscover them:
   hotel for its seals as an iOS-style grouped list with a checkmark-seal badge; the approval
   sheet shows them too. Businesses never asked are listed: forged seal in red, no valid seal
   grey and struck through.
+- **Picking favourites** (wallet + `assistant/cards.py`): after `post_request` Tuttie shows up
+  to 5 hotels as cards (shortlist first, marked "Recommended" and preselected), with pros and
+  cons built in code from the signed offer and the hotel's signed policies. Tuttie waits; the
+  user swipes through, hearts favourites and taps "Negotiate with …"; the wallet sends the
+  favourites with their node ids, Tuttie calls `negotiate(node_ids=…)` and books the best
+  agreement. Hotel photos: drop `code/apps/wallet/public/hotels/<node_id>.jpg`; until then a
+  drawn scene is shown. `scripts/demo_headless.py` picks the recommended cards like the wallet.
+- **Conversations in the wallet:** a conversation is a list of turns (user bubble, what
+  happened on the market, Tuttie's highlighted answer). Swipe left on the open card (outside
+  the scrolling list) starts a new one; swipe right shows the history. History lives only on
+  the device (`localStorage`, `lib/history.js`); the server forgets an archived conversation
+  (`/reset`). Opening the wallet (or coming back after 5 min) with a finished conversation
+  starts fresh; a running one (approval waiting) resumes from `GET /history`. Touches inside
+  the conversation scroll it natively and never move or close the card.
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.

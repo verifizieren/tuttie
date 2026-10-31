@@ -145,6 +145,13 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 sends a named `reset` event when a new demo starts; the UI then clears itself.
 Events about a node also carry `uid`, the business's UID from its registry record (signed
 into every seal, so it is only shown inside a seal that verifies).
+Marketplace events have `detail.phase`: `posted`, `offer`, `shortlist`, then `cards`
+(`detail.cards`: up to 5 hotels for the user to pick favourites from, shortlist first, each
+`{node_id, name, trust_tier, size, about, agent, offer_id, item, price_chf, includes, pros,
+cons, shortlisted}`; pros and cons are built in code from the signed offer and the hotel's
+signed policies, `assistant/cards.py`), and `agreement`. Tuttie's `negotiate` tool takes the
+favourites as `node_ids`. `GET /history` returns this browser's timeline so far (the same
+events the stream replays). Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
 `assistant/agent.py`, e.g. `excited`, `sorry`); the wallet shows it on Tuttie's face.
 
