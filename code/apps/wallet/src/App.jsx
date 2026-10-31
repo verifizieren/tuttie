@@ -37,6 +37,7 @@ import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
+import { voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -68,7 +69,7 @@ export default function App() {
   // What Tuttie is doing, and the eyes following it (lib/presence.js, lib/faceDirector.js).
   const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
   useFaceDirector(presence, face);
-  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
+  const { state: voice, unlockAudio, muted, toggleMute, retry: retryVoice } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
                                                                     presence.levels, agent.id);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
@@ -127,6 +128,7 @@ export default function App() {
   function tapWhileOpen() {
     unlockAudio();
     setQuiet(false);  // tapping Tuttie's face brings its voice back after typing
+    retryVoice();  // voice could not connect: the tap tries again
     if (mode !== "voice") return startVoice();
     presence.cue("tap");  // a tap never ends voice mode, Tuttie just reacts
   }
@@ -208,7 +210,8 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))}
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
+                                                     || (mode === "voice" && !quiet ? voiceNote(voice) : "")}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
           <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} onDeck={actions.deck} reveal={reveal} />
