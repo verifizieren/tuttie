@@ -61,6 +61,8 @@ class MarketDesk:
         self.offer_wait_s = offer_wait_s
         self.last_request: dict | None = None    # the last posted request (public part)
         self.last_shortlist: list[dict] = []     # its shortlisted offers, with their signed envelopes
+        self.last_offers: list[dict] = []        # every checked offer for it (the user may pick any)
+        self.last_budget: float | None = None    # the private budget it was shortlisted with
 
     async def find(self, date: str, requirements: list[str] | None = None, tags: list[str] | None = None,
                    category: str = "hotel", guests: int = 1, budget_chf: float | None = None) -> dict:
@@ -92,6 +94,7 @@ class MarketDesk:
         offers = await self.collect(request.request_id, len(offering), posting["invited"])
         best = shortlist(offers, budget_chf, datetime.now(timezone.utc))
         self.last_request, self.last_shortlist = request.model_dump(mode="json"), best
+        self.last_offers, self.last_budget = offers, budget_chf
         self.bus.emit("marketplace", "verified",
                       f"Shortlist: {len(best)} of {len(offers)} offers fit"
                       + (f" (budget CHF {budget_chf:g}, kept private)" if budget_chf else ""),

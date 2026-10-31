@@ -44,7 +44,7 @@ def stub_llm(monkeypatch):
 
 
 def run_find(negotiate_budget: float | None = None, book_agreement: bool = False,
-             **kwargs) -> tuple[dict, EventBus, Market]:
+             favourites: list[str] | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -66,11 +66,11 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
             bus = EventBus()
             desk = MarketDesk(http, "http://localhost:4000", bus, load_authorities(),
                               market_url="http://localhost:4010", offer_wait_s=3)
-            result = await desk.find(**kwargs)
+            link = in_process_link({f"http://localhost:{port}": app for port, app in apps.items()})
+            toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk, mcp=link)
+            result = await toolbox.post_request(**kwargs)  # the LLM tool: find, then the cards
             if negotiate_budget is not None:
-                link = in_process_link({f"http://localhost:{port}": app for port, app in apps.items()})
-                toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk, mcp=link)
-                result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget)
+                result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget, node_ids=favourites)
                 if book_agreement:  # the user approves on the phone while book waits
                     async def phone():
                         while not toolbox.approvals.pending:
@@ -99,7 +99,7 @@ def test_tuttie_posts_collects_offers_and_shortlists_within_its_private_budget()
     assert result["shortlist"][0]["price_chf"] == 180 and result["shortlist"][0]["size"] == "medium"
     assert "ch.basel.cheap-hotels" in result["skipped"] and "ch.basel.budget-rooms" in result["skipped"]
     phases = [e["detail"].get("phase") for e in bus.history if e["kind"] == "marketplace"]
-    assert phases[0] == "posted" and phases.count("offer") == 2 and phases[-1] == "shortlist"
+    assert phases[0] == "posted" and phases.count("offer") == 2 and phases[-2:] == ["shortlist", "cards"]
 
 
 def test_without_a_budget_every_verified_offer_is_shortlisted_cheapest_first():
@@ -150,3 +150,21 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     agreed = result["negotiation"]["best"]["price_chf"]
     assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
+
+
+def test_the_cards_show_every_offer_with_signed_pros_and_cons_shortlist_first():
+    result, bus, _ = run_find(date="2026-11-14", tags=["basel-sbb"], requirements=["quiet", "dog"], budget_chf=200)
+    cards = [e for e in bus.history if e["detail"].get("phase") == "cards"][-1]["detail"]["cards"]
+    assert [(c["name"], c["shortlisted"]) for c in cards] == [("Hotel Rheinblick", True), ("Alpina Grand Basel", False)]
+    rheinblick, alpina = cards
+    assert "Within your budget" in rheinblick["pros"] and "Dogs welcome, CHF 15 a night" in rheinblick["pros"]
+    assert "CHF 40 over your budget" in alpina["cons"] and "Not a quiet location" in alpina["cons"]
+    assert [c["name"] for c in result["cards"]] == ["Hotel Rheinblick", "Alpina Grand Basel"]
+
+
+def test_tuttie_negotiates_only_with_the_users_favourites():
+    result, bus, _ = run_find(negotiate_budget=300, favourites=["ch.basel.alpina-grand"], date="2026-11-14",
+                              tags=["basel-sbb"], budget_chf=300)
+    assert [o["hotel"] for o in result["negotiation"]["outcomes"]] == ["Alpina Grand Basel"]
+    sessions = {e["node_name"] for e in bus.history if e["kind"] == "a2a"}
+    assert sessions == {"Alpina Grand Basel"}  # Rheinblick was never asked to bargain

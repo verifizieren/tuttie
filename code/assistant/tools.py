@@ -28,6 +28,7 @@ from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
 from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
+from assistant.cards import card_order, hotel_card
 from assistant.marketplace import MarketDesk
 from assistant.mcp_client import McpCallFailed, McpLink
 from sessions import Context
@@ -69,10 +70,12 @@ SCHEMAS = [
     ),
     function(
         "negotiate",
-        "Bargain with every hotel on the last shortlist at once (one subagent each) and return the "
-        "best signed agreement. Use it only when the user asks for a better price or to negotiate.",
+        "Bargain at once (one subagent each) with the user's favourite hotels, or without favourites "
+        "with the whole shortlist, and return the best signed agreement.",
         {"budget_chf": {"type": "number",
-                        "description": "the user's price limit. PRIVATE: only compared by Tuttie's code, never sent"}},
+                        "description": "the user's price limit. PRIVATE: only compared by Tuttie's code, never sent"},
+         "node_ids": {"type": "array", "items": {"type": "string"},
+                      "description": "the user's favourites (node ids); omit to negotiate with the shortlist"}},
     ),
     function(
         "search_registry",
@@ -219,18 +222,40 @@ class Toolbox:
         self.commitments: dict[str, list[dict]] = {}  # node_id -> signed A2A envelopes with a commitment
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
-        self.charges: dict[str, list[dict]] = {}  # node_id -> charges from its signed policies
+        self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
-        tools = {"post_request": self.market.find, "negotiate": self.negotiate, "search_registry": self.search_registry,
+        tools = {"post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
 
-    async def negotiate(self, budget_chf: float | None = None) -> dict:
-        """Bargain over the last shortlist with dev member 2's negotiator (code/negotiation/).
+    async def post_request(self, **request) -> dict:
+        """Post the request on the market (MarketDesk.find), then show the offers as cards.
+
+        The wallet lets the user swipe through the cards and pick favourites; Tuttie negotiates
+        only with those (negotiate with node_ids).
+        """
+        result = await self.market.find(**request)
+        if "error" in result or not self.market.last_offers:
+            return result
+        shortlisted = {o["offer"]["offer_id"] for o in self.market.last_shortlist}
+        cards = []
+        for item in card_order(self.market.last_offers, self.market.last_shortlist):
+            facts = await self.load_policies(item["node_id"])
+            cards.append(hotel_card(item, facts, self.market.last_request["constraints"]["requirements"],
+                                    self.market.last_budget, item["offer"]["offer_id"] in shortlisted))
+        self.bus.emit("marketplace", "verified", f"{len(cards)} hotels to choose from",
+                      detail={"phase": "cards", "cards": cards})
+        result["cards"] = [{k: c[k] for k in ("node_id", "name", "price_chf", "pros", "cons", "shortlisted")}
+                           for c in cards]
+        return result
+
+    async def negotiate(self, budget_chf: float | None = None, node_ids: list[str] | None = None) -> dict:
+        """Bargain with dev member 2's negotiator (code/negotiation/) over the user's favourites
+        (`node_ids`, any hotel that offered) or, without favourites, over the shortlist.
 
         Only the date and the needs are shared with the hotels; the budget is a private context
         item that the negotiator compares in code and never sends.
@@ -239,17 +264,23 @@ class Toolbox:
         from negotiation.tuttie import BUDGET_LIMIT, TuttieNegotiator, best
         from assistant.subagents import SubagentPool
 
-        if not self.market.last_shortlist:
+        if node_ids:
+            chosen = [o for o in self.market.last_offers if o["node_id"] in node_ids]
+            if not chosen:
+                return {"error": f"none of {node_ids} sent an offer for the last request"}
+        else:
+            chosen = self.market.last_shortlist
+        if not chosen:
             return {"error": "post a request first: there is no shortlist to negotiate"}
         needs = self.market.last_request["constraints"]
         context = Context().add("date", needs["date"], "public").add("requirements", needs["requirements"], "negotiation")
         if budget_chf is not None:
             context.add(BUDGET_LIMIT, budget_chf, "private")
         negotiator = TuttieNegotiator(SubagentPool(self), self.market.agent_id, load_signing_key(self.market.agent_id))
-        outcomes = await negotiator.negotiate_all(self.market.last_shortlist, context)
+        outcomes = await negotiator.negotiate_all(chosen, context)
         winner = best(outcomes)
         self.agreements.update({o.node_id: o.agreement for o in outcomes if o.status == "agreed"})
-        names = {o["node_id"]: o["name"] for o in self.market.last_shortlist}
+        names = {o["node_id"]: o["name"] for o in chosen}
         summary = (f"Best agreement: {names[winner.node_id]} at CHF {winner.price_chf:g} "
                    f"(offered CHF {winner.offer_price_chf:g})") if winner else "No hotel agreed within the budget"
         self.bus.emit("marketplace", "verified" if winner else "declined", summary,
@@ -475,7 +506,7 @@ class Toolbox:
         answer = {"node_id": node_id, "source_step": step, **confirmation}
         if confirmation.get("status") == "confirmed":
             # Charges the user already allowed with a mandate are paid right away, without asking.
-            for charge in self.charges.get(node_id, []):
+            for charge in await self.load_charges(node_id):
                 if (node_id, charge["purpose"]) in self.approvals.mandates:
                     paid = await self.pay(node_id, charge["purpose"], confirmation["booking_id"])
                     answer.setdefault("charges_paid", []).append(paid)
@@ -492,12 +523,16 @@ class Toolbox:
         return {"agent_id": self.market.agent_id, "purpose": charge["purpose"], "max_chf": charge["price_chf"],
                 "price_chf": charge["price_chf"]}
 
-    async def load_charges(self, node_id: str) -> list[dict]:
-        """The charges a hotel lists in its signed policies (kept for this conversation)."""
-        if node_id not in self.charges:
+    async def load_policies(self, node_id: str) -> dict:
+        """A hotel's signed policies (get_policies), kept for this conversation; {} if unavailable."""
+        if node_id not in self.policies:
             result = await self.verified_mcp(node_id, "get_policies", {}, "a2t", "get_policies")
-            self.charges[node_id] = result.payload.get("charges", []) if isinstance(result, Verified) else []
-        return self.charges[node_id]
+            self.policies[node_id] = result.payload if isinstance(result, Verified) else {}
+        return self.policies[node_id]
+
+    async def load_charges(self, node_id: str) -> list[dict]:
+        """The charges a hotel lists in its signed policies."""
+        return (await self.load_policies(node_id)).get("charges", [])
 
     async def pay(self, node_id: str, purpose: str, booking_id: str) -> dict:
         """Pay a hotel's charge for a booking: with the user's mandate if it covers it, else after
