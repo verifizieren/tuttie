@@ -80,6 +80,10 @@
              background: rgba(255, 255, 255, .28); opacity: 0; transition: opacity .3s; z-index: 2; pointer-events: none; }
   .app.open .grabber { opacity: 1; }
   .agent.dragging { transition: none; }
+  /* The only text on the card: a quiet name label, in the stack and in the open view. */
+  .label { position: absolute; top: 16px; left: 20px; z-index: 2; pointer-events: none;
+           font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgba(236, 235, 244, .38); }
+  .app.open .label { top: 22px; left: 24px; }
   form { display: none; width: 100%; gap: 8px; }
   .app.typing form { display: flex; }
   .app.typing .controls { padding: 0 20px 22px; }
@@ -104,6 +108,7 @@
     <canvas id="eyes"></canvas>
     <div class="edge"></div>
     <div class="grabber"></div>
+    <span class="label">Tuttie</span>
     <div class="controls" id="controls">
       <div class="said" id="said"></div>
       <div class="status" id="status">Tap Tuttie to talk</div>
