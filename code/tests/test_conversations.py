@@ -1,11 +1,15 @@
 """Tests that every browser gets its own conversation (assistant/app.py, assistant/conversations.py)."""
 
+import os
+
 import httpx
 from fastapi.testclient import TestClient
 
-from assistant import conversations as conv_module
-from assistant.app import SESSION_COOKIE, app
-from assistant.conversations import Conversations
+os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client; these tests never call it
+
+from assistant import conversations as conv_module  # noqa: E402
+from assistant.app import SESSION_COOKIE, app  # noqa: E402
+from assistant.conversations import Conversations  # noqa: E402
 
 
 def test_each_browser_gets_its_own_session_and_approvals():
