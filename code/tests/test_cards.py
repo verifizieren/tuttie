@@ -39,6 +39,12 @@ def test_a_hotel_that_misses_the_needs_shows_them_in_red():
     assert card["over_budget_chf"] == 20
 
 
+def test_an_agreed_price_within_the_budget_is_not_over_it():
+    card = hotel_card(item("city", 180), CITY_FACTS, NEEDS, 160, shortlisted=False, agreed_chf=155)
+    assert card["over_budget_chf"] is None
+    assert hotel_card(item("city", 180), CITY_FACTS, NEEDS, 160, False, agreed_chf=170)["over_budget_chf"] == 10
+
+
 def test_without_a_budget_nothing_is_over_budget():
     assert hotel_card(item("guesthouse", 135), GUESTHOUSE_FACTS, [], None, shortlisted=True)["over_budget_chf"] is None
 
