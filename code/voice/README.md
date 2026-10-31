@@ -36,8 +36,9 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   markdown or ids (booking ids and receipt numbers stay in the wallet), numbers as people say
   them. `spoken()` in `voice/agent.py` makes the rest sayable: amounts in francs ("CHF 128" is
   spoken as "128 francs"), degrees, percent, 24-hour times as people say them ("18:00" is "6
-  pm", "00:52" is "12:52 am", also "midnight", "noon"), and any note in square brackets is
-  dropped.
+  pm", "00:52" is "12:52 am", also "midnight", "noon"; "8:30 pm" and durations stay), and of
+  notes in square brackets only citations, labels like [confirmed] and ids are dropped: any
+  other note is spoken without its brackets (the wallet shows the same text).
 - Voice: the demo server uses "Germain" (`TUTTIE_VOICE_ID=XJeDCVLci9KGsGtVpFLM`,
   a library voice, needs a paid plan); without it the free "Eric".
 - The wallet shows each spoken answer word by word in step with the voice (LiveKit
