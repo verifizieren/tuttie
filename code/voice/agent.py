@@ -68,10 +68,24 @@ def francs(match: re.Match) -> str:
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
+BRACKETS = re.compile(r"\s*\[[^\]\n]{0,60}\]")   # notes the model put in brackets: [3], [confirmed]
+CLOCK = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")  # 24-hour times: 18:00, 00:52
+
+
+def clock(match: re.Match) -> str:
+    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight"."""
+    hour, minute = int(match.group(1)), int(match.group(2))
+    if minute == 0 and hour in (0, 12):
+        return "midnight" if hour == 0 else "noon"
+    said = str(hour % 12 or 12) + (f":{minute:02d}" if minute else "")
+    return f"{said} {'am' if hour < 12 else 'pm'}"
+
+
 def spoken(answer: str) -> str:
-    """An answer as it should sound: amounts in francs, temperatures in degrees, no citations,
-    no markdown, no emoji."""
-    text = re.sub(r"\s*\[\d+\]", "", answer)
+    """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
+    (6 pm), no bracketed notes, no markdown, no emoji."""
+    text = BRACKETS.sub("", answer)
+    text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"

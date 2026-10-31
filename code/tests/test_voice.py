@@ -89,6 +89,16 @@ def test_temperatures_and_percentages_are_said_in_words():
         "Between 6.4 and 11.6 degrees, around 8 degrees, a 25 percent chance."
 
 
+def test_times_are_said_as_people_say_them():
+    assert spoken("Around 9 °C at 18:00, 8 at 20:00, train at 00:52, back by 12:00, until 00:00, 7:05.") == \
+        "Around 9 degrees at 6 pm, 8 at 8 pm, train at 12:52 am, back by noon, until midnight, 7:05 am."
+
+
+def test_notes_in_brackets_are_not_read_out():
+    assert spoken("The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3].") == \
+        "The total is 128 francs. Tax paid. Fine."
+
+
 def test_amounts_are_said_in_francs():
     assert spoken("CHF 1 tax, 70 CHF over, CHF 12.50 left, in CHF.") == "1 franc tax, 70 francs over, 12.50 francs left, in francs."
 
