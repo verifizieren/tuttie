@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
+import { applyEvent, cleanAnswer, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -99,4 +99,9 @@ test('an approval that ends without a decision is not called a decline', () => {
   assert.equal(ended.turns[0].tool.text, 'Approval closed');
   const declined = applyEvent(pending, { step: 2, kind: 'approval', status: 'declined', detail: { approval_id: 'a' } });
   assert.equal(declined.turns[0].tool.text, 'You declined');
+});
+
+test('notes the model put in square brackets are not shown', () => {
+  assert.equal(cleanAnswer('Booked, total CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3].'),
+               'Booked, total CHF 128. Tax paid. Fine.');
 });

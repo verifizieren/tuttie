@@ -87,7 +87,7 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
 
 /** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
 export const cleanAnswer = text => String(text ?? "").split("\n").filter(line => !/^\s*Ignored:/i.test(line)).join("\n")
-  .replace(/\s*\[\d+\]/g, "").trim();
+  .replace(/\s*\[[^\]\n]{0,60}\]/g, "").trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });

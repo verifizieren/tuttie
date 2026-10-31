@@ -39,7 +39,7 @@ export function loadHistory() {
 function outcome(state) {
   if (state.booking) return `Booked ${state.booking.hotel} · CHF ${state.booking.total}`;
   const last = [...state.turns].reverse().find(t => t.answer)?.answer || "";
-  return last.replace(/\*\*/g, "").replace(/\s*\[\d+\]/g, "").split(/(?<=[.!?])\s/)[0].slice(0, 90);
+  return last.replace(/\*\*/g, "").replace(/\s*\[[^\]\n]{0,60}\]/g, "").split(/(?<=[.!?])\s/)[0].slice(0, 90);
 }
 
 /** Archive a conversation (replacing an earlier copy of the same one); returns the new list. */
