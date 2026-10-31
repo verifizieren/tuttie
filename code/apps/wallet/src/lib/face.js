@@ -64,6 +64,10 @@ const EXPRESSIONS = {
   confusion: both({ lower: { y: .2, bend: .2 } }, { upper: { angle: -10, y: .3 }, lower: { angle: 5, y: .2, bend: .2 } }),
   amazement: both({ lower: { y: .2 } }, { lower: { y: .2 } }),
   excitement: both({ lower: { y: .3, bend: .2 } }, { lower: { y: .3, bend: .2 } }),
+  // Tuttie's own: listening, eyes gently open, and the same with a small tilt of interest.
+  listening: both({ scale_x: .86, scale_y: .96, lower: { y: .08 } }, { scale_x: .86, scale_y: .96, lower: { y: .08 } }),
+  attentive: both({ scale_x: .86, scale_y: .94, upper: { angle: -6, y: .05 } },
+                  { scale_x: .86, scale_y: .98, upper: { angle: 4 } }),
 };
 
 function expressionParams(name) {
