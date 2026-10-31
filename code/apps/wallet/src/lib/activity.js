@@ -28,7 +28,7 @@ export const EMPTY = {
   closing: null,        // the user said goodbye: "asked" (end_conversation), "ready" once Tuttie answered
 };
 
-const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
+const validTiers = (seals = []) => (seals || []).filter(s => s?.valid).map(s => s.tier);
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
@@ -86,7 +86,7 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
 }
 
 /** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
-export const cleanAnswer = text => text.split("\n").filter(line => !/^\s*Ignored:/i.test(line)).join("\n")
+export const cleanAnswer = text => String(text ?? "").split("\n").filter(line => !/^\s*Ignored:/i.test(line)).join("\n")
   .replace(/\s*\[\d+\]/g, "").trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
@@ -172,7 +172,7 @@ export function applyEvent(state, event) {
     }
     if (detail.phase === "offer" && event.node_id) {
       const next = withHotel(state, event.node_id, event.node_name, {
-        offer: detail.offer, tiers: validTiers(event.seals), seals: event.seals, uid: event.uid, status: "offered",
+        offer: detail.offer, tiers: validTiers(event.seals), seals: event.seals || [], uid: event.uid, status: "offered",
         size: detail.profile?.size || hotel(state, event.node_id).size,
       });
       const n = offerCount(next);
@@ -215,18 +215,20 @@ export function applyEvent(state, event) {
     const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true, at);
     return withBooking({ ...base, phase: "booked", bookingTurn: turnOf(base, at) },
                        { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
-                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
+                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: event.seals || [], uid: event.uid,
                          payments: [] });
   }
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
       return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
-        hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid,
+        hotel: event.node_name, summary: event.summary, seals: event.seals || [], uid: event.uid,
         offerMandate: detail.offer_mandate || null, terms: detail.terms || null } };
     }
+    // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
-    return { ...progress(state, "tool", approved ? "Booking…" : "You declined", !approved, at), approval: null,
+    const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
+    return { ...progress(state, "tool", line, !approved, at), approval: null,
              phase: approved ? "booking" : "declined" };
   }
   return state;

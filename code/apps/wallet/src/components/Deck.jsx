@@ -52,7 +52,7 @@ function HotelCard({ card, hotel, position, count, style, handlers, verdict, cla
       <div className="swipe-name">{card.name}</div>
       <div className="swipe-foot">
         <ul className="feature-icons">
-          {card.features.map(f => (
+          {(card.features || []).map(f => (
             <li key={f.key} className={f.ok ? "yes" : "no"} title={f.label} aria-label={f.label}>
               <FeatureIcon name={f.key} />
             </li>

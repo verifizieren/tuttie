@@ -81,3 +81,22 @@ test('a reload continues the deck where the user left it', () => {
   assert.equal(deckStart(restoreConversation([cards, newer], 'chat', saved)), null);
   assert.equal(deckStart(withDeck(state, {index: 3, liked: ['a']})), null);  // nothing left to swipe
 });
+
+test('malformed events never crash the timeline', () => {
+  const start = startTurn(EMPTY, 'hi');
+  assert.equal(applyEvent(start, { step: 1, kind: 'answer', summary: null, detail: null }).turns[0].answer, '');
+  const offer = applyEvent(start, { step: 1, kind: 'marketplace', node_id: 'h', node_name: 'H',
+                                    detail: { phase: 'offer', offer: { price_chf: 100 } } });
+  assert.deepEqual(offer.hotels.h.tiers, []);
+  assert.deepEqual(offer.hotels.h.seals, []);
+  const approval = applyEvent(start, { step: 1, kind: 'approval', status: 'pending', detail: { approval_id: 'a' } });
+  assert.deepEqual(approval.approval.seals, []);
+});
+
+test('an approval that ends without a decision is not called a decline', () => {
+  const pending = applyEvent(startTurn(EMPTY, 'book'), { step: 1, kind: 'approval', status: 'pending', detail: { approval_id: 'a' } });
+  const ended = applyEvent(pending, { step: 2, kind: 'approval', status: 'expired', detail: { approval_id: 'a' } });
+  assert.equal(ended.turns[0].tool.text, 'Approval closed');
+  const declined = applyEvent(pending, { step: 2, kind: 'approval', status: 'declined', detail: { approval_id: 'a' } });
+  assert.equal(declined.turns[0].tool.text, 'You declined');
+});
