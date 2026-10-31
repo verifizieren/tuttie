@@ -93,10 +93,11 @@ def test_tuttie_posts_collects_offers_and_shortlists_within_its_private_budget()
     # The budget never left Tuttie: the posting the hotels saw has none.
     posted = market.view(result["request_id"])["request"]
     assert posted["constraints"]["budget_chf"] is None and result["posted"]["constraints"]["budget_chf"] is None
-    # Alpina (CHF 240) offered but is over the private budget; Rheinblick (CHF 180) fits.
+    # Alpina (CHF 270 with the dog) offered but is over the private budget; Rheinblick (CHF 195) fits.
     assert result["offers_received"] == 2
     assert [o["name"] for o in result["shortlist"]] == ["Hotel Rheinblick"]
-    assert result["shortlist"][0]["price_chf"] == 180 and result["shortlist"][0]["size"] == "medium"
+    # The dog needs Rheinblick's add-on (CHF 15): every fee that applies is in the offer.
+    assert result["shortlist"][0]["price_chf"] == 195 and result["shortlist"][0]["size"] == "medium"
     assert "ch.basel.cheap-hotels" in result["skipped"] and "ch.basel.budget-rooms" in result["skipped"]
     phases = [e["detail"].get("phase") for e in bus.history if e["kind"] == "marketplace"]
     assert phases[0] == "posted" and phases.count("offer") == 2 and phases[-3:] == ["shortlist", "agreement", "cards"]
@@ -160,7 +161,7 @@ def test_the_cards_show_every_offer_with_signed_features_shortlist_first():
     rheinblick, alpina = cards
     labels = {c["name"]: {f["label"]: f["ok"] for f in c["features"]} for c in cards}
     assert labels["Hotel Rheinblick"]["Dogs CHF 15"] and labels["Hotel Rheinblick"]["Quiet"]
-    assert alpina["over_budget_chf"] == 40 and labels["Alpina Grand Basel"]["Not quiet"] is False
+    assert alpina["over_budget_chf"] == 70 and labels["Alpina Grand Basel"]["Not quiet"] is False  # 240 + dog 30
     assert rheinblick["rating"]["score"] == 4.5
     assert [c["name"] for c in result["cards"]] == ["Hotel Rheinblick", "Alpina Grand Basel"]
 

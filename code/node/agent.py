@@ -27,19 +27,41 @@ what the model does not know, no clever question can extract.
 """
 
 import json
+import os
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 
 from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
 
-from llm import LLM
+from llm import LLM as ChatLLM
 from node.catalog import AVAILABLE, tools_for
 
 # Tools a business uses when its config has no "agent" section yet.
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
 DEFAULT_WAKES_ON = ["posting.created", "posting.updated"]
 COMMITMENT_DAYS = 30  # validity of a commitment when the arrival date is unknown
+# The company agents' decisions are small (interested?, which room and add-ons, a short answer),
+# so they use a fast model without reasoning; Tuttie keeps the stronger one (LLM_MODEL).
+AGENT_MODEL = os.environ.get("AGENT_LLM_MODEL", "gpt-4.1-mini")
+
+
+def LLM() -> ChatLLM:  # noqa: N802 (named like a class: tests replace it with a stub)
+    """The model the company agents use."""
+    return ChatLLM(AGENT_MODEL, reasoning=False)
+
+
+# Needs an add-on can cover, and the words that name them in a request or an add-on's item.
+NEED_WORDS = {"dog": ("dog",), "late": ("late arrival", "late check-in", "arriv", "midnight", "01:00", "1am", "after 22"),
+              "kids": ("child", "kid", "cot", "family")}
+
+
+def covers(text: str) -> set[str]:
+    """The needs a text speaks of (dog, late, kids)."""
+    text = text.lower()
+    return {need for need, words in NEED_WORDS.items() if any(word in text for word in words)}
+
+
 # Facts only the node's own code may use; they never reach an LLM or another agent.
 PRIVATE_FACTS = ("negotiation",)
 
@@ -118,7 +140,7 @@ class BusinessAgent:
     def __init__(self, config: dict):
         self.node_id = config["node_id"]
         self.business = config["name"]
-        self.llm: LLM | None = None  # created on first use, so nodes start without an API key
+        self.llm: ChatLLM | None = None  # created on first use, so nodes start without an API key
         self.apply(config)
 
     def apply(self, config: dict) -> None:
@@ -244,7 +266,11 @@ class BusinessAgent:
         except (ValidationError, json.JSONDecodeError, OpenAIError):
             return None
         room = self.rooms.get(choice.room_type)
-        chosen = [self.add_ons.get(add_on_id) for add_on_id in dict.fromkeys(choice.add_ons)]
+        needed = self.add_ons_for(request.get("constraints", {}).get("requirements", []))
+        # The LLM's own picks only for what the needed ones do not cover yet (e.g. breakfast).
+        extra = [a for a in choice.add_ons if a not in needed and not covers(self.add_ons.get(a, {}).get("item", ""))
+                 & covers(" ".join(self.add_ons[n]["item"] for n in needed))]
+        chosen = [self.add_ons.get(add_on_id) for add_on_id in dict.fromkeys([*needed, *extra])]
         if room is None or None in chosen:
             return None
         date_text = request.get("constraints", {}).get("date", "")
@@ -259,6 +285,19 @@ class BusinessAgent:
             "valid_until": posting["expires_at"],
         }
 
-    def _llm(self) -> LLM:
+    def add_ons_for(self, requirements: list[str]) -> list[str]:
+        """The add-ons a request needs (a dog, a late arrival, children), chosen in code so
+        every fee that applies is in the offer: fewest add-ons that cover all needs."""
+        needs, picked = covers(" ".join(requirements)), []
+        while needs:
+            best = max(self.add_ons.values(), default=None,
+                       key=lambda a: (len(covers(a["item"]) & needs), -len(covers(a["item"]) - needs)))
+            if best is None or not covers(best["item"]) & needs:
+                break
+            picked.append(best["id"])
+            needs -= covers(best["item"])
+        return picked
+
+    def _llm(self) -> ChatLLM:
         self.llm = self.llm or LLM()
         return self.llm

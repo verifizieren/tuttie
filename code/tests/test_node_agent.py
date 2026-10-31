@@ -118,3 +118,10 @@ def test_hotel_config_is_consistent(name):
     cheapest = min(r["price_chf"] for r in facts["rooms"] if r["room_type"].startswith("double"))
     assert 0 < facts["negotiation"]["floor_chf"] < cheapest
     assert facts["negotiation"]["max_rounds"] >= 1
+
+
+def test_the_add_ons_a_request_needs_are_chosen_in_code_fewest_first():
+    needs = ["quiet room", "medium-sized dog", "arrival around 01:00"]
+    assert BusinessAgent(RHEINBLICK).add_ons_for(needs) == ["late-checkin-dog"]  # one add-on covers both
+    assert BusinessAgent(HOTELS["hotel-alpina-grand"]).add_ons_for(needs) == ["dog"]  # 24h reception: no late check-out for an arrival
+    assert BusinessAgent(RHEINBLICK).add_ons_for(["quiet"]) == []
