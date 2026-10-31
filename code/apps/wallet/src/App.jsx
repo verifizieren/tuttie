@@ -110,7 +110,9 @@ export default function App() {
     setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !approval && startsFresh(agent)) actions.newConversation(agent).catch(failedNewChat);
+      if (closedOnce.current && !approval && startsFresh(agent)) {
+        actions.newConversation(agent).then(() => setError(""), failedNewChat);  // an old error never outlives it
+      }
       closedOnce.current = false;
     }
     setMode("voice");
