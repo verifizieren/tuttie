@@ -384,6 +384,11 @@ Why things are the way they are, so nobody has to rediscover them:
   publish + subscribe connections): iPhones joined the room but never sent an ICE check with the
   single connection. Chromium verified end to end (fresh browser, spoken request -> answer);
   Firefox can't be tested headless (no audio device).
+- **iPhone voice:** Safari sets up WebRTC connections only while the page uses the microphone.
+  Joining the room ahead with the mic off left iPhones stuck in ICE "checking" (no checks, no
+  relay allocation; wallet report `closed while checking`). The first tap now captures the mic,
+  then joins; the room stays joined while the card is closed (mic released,
+  `stopMicTrackOnMute`), so later opens are instant.
 - **Voice on phones:** ICE from phones failed (no UDP into the team server; iPhones don't use
   plain TCP). A coturn relay on TCP 4044 (`code/voice/turnserver.conf`, started by run_all when
   `TURN_SECRET` is set) carries their audio; LiveKit hands it to clients. Relays only to the
