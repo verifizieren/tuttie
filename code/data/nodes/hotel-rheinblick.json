@@ -19,7 +19,7 @@
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
     },
     "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
-    "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+    "wakes_on": ["posting.created", "posting.updated"]
   },
   "facts": {
     "profile": { "size": "medium", "rooms_total": 42, "about": "Family-owned hotel right next to Basel SBB, run by the second generation." },

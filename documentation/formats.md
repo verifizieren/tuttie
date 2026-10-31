@@ -367,7 +367,7 @@ config (`code/data/nodes/*.json`, code in `code/node/agent.py`):
     "priorities": ["what it tries to achieve"], "boundaries": ["what it must never do"]
   },
   "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
-  "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+  "wakes_on": ["posting.created", "posting.updated"]
 }
 ```
 

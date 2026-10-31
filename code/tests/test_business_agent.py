@@ -92,7 +92,7 @@ def test_wake_up_reports_whether_the_next_tool_is_available():
     assert result["next_tool_available"] is True
     assert "You are Lena" in agent.llm.system
     planned = agent_with(HOTELS["large"], {"interested": True, "reason": "Pay!", "next_tool": "pay"})
-    result = asyncio.run(planned.invoke({"type": "negotiation.counter"}))
+    result = asyncio.run(planned.invoke({"type": "posting.updated"}))
     assert TOOLS["pay"]["status"] == PLANNED and result["next_tool_available"] is False
 
 

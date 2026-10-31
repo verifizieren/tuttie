@@ -19,7 +19,7 @@
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
     },
     "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
-    "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+    "wakes_on": ["posting.created", "posting.updated"]
   },
   "facts": {
     "profile": { "size": "large", "rooms_total": 220, "chain": "Alpina Hotels (12 hotels in Switzerland)", "about": "Business hotel at Basel SBB with a restaurant, a gym and conference rooms." },
