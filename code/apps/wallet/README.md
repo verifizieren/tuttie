@@ -1,6 +1,8 @@
 # Wallet app (issue #2) — approvals page only; wallet UI not started
 
-The phone is the main stage of the demo. The web app **is** the wallet: built for phone
+The phone is the main stage of the demo. This is the real product: the demo is only a
+simulated run through this same app (`code/demo/` feeds scripted input), so every screen
+must work for real use too. The web app **is** the wallet: built for phone
 screens first (one column, safe areas, big touch targets), not a phone mock-up on a laptop.
 
 Direction agreed by the team:

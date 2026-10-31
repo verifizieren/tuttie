@@ -41,6 +41,12 @@ can work in parallel without stepping on each other. Contracts live in
 
 ## Rules that keep the areas independent
 
+- **The demo runs the real app.** `code/demo/` never has its own UI. It drives the real
+  wallet (and console) by feeding scripted input into the same backend the user would use
+  (e.g. the user's lines instead of live speech) and lets the real flow run. Any feature
+  the demo shows must exist in the app for real use; demo-only switches are limited to
+  input and timing (e.g. `?demo=<script>` on the wallet), never to separate screens.
+
 - **Signing stays in `code/aps/`.** No other folder creates or checks signatures by hand.
 - **Prices never come from an LLM.** They come from node configs and signed messages.
 - **The scripted demo calls the real components**; it never fakes verification

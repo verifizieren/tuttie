@@ -47,6 +47,11 @@ Brand: dark, Inter, terracotta accent (`code/apps/shared/tuttie.css`), shared by
 
 The demo must never fail on stage, but the code behind it must really work.
 
+**One app, not a demo app.** The wallet is the real product and works on its own for real
+use. The demo is a *simulated run through that same app*: same pages, same components,
+same backend. There is no separate demo page with its own look; whatever the audience sees
+is what a real user would see.
+
 - **Directed:** the demo follows a script (`code/demo/`, storyline issue #3): fixed user
   lines, fixed timing, and a voice agent whose lines we already know, so we play them
   directly instead of depending on live speech recognition.
