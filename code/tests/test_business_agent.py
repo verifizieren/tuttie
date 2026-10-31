@@ -60,7 +60,7 @@ def test_hotel_sizes_differ_in_rooms():
 def test_agents_know_planned_tools_and_their_status():
     agent = BusinessAgent(config(HOTELS["large"]))
     text = agent.persona_text()
-    assert "make_offer [planned]" in text and "book [available]" in text
+    assert "counter_offer [planned]" in text and "make_offer [available]" in text
     with pytest.raises(ValueError):
         tools_for(["teleport"])
 
@@ -85,15 +85,36 @@ def test_unsubscribed_event_is_ignored_without_the_llm():
     assert result["ignored"] is True
 
 
-def test_wake_up_reports_a_planned_next_tool_as_not_available():
+def test_wake_up_reports_whether_the_next_tool_is_available():
     agent = agent_with(HOTELS["large"], {"interested": True, "reason": "We have rooms.", "next_tool": "make_offer"})
     result = asyncio.run(agent.invoke({"type": "posting.created", "posting": {"category": "hotel"}}))
     assert result["interested"] is True and result["next_tool"] == "make_offer"
-    assert TOOLS["make_offer"]["status"] == PLANNED and result["next_tool_available"] is False
+    assert result["next_tool_available"] is True
     assert "You are Lena" in agent.llm.system
+    planned = agent_with(HOTELS["large"], {"interested": True, "reason": "Counter!", "next_tool": "counter_offer"})
+    result = asyncio.run(planned.invoke({"type": "posting.created"}))
+    assert TOOLS["counter_offer"]["status"] == PLANNED and result["next_tool_available"] is False
 
 
 def test_wake_up_drops_a_tool_the_agent_does_not_have():
     agent = agent_with(HOTELS["small"], {"interested": False, "reason": "Too far.", "next_tool": "teleport"})
     result = asyncio.run(agent.invoke({"type": "posting.created"}))
     assert result["next_tool"] is None and result["next_tool_available"] is False
+
+
+POSTING = {"request_id": "rq-test1", "expires_at": "2026-11-13T22:00:00Z", "offer_url": "http://market/x",
+           "request": {"payload": {"constraints": {"date": "2026-11-14", "requirements": ["dog", "late arrival"]}}}}
+
+
+def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
+    agent = agent_with(HOTELS["medium"], {"room_type": "double", "add_ons": ["late-checkin-dog"], "price_chf": 1})
+    offer = asyncio.run(agent.make_offer(POSTING))
+    assert offer["price_chf"] == 180 + 15 and offer["request_id"] == "rq-test1"
+    assert offer["includes"] == ["late check-in after 22:00 with dog"]
+    assert offer["item"] == "double room 2026-11-14" and offer["valid_until"] == POSTING["expires_at"]
+
+
+@pytest.mark.parametrize("choice", [{"room_type": "penthouse"}, {"room_type": "double", "add_ons": ["free-spa"]},
+                                    {"add_ons": []}])
+def test_no_offer_for_unknown_rooms_or_add_ons(choice):
+    assert asyncio.run(agent_with(HOTELS["medium"], choice).make_offer(POSTING)) is None
