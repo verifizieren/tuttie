@@ -187,34 +187,77 @@
     face.sleep();
   }
 
-  // Gestures on the card. Closed: tap or swipe up wakes Tuttie into voice mode. Open: the card
-  // follows a downward drag and closes when released far or fast enough, otherwise it springs
-  // back. Taps while voice is on keep it on: the agent is never sent away by accident.
-  let drag = null;  // {y, t, dy} of the current pointer gesture
+  // Gestures on the card, iOS-sheet style. The card follows the finger every frame; on release
+  // the decision uses the speed of the last ~100 ms (so an uneven swipe or a flick back is read
+  // right), and the closing or spring-back animation starts from where the finger left the card
+  // with a duration matched to its speed. Closed: tap or swipe up wakes Tuttie into voice mode.
+  // Open: swipe down closes. Taps while voice is on keep it on: Tuttie is never sent away by accident.
+  const TAP = 8;          // px a finger may move and still count as a tap
+  const SAMPLE_MS = 100;  // window for the release speed
+  let drag = null;        // {startY, samples: [{y, t}], offset, frame}
+
+  // Rubber band: past the natural direction the card moves less and less.
+  const rubber = (d, k = 4) => Math.sign(d) * Math.sqrt(Math.abs(d)) * k;
+
+  function offsetFor(dy) {
+    if (app.classList.contains("open")) return dy > 0 ? dy : rubber(dy);  // down follows 1:1
+    return dy < 0 ? Math.max(rubber(dy, 6), -90) : rubber(dy, 2);          // closed: up with resistance
+  }
+
+  function paint() {
+    drag.frame = null;
+    const scale = app.classList.contains("open") ? 1 - Math.min(Math.max(drag.offset, 0), 400) / 4000 : 1;
+    agent.style.transform = `translateY(${drag.offset}px) scale(${scale})`;
+  }
+
   agent.addEventListener("pointerdown", e => {
-    if (e.target.closest("button, form")) return;
-    drag = { y: e.clientY, t: performance.now(), dy: 0 };
+    if (e.target.closest("button, form") || drag) return;
+    try { agent.setPointerCapture(e.pointerId); } catch { /* keep following even off the card when possible */ }
+    drag = { startY: e.clientY, samples: [{ y: e.clientY, t: performance.now() }], offset: 0, frame: null };
   });
+
   agent.addEventListener("pointermove", e => {
-    if (!drag || !app.classList.contains("open")) return;
-    drag.dy = Math.max(0, e.clientY - drag.y);
-    if (drag.dy > 6) {
-      agent.classList.add("dragging");
-      agent.style.transform = `translateY(${drag.dy}px) scale(${1 - Math.min(drag.dy, 400) / 4000})`;
-    }
+    if (!drag) return;
+    const now = performance.now();
+    drag.samples.push({ y: e.clientY, t: now });
+    while (drag.samples.length > 2 && now - drag.samples[0].t > SAMPLE_MS) drag.samples.shift();
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dy) < TAP && !agent.classList.contains("dragging")) return;
+    agent.classList.add("dragging");
+    drag.offset = offsetFor(dy);
+    if (!drag.frame) drag.frame = requestAnimationFrame(paint);
   });
+
+  // Let the next transition run at `ms` (matched to the release speed), then restore the CSS default.
+  function settleIn(ms) {
+    agent.style.transitionDuration = `${ms}ms`;
+    setTimeout(() => agent.style.removeProperty("transition-duration"), ms + 50);
+  }
+
   function endDrag(e) {
     if (!drag) return;
-    const moved = e.clientY - drag.y, speed = moved / Math.max(1, performance.now() - drag.t);
+    if (drag.frame) cancelAnimationFrame(drag.frame);
+    const first = drag.samples[0], moved = e.clientY - drag.startY;
+    const speed = (e.clientY - first.y) / Math.max(16, performance.now() - first.t);  // px per ms, + = down
+    const dragged = agent.classList.contains("dragging"), open = app.classList.contains("open");
     drag = null;
+
+    let action = null;
+    if (!dragged || Math.abs(moved) < TAP) action = "tap";
+    else if (open && speed > -.2 && (moved > 120 || (moved > 30 && speed > .35))) action = "close";
+    else if (!open && speed < .2 && (moved < -30 || speed < -.35)) action = "open";
+
+    // Duration from the remaining distance and the finger's speed: fast flicks finish fast.
+    const remaining = action === "close" ? Math.max(200, innerHeight - moved) : Math.abs(moved) + 60;
+    if (action !== "tap") settleIn(Math.round(Math.min(650, Math.max(240, remaining / Math.max(Math.abs(speed), .8)))));
     agent.classList.remove("dragging");
-    agent.style.removeProperty("transform");
-    if (app.classList.contains("open")) {
-      if (moved > 120 || (moved > 40 && speed > .6)) close();
-      else if (Math.abs(moved) < 8 && !app.classList.contains("voice")) startVoice();
-      else if (Math.abs(moved) < 8) face.set("excitement", 250), setTimeout(() => face.set("neutral", 500), 600);
-    } else if (Math.abs(moved) < 8 || moved < -30) {
-      startVoice();
+    agent.style.removeProperty("transform");  // transitions back from the dragged position, no jump
+
+    if (action === "close") close();
+    else if (action === "open") startVoice();
+    else if (action === "tap") {
+      if (!open || !app.classList.contains("voice")) startVoice();
+      else face.set("excitement", 250), setTimeout(() => face.set("neutral", 500), 600);
     }
   }
   agent.addEventListener("pointerup", endDrag);
