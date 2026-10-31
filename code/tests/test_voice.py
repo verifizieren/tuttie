@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -204,3 +205,10 @@ def test_the_room_counter_forgets_after_a_minute():
         assert counter.allow(owner, "1.2.3.4", now=0)
     assert not counter.allow(owner, "1.2.3.4", now=1)
     assert counter.allow(owner, "1.2.3.4", now=61)
+
+
+def test_answer_notes_shared_with_the_wallet():
+    """The same cases as the wallet's cleanAnswer (tests/fixtures/answer_notes.json): screen and voice agree."""
+    cases = json.loads((Path(__file__).parent / "fixtures" / "answer_notes.json").read_text())
+    for case in cases:
+        assert spoken(case["in"]) == case["spoken"], case["in"]

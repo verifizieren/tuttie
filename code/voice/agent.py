@@ -68,24 +68,43 @@ def francs(match: re.Match) -> str:
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
-LINK = re.compile(r"\[([^\]\n]*)\]\([^)\n]*\)")          # a markdown link: keep its text only
-NOTE = re.compile(r"[ \t]?\[([^\]\n]{0,60})\]")             # a note the model put in square brackets
-# Notes that carry nothing to say: citations ([3], [3, 4]), one-word labels ([confirmed]) and ids
-# ([receipt RC-A14786]: the wallet shows those). Any other note may be a fact (a fee, a
-# condition), so only its brackets go.
-EMPTY_NOTE = re.compile(r"\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*")
+# What the model may put in square brackets, cleaned the same way as the wallet's screen
+# (apps/wallet/src/lib/activity.js withoutNotes; shared cases in tests/fixtures/answer_notes.json).
+# Only what carries nothing to say goes: citations ([3], [3, 4]), a few labels ([confirmed]),
+# booking and receipt ids, node ids. Any other note may be a fact (a fee, "cancelled"), so it is
+# kept and only its brackets go. Markdown links keep their text.
+LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
+NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
+CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
+LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
+NODE_ID = re.compile(r"[a-z]+(?:\.[a-z0-9-]+)+")
+ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b", re.IGNORECASE)
+IGNORED_LINE = re.compile(r"\bignored:", re.IGNORECASE)  # a line about an ignored business
 # 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration:
-# "18:00", "00:52" yes; "8:30 pm", "1:30 hours", "18:00:30" no.
-CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))",
-                   re.IGNORECASE)
+# "18:00", "00:52" yes; "8:30 pm", "1:30 hours", "14:00 hrs", "18:00:30" no.
+CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b"
+                   r"(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hrs?\b|hours?\b|min|uhr\b))", re.IGNORECASE)
+
+
+def link(match: re.Match) -> str:
+    """A markdown link: its text, or for a citation link ("[3](...)") what is in its parentheses."""
+    text = match.group(1).strip()
+    return text if text and not CITATION.fullmatch(text) else f"({match.group(2)})"
 
 
 def note(match: re.Match) -> str:
-    """A bracketed note: dropped if it says nothing, else kept without its brackets."""
-    inner = match.group(1).strip()
-    if not inner or EMPTY_NOTE.fullmatch(inner):
+    """A bracketed note: dropped if it says nothing, else its words without the brackets."""
+    inner = ID.sub("", match.group(1)).strip(" ,;")
+    if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
+            or inner.lower().startswith("ignored:")):
         return ""
-    return (" " if match.group(0)[0] in " \t" else "") + inner
+    glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
+    return (" " if glued else "") + inner
+
+
+def tidy(text: str) -> str:
+    """No space before punctuation and no double spaces where a note was taken out."""
+    return re.sub(r"[ \t]{2,}", " ", re.sub(r"(?<![ \t])[ \t]+(?=[.,;:!?])", "", text))
 
 
 def clock(match: re.Match) -> str:
@@ -100,7 +119,7 @@ def clock(match: re.Match) -> str:
 def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
-    text = NOTE.sub(note, LINK.sub(r"\1", answer))
+    text = tidy(NOTE.sub(note, LINK.sub(link, answer)))
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
@@ -108,7 +127,7 @@ def spoken(answer: str) -> str:
     text = re.sub(r"(\d)\s?%", r"\1 percent", text)
     text = re.sub(r"[*_`#]", "", text)
     text = re.sub(r"[\U0001F000-\U0001FFFF☀-➿]", "", text)
-    return " ".join(line for line in text.splitlines() if not line.strip().lower().startswith("ignored:")).strip()
+    return " ".join(line.strip() for line in text.splitlines() if not IGNORED_LINE.search(line)).strip()
 
 
 def meaningful(text: str) -> bool:
