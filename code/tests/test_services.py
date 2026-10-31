@@ -151,6 +151,8 @@ def test_connections_with_times_platforms_and_trains():
     ({"origin": "Zürich HB", "destination": "Basel SBB", "date": DAY, "time": "25:00"}, "time must be HH:MM"),
     ({"origin": "", "destination": "Basel SBB", "date": DAY, "time": "22:00"}, "from must be a station"),
     ({"origin": "Zürich HB", "destination": "Basel SBB", "date": "tomorrow", "time": "22:00"}, "date must be"),
+    ({"origin": "Zürich HB", "destination": "Basel SBB", "date": "1990-01-01", "time": "22:00"}, "today or later"),
+    ({"origin": "Basel SBB", "destination": " basel sbb", "date": DAY, "time": "22:00"}, "different stations"),
 ])
 def test_connection_requests_that_cannot_be_answered_are_signed_refusals(args, reason):
     payload = asyncio.run(call(TRAINS, source(live), "get_connections", args))
@@ -162,6 +164,35 @@ def test_no_connection_found_is_a_refusal():
     args = {"origin": "Basel SBB", "destination": "Nowhere", "date": DAY, "time": "22:00"}
     payload = asyncio.run(call(TRAINS, none, "get_connections", args))
     assert payload["status"] == "refused" and "no connection" in payload["reason"]
+
+
+@pytest.mark.parametrize("handler", [
+    lambda r: httpx.Response(400, json={"errors": [{"message": "bad request"}]}),
+    lambda r: httpx.Response(404),
+])
+def test_a_request_the_timetable_refuses_is_a_refusal_not_a_sample(handler):
+    args = {"origin": "Zürich HB", "destination": "Basel SBB", "date": DAY, "time": "22:00"}
+    payload = asyncio.run(call(TRAINS, source(handler), "get_connections", args))
+    assert payload["status"] == "refused" and "refused the request" in payload["reason"]
+    assert "connections" not in payload
+
+
+def timeout(request: httpx.Request) -> httpx.Response:
+    raise httpx.ReadTimeout("too slow", request=request)
+
+
+@pytest.mark.parametrize("handler", [offline, timeout, lambda r: httpx.Response(503)])
+def test_only_an_outage_of_the_timetable_gives_the_sample(handler):
+    args = {"origin": "Zürich HB", "destination": "Basel SBB", "date": DAY, "time": "22:00"}
+    payload = asyncio.run(call(TRAINS, source(handler), "get_connections", args))
+    assert payload["source"] == trains.SAMPLE_SOURCE
+
+
+def test_bad_requests_get_no_sample_even_offline():
+    for args in ({"origin": "Basel SBB", "destination": "Basel SBB", "date": DAY, "time": "22:00"},
+                 {"origin": "Milano Centrale", "destination": "Basel SBB", "date": "1990-01-01", "time": "22:00"}):
+        payload = asyncio.run(call(TRAINS, source(offline), "get_connections", args))
+        assert payload["status"] == "refused" and "connections" not in payload
 
 
 def test_without_internet_the_timetable_is_a_marked_sample():
