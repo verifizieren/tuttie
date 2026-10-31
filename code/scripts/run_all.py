@@ -1,29 +1,83 @@
-"""Start the registry, the marketplace, one node server per config and the assistant; Ctrl+C stops them all."""
+"""Start the registry, the marketplace, one node server per config and the assistant; Ctrl+C stops them all.
 
+Every line a service prints is prefixed with its name (`[registry]`, `[gaestehaus-am-rhein]`,
+`[tuttie]`, ...), coloured in a terminal, so twelve services in one window stay readable.
+Before starting, it warns if there is no OpenAI key: everything starts without one, but Tuttie
+cannot answer, and nothing else would say so.
+"""
+
+import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
+from dotenv import dotenv_values
+
 ROOT = Path(__file__).resolve().parent.parent
+COLOURS = [31, 32, 33, 34, 35, 36, 91, 92, 93, 94, 95, 96]  # ANSI foreground colours
+
+
+def services() -> list[tuple[str, list[str]]]:
+    """(name, command) for every service, in start order."""
+    found = [("registry", [sys.executable, "-m", "registry.app"]),
+             ("marketplace", [sys.executable, "-m", "marketplace.app"])]
+    for path in sorted((ROOT / "data" / "nodes").glob("*.json")):
+        name = path.stem.removeprefix("hotel-").removeprefix("basel-")
+        found.append((name, [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]))
+    found.append(("tuttie", [sys.executable, "-m", "assistant.app"]))
+    return found
+
+
+def key_warning(env_file: Path = ROOT / ".env", environ=os.environ) -> str | None:
+    """A warning if no usable OpenAI key is set (in the environment or in .env), else None.
+
+    Only checks that a key is there and is not the example placeholder; the key itself is
+    never printed.
+    """
+    key = environ.get("OPENAI_API_KEY") or (dotenv_values(env_file).get("OPENAI_API_KEY") if env_file.exists() else None)
+    if not key or key.strip() in {"", "sk-..."}:
+        where = "code/.env" if env_file.exists() else "code/.env (missing: cp .env.example .env)"
+        return (f"warning: no OPENAI_API_KEY in {where}. Everything starts, but Tuttie cannot "
+                "answer in the wallet. Tests and scripts/bargain_preview.py work without it.")
+    return None
+
+
+def prefix_output(name: str, stream, colour: int | None, width: int) -> None:
+    """Copy a service's output line by line, each line prefixed with the service's name."""
+    label = f"[{name}]".ljust(width + 2)
+    if colour is not None:
+        label = f"\033[{colour}m{label}\033[0m"
+    for line in stream:
+        sys.stdout.write(f"{label} {line}")
+        sys.stdout.flush()
 
 
 def main() -> None:
-    commands = [[sys.executable, "-m", "registry.app"], [sys.executable, "-m", "marketplace.app"]]
-    commands += [
-        [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]
-        for path in sorted((ROOT / "data" / "nodes").glob("*.json"))
-    ]
-    commands.append([sys.executable, "-m", "assistant.app"])
-    processes = [subprocess.Popen(cmd, cwd=ROOT) for cmd in commands]
+    """Start all services, show their output with names, stop all of them on Ctrl+C or when one exits."""
+    if warning := key_warning():
+        print(warning, file=sys.stderr)
+    to_start = services()
+    width = max(len(name) for name, _ in to_start)
+    colourful = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}  # lines appear when printed, not when a buffer fills
+    processes: list[tuple[str, subprocess.Popen]] = []
+    for index, (name, cmd) in enumerate(to_start):
+        process = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   text=True, bufsize=1)
+        colour = COLOURS[index % len(COLOURS)] if colourful else None
+        threading.Thread(target=prefix_output, args=(name, process.stdout, colour, width), daemon=True).start()
+        processes.append((name, process))
     try:
-        while all(p.poll() is None for p in processes):
+        while all(p.poll() is None for _, p in processes):
             time.sleep(0.5)
-        print("a service exited, stopping the others", file=sys.stderr)
+        exited = [name for name, p in processes if p.poll() is not None]
+        print(f"{', '.join(exited)} exited, stopping the others", file=sys.stderr)
     except KeyboardInterrupt:
         pass
     finally:
-        stop(processes)
+        stop([p for _, p in processes])
 
 
 def stop(processes: list[subprocess.Popen], grace_s: float = 3) -> None:
