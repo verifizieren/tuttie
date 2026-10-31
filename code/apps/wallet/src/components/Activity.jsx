@@ -100,16 +100,15 @@ function order(hotels) {
     rank(a) - rank(b) || (a.agreed ?? a.offer?.price_chf ?? 1e9) - (b.agreed ?? b.offer?.price_chf ?? 1e9));
 }
 
-/** What happened on the market: the cards to swipe, then the hotel the user chose. Businesses
- *  with forged or missing seals are not shown at all: Tuttie never asked them. */
-function Market({ state, readOnly, onPick, onLean }) {
+/** What happened on the market: the hotel the user chose (the cards to swipe are shown on
+ *  their own, see Activity). Businesses with forged or missing seals are not shown at all:
+ *  Tuttie never asked them. */
+function Market({ state }) {
   const [openId, setOpenId] = useState(null);
-  const swiping = state.cards && !state.picked && !readOnly && Boolean(onPick);
   // The chosen hotel, until the booking card replaces it.
   const liked = state.booking ? [] : order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
   return (
     <>
-      {swiping && <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} />}
       {liked.map(([nodeId, hotel]) => (
         <HotelRow key={nodeId} hotel={hotel} overBudget={false}
                   open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
@@ -128,26 +127,37 @@ function Market({ state, readOnly, onPick, onLean }) {
 export default function Activity({ state, readOnly = false, onPick, onLean, reveal = null }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
+  const swiping = Boolean(state.cards && !state.picked && !readOnly && onPick);
   // New content comes last; bring it into view when it arrives.
-  // The cards to swipe are shown from their top, so the whole card is in view.
   useEffect(() => {
-    if (readOnly || !box.current) return;
-    const deck = state.cards && !state.picked && box.current.querySelector(".deck");
-    const top = deck ? deck.offsetTop - 8 : box.current.scrollHeight;
-    box.current.scrollTo({ top, behavior: "smooth" });
-  }, [readOnly, state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
+    if (readOnly || swiping || !box.current) return;
+    box.current.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" });
+  }, [readOnly, swiping, state.turns.length, last?.answer, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
+  // The cards to swipe get the card's space to themselves, in place: no list behind them.
+  if (swiping) {
+    return (
+      <div className="activity swiping">
+        <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} />
+      </div>
+    );
+  }
   const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
+  // What Tuttie did stays (steps, the chosen hotel, the booking); of what it said, only its
+  // current answer is shown. The history (readOnly) keeps every answer.
+  const current = state.turns.length - 1;
   return (
     <div className="activity" ref={box} data-scroll>
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
           {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
           <Steps turn={turn} latest={latest} />
-          {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} onLean={onLean} />}
+          {i === state.marketTurn && state.request && <Market state={state} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
-          {turn.answer && <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />}
+          {turn.answer && (readOnly || i === current) && (
+            <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />
+          )}
         </div>
       ))}
     </div>
