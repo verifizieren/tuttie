@@ -308,6 +308,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 @keyframes sheet { from { transform: translateY(110%); } }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
+.sheet-terms { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.sheet-terms span { display: block; }
 .sheet .seal-list { margin-bottom: 16px; background: #2a2a2e; }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sheet-buttons button { padding: 15px; border-radius: 16px; font-size: 16px; }

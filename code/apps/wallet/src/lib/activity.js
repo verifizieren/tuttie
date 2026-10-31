@@ -19,8 +19,8 @@ export const EMPTY = {
   cards: null,          // the hotels to swipe (assistant/cards.py), once the offers are in
   swipes: [],           // queued live commands; preserve rapid consecutive choices
   picked: null,         // node ids the user liked
-  approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate } while the user decides
-  booking: null,        // the latest { id, hotel, total, date, room, extras, checked, seals, uid, payments }; each stays in its turn
+  approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate, terms } while the user decides
+  booking: null,        // the latest { id, hotel, total, date, room, rate, extras, checked, seals, uid, payments }; each stays in its turn
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
   mood: "neutral",      // how it feels (assistant/agent.py MOODS)
@@ -191,7 +191,7 @@ export function applyEvent(state, event) {
     const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true, at);
     return withBooking({ ...base, phase: "booked", bookingTurn: turnOf(base, at) },
                        { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
-                         extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
+                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
                          payments: [] });
   }
 
@@ -199,7 +199,7 @@ export function applyEvent(state, event) {
     if (event.status === "pending") {
       return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
         hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid,
-        offerMandate: detail.offer_mandate || null } };
+        offerMandate: detail.offer_mandate || null, terms: detail.terms || null } };
     }
     const approved = event.status === "approved";
     return { ...progress(state, "tool", approved ? "Booking…" : "You declined", !approved, at), approval: null,

@@ -1,4 +1,6 @@
-// The approval sheet: Tuttie wants to pay a business and waits for the user. Approving runs a
+// The approval sheet: Tuttie wants to pay a business and waits for the user. A booking shows the
+// terms the user's key signs with the amount (room, night and rate, i.e. the cancellation
+// terms), so a flexible and a non-refundable rate never look the same. Approving runs a
 // Face ID-style confirmation (a short scan, then a check) before the decision is sent; the
 // assistant signs it with the user's key, and the hotel only books with that signature and
 // only for exactly this amount. Declining is immediate. A booking may also offer a mandate for
@@ -12,6 +14,7 @@ const SCAN_MS = 1100;   // how long the face scan runs
 const CHECK_MS = 550;   // how long the check is shown before the sheet goes
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 function FaceScan({ done }) {
   return (
@@ -59,6 +62,12 @@ export default function ApprovalSheet({ approval }) {
         {approval.hotel}
       </div>
       <div className="sheet-amount">CHF {approval.amount}</div>
+      {approval.terms && (
+        <div className="sheet-terms">
+          {approval.terms.room_type} room · {day(approval.terms.date)}
+          {approval.terms.rate && <span>{approval.terms.rate}</span>}
+        </div>
+      )}
       <SealList seals={approval.seals} uid={approval.uid} />
       {offer && (
         <label className="mandate">

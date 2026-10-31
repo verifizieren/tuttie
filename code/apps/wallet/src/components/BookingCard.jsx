@@ -36,7 +36,8 @@ export default function BookingCard({ booking }) {
     <div className="booking">
       <div className="booking-top">
         <SealMarks seals={booking.seals} />
-        <span className="booking-hotel">{booking.hotel}<small>{day(booking.date)} · {booking.id}</small></span>
+        <span className="booking-hotel">{booking.hotel}<small>{day(booking.date)} · {booking.id}</small>
+          {booking.rate && <small>{booking.room} room · {booking.rate}</small>}</span>
         <span className="booking-total">CHF {booking.total}</span>
       </div>
       {booking.payments.map((payment, i) => (
