@@ -69,7 +69,7 @@ def agent_only(request: Request) -> None:
 
 
 @router.post("/voice/token")
-def voice_token(request: Request) -> dict:
+async def voice_token(request: Request) -> dict:
     """A LiveKit token for a fresh room tied to this browser's conversation."""
     if not configured():
         raise HTTPException(status_code=503, detail="voice is not configured")
@@ -109,7 +109,7 @@ async def live_only(bus):
 
 
 @router.get("/voice/events", dependencies=[Depends(agent_only)])
-def voice_events(room: str, request: Request) -> StreamingResponse:
+async def voice_events(room: str, request: Request) -> StreamingResponse:
     """New events of the room's conversation as Server-Sent Events, for the voice agent to speak from."""
     return StreamingResponse(live_only(room_conversation(request, room).bus), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

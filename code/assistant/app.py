@@ -61,8 +61,14 @@ async def session_cookie(request: Request, call_next):
     return response
 
 
-def conversation(request: Request) -> Conversation:
-    """The calling browser's conversation."""
+async def conversation(request: Request) -> Conversation:
+    """The calling browser's conversation.
+
+    Async on purpose, like every route that touches conversations: FastAPI runs plain `def`
+    dependencies and routes in worker threads, where two first requests of one browser could
+    each create a conversation (one silently lost), and approvals or cancels would wake the
+    event loop from a foreign thread.
+    """
     return request.app.state.conversations.get(request.state.session_id)
 
 
@@ -94,7 +100,7 @@ async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> 
 
 
 @app.post("/reset")
-def reset(conv: Conversation = Depends(conversation)) -> dict:
+async def reset(conv: Conversation = Depends(conversation)) -> dict:
     """Start this conversation over: stop its chats, decline its approvals, clear its timeline."""
     conv.reset()
     return {"ok": True}
@@ -130,13 +136,13 @@ async def identity(conv: Conversation = Depends(conversation)) -> dict:
 
 
 @app.get("/approvals/pending")
-def pending_approvals(conv: Conversation = Depends(conversation)) -> list[dict]:
+async def pending_approvals(conv: Conversation = Depends(conversation)) -> list[dict]:
     """Approvals waiting for this user's decision."""
     return list(conv.approvals.pending.values())
 
 
 @app.post("/approvals/{approval_id}")
-def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(conversation)) -> dict:
+async def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(conversation)) -> dict:
     """Record the user's decision; it is signed with the user's key and wakes the waiting chat."""
     if req.decision not in ("approved", "declined"):
         raise HTTPException(status_code=422, detail="decision must be approved or declined")
@@ -147,14 +153,14 @@ def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(
 
 
 @app.get("/history")
-def history(response: Response, conv: Conversation = Depends(conversation)) -> list[dict]:
+async def history(response: Response, conv: Conversation = Depends(conversation)) -> list[dict]:
     """This conversation's timeline so far, so the wallet can decide on opening whether to start fresh."""
     response.headers["X-Conversation-ID"] = conv.id
     return conv.bus.history
 
 
 @app.get("/events")
-def events(conversation_id: str | None = None, conv: Conversation = Depends(conversation)) -> StreamingResponse:
+async def events(conversation_id: str | None = None, conv: Conversation = Depends(conversation)) -> StreamingResponse:
     """This conversation's timeline as Server-Sent Events."""
     if conversation_id is not None and conversation_id != conv.id:
         raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
