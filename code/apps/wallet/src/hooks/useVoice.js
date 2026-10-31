@@ -27,6 +27,7 @@ function visible() {
  * @param onSpeech  ({ id, text, done }) => void: Tuttie's words so far, as it speaks them
  * @param onLevels  (speaking, hearing) => void: both voice levels (0..1), every LEVEL_MS while live,
  *                  and (0, 0) when voice stops; feeds Tuttie's presence (hooks/usePresence.js)
+ * @param conversationId  the conversation on screen (null while loading): the room belongs to it
  * @returns { state, unlockAudio, muted, toggleMute }: state is "off" | "connecting" | "ready"
  *          (joined, waiting in the background) | "live" (voice mode on) | "unavailable"; call
  *          unlockAudio() from a tap if the browser blocked Tuttie's voice; muted keeps the
@@ -53,7 +54,10 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
 
   // Join the room ahead, microphone off, while the wallet is on screen.
   useEffect(() => {
-    if (!shown) return undefined;
+    // Only once the conversation is loaded: its request also sets this browser's session cookie,
+    // and a token fetched before that would tie the room to another session (voice would go
+    // into a conversation the screen does not show).
+    if (!shown || !conversationId) return undefined;
     let closed = false, lk = null, retry = null;
     setState("connecting");
     (async () => {
