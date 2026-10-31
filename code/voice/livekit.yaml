@@ -4,8 +4,8 @@
 #     (assistant/voice.py), so it rides on the same https origin as the wallet;
 #   - media goes straight to the public IP: TCP 4042 and UDP 4043 (if the network lets it
 #     through). The IP comes from LIVEKIT_NODE_IP (--node-ip). The team server lets no UDP in
-#     and iPhones don't use plain TCP, so phones need the TURN relay: TLS on TCP 4044, added by
-#     scripts/run_all.py when LIVEKIT_TURN_DOMAIN/_CERT/_KEY are set (scripts/get_cert.sh).
+#     and iPhones don't use plain TCP, so phones go through the TURN relay on TCP 4044
+#     (voice/turnserver.conf), added by scripts/run_all.py when TURN_SECRET is set.
 # API key and secret come from the environment (LIVEKIT_KEYS="<key>: <secret>", set by run_all.py).
 port: 7880
 rtc:

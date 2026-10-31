@@ -42,6 +42,15 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   signaling goes through the assistant on the wallet's own https origin (`/rtc`) and media uses
   TCP 4042 / UDP 4043 on `LIVEKIT_NODE_IP`.
 
+Phones: the team server lets no UDP in, and iPhones don't use LiveKit's plain TCP port, so
+their ICE failed (seen in the LiveKit log as failed UDP pairs). A TURN relay (coturn,
+`turnserver.conf`) on plain TCP 4044 carries their audio to LiveKit on the same host; LiveKit
+hands it to every client. It relays only to this server's own IP, and the audio stays
+encrypted end to end (DTLS-SRTP), so it needs no certificate. coturn is unpacked without root:
+`apt-get download coturn libpq5 libevent-extra-2.1-7t64 libevent-openssl-2.1-7t64
+libevent-pthreads-2.1-7t64`, then `dpkg-deb -x <deb> ~/.local/coturn/root` for each; set
+`TURN_SECRET` in `.env`.
+
 Setup: `code/.env` needs `ELEVENLABS_KEY`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`,
 `LIVEKIT_URL` and `LIVEKIT_NODE_IP` (see `.env.example`), and the LiveKit server binary in
 `~/.local/livekit/livekit-server` (or `LIVEKIT_SERVER`). `scripts/run_all.py` then starts the

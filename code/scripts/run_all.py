@@ -40,28 +40,46 @@ def services(voice: dict | None = None) -> list[tuple[str, list[str]]]:
         command = [str(LIVEKIT_SERVER), *livekit_config(voice)]
         if voice.get("LIVEKIT_NODE_IP"):
             command += ["--node-ip", voice["LIVEKIT_NODE_IP"]]
+        if turn_configured(voice):
+            found.append(("turn", turn_command(voice)))
         found.append(("livekit", command))
         if voice.get("ELEVENLABS_KEY"):
             found.append(("voice", [sys.executable, "-m", "voice.agent", "start"]))
     return found
 
 
-TURN_TLS_PORT = 4044  # in the team server's open range; TCP, so it gets through where UDP does not
+TURN_PORT = 4044  # plain TCP, inside the team server's open range
+TURN_USER = "tuttie"
+TURNSERVER = Path(os.environ.get("TURNSERVER", Path.home() / ".local" / "coturn" / "root" / "usr" / "bin" / "turnserver"))
+
+
+def turn_configured(voice: dict) -> bool:
+    """The TURN relay runs with a secret, the server's public IP and an installed coturn."""
+    return bool(voice.get("TURN_SECRET") and voice.get("LIVEKIT_NODE_IP")) and TURNSERVER.exists()
+
+
+def turn_command(voice: dict) -> list[str]:
+    """coturn with voice/turnserver.conf, relaying only to LiveKit on this server."""
+    libs = TURNSERVER.parent.parent / "lib" / "x86_64-linux-gnu"  # coturn unpacked without root
+    return ["env", f"LD_LIBRARY_PATH={libs}", str(TURNSERVER), "-c", "voice/turnserver.conf",
+            "--user", f"{TURN_USER}:{voice['TURN_SECRET']}", "--allowed-peer-ip", voice["LIVEKIT_NODE_IP"],
+            "--listening-ip", voice["LIVEKIT_NODE_IP"], "--relay-ip", voice["LIVEKIT_NODE_IP"],
+            "--pidfile", str(TURNSERVER.parent.parent.parent / "turnserver.pid"),
+            "--db", str(TURNSERVER.parent.parent.parent / "turndb")]  # its own files, not /var/lib
 
 
 def livekit_config(voice: dict) -> list[str]:
-    """LiveKit's config arguments: voice/livekit.yaml, plus the TURN relay when a certificate is set.
+    """LiveKit's config arguments: voice/livekit.yaml, plus the TURN relay when it runs.
 
-    Phones often can't reach the media ports directly (the team server lets no UDP through, and
-    iPhones don't fall back to plain TCP); TURN over TLS on TURN_TLS_PORT relays their audio.
-    It needs a certificate for LIVEKIT_TURN_DOMAIN (scripts/get_cert.sh).
+    Phones often can't reach the media ports directly (the team server lets no UDP in, and
+    iPhones don't use plain TCP); LiveKit then hands them the relay (voice/turnserver.conf).
     """
-    config = (ROOT / "voice" / "livekit.yaml").read_text()
-    if not all(voice.get(k) for k in ("LIVEKIT_TURN_DOMAIN", "LIVEKIT_TURN_CERT", "LIVEKIT_TURN_KEY")):
+    if not turn_configured(voice):
         return ["--config", "voice/livekit.yaml"]
-    turn = (f"turn:\n  enabled: true\n  domain: {voice['LIVEKIT_TURN_DOMAIN']}\n  tls_port: {TURN_TLS_PORT}\n"
-            f"  cert_file: {voice['LIVEKIT_TURN_CERT']}\n  key_file: {voice['LIVEKIT_TURN_KEY']}\n")
-    return ["--config-body", config + turn]
+    relay = (f"rtc:\n  turn_servers:\n    - host: {voice['LIVEKIT_NODE_IP']}\n      port: {TURN_PORT}\n"
+             f"      protocol: tcp\n      username: {TURN_USER}\n      credential: {voice['TURN_SECRET']}\n")
+    config = (ROOT / "voice" / "livekit.yaml").read_text().replace("rtc:\n", relay, 1)
+    return ["--config-body", config]
 
 
 def key_warning(env_file: Path = ROOT / ".env", environ=os.environ) -> str | None:

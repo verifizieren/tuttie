@@ -64,9 +64,15 @@ def test_output_lines_are_prefixed_with_the_service_name(monkeypatch):
     assert coloured.getvalue() == "\033[32m[tuttie]\033[0m x\n"
 
 
-def test_the_turn_relay_is_added_only_with_a_certificate():
+def test_the_turn_relay_runs_and_is_handed_to_livekit_only_when_configured(monkeypatch, tmp_path):
     assert run_all.livekit_config({}) == ["--config", "voice/livekit.yaml"]
-    flag, body = run_all.livekit_config({"LIVEKIT_TURN_DOMAIN": "web4.example", "LIVEKIT_TURN_CERT": "/c.pem",
-                                         "LIVEKIT_TURN_KEY": "/k.pem"})
+    turnserver = tmp_path / "usr" / "bin" / "turnserver"
+    turnserver.parent.mkdir(parents=True)
+    turnserver.touch()
+    monkeypatch.setattr(run_all, "TURNSERVER", turnserver)
+    voice = {"TURN_SECRET": "s3cret", "LIVEKIT_NODE_IP": "203.0.113.5"}
+    flag, body = run_all.livekit_config(voice)
     assert flag == "--config-body" and "tcp_port: 4042" in body
-    assert "turn:\n  enabled: true\n  domain: web4.example\n  tls_port: 4044" in body and "key_file: /k.pem" in body
+    assert "turn_servers:\n    - host: 203.0.113.5\n      port: 4044\n      protocol: tcp" in body
+    command = run_all.turn_command(voice)
+    assert "--allowed-peer-ip" in command and command[command.index("--allowed-peer-ip") + 1] == "203.0.113.5"
