@@ -16,6 +16,7 @@ def test_every_service_gets_a_short_unique_name():
     names = [name for name, _ in run_all.services()]
     assert names[:2] == ["registry", "marketplace"] and names[-1] == "tuttie"
     assert "rheinblick" in names and "guesthouse-am-rhein" in names
+    assert "weather" in names and "trains" in names
     assert len(names) == len(set(names))
 
 

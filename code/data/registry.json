@@ -238,6 +238,65 @@
     ]
   },
   {
+    "node_id": "ch.transport.timetable",
+    "name": "Swiss train timetable (opendata)",
+    "uid": "CHE-745.021.597",
+    "public_key": "HskXnukHfMakTsK+Dsr7M4x8d8dK/lWhl/Yhv/lf8fI=",
+    "endpoint": "http://localhost:4012",
+    "kind": "service",
+    "capabilities": [
+      "train_timetable"
+    ],
+    "tags": [
+      "train",
+      "timetable",
+      "public-transport",
+      "switzerland",
+      "basel"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "dQ68qPmdmzZxLY5jCVyUqdW8Zwq+6CVxxm6WGcN83m6wLm6/5fHUnkIbQqYvtj/D5NmvCevi6Gq91XJY3t48CQ=="
+      },
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "Px3xq7BRdL6r6EAn1LOCnuOkfnY8R8TXRrIQz3t292jMvATwiR+xfYH+bhh8Z0vxuyHc7EA3ho1Yz72GewbZDQ=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.weather.open-meteo",
+    "name": "Weather service (Open-Meteo)",
+    "uid": "CHE-681.790.277",
+    "public_key": "wxX+WHZiPw9TeQl0AgYzw5FUm+JhQ90kCfkJOMF20f4=",
+    "endpoint": "http://localhost:4011",
+    "kind": "service",
+    "capabilities": [
+      "weather_forecast"
+    ],
+    "tags": [
+      "weather",
+      "forecast",
+      "switzerland",
+      "basel"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "CZCrtDggL/2nxkicbRuqz9bDf/nC07tk8Z+/Xk7cHNPtXxynlpk3Ukw90rY+07KRDL45dQBI0iKU6319/mEIAA=="
+      },
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "BvBT9oSKEcAM4ja4Lnzj8sL8UOcVn3IGq8wRL9BWGiWVYfLNAODXe3e2YK4lp8Vq+upLo+zDGqX1kAZm7cy1AQ=="
+      }
+    ]
+  },
+  {
     "node_id": "ch.tuttie.alex-muster",
     "name": "Tuttie",
     "uid": null,

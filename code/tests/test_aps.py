@@ -158,6 +158,8 @@ def test_demo_registry_verdicts():
         "ch.legal.consumer-law": "gold",
         "ch.legal.advisor": "grey",
         "ch.tuttie.alex-muster": "blue",
+        "ch.weather.open-meteo": "gold",     # services/: public information, signed
+        "ch.transport.timetable": "gold",
     }
     assert "licensed_legal_ch" in evaluate_record(records["ch.legal.consumer-law"], auths)["capabilities"]
     assert "licensed_legal_ch" not in evaluate_record(records["ch.legal.advisor"], auths)["capabilities"]
@@ -262,7 +264,8 @@ def test_demo_registry_uids():
     records = json.loads((DATA / "registry.json").read_text())
     uids = {r["node_id"]: evaluate_record(r, auths)["uid"] for r in records}
     assert {node_id for node_id, uid in uids.items() if uid} == {
-        "ch.basel.hotel-rheinblick", "ch.basel.hotel-gundeli", "ch.basel.alpina-grand", "ch.basel.gaestehaus-am-rhein"}
+        "ch.basel.hotel-rheinblick", "ch.basel.hotel-gundeli", "ch.basel.alpina-grand", "ch.basel.gaestehaus-am-rhein",
+        "ch.weather.open-meteo", "ch.transport.timetable"}
     assert all(is_valid_uid(r["uid"]) for r in records if r["uid"])
 
 

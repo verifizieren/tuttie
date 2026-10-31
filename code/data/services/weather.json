@@ -1,0 +1,28 @@
+{
+  "node_id": "ch.weather.open-meteo",
+  "name": "Weather service (Open-Meteo)",
+  "uid": "CHE-681.790.277",
+  "port": 4011,
+  "kind": "service",
+  "service": "weather",
+  "offline_sample": true,
+  "capabilities": [
+    "weather_forecast"
+  ],
+  "tags": [
+    "weather",
+    "forecast",
+    "switzerland",
+    "basel"
+  ],
+  "seals": [
+    {
+      "issuer": "handelsregister-bs",
+      "tier": "gold"
+    },
+    {
+      "issuer": "adobe",
+      "tier": "blue"
+    }
+  ]
+}

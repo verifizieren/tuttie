@@ -34,6 +34,8 @@ def services(voice: dict | None = None) -> list[tuple[str, list[str]]]:
     for path in sorted((ROOT / "data" / "nodes").glob("*.json")):
         name = path.stem.removeprefix("hotel-").removeprefix("basel-")
         found.append((name, [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]))
+    for path in sorted((ROOT / "data" / "services").glob("*.json")):  # weather, trains (services/server.py)
+        found.append((path.stem, [sys.executable, "-m", "services.server", "--config", str(path.relative_to(ROOT))]))
     found.append(("tuttie", [sys.executable, "-m", "assistant.app"]))
     voice = voice or {}
     if voice.get("LIVEKIT_API_KEY") and voice.get("LIVEKIT_API_SECRET") and LIVEKIT_SERVER.exists():

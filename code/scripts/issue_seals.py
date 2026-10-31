@@ -24,6 +24,7 @@ from aps.seals import issue_seal  # noqa: E402
 
 NODES_DIR = ROOT / "data" / "nodes"
 AGENTS_DIR = ROOT / "data" / "agents"
+SERVICES_DIR = ROOT / "data" / "services"  # public information services (weather, trains): services/server.py
 USER_KEY_ID = "user"
 REGISTRY_PATH = ROOT / "data" / "registry.json"
 
@@ -56,7 +57,7 @@ def build_record(config: dict) -> dict:
 
 
 def main() -> None:
-    configs = sorted(NODES_DIR.glob("*.json")) + sorted(AGENTS_DIR.glob("*.json"))
+    configs = sorted(NODES_DIR.glob("*.json")) + sorted(SERVICES_DIR.glob("*.json")) + sorted(AGENTS_DIR.glob("*.json"))
     records = [build_record(json.loads(p.read_text())) for p in configs]
     REGISTRY_PATH.write_text(json.dumps(records, indent=2) + "\n")
     for record in records:

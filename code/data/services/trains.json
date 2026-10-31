@@ -1,0 +1,29 @@
+{
+  "node_id": "ch.transport.timetable",
+  "name": "Swiss train timetable (opendata)",
+  "uid": "CHE-745.021.597",
+  "port": 4012,
+  "kind": "service",
+  "service": "trains",
+  "offline_sample": true,
+  "capabilities": [
+    "train_timetable"
+  ],
+  "tags": [
+    "train",
+    "timetable",
+    "public-transport",
+    "switzerland",
+    "basel"
+  ],
+  "seals": [
+    {
+      "issuer": "handelsregister-bs",
+      "tier": "gold"
+    },
+    {
+      "issuer": "adobe",
+      "tier": "blue"
+    }
+  ]
+}
