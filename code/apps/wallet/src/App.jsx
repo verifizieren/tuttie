@@ -18,7 +18,7 @@ import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import { sendChat } from "./lib/api.js";
-import { EXPRESSION, statusLine } from "./lib/activity.js";
+import { BUSY, EXPRESSION, THINKING, statusLine } from "./lib/activity.js";
 
 const STATUS = {
   closed: "Tap Tuttie to talk",
@@ -27,6 +27,7 @@ const STATUS = {
 };
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
+const THINKING_MS = 1600;  // how long each thinking look lasts
 const OPEN_GUARD_MS = 700;
 
 export default function App() {
@@ -73,8 +74,18 @@ export default function App() {
   }
 
   // While Tuttie works, its face follows what is happening on the agent web.
+  // While it is busy, it moves through a few thinking looks instead of holding one.
   useEffect(() => {
-    if (mode === "voice" && EXPRESSION[agent.phase]) face.current?.set(EXPRESSION[agent.phase], 500);
+    if (mode !== "voice" || !EXPRESSION[agent.phase]) return;
+    face.current?.set(EXPRESSION[agent.phase], 500);
+    if (!BUSY.has(agent.phase)) return;
+    let i = 0;
+    const timer = setInterval(() => {
+      const { name, look } = THINKING[i++ % THINKING.length];
+      face.current?.set(name, 600);
+      face.current?.lookAt(look[0], look[1], 600);
+    }, THINKING_MS);
+    return () => clearInterval(timer);
   }, [agent.phase, mode, face]);
 
   // An approval needs the user: open the card if it is closed.

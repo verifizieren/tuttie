@@ -95,6 +95,19 @@ export function statusLine(state) {
   }
 }
 
+/** While Tuttie works it does not hold one face: it moves through these looks, each with a
+ *  glance (x, y in -1..1), like someone thinking. Names from lib/face.js. */
+export const THINKING = [
+  { name: "skepticism", look: [-.6, -.5] },
+  { name: "confusion", look: [.5, -.4] },
+  { name: "suspicion", look: [0, .2] },
+  { name: "neutral", look: [.7, -.6] },
+  { name: "skepticism", look: [-.3, .3] },
+];
+
+/** Phases in which Tuttie is busy and the face cycles through THINKING. */
+export const BUSY = new Set(["thinking", "posted", "negotiating", "booking"]);
+
 /** The face's expression for a phase (names from lib/face.js). */
 export const EXPRESSION = {
   thinking: "skepticism", posted: "amazement", offers: "happiness", negotiating: "suspicion",
