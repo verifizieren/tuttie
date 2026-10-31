@@ -15,10 +15,11 @@ async function post(path, body) {
   return response.json();
 }
 
-/** Ask Tuttie something; the answer arrives later as an "answer" event on the stream.
- *  `firstTool` fixes Tuttie's first step (after swiping the cards: "negotiate"). */
-export const sendChat = (message, firstTool = null, conversationId = null) =>
-  post("/chat", { message, first_tool: firstTool, conversation_id: conversationId });
+/** Ask Tuttie something as a new turn; returns { turn_id }. The answer arrives later as an
+ *  "answer" event with that turn id. `firstTool` fixes Tuttie's first step (after swiping the
+ *  cards: "book"); `said` is what the user sees as their message, if not the message itself. */
+export const sendChat = (message, firstTool = null, conversationId = null, said = null) =>
+  post("/chat", { message, first_tool: firstTool, conversation_id: conversationId, said });
 
 /** The user's decision on a pending approval; the assistant signs it with the user's key.
  *  `allowMandate` also signs the mandate the approval offered (e.g. for the city tax). */

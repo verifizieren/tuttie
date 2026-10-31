@@ -169,7 +169,7 @@ export default function App() {
     setMode("voice");  // Tuttie is awake while it works
     setError("");
     try {
-      await sendChat(text, firstTool, agent.id);
+      await sendChat(text, firstTool, agent.id, shown);
     } catch (e) {
       setError(e.message || "Tuttie is unreachable right now");
     }
