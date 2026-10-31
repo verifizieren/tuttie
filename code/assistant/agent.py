@@ -197,3 +197,6 @@ class Assistant:
             return {"error": f"bad arguments for {name}: {error}"}
         except httpx.HTTPError as error:
             return {"error": f"{name} failed: node unreachable ({type(error).__name__})"}
+        except Exception as error:  # one failing tool must not end the whole turn
+            log.exception("tool %s failed", name)
+            return {"error": f"{name} failed ({type(error).__name__}); do not retry it in this turn"}
