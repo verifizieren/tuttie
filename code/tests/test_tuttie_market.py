@@ -6,7 +6,7 @@ Runs the real registry, market and company agents in process; only the LLM is a 
 import asyncio
 import copy
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -21,7 +21,7 @@ from marketplace.app import create_app as create_market_app
 from marketplace.market import Market
 from assistant.approvals import ApprovalBook
 from assistant.tools import Toolbox
-from negotiation_helpers import registry_lookup
+from negotiation_helpers import RHEINBLICK, registry_lookup, signed_offer
 from node.server import create_app
 from registry.app import app as registry_app
 from tests.mcp_helpers import in_process_link
@@ -231,3 +231,36 @@ def test_negotiate_can_be_limited_to_some_hotels():
     result, _, _ = run_find(negotiate_budget=300, favourites=["ch.basel.alpina-grand"], date="2026-11-14",
                             tags=["basel-sbb"], budget_chf=300)
     assert [o["hotel"] for o in result["negotiation"]["outcomes"]] == ["Alpina Grand Basel"]
+
+
+def relayed(node_id, offer_id, request_id="rq-relay", valid_for=timedelta(hours=2)):
+    """A hotel's genuinely signed offer as the market relays it."""
+    envelope = signed_offer(node_id, offer_id=offer_id, request_id=request_id, valid_for=valid_for)
+    return {"node_id": node_id, "name": node_id, "offer": envelope["payload"], "envelope": envelope}
+
+
+def test_one_hotel_sending_two_offers_does_not_end_the_wait_for_the_others():
+    """The wait counts hotels, not offers: Rheinblick's two offers must not stop it before
+    Gästehaus (the second expected hotel) has offered. Rheinblick keeps one offer, its latest."""
+    other = "ch.basel.gaestehaus-am-rhein"
+    polls = {"n": 0}
+
+    def market(request):
+        polls["n"] += 1
+        offers = [relayed(RHEINBLICK, "of-a"), relayed(RHEINBLICK, "of-b")]
+        if polls["n"] >= 2:
+            offers.append(relayed(other, "of-c"))
+        return httpx.Response(200, json={"offers": offers})
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(market)) as http:
+            desk = MarketDesk(http, "http://reg", EventBus(), load_authorities(),
+                              market_url="http://market", offer_wait_s=3)
+
+            async def check(item, invited):
+                return {**item, "trust_tier": "gold", "source_step": 1}
+            desk.check = check
+            return await desk.collect("rq-relay", expected=2, invited={})
+
+    offers = asyncio.run(scenario())
+    assert sorted((o["node_id"], o["offer"]["offer_id"]) for o in offers) == [(other, "of-c"), (RHEINBLICK, "of-b")]

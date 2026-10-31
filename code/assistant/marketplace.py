@@ -112,20 +112,27 @@ class MarketDesk:
     async def collect(self, request_id: str, expected: int, invited: dict) -> list[dict]:
         """Poll the posting until every interested agent has offered (or time runs out).
 
-        Each offer is checked again by Tuttie and shown once on the timeline.
+        `expected` counts hotels, so the wait ends once that many *different* hotels have sent
+        an offer that checks out. A hotel keeps one offer: a newer one from the same hotel
+        replaces its earlier one (its latest word), so one eager hotel can neither end the
+        wait for the others nor fill the cards twice. Each offer is checked again by Tuttie
+        and shown once on the timeline.
         """
-        accepted: dict[str, dict] = {}
+        seen: set[str] = set()                  # offer ids already checked (valid or not)
+        by_hotel: dict[str, dict] = {}          # node_id -> its latest offer that checked out
         deadline = asyncio.get_running_loop().time() + self.offer_wait_s
         while True:
             response = await self.http.get(f"{self.market_url}/postings/{request_id}")
             for item in response.json().get("offers", []):
                 offer_id = item["offer"]["offer_id"]
-                if offer_id not in accepted:
-                    checked = await self.check(item, invited.get(item["node_id"], {}))
-                    if checked:
-                        accepted[offer_id] = checked
-            if len(accepted) >= expected or asyncio.get_running_loop().time() > deadline:
-                return list(accepted.values())
+                if offer_id in seen:
+                    continue
+                seen.add(offer_id)
+                checked = await self.check(item, invited.get(item["node_id"], {}))
+                if checked:
+                    by_hotel[checked["node_id"]] = checked
+            if len(by_hotel) >= expected or asyncio.get_running_loop().time() > deadline:
+                return list(by_hotel.values())
             await asyncio.sleep(POLL_S)
 
     async def check(self, item: dict, invited: dict) -> dict | None:
