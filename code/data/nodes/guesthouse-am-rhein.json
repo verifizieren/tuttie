@@ -18,7 +18,7 @@
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
     },
     "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
-    "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+    "wakes_on": ["posting.created", "posting.updated"]
   },
   "facts": {
     "profile": { "size": "small", "rooms_total": 7, "about": "Independent guesthouse in Kleinbasel, a few steps from the Rhine, run by its owner Anna since 2009." },
@@ -29,7 +29,7 @@
     "quiet_note": "A residential street by the Rhine; no bar, no traffic at night.",
     "rooms": [
       { "room_type": "double", "price_chf": 135, "rate": "free cancellation until 48h before arrival", "available": true },
-      { "room_type": "single", "price_chf": 95, "rate": "free cancellation until 48h before arrival", "available": true }
+      { "room_type": "single", "price_chf": 95, "rate": "free cancellation until 48h before arrival", "available": true, "note": "too small for a dog: guests with a dog get the double" }
     ],
     "policies": {
       "dogs_allowed": true,
