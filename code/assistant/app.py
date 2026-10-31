@@ -29,7 +29,7 @@ from assistant.events import EventBus  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
 from llm import LLM  # noqa: E402
 
-APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # console/, wallet/, shared/, ...
+APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # wallet/, shared/, old/ (first prototype), ...
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")
 
 bus = EventBus()
@@ -102,7 +102,7 @@ def phone_qr(request: Request) -> Response:
     """QR code of the phone page URL, as seen by the browser (works behind the reverse proxy)."""
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
-    url = os.environ.get("PHONE_URL", f"{scheme}://{host}/wallet/")
+    url = os.environ.get("PHONE_URL", f"{scheme}://{host}/old/wallet/")
     buffer = io.BytesIO()
     qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=2).save(buffer)
     return Response(buffer.getvalue(), media_type="image/svg+xml", headers={"X-Phone-Url": url})
@@ -116,13 +116,13 @@ def events() -> StreamingResponse:
 
 @app.get("/")
 def home() -> RedirectResponse:
-    return RedirectResponse("/console/")
+    return RedirectResponse("/wallet/")
 
 
 @app.get("/phone.html")
 def old_phone_link() -> RedirectResponse:
-    """Links and QR codes from before the apps/ split."""
-    return RedirectResponse("/wallet/")
+    """Links and QR codes from the first prototype."""
+    return RedirectResponse("/old/wallet/")
 
 
 app.mount("/", StaticFiles(directory=APPS_DIR, html=True), name="apps")
