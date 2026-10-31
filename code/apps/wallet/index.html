@@ -4,15 +4,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-visual">
 <meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tuttie">
+<link rel="manifest" href="/wallet/manifest.json">
+<link rel="apple-touch-icon" href="/wallet/icons/apple-touch-icon.png">
 <title>Tuttie</title>
 <link rel="stylesheet" href="/shared/tuttie.css">
 <style>
-  html, body { height: 100%; }
-  body { background: #000; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
-  .app { position: relative; max-width: 430px; height: 100dvh; margin: 0 auto; overflow: hidden;
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-tap-highlight-color: transparent; }
+  /* --app-h / --app-top follow the visible viewport (see fitViewport), so the on-screen
+     keyboard shrinks the app instead of pushing it off screen. */
+  .app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-h, 100dvh);
+         max-width: 430px; margin: 0 auto; overflow: hidden;
          --top: max(16px, env(safe-area-inset-top)); --bottom: max(16px, env(safe-area-inset-bottom));
          padding: var(--top) 16px var(--bottom); }
 
@@ -45,7 +53,8 @@
 
   /* Open: the other cards drop away and the face fills the screen. */
   .app.open .card:not(.agent) { transform: translateY(110vh); opacity: 0; }
-  .app.open .agent { top: var(--top); height: calc(100dvh - var(--top) - var(--bottom)); border-radius: 32px; }
+  .app.open .agent { top: var(--top); height: calc(var(--app-h, 100dvh) - var(--top) - var(--bottom)); border-radius: 32px; }
+  .app.typing { --bottom: 8px; }
   .app.open .agent canvas { height: 72%; }
   .app.typing .agent canvas { height: 46%; }
 
@@ -104,6 +113,20 @@
   const said = document.getElementById("said");
   const input = document.getElementById("text");
   const face = new TuttieFace(document.getElementById("eyes"));
+
+  // Size the app to the visible viewport and keep the page pinned (keyboard-safe on phones).
+  function fitViewport() {
+    const vv = window.visualViewport;
+    document.documentElement.style.setProperty("--app-h", `${vv ? vv.height : innerHeight}px`);
+    document.documentElement.style.setProperty("--app-top", `${vv ? vv.offsetTop : 0}px`);
+    window.scrollTo(0, 0);
+  }
+  fitViewport();
+  window.visualViewport?.addEventListener("resize", fitViewport);
+  window.visualViewport?.addEventListener("scroll", fitViewport);
+  window.addEventListener("resize", fitViewport);
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/wallet/sw.js").catch(() => {});
   face.sleep(0);
 
   let openedAt = 0;  // taps on the controls right after opening are ignored (no accidental keyboard)
@@ -123,7 +146,7 @@
     app.classList.add("typing");
     face.sleep();
     status.textContent = "Tap Tuttie to talk instead";
-    input.focus();
+    input.focus({ preventScroll: true });
   }
 
   function close() {
