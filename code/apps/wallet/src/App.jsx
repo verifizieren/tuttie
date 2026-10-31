@@ -25,6 +25,7 @@ import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
 import ApprovalSheet from "./components/ApprovalSheet.jsx";
 import BankCard from "./components/BankCard.jsx";
+import Boundary from "./components/Boundary.jsx";
 import Dock from "./components/Dock.jsx";
 import History from "./components/History.jsx";
 import useAgentStream from "./hooks/useAgentStream.js";
@@ -205,11 +206,16 @@ export default function App() {
       <BankCard index={1} color="black" />
       <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : currentTask(agent))}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
-        <Activity key={agent.id} state={agent} onPick={switching ? undefined : pick} onLean={lean} reveal={reveal} />
-        {showHistory && <History entries={history.filter(e => e.id !== agent.id)} open={historyChat.id}
-          error={historyChat.error} resuming={historyChat.resuming} onClose={() => setShowHistory(false)}
-          onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
-          onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />}
+        <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
+          <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} reveal={reveal} />
+        </Boundary>
+        {showHistory && <Boundary key={historyChat.id || "list"} className="history"
+                                   message="This earlier chat cannot be shown. Tap History in the dock to go back.">
+          <History entries={history.filter(e => e.id !== agent.id)} open={historyChat.id}
+            error={historyChat.error} resuming={historyChat.resuming} onClose={() => setShowHistory(false)}
+            onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
+            onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
+        </Boundary>}
         <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} />
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
