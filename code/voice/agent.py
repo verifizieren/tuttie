@@ -159,8 +159,9 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
                 agent.asked = None  # answered without (or after) a tool: no filler any more
                 say(spoken(event["summary"]))
                 continue
-            # The first tool for the request gets a filler; closing the card does not (a goodbye follows).
-            if event["kind"] not in ("thinking", "close") and (line := agent.filler()):
+            # The first tool for the request gets a filler; opening the turn, thinking and closing the
+            # card do not (a goodbye follows).
+            if event["kind"] not in ("turn", "thinking", "close") and (line := agent.filler()):
                 say(line)
             if prompt := update_for(event, said):
                 say(prompt)
