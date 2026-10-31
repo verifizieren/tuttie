@@ -24,6 +24,29 @@
     ]
   },
   {
+    "node_id": "ch.basel.hotel-gundeli",
+    "name": "Hotel Gundeli",
+    "public_key": "9F9e5fBWTPM44AS0MjqtAqZcHlyYBoJdG/DpaM2Re+I=",
+    "endpoint": "http://localhost:4006",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "basel-sbb",
+      "family"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "1zL82j/NsjcgUDFEd2hRJ+CvOxD5I8PsfPyVncMSCZoGo3tfxrjzZeE/4bdvd59NnkSweEGoU8sFxPuBLg7mAA=="
+      }
+    ]
+  },
+  {
     "node_id": "ch.basel.hotel-rheinblick",
     "name": "Hotel Rheinblick",
     "public_key": "jLSkoHn2gRTVnTmgrGaVofEGKASUUZrOu6/2juOxEeQ=",

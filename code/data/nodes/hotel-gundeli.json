@@ -1,0 +1,42 @@
+{
+  "node_id": "ch.basel.hotel-gundeli",
+  "name": "Hotel Gundeli",
+  "port": 4006,
+  "kind": "business",
+  "capabilities": ["can_book", "can_take_payment"],
+  "tags": ["hotel", "basel-sbb", "family"],
+  "seals": [
+    { "issuer": "handelsregister-bs", "tier": "gold" }
+  ],
+  "facts": {
+    "address": "Güterstrasse 40, 4053 Basel",
+    "distance_to_basel_sbb_m": 400,
+    "quiet": true,
+    "quiet_note": "Residential street on the Gundeldingen side, south exit of Basel SBB.",
+    "rooms": [
+      { "room_type": "double", "price_chf": 150, "rate": "standard, free cancellation until 24h before arrival", "available": true },
+      { "room_type": "family", "price_chf": 210, "rate": "family room for 2 adults and up to 2 children, free cancellation until 24h before arrival", "available": true }
+    ],
+    "policies": {
+      "dogs_allowed": false,
+      "children": "Children welcome; cots and children's beds on request.",
+      "check_in": "24h reception",
+      "late_arrival": "Reception is open 24 hours.",
+      "cancellation": "Free cancellation until 24h before arrival."
+    },
+    "add_ons": [
+      {
+        "id": "cot",
+        "item": "baby cot in the room",
+        "price_chf": 0,
+        "conditions": ["set up before arrival"]
+      },
+      {
+        "id": "child-breakfast",
+        "item": "breakfast for one child",
+        "price_chf": 12,
+        "conditions": ["children under 12, CHF 12 per night"]
+      }
+    ]
+  }
+}

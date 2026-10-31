@@ -126,6 +126,7 @@ def test_demo_registry_verdicts():
     assert tiers == {
         "ch.basel.hotel-rheinblick": "gold",
         "ch.basel.hotel-spalenhof": "blue",
+        "ch.basel.hotel-gundeli": "gold",
         "ch.basel.cheap-hotels": "broken",
         "ch.legal.consumer-law": "gold",
         "ch.legal.advisor": "grey",

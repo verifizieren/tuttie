@@ -40,7 +40,7 @@ SCHEMAS = [
         "Results are seal-checked: use only 'verified', never 'rejected'.",
         {
             "tags": {"type": "array", "items": {"type": "string"},
-                     "description": "Known tags: hotel, basel-sbb, dog-friendly, quiet, legal, consumer-law, switzerland"},
+                     "description": "Known tags: hotel, basel-sbb, dog-friendly, quiet, family, legal, consumer-law, switzerland"},
             "capability": {"type": "string", "enum": ["can_book", "can_take_payment", "licensed_legal_ch"],
                            "description": "Optional. Omit it for hotels; tags are enough."},
         },
