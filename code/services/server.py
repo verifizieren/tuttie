@@ -27,6 +27,7 @@ import httpx
 from fastapi import FastAPI
 from mcp.server.mcpserver import MCPServer
 
+from apidocs import api_docs
 from aps import load_signing_key, sign_envelope
 from node.mcp_tools import mcp_app
 from services import trains, weather
@@ -115,7 +116,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None) -> FastAPI:
         if http is None and client["http"] is not None:
             await client["http"].aclose()
 
-    app = FastAPI(title=config["name"], lifespan=lifespan)
+    app = FastAPI(title=config["name"], lifespan=lifespan, **api_docs())
     app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
     app.mount("/mcp", mcp_app(tools))
     return app

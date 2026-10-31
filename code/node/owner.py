@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from apidocs import api_docs
 from node.agent import DEFAULT_TOOLS, DEFAULT_WAKES_ON, PRIVATE_FACTS
 from node.catalog import tools_for
 from node.deployments import DeploymentStore
@@ -39,7 +40,7 @@ MAX_NOTE = 200
 def owner_app(config: dict, store: DeploymentStore, on_deploy: Callable[[], None]) -> FastAPI:
     """The owner app for one node. `config` is the node's live config, changed in place by a
     deploy; `on_deploy` tells the node's agent to re-read it."""
-    app = FastAPI(title="Owner view API")
+    app = FastAPI(title="Owner view API", **api_docs())
     # The token travels in a header, never a cookie, so open origins are safe.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
                        allow_headers=["Authorization", "Content-Type"])

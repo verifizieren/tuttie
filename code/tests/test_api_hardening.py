@@ -81,3 +81,26 @@ def test_voice_rooms_are_bounded(monkeypatch):
     with TestClient(app) as client:
         rooms = [client.post("/voice/token").json()["room"] for _ in range(5)]
         assert list(app.state.voice_rooms) == rooms[-3:]
+
+
+def test_api_docs_are_off_unless_asked_for(monkeypatch):
+    # /docs and /openapi.json listed every internal endpoint of the live assistant.
+    import json
+    from pathlib import Path
+
+    from fastapi.testclient import TestClient
+
+    from apidocs import api_docs
+    from assistant.app import app
+    from registry.app import app as registry_app
+    from services.server import create_app as service_app
+
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert TestClient(app).get(path).status_code == 404
+        assert TestClient(registry_app).get(path).status_code == 404
+    weather = json.loads((Path(__file__).resolve().parent.parent / "data" / "services" / "weather.json").read_text())
+    assert TestClient(service_app(weather)).get("/openapi.json").status_code == 404
+
+    monkeypatch.setenv("API_DOCS", "1")  # local development
+    assert api_docs() == {}
+    assert TestClient(service_app(weather)).get("/openapi.json").status_code == 200

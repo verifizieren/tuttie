@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel, ValidationError
 
+from apidocs import api_docs
 from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import booking_terms
 from aps.call import call_body
@@ -350,7 +351,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         async with tools.session_manager.run():
             yield
 
-    app = FastAPI(title=config["name"], lifespan=lifespan)
+    app = FastAPI(title=config["name"], lifespan=lifespan, **api_docs())
     app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
     app.mount("/mcp", mcp_app(tools))
     # The owner view (apps/owner): read the live business, deploy new settings (node/owner.py).

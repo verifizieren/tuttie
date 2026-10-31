@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+from apidocs import api_docs  # noqa: E402
 from assistant.conversations import Conversation, Conversations  # noqa: E402
 from assistant.inputs import UserText  # noqa: E402
 from assistant.voice import router as voice_router  # noqa: E402
@@ -47,7 +48,7 @@ async def lifespan(app: FastAPI):
         yield
 
 
-app = FastAPI(title="APS assistant", lifespan=lifespan)
+app = FastAPI(title="APS assistant", lifespan=lifespan, **api_docs())
 
 
 @app.exception_handler(RequestValidationError)

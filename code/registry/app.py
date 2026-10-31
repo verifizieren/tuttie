@@ -9,9 +9,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
+from apidocs import api_docs
+
 REGISTRY_PATH = Path(__file__).resolve().parent.parent / "data" / "registry.json"
 
-app = FastAPI(title="APS registry")
+app = FastAPI(title="APS registry", **api_docs())
 
 
 def load_records() -> list[dict]:
