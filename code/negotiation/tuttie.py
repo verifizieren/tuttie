@@ -17,6 +17,8 @@ counters and the final Agreement, which is what the user later approves on the p
 
 Strategy (`next_price`): open at OPENING_DISCOUNT below the offer, then move TUTTIE_STEP of the
 way toward the hotel's latest price; accept a hotel price within the limit once it is final or close.
+A signed Agreement counts only at or below Tuttie's last counter and with the offer's terms
+unchanged (`agreement_problem`); anything else ends the negotiation as "refused".
 """
 
 import asyncio
@@ -114,6 +116,10 @@ class TuttieNegotiator:
                 outcome.status, outcome.reason = "refused", reply.get("reason", "")
                 return outcome
             if reply.get("type") == "agreement":
+                problem = agreement_problem(offer, reply, min(limit, own))
+                if problem:
+                    outcome.status, outcome.reason = "refused", problem
+                    return outcome
                 outcome.status, outcome.price_chf, outcome.agreement = "agreed", reply["price_chf"], result.envelope
                 return outcome
             if reply.get("type") == "rejection":
@@ -138,6 +144,25 @@ class TuttieNegotiator:
         come back in the same order.
         """
         return await asyncio.gather(*(self.negotiate(o["node_id"], o["envelope"], context) for o in offers))
+
+
+TERMS = ("request_id", "offer_id", "item", "room_type", "date", "rate", "includes", "conditions")
+
+
+def agreement_problem(offer: Offer, reply: dict, ceiling: float) -> str:
+    """Why a signed "agreement" is not what Tuttie agreed to, or "" if it is.
+
+    A hotel only agrees to Tuttie's counter or to its own lower price, so the price must be at
+    most `ceiling` (Tuttie's last counter, which never exceeds the private limit). The terms
+    are the offer's, unchanged: only the price was negotiated.
+    """
+    price = reply.get("price_chf")
+    if not isinstance(price, (int, float)) or price > ceiling:
+        return "the agreement's price is above what Tuttie offered"
+    changed = [key for key in TERMS if reply.get(key) != getattr(offer, key)]
+    if changed:
+        return f"the agreement does not match the offer ({', '.join(changed)})"
+    return ""
 
 
 def best(outcomes: list[Outcome]) -> Outcome | None:

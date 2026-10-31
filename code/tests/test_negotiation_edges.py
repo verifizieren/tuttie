@@ -158,8 +158,53 @@ def test_hotel_lookup_of_an_unknown_node_finds_nothing(monkeypatch):
 def test_a_final_price_within_the_budget_is_accepted_with_a_matching_counter():
     """The hotel's last word fits the budget: Tuttie's next counter is exactly that price."""
     agreement = {"tool": "counter_offer", "type": "agreement", "request_id": "rq-neg1",
-                 "offer_id": "of-hotel-rheinblick-1", "round": 2, "item": "double room 2026-11-14", "price_chf": 175,
+                 "offer_id": "of-hotel-rheinblick-1", "round": 2, "item": "double room 2026-11-14", "room_type": "double",
+                 "date": "2026-11-14", "rate": "best rate, non-refundable", "price_chf": 175,
                  "includes": [], "conditions": ["best rate, non-refundable"], "valid_until": "2099-01-01T00:00:00Z"}
     outcome = negotiate([counter(175, final=True), agreement], limit=180)
     assert outcome.status == "agreed" and outcome.price_chf == 175 and outcome.rounds == 2
     assert [step["own_chf"] for step in outcome.history] == [162, 175]  # opened 10 % below 180, then matched
+
+
+def agreement(price, **changes):
+    """A signed-looking agreement about signed_offer()'s terms, as the hotel would copy them."""
+    return {"tool": "counter_offer", "type": "agreement", "request_id": "rq-neg1",
+            "offer_id": "of-hotel-rheinblick-1", "round": 1, "item": "double room 2026-11-14",
+            "room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable",
+            "price_chf": price, "includes": [], "conditions": ["best rate, non-refundable"],
+            "valid_until": "2099-01-01T00:00:00Z", **changes}
+
+
+def test_an_agreement_at_tuttie_s_counter_is_agreed():
+    outcome = negotiate([agreement(162)], limit=180)  # Tuttie opened at 162 (10 % below 180)
+    assert outcome.status == "agreed" and outcome.price_chf == 162
+
+
+@pytest.mark.parametrize("limit, price", [
+    (150, 900),   # far above the private budget
+    (200, 999),   # above the offer price
+    (200, 163),   # one franc above Tuttie's own counter (162)
+])
+def test_an_agreement_above_tuttie_s_counter_is_refused(limit, price):
+    outcome = negotiate([agreement(price)], limit=limit)
+    assert outcome.status == "refused" and outcome.price_chf is None and outcome.agreement is None
+    assert "above" in outcome.reason
+
+
+def test_an_agreement_without_a_budget_is_capped_by_the_offer_price():
+    negotiator = TuttieNegotiator(ScriptedPool([agreement(999)]), TUTTIE, load_signing_key(TUTTIE))
+    outcome = asyncio.run(negotiator.negotiate(RHEINBLICK, signed_offer(), Context()))
+    assert outcome.status == "refused"
+
+
+@pytest.mark.parametrize("changes", [
+    {"offer_id": "of-hotel-rheinblick-2"},
+    {"request_id": "rq-other"},
+    {"date": "2026-11-15"},
+    {"room_type": "single"},
+    {"rate": "flexible"},
+    {"includes": ["breakfast"]},
+])
+def test_an_agreement_with_other_terms_than_the_offer_is_refused(changes):
+    outcome = negotiate([agreement(162, **changes)], limit=180)
+    assert outcome.status == "refused" and "does not match the offer" in outcome.reason
