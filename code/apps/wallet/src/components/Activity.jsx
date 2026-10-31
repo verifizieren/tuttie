@@ -137,12 +137,16 @@ export default function Activity({ state, readOnly = false, onPick, onLean, onDe
   }, [readOnly, swiping, state.turns.length, last?.answer, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
-  // The cards to swipe get the card's space to themselves, in place: no list behind them.
+  // The cards to swipe get the card's space to themselves, in place: no list behind them, only
+  // Tuttie's short recommendation that came with them (as it is spoken, while it is spoken).
   if (swiping) {
+    const note = state.turns[state.marketTurn]?.answer;
+    const spoken = note && reveal?.answer === note ? reveal.text : null;
     return (
       <div className="activity swiping">
         <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes}
               start={deckStart(state)} onProgress={onDeck} />
+        {note && <p className="deck-note">{spoken ?? note}</p>}
       </div>
     );
   }
