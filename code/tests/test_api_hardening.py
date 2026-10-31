@@ -68,3 +68,16 @@ def test_cookieless_requests_cannot_push_out_peoples_chats(monkeypatch):
     store.by_session["anonymous-9"].bus.emit("answer", "verified", "Hi")  # now all three are used
     store.get("someone-new")  # the least recently used idle chat goes; a pending approval stays
     assert "chatting" not in store.by_session and store.by_session["waiting"] is waiting
+
+
+def test_voice_rooms_are_bounded(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from assistant.app import app
+
+    monkeypatch.setattr(voice, "API_KEY", "key")
+    monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests")
+    monkeypatch.setattr(voice, "MAX_VOICE_ROOMS", 3)
+    with TestClient(app) as client:
+        rooms = [client.post("/voice/token").json()["room"] for _ in range(5)]
+        assert list(app.state.voice_rooms) == rooms[-3:]

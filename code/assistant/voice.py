@@ -32,6 +32,7 @@ LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
 API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 TOKEN_TTL_S = 2 * 60 * 60
+MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; the oldest are forgotten
 
 router = APIRouter()
 
@@ -77,7 +78,10 @@ async def voice_token(request: Request) -> dict:
         raise HTTPException(status_code=503, detail="voice is not configured")
     room = f"tuttie-{secrets.token_urlsafe(12)}"
     conv = request.app.state.conversations.get(request.state.session_id)
-    request.app.state.voice_rooms[room] = (request.state.session_id, conv.id)
+    rooms = request.app.state.voice_rooms
+    rooms[room] = (request.state.session_id, conv.id)
+    while len(rooms) > MAX_VOICE_ROOMS:
+        rooms.pop(next(iter(rooms)))
     token = (api.AccessToken(API_KEY, API_SECRET)
              .with_identity(f"user-{secrets.token_hex(4)}")
              .with_name("You")
