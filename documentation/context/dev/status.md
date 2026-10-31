@@ -54,9 +54,10 @@ Build order from [goals.md](goals.md):
    `test_node_book.py`, `test_tuttie_market.py` (post → shortlist → negotiate → book).
    Tuned for the pitch story (Gästehaus am Rhein, CHF 135, budget 160: three visible rounds,
    agreed at CHF 128; Rheinblick still CHF 185; preview with `scripts/bargain_preview.py`). **Decided:** no `negotiation.counter` wake-up; counters go
-   straight to the `counter_offer` tool. **Request to dev member 1:** drop
-   `negotiation.counter` from the hotels' `wakes_on` (configs) and from `DEFAULT_WAKES_ON`
-   (`node/agent.py`) so no agent card promises an event nothing sends.
+   straight to the `counter_offer` tool. Done: no hotel's `wakes_on`
+   lists `negotiation.counter` any more (`DEFAULT_WAKES_ON` never did). Anna offers the double
+   with `late-arrival-dog` (CHF 135) for a dog guest: her config notes the single is too small
+   for a dog. Verified headless: 135 → 121/131 → 126/130 → agreed 128 → approved → booked.
 5. **MCP services** — not started.
 
 ### Who works on what
@@ -211,6 +212,9 @@ Why things are the way they are, so nobody has to rediscover them:
   Rhein (Kleinbasel) was never woken, so the pitch story (Anna wins) could not happen.
 - **Wallet face while busy:** in the thinking, posted, negotiating and booking phases the eyes
   move through a few thinking looks with glances (`THINKING` in `lib/activity.js`).
+- **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
+  `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
+  wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
 - **Broken vs untrusted:** a forged or invalid seal is broken (red); self-signed or unsigned

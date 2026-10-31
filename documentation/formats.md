@@ -139,6 +139,8 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 `thinking` events carry a reasoning summary of the assistant's LLM in `summary`
 (usually `"**Title**\n\nbody"`), with `status: "info"` and no node. The SSE stream also
 sends a named `reset` event when a new demo starts; the UI then clears itself.
+`answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
+`assistant/agent.py`, e.g. `excited`, `sorry`); the wallet shows it on Tuttie's face.
 
 ## A2A reply (structured, never free text)
 
