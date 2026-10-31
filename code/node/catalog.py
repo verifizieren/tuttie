@@ -11,17 +11,17 @@ AVAILABLE, PLANNED = "available", "planned"
 TOOLS = {
     "get_availability": {
         "status": AVAILABLE,
-        "endpoint": "POST /tools/get_availability",
+        "endpoint": "MCP /mcp/ get_availability",
         "description": "Rooms and prices for a date, from the hotel's facts.",
     },
     "get_policies": {
         "status": AVAILABLE,
-        "endpoint": "POST /tools/get_policies",
+        "endpoint": "MCP /mcp/ get_policies",
         "description": "Location, quietness, pets, check-in and cancellation policies.",
     },
     "book": {
         "status": AVAILABLE,
-        "endpoint": "POST /tools/book",
+        "endpoint": "MCP /mcp/ book (signed call)",
         "description": "Confirm a booking; needs the guest's signed approval for exactly the total.",
     },
     "make_offer": {
@@ -36,7 +36,7 @@ TOOLS = {
     },
     "pay": {
         "status": PLANNED,
-        "endpoint": "POST /tools/pay",
+        "endpoint": "MCP /mcp/ pay (signed call)",
         "description": "Take a payment under the guest's mandate.",
     },
 }

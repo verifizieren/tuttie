@@ -17,6 +17,7 @@ from aps import verify_envelope
 from aps.keys import load_public_key
 from node.agent import FALLBACK, PRIVATE_FACTS, BusinessAgent, public_facts
 from node.server import create_app
+from tests.mcp_helpers import call_tool
 
 NODES = Path(__file__).resolve().parent.parent / "data" / "nodes"
 HOTELS = {name: json.loads((NODES / f"{name}.json").read_text())
@@ -88,14 +89,13 @@ def test_agent_endpoint_signs_the_reply(monkeypatch):
 
 def test_get_policies_shows_the_profile_but_never_negotiation_limits():
     for config in HOTELS.values():
-        payload = TestClient(create_app(config)).post("/tools/get_policies").json()["payload"]
+        payload = call_tool(create_app(config), "get_policies")["payload"]
         assert payload["profile"] == config["facts"]["profile"]
         assert "floor_chf" not in json.dumps(payload)
 
 
 def test_get_availability_lists_only_available_rooms_with_config_prices():
-    payload = TestClient(create_app(RHEINBLICK)).post(
-        "/tools/get_availability", json={"date": "2026-11-14"}).json()["payload"]
+    payload = call_tool(create_app(RHEINBLICK), "get_availability", {"date": "2026-11-14"})["payload"]
     assert {r["room_type"]: r["price_chf"] for r in payload["rooms"]} == {"double": 180, "double-flex": 205}
 
 

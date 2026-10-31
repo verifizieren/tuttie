@@ -3,7 +3,8 @@
 Usage: python -m node.server --config data/nodes/hotel-rheinblick.json [--port 4001]
 
 Every response is a signed envelope from this node's key (keys/<node_id>.json).
-Tools answer only from the config's "facts"; the company's agent (node/agent.py) answers other
+The business's tools (get_availability, get_policies, book) are an MCP server at /mcp/
+(node/mcp_tools.py); they answer only from the config's "facts". The company's agent (node/agent.py) answers other
 agents (POST /agent), is woken by the marketplace (POST /agent/invoke) and describes itself
 (GET /agent/card). Agents that want an ongoing conversation open a session
 (POST /agent/sessions): each session has its own memory, so many run in parallel.
@@ -15,6 +16,7 @@ import argparse
 import asyncio
 import json
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -28,12 +30,8 @@ from aps.keys import load_public_key
 from negotiation.agreement import AgreementInvalid, AgreementRedeemer
 from negotiation.hotel import counter_offer_router, registry_lookup
 from node.agent import BusinessAgent
+from node.mcp_tools import mcp_app, mcp_server
 from sessions import SessionClosed, SessionStore
-
-
-class AvailabilityRequest(BaseModel):
-    date: str
-    guests: int = 1
 
 
 class AgentRequest(BaseModel):
@@ -76,14 +74,12 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
-    app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
         """Wrap a response payload in this node's signed envelope."""
         return sign_envelope(node_id, payload, signing_key)
 
-    @app.post("/tools/get_availability")
-    def get_availability(req: AvailabilityRequest) -> dict:
+    def get_availability(date: str, guests: int = 1) -> dict:
         """Signed list of available rooms and prices for a date."""
         rooms = [
             {k: room[k] for k in ("room_type", "price_chf", "rate")}
@@ -92,13 +88,12 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         return signed({
             "tool": "get_availability",
             "hotel": config["name"],
-            "date": req.date,
-            "guests": req.guests,
+            "date": date,
+            "guests": guests,
             "currency": "CHF",
             "rooms": rooms,
         })
 
-    @app.post("/tools/get_policies")
     def get_policies() -> dict:
         """Signed policies: who the business is (size), location, quietness, dogs, check-in, cancellation."""
         return signed({
@@ -112,14 +107,14 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "policies": facts.get("policies", {}),
         })
 
-    @app.post("/tools/book")
-    def book(req: BookRequest) -> dict:
+    def book(req: BookRequest, checked: list[str]) -> dict:
         """Confirm a booking only with the user's signed approval for exactly this total.
 
         The total is either a negotiated price (this node's own signed Agreement, redeemed
         once) or the room's price plus extras, which are this node's own signed A2A
         commitments: either way the price is the one the node promised, whatever the caller
-        claims.
+        claims. `checked` lists what was verified before (the caller's signed call); the
+        confirmation names every signature it rests on.
         """
         def refuse(reason: str) -> dict:
             """A signed refusal with the reason."""
@@ -153,6 +148,11 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         if round(total, 2) != round(approval["amount_chf"], 2):
             return refuse(f"approved CHF {approval['amount_chf']} does not match total CHF {total}")
 
+        checked = [*checked, "user approval"]
+        if agreement is not None:
+            checked.append("hotel agreement")
+        if req.extras:
+            checked.append("hotel commitments")
         used_approvals.add(approval["approval_id"])
         if agreement is not None:
             agreements.mark_used(agreement)
@@ -168,7 +168,21 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "total_chf": total,
             "approval_id": approval["approval_id"],
             "arrival": facts.get("policies", {}).get("late_arrival"),
+            "checked": checked,
         })
+
+    tools = mcp_server(config["name"], signed, {"get_availability": get_availability, "get_policies": get_policies,
+                                                "book": book}, BookRequest, lookup)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        """Run the MCP server's session manager while the node runs."""
+        async with tools.session_manager.run():
+            yield
+
+    app = FastAPI(title=config["name"], lifespan=lifespan)
+    app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
+    app.mount("/mcp", mcp_app(tools))
 
     @app.post("/agent")
     async def agent(req: AgentRequest) -> dict:
