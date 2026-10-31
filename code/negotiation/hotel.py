@@ -18,6 +18,10 @@ or a Rejection (marketplace/messages.py), or {"status": "refused"} for invalid i
 
 Mount it in node/server.py's create_app:
     app.include_router(counter_offer_router(config, signed))
+
+The same tool over MCP (the node's MCP server, owner of node/server.py), with exactly the same
+checks and the same signed reply, because both call CounterOfferTool.reply:
+    mcp_server.add_tool(counter_offer_mcp_tool(config, signed, lookup), name="counter_offer")
 """
 
 import json
@@ -158,6 +162,14 @@ class CounterOfferTool:
         return reply.model_dump()
 
 
+    async def reply(self, req: CounterOfferRequest, signed: Callable[[dict], dict]) -> dict:
+        """The signed reply for any transport (HTTP or MCP): the answer, or a signed refusal."""
+        try:
+            return signed({"tool": "counter_offer", **await self.answer(req)})
+        except CounterOfferRefused as refusal:
+            return signed({"tool": "counter_offer", "status": "refused", "reason": str(refusal)})
+
+
 def counter_offer_router(config: dict, signed: Callable[[dict], dict], lookup: Lookup = registry_lookup) -> APIRouter:
     """POST /tools/counter_offer for one node; `signed` wraps a payload in the node's envelope."""
     tool = CounterOfferTool(config, lookup)
@@ -166,9 +178,31 @@ def counter_offer_router(config: dict, signed: Callable[[dict], dict], lookup: L
     @router.post("/tools/counter_offer")
     async def counter_offer(req: CounterOfferRequest) -> dict:
         """Answer a guest's counter within the owner's private limits, signed."""
-        try:
-            return signed({"tool": "counter_offer", **await tool.answer(req)})
-        except CounterOfferRefused as refusal:
-            return signed({"tool": "counter_offer", "status": "refused", "reason": str(refusal)})
+        return await tool.reply(req, signed)
 
     return router
+
+
+def counter_offer_mcp_tool(config: dict, signed: Callable[[dict], dict],
+                           lookup: Lookup = registry_lookup) -> Callable[..., Awaitable[dict]]:
+    """The counter_offer tool as a plain async function for an MCP server (`add_tool`).
+
+    MCP builds the tool's input schema from the parameters and its description from the
+    docstring below, so they are what a calling agent sees. No MCP import here: the node's
+    server registers it, and this module stays usable without the SDK.
+    """
+    tool = CounterOfferTool(config, lookup)
+
+    async def counter_offer(counter: dict, offer: dict, last: dict | None = None) -> dict:
+        """Bargain over this hotel's offer. Stateless: send everything signed each round.
+
+        counter: your Counter as a signed envelope (signed by a sealed user agent whose user
+                 delegated "negotiate"; at most 300 s old).
+        offer:   this hotel's own signed Offer envelope the negotiation is about.
+        last:    this hotel's own signed previous Counter envelope (null in round 1).
+        Returns the hotel's signed envelope: a Counter, an Agreement or a Rejection, or a
+        refusal with the reason.
+        """
+        return await tool.reply(CounterOfferRequest(counter=counter, offer=offer, last=last), signed)
+
+    return counter_offer

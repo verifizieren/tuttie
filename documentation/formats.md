@@ -396,6 +396,12 @@ sealed user agent whose delegation grants `negotiate`, is fresh (≤ 300 s) and 
 this offer and round. The answer is a signed `{"tool": "counter_offer", ...Counter |
 Agreement | Rejection}`, or `{"tool": "counter_offer", "status": "refused", "reason"}`.
 
+**Over MCP** the tool is `counter_offer(counter, offer, last=null)` with the same three
+envelopes as arguments and the same signed reply (`negotiation/hotel.py`
+`counter_offer_mcp_tool`; one `CounterOfferTool.reply` for HTTP and MCP). It needs no signed
+call (C1): the counter inside is already signed by Tuttie, fresh and delegated, and the
+answer is stateless, so replaying it only repeats the same answer.
+
 **Limits** (`negotiation/rules.py`, compared in code only): `facts.negotiation =
 {"floor_chf", "max_rounds"}` is private, never sent and never in a prompt. `floor_chf` is the
 lowest price for the standard room (`double`, else the cheapest); other rooms may drop by
