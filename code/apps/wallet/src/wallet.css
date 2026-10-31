@@ -330,5 +330,12 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .faceid-ok circle { fill: var(--green); transform-origin: center; animation: pop .45s cubic-bezier(.34, 1.4, .5, 1) both; }
 .faceid-ok path { fill: none; stroke: #04140c; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
                   stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s var(--ease) .2s forwards; }
+.faceid-no circle { fill: var(--panel2); stroke: var(--line2); }
+.faceid-no path { stroke: var(--muted); stroke-dasharray: 48; stroke-dashoffset: 48; }
+.faceid-wait { width: 44px; height: 44px; margin: 4px; border-radius: 50%; border: 3px solid var(--line2);
+               border-top-color: var(--muted); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sheet-error { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--red); }
+.sheet-close { grid-template-columns: 1fr; }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
