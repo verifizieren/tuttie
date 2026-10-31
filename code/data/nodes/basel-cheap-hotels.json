@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.cheap-hotels",
   "name": "basel-cheap-hotels",
+  "uid": "CHE-948.219.932",
   "port": 4003,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],

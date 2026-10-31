@@ -27,9 +27,9 @@ can work in parallel without stepping on each other. Contracts live in
 | --- | --- | --- | --- | --- |
 | Protocol and signing | `code/aps/` | #10 | done, tested | Python API; formats: envelope, seals, approval |
 | Registry | `code/registry/` | #9 | done | `GET /search`, `GET /nodes/{id}` |
-| Business nodes and company agents | `code/node/`, `code/data/nodes/` | #10 | same agent object for every company (persona, tool catalog, wake-ups); three hotel agents large / medium / small; offer and negotiation tools planned | signed envelopes; formats: business agent, offer, counter-offer |
+| Business nodes and company agents | `code/node/`, `code/data/nodes/` | #10 | same agent object for every company (persona, tool catalog, wake-ups, sessions); three hotel agents large / medium / small with public profiles and private negotiation limits; offer and negotiation tools planned | signed envelopes; formats: business agent, offer, counter-offer |
 | Marketplace (requests, offers, shortlist, negotiation) | `code/marketplace/` | #8, #9, #10 | to build | formats: request, offer, counter-offer, agreement |
-| User's agent (Tuttie) | `code/assistant/` | #10 | done for direct booking; subagents with own memory and limited context run in parallel (`assistant/subagents.py`); marketplace flow to add | UI events over SSE, approvals API |
+| User's agent (Tuttie) | `code/assistant/`, `code/data/agents/` | #10 | done for direct booking; own identity (key, seal, user delegation); subagents with own memory and limited context run in parallel (`assistant/subagents.py`); marketplace flow to add | UI events over SSE, approvals API, `GET /identity` |
 | Sessions, memory, context passing | `code/sessions/` | #8, #10 | done: isolated sessions with memory, used by company agents and Tuttie's subagents; context classed public / negotiation / private | Python API; node session endpoints |
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
 | Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |

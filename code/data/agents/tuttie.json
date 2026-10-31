@@ -1,0 +1,10 @@
+{
+  "node_id": "ch.tuttie.alex-muster",
+  "name": "Tuttie",
+  "port": 4040,
+  "kind": "user-agent",
+  "capabilities": ["can_post_requests", "can_negotiate"],
+  "tags": ["tuttie", "user-agent"],
+  "seals": [{ "issuer": "adobe", "tier": "blue" }],
+  "delegation": { "scopes": ["ask_agents", "negotiate", "post_requests"], "valid_days": 365 }
+}

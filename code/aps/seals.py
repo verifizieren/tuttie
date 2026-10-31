@@ -4,11 +4,17 @@ A seal counts only if its issuer is a trusted authority (data/authorities.json)
 with the claimed tier and the signature verifies. A seal whose issuer is the node
 itself is a self-signed grey seal. A node without any seal is unsigned and also grey
 (untrusted, but it claims nothing false). Any claimed seal that fails makes the node broken.
+
+Seals also cover the node's Swiss business number (UID). An authority with
+"vouches_for_uid" (the commercial register) vouches that the UID belongs to this node,
+so its seal is only valid on a record with a well-formed UID. A UID counts as verified
+only through such a seal; any other UID in a record is just a claim.
 """
 
 from nacl.signing import SigningKey
 
 from aps.envelope import sign_bytes, verify_bytes
+from aps.uid import is_valid_uid
 
 TIER_RANK = {"broken": 0, "grey": 1, "blue": 2, "gold": 3}
 # Capabilities that grey nodes never get, whatever they claim.
@@ -16,9 +22,14 @@ PAYMENT_CAPABILITIES = {"can_take_payment"}
 
 
 def seal_body(record: dict, issuer: str, tier: str) -> dict:
-    """The fields a seal signs: who the node is, its key and what it may do, plus issuer and tier."""
+    """The fields a seal signs: who the node is (id, UID, key), what it may do, plus issuer and tier.
+
+    "uid" is None for nodes without a UID; it is always signed, so it cannot be added,
+    changed or removed after sealing.
+    """
     return {
         "node_id": record["node_id"],
+        "uid": record.get("uid"),
         "public_key": record["public_key"],
         "capabilities": record["capabilities"],
         "issuer": issuer,
@@ -39,6 +50,8 @@ def check_seal(record: dict, seal: dict, authorities: dict) -> bool:
             return False
         public_key = record["public_key"]
     elif issuer in authorities and authorities[issuer]["tier"] == tier:
+        if authorities[issuer].get("vouches_for_uid") and not is_valid_uid(record.get("uid")):
+            return False  # the register cannot vouch for a missing or malformed UID
         public_key = authorities[issuer]["public_key"]
     else:
         return False
@@ -48,14 +61,15 @@ def check_seal(record: dict, seal: dict, authorities: dict) -> bool:
 def evaluate_record(record: dict, authorities: dict) -> dict:
     """Return the trust verdict for a registry record.
 
-    {"tier": "gold|blue|grey|broken", "seals": [{issuer, tier, valid}], "capabilities": [granted]}
+    {"tier": "gold|blue|grey|broken", "seals": [{issuer, tier, valid}], "capabilities": [granted],
+     "uid": the UID if a UID-vouching authority sealed it, else None}
     """
     seals = [
         {"issuer": s.get("issuer"), "tier": s.get("tier"), "valid": check_seal(record, s, authorities)}
         for s in record.get("seals", [])
     ]
     if not all(s["valid"] for s in seals):
-        return {"tier": "broken", "seals": seals, "capabilities": []}
+        return {"tier": "broken", "seals": seals, "capabilities": [], "uid": None}
 
     tier = max((s["tier"] for s in seals), key=TIER_RANK.__getitem__, default="grey")
     licensed = {}  # capability -> issuers that are allowed to license it
@@ -74,4 +88,6 @@ def evaluate_record(record: dict, authorities: dict) -> dict:
                 granted.append(capability)
         else:
             granted.append(capability)
-    return {"tier": tier, "seals": seals, "capabilities": granted}
+    uid_vouched = any(authorities.get(s["issuer"], {}).get("vouches_for_uid") for s in seals)
+    return {"tier": tier, "seals": seals, "capabilities": granted,
+            "uid": record.get("uid") if uid_vouched else None}

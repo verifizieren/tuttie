@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.hotel-rheinblick",
   "name": "Hotel Rheinblick",
+  "uid": "CHE-526.018.151",
   "port": 4001,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
@@ -13,8 +14,6 @@
     "persona": {
       "name": "Marco",
       "role": "front desk agent",
-      "business_size": "medium",
-      "about": "Hotel Rheinblick is a family-owned hotel with 42 rooms right next to Basel SBB, run by the second generation.",
       "tone": "warm and personal, like a front desk that remembers your name",
       "priorities": ["quiet courtyard rooms for guests who need rest", "guests with dogs are welcome", "fair direct prices instead of platform fees"],
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
@@ -23,8 +22,8 @@
     "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
   },
   "facts": {
+    "profile": { "size": "medium", "rooms_total": 42, "about": "Family-owned hotel right next to Basel SBB, run by the second generation." },
     "address": "Centralbahnstrasse 12, 4051 Basel",
-    "rooms_total": 42,
     "distance_to_basel_sbb_m": 250,
     "quiet": true,
     "quiet_note": "Rooms face the inner courtyard, not the tracks.",

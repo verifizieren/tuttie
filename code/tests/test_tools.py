@@ -22,8 +22,11 @@ NODE_REPLIES = {
 }
 
 
-def make_toolbox(tamper: bool = False) -> tuple[Toolbox, EventBus, list[str]]:
-    """Toolbox whose registry and nodes are served by a mock transport. Returns contacted URLs too."""
+def make_toolbox(tamper: bool = False, timestamp: str | None = None) -> tuple[Toolbox, EventBus, list[str]]:
+    """Toolbox whose registry and nodes are served by a mock transport. Returns contacted URLs too.
+
+    `timestamp` makes the nodes sign their replies with that (e.g. an old) timestamp.
+    """
     contacted = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -36,7 +39,8 @@ def make_toolbox(tamper: bool = False) -> tuple[Toolbox, EventBus, list[str]]:
             return httpx.Response(200, json=record) if record else httpx.Response(404)
         node = next(r for r in REGISTRY if r["endpoint"].endswith(f":{request.url.port}"))
         payload = NODE_REPLIES.get(path, NODE_REPLIES["/tools/get_availability"])
-        envelope = sign_envelope(node["node_id"], json.loads(json.dumps(payload)), load_signing_key(node["node_id"]))
+        envelope = sign_envelope(node["node_id"], json.loads(json.dumps(payload)), load_signing_key(node["node_id"]),
+                                 timestamp=timestamp)
         if tamper:
             envelope["payload"]["rooms"][0]["price_chf"] = 1
         return httpx.Response(200, json=envelope)
@@ -52,6 +56,22 @@ def test_search_rejects_scam_and_keeps_verified_nodes():
     assert [r["node_id"] for r in found["rejected"]] == [SCAM]
     assert {r["node_id"]: r["trust_tier"] for r in found["verified"]}[RHEINBLICK] == "gold"
     assert {e["node_id"]: e["status"] for e in bus.history}[SCAM] == "broken"
+
+
+def test_search_shows_uid_only_when_the_register_vouched_for_it():
+    toolbox, _, _ = make_toolbox()
+    found = asyncio.run(toolbox.search_registry(["hotel"]))
+    uids = {r["node_id"]: r["uid"] for r in found["verified"]}
+    assert uids[RHEINBLICK] == "CHE-526.018.151"
+    assert uids["ch.basel.hotel-spalenhof"] is None  # blue seal only: its UID is just a claim
+
+
+def test_call_tool_drops_outdated_signed_reply():
+    """A genuine but old reply (a replay) is dropped like a forged one."""
+    toolbox, bus, _ = make_toolbox(timestamp="2026-01-01T00:00:00Z")
+    result = asyncio.run(toolbox.call_tool(RHEINBLICK, "get_availability", {"date": "2026-11-14"}))
+    assert result["rejected"] is True and "outdated" in result["reason"]
+    assert bus.history[-1]["status"] == "broken"
 
 
 def test_call_tool_returns_verified_payload():
@@ -139,3 +159,18 @@ def test_book_refuses_untrusted_unsigned_node():
     result = asyncio.run(toolbox.book("ch.basel.budget-rooms", "2026-11-14", "double", "A"))
     assert result["rejected"] is True and not toolbox.approvals.pending
     assert not any(url.endswith("/tools/book") for url in contacted)
+
+
+def test_identity_shows_tuttie_sealed_and_acting_for_the_user():
+    toolbox, bus, _ = make_toolbox()
+    me = asyncio.run(toolbox.identity("ch.tuttie.alex-muster"))
+    assert me["trust_tier"] == "blue" and me["acts_for_user"] is True
+    assert set(me["scopes"]) == {"ask_agents", "negotiate", "post_requests"}
+    assert bus.history == []  # identity checks are for the wallet, not the timeline
+
+
+def test_identity_without_delegation_does_not_act_for_the_user():
+    toolbox, _, _ = make_toolbox()
+    me = asyncio.run(toolbox.identity(RHEINBLICK))  # a sealed node, but nobody delegated to it
+    assert me["acts_for_user"] is False and me["scopes"] == []
+    assert asyncio.run(toolbox.identity("ch.nobody.here"))["rejected"] is True

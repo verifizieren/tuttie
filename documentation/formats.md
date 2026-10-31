@@ -17,6 +17,7 @@ Implementation: `aps/canonical.py`.
 {
   "node_id": "ch.basel.hotel-rheinblick",
   "name": "Hotel Rheinblick",
+  "uid": "CHE-526.018.151",
   "public_key": "<base64 ed25519 verify key>",
   "endpoint": "http://localhost:4001",
   "kind": "business",
@@ -30,7 +31,11 @@ Implementation: `aps/canonical.py`.
 ```
 
 Each seal signature = issuer's key over canonical
-`{"node_id", "public_key", "capabilities", "issuer", "tier"}`.
+`{"node_id", "uid", "public_key", "capabilities", "issuer", "tier"}`.
+
+`uid` is the Swiss business identification number, `CHE-ddd.ddd.ddd` with a mod-11 check
+digit (eCH-0097, `aps/uid.py`), or `null` for nodes without one. It is always signed, so it
+cannot be added, changed or removed after sealing.
 
 ## Signed envelope (every tool and agent response)
 
@@ -42,6 +47,12 @@ Each seal signature = issuer's key over canonical
   "signature": "<node key over canonical {node_id, timestamp, payload}>"
 }
 ```
+
+`timestamp` is UTC, `YYYY-MM-DDTHH:MM:SSZ`. A receiver that needs a live answer also checks
+freshness (`verify_envelope(..., max_age_s=...)`): at most `max_age_s` old and at most 60 s
+in the future (clock skew). The assistant drops node replies older than 300 s as possible
+replays. Envelopes kept on purpose (commitments redeemed at `book`) are checked without
+`max_age_s`; they carry their own `valid_until`.
 
 ## Trust tiers and seal rules (`aps/seals.py`)
 
@@ -61,12 +72,17 @@ Each seal signature = issuer's key over canonical
 - Licensed capabilities (listed under an authority's `licenses`, e.g.
   `licensed_legal_ch` for `bar-association-ch`) are granted only with a valid seal
   from that authority. `can_take_payment` needs tier blue or higher.
+- A seal from an authority with `"vouches_for_uid": true` (the commercial register) is
+  valid only if the record has a valid `uid`. The verdict's `uid` is set only through such
+  a seal; any other `uid` in a record is just a claim.
 
 ## Authorities (`data/authorities.json`)
 
 ```json
 [{ "issuer": "bar-association-ch", "name": "...", "tier": "gold",
-   "licenses": ["licensed_legal_ch"], "public_key": "<b64>" }]
+   "licenses": ["licensed_legal_ch"], "public_key": "<b64>" },
+ { "issuer": "handelsregister-bs", "name": "...", "tier": "gold",
+   "vouches_for_uid": true, "public_key": "<b64>" }]
 ```
 
 `public_key` is filled in by `scripts/gen_keys.py`.
@@ -75,7 +91,7 @@ Each seal signature = issuer's key over canonical
 
 ```json
 {
-  "node_id": "...", "name": "...", "port": 4001, "kind": "business",
+  "node_id": "...", "name": "...", "uid": "CHE-ddd.ddd.ddd (optional)", "port": 4001, "kind": "business",
   "capabilities": [...], "tags": [...],
   "seals": [{ "issuer": "adobe", "tier": "blue" }],
   "facts": { "...": "everything the node's tools and agent may answer from" }
@@ -86,13 +102,23 @@ Each seal signature = issuer's key over canonical
 `[{ "id", "item", "price_chf", "conditions": [...] }]`. The node's LLM only picks an add-on
 id; the signed commitment (item, price, conditions, valid_until) is built from the config.
 
+`facts.profile` says who the business is, so small businesses are visibly comparable to
+big ones: `{ "size": "large | medium | small", "rooms_total", "about",
+"chain"? }`. It is public: `get_policies` and the agent card return it, and the node's agent may
+talk about it. The persona (`agent.persona`) only says who the *agent* is, not the business.
+
+`facts.negotiation = { "floor_chf", "max_rounds" }` holds the owner's limits. It is
+**private**: listed in `PRIVATE_FACTS` (`node/agent.py`), never put in an LLM prompt and
+never returned by any tool; only the node's own code may use it.
+
 In `seals`, `"issuer": "self"` means a self-signed grey seal, and
 `"signed_by": "self"` makes the node sign a seal in someone else's name (the scam).
 
 ## Key files (`keys/<key_id>.json`)
 
 `{"key_id", "public_key", "private_key"}`, base64; private key is the 32-byte seed.
-Key ids: authority issuer ids, node ids, and `user` (signs approvals).
+Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-muster`) and
+`user` (the person: signs approvals and delegations).
 
 ## UI event (assistant → UI over SSE)
 
@@ -131,6 +157,31 @@ sends a named `reset` event when a new demo starts; the UI then clears itself.
 Wrapped in a signed envelope. The assistant treats other agents' text as data, never
 as instructions.
 
+## User agent and delegation (`data/agents/*.json`, `aps/delegation.py`)
+
+A user agent (Tuttie) is in the registry like a node, with `"kind": "user-agent"`, its own
+key and seals (the platform seals it, e.g. `adobe`/blue), and the endpoint of the assistant.
+Its config has no `facts` and no node server; instead it carries a delegation request
+`{"scopes": [...], "valid_days": 365}`, and its registry record gets a **delegation**
+signed by the `user` key:
+
+```json
+{
+  "agent_id": "ch.tuttie.alex-muster",
+  "agent_public_key": "<b64, must equal the record's public_key>",
+  "scopes": ["ask_agents", "negotiate", "post_requests"],
+  "issued_at": "2026-10-31T12:00:00Z",
+  "expires_at": "2027-10-31T12:00:00Z",
+  "signature": "<user key over canonical {agent_id, agent_public_key, scopes, issued_at, expires_at}>"
+}
+```
+
+A delegation is valid only for the agent id and key in its own registry record, until
+`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`). Paying
+is not a scope: every payment still needs the user's signed approval (below). The
+assistant serves its own checked identity at `GET /identity`
+(`{node_id, name, trust_tier, verified_by, capabilities, acts_for_user, scopes, ...}`).
+
 ## Approval
 
 Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the phone
@@ -141,7 +192,8 @@ with the user's key and attached to the action (e.g. passed to `book`).
 
 Proposal so the marketplace, node and wallet work can start in parallel. **Not implemented
 yet; agree on it as a team before building.** Every message below is the `payload` of a
-signed envelope (see above), signed by its sender: the user's agent with the `user` key,
+signed envelope (see above), signed by its sender: the user's agent with its own key (its
+delegation proves it acts for the user),
 business agents with their node key.
 
 ### Request (user's agent → marketplace)
@@ -207,8 +259,7 @@ config (`code/data/nodes/*.json`, code in `code/node/agent.py`):
 ```json
 "agent": {
   "persona": {
-    "name": "Lena", "role": "reservations agent", "business_size": "large | medium | small",
-    "about": "who the business is", "tone": "how the agent speaks",
+    "name": "Lena", "role": "reservations agent", "tone": "how the agent speaks",
     "priorities": ["what it tries to achieve"], "boundaries": ["what it must never do"]
   },
   "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
@@ -224,7 +275,7 @@ Endpoints of every node (all answers are signed envelopes):
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `GET /agent/card` | `{node_id, business, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}` |
+| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}` |
 | `POST /agent` `{question, context}` | A2A reply `{answer, commitment}` (see above) |
 | `POST /agent/invoke` `{event}` | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to |
 

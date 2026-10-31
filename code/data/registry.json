@@ -2,6 +2,7 @@
   {
     "node_id": "ch.basel.budget-rooms",
     "name": "Basel Budget Rooms",
+    "uid": "CHE-390.996.037",
     "public_key": "6tRiM1/aXxq231Kgl+9Dvz9iOge3XWHljwjzriclidM=",
     "endpoint": "http://localhost:4007",
     "kind": "business",
@@ -19,6 +20,7 @@
   {
     "node_id": "ch.basel.cheap-hotels",
     "name": "basel-cheap-hotels",
+    "uid": "CHE-948.219.932",
     "public_key": "uCr04XpGZRgW9+UxjtLTBu5KUWH4HAJCuc4mrJmi8Mw=",
     "endpoint": "http://localhost:4003",
     "kind": "business",
@@ -36,13 +38,14 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "q/JuL8KoMQCgUOWnJv+E7iQVmuNVqFl84JLSU9x40VFzUpCKku6Mg4H+t0/8QOJMr7Y7wKA5GnBc4iHp9V8yAQ=="
+        "signature": "KxP6DC2SKRClKyAuSbNAtSyJWQucC/Oc7r2FUICmybne0VMfGuKJPrSVdPopQ/uZwhqtBF4oQSBA0sSdf4pPCg=="
       }
     ]
   },
   {
     "node_id": "ch.basel.gaestehaus-am-rhein",
     "name": "G\u00e4stehaus am Rhein",
+    "uid": "CHE-775.451.488",
     "public_key": "D0iYmNpeD0zk8V+erSxT65VFY2w2nGUd++N8VyQeqds=",
     "endpoint": "http://localhost:4009",
     "kind": "business",
@@ -62,13 +65,14 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "bjKcdMw04qlcnNEcobrT451/WkHYECiosn0zyjahH0ubG5Ht95hH2meoL7LmcJHMXGLIpEkt9KxGXq85huCGDg=="
+        "signature": "rMfu6O9LnD5FCF3KlFsnQrT/zuPkaE/jLvcvqVeQuL4OfoKe7SL52z8RnRCFCQxxY2dm3USQ5bfreu3N+hNjDw=="
       }
     ]
   },
   {
     "node_id": "ch.basel.alpina-grand",
     "name": "Alpina Grand Basel",
+    "uid": "CHE-202.469.662",
     "public_key": "iRtpCuLB7Z7aPGcuOWPyjnL2mkhR105Iulu279/j/9w=",
     "endpoint": "http://localhost:4008",
     "kind": "business",
@@ -87,18 +91,19 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "+4PJIPr4OpxGrz37NNCEklOta9b4/xjEJ6tuvAmDDW52Q/cpNNWW4ebRsWoNlm3NP6LEol0oPKE46zDotjHwBw=="
+        "signature": "v1ByA6UROdqc4GDu41H7uBds1qHF/K1ytcXXRm6ZlZWbAloUwZ5eQ4CmHBtepn/tRSTdovsYJ5bJvLYWU33rCA=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "KMKrL88LHt+dMN+A3JVhH1K3/z9t1vSf9x0zJ+Yp6qvPQNyfZuhHHk5ycZI/RzMeVdsqU7S10XZg+fGvMpONBQ=="
+        "signature": "kU0isTeCwmCXHyaJ8aUZptt6WbMmJhWpfjYBVwLvvjly0I14WmOq9a5DeKJj1vv2J9G6aS6eyUvNr39pzHlnAA=="
       }
     ]
   },
   {
     "node_id": "ch.basel.hotel-gundeli",
     "name": "Hotel Gundeli",
+    "uid": "CHE-131.860.915",
     "public_key": "9F9e5fBWTPM44AS0MjqtAqZcHlyYBoJdG/DpaM2Re+I=",
     "endpoint": "http://localhost:4006",
     "kind": "business",
@@ -115,13 +120,14 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "1zL82j/NsjcgUDFEd2hRJ+CvOxD5I8PsfPyVncMSCZoGo3tfxrjzZeE/4bdvd59NnkSweEGoU8sFxPuBLg7mAA=="
+        "signature": "SXMKtoFAZ+LGLIIbcdAbvwrAcnl1esl4EbXl/5as82p1jVh56Niu4GTPzCvCWupdrFTn5sRih6XsVwTVzxKUBw=="
       }
     ]
   },
   {
     "node_id": "ch.basel.hotel-rheinblick",
     "name": "Hotel Rheinblick",
+    "uid": "CHE-526.018.151",
     "public_key": "jLSkoHn2gRTVnTmgrGaVofEGKASUUZrOu6/2juOxEeQ=",
     "endpoint": "http://localhost:4001",
     "kind": "business",
@@ -139,18 +145,19 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "q6wLeLzCnXqcEhjf6dpYrEg+4Xu6iwZT/D5G0zAE7pjHqI25vi/L1EIcqR1e6MmmvBfrZ2VFIXbD6Tbr0aaNAw=="
+        "signature": "PNmHEiDhxU3cHks2D7MYjxmLE1KpcoeVS88u5hH02+2qMaJfEDnvqerW1QaojKyYOvAEN4Cpv8SGwzDykxSCDA=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "DgZlOEwu8Q55dGBMRkGDzIZfsVauBfHrtVW3PaKQmyzxthQnmGsHtmyQLnF7uePhj5grBh7aeBsfE9ip0eWMAQ=="
+        "signature": "bh5lIZ7N9n1dgZ6u99wWxDcqoXIO99Tg1TLOVn93myov1aILdz0WSiGUGpjT6gwPee54XODTnbR2fl5um5SCBA=="
       }
     ]
   },
   {
     "node_id": "ch.basel.hotel-spalenhof",
     "name": "Hotel Spalenhof",
+    "uid": "CHE-908.301.668",
     "public_key": "b0wQ00PBLQ9z2NBCgTidoON1HffkRZpAx+5UKOsGj1g=",
     "endpoint": "http://localhost:4002",
     "kind": "business",
@@ -166,13 +173,14 @@
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "cWHq7e1B8rPDAdOb9BUU0n/Qgf2Mo88hR1lxD71Ih2ijpnhtS5HvXWOyHz0ePDEAX+gIfrJbvH+Sjl41URERBA=="
+        "signature": "1lZVYzBNdTU0V6nZFyVUajPzVnKg5uOKjHaMtnYfGAUaMzluquKDzOVokA9SL2M6uoC6u52udcNMwLvylij5CA=="
       }
     ]
   },
   {
     "node_id": "ch.legal.consumer-law",
     "name": "Swiss consumer-law agent",
+    "uid": "CHE-518.190.931",
     "public_key": "fNDGGHiEcWp5BN18M9Ibi5MWtZkRRIf/smEL+N8QIRc=",
     "endpoint": "http://localhost:4004",
     "kind": "agent",
@@ -189,18 +197,19 @@
       {
         "issuer": "bar-association-ch",
         "tier": "gold",
-        "signature": "G+BYoYxa28BC+/F0wDAsA1Awmlhk3eh41WnGy/79VgpXeUxBwo+N3g/EpcXRV8jE0AA8zprIRnUNzME9TUq8DQ=="
+        "signature": "Ya6kPcSLBws7PlkCh5N9QTVJGFFaqxgRbUfkBviBNn34jQ74PEZjCOH6h7Pz30GoGVMO40ZThsAEx67yIcHBDQ=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "25VXaN/1l7JUtdDhohEHI2lyatbMAOayLDx53urPgoxDYhvB/Ha7av9nylxfFG6t5A6C/HTYJ2i4sSM6UfiJAg=="
+        "signature": "KtUAxLTMmB3KXXKovGeE58OppS3XJw6XkYRazFzEmA8sQbxRz0nSvCzyauTLph9RkrIL4VJc778N8MFezC0xAA=="
       }
     ]
   },
   {
     "node_id": "ch.legal.advisor",
     "name": "Legal advisor",
+    "uid": null,
     "public_key": "jZlmMAnoaf09v1yhHC96oM5MSKpK6VgiRId3NeqXad4=",
     "endpoint": "http://localhost:4005",
     "kind": "agent",
@@ -217,8 +226,43 @@
       {
         "issuer": "ch.legal.advisor",
         "tier": "grey",
-        "signature": "+6IFidhJi6Imu8hfosnJQ0wzgcU15xpmOU9FRtWDe+OM8jJmEyk26Pk929BGaS7TLycUkec/J7+qdmMAy5TkAQ=="
+        "signature": "p7ult18Dhq6rkS4nzjL5kE1qWlevV1Dk4djg/NXWpho5nVkzpYdV0+mxrOXfGfgS51WwnXGEXznHL/C6tEtMAw=="
       }
     ]
+  },
+  {
+    "node_id": "ch.tuttie.alex-muster",
+    "name": "Tuttie",
+    "uid": null,
+    "public_key": "00T3JRuLqKIfZuw8jYEaJWTgJiL9+2nwTrS5xt05M7M=",
+    "endpoint": "http://localhost:4040",
+    "kind": "user-agent",
+    "capabilities": [
+      "can_post_requests",
+      "can_negotiate"
+    ],
+    "tags": [
+      "tuttie",
+      "user-agent"
+    ],
+    "seals": [
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "6iZS9GSa08sftbWra2neBOOfqo7lZrVwFYrUccBzCo2LT6aXCgqWj6L+WxN0g0lMSWHtmIBhSZTig/D/QsQWBA=="
+      }
+    ],
+    "delegation": {
+      "agent_id": "ch.tuttie.alex-muster",
+      "agent_public_key": "00T3JRuLqKIfZuw8jYEaJWTgJiL9+2nwTrS5xt05M7M=",
+      "scopes": [
+        "ask_agents",
+        "negotiate",
+        "post_requests"
+      ],
+      "issued_at": "2026-10-31T11:47:38Z",
+      "expires_at": "2027-10-31T11:47:38Z",
+      "signature": "LKaVsUgwXkYaz4gWJVdbte3CrDcwJbsd9sueyz8t/ObbBfOK5tSSaAHCe4qn4Y4xU8THqAKB5Uu8wSErFrzqDg=="
+    }
   }
 ]

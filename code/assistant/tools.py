@@ -18,6 +18,9 @@ from pathlib import Path
 import httpx
 
 from aps import evaluate_record, verify_envelope
+from aps.delegation import verify_delegation
+from aps.envelope import is_fresh
+from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
 from assistant.events import EventBus
 
@@ -26,6 +29,8 @@ TOOL_NAME = re.compile(r"^[a-z_]{1,40}$")
 NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 # Tools the assistant may call freely; book needs the user's approval first.
 READ_TOOLS = {"get_availability", "get_policies"}
+# Node replies must be this fresh, so an old signed reply (e.g. an outdated price) cannot be replayed.
+MAX_REPLY_AGE_S = 300
 
 
 def function(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:
@@ -110,6 +115,7 @@ def node_view(record: dict, verdict: dict) -> dict:
         "name": record["name"],
         "kind": record["kind"],
         "trust_tier": verdict["tier"],
+        "uid": verdict["uid"],  # only set when the commercial register vouched for it
         "verified_by": [s["issuer"] for s in verdict["seals"]],
         "capabilities": verdict["capabilities"],
         "tags": record["tags"],
@@ -152,6 +158,7 @@ class Toolbox:
         self.bus = bus
         self.approvals = approvals
         self.authorities = load_authorities()
+        self.user_public_key = load_public_key("user")  # checks that Tuttie really acts for this user
         self.reset()
 
     def reset(self) -> None:
@@ -191,6 +198,27 @@ class Toolbox:
             result["hint"] = f"No node has all these tags. Search with fewer tags; known tags: {known}"
         return result
 
+    async def identity(self, agent_id: str) -> dict:
+        """The verified identity of a user agent (Tuttie), for the wallet to show.
+
+        Checks the agent's seals like any node and, on top, that the user's key signed
+        a delegation for exactly this agent and key. Not shown on the timeline.
+        """
+        found = await self.lookup(agent_id)
+        if found is None:
+            return {"node_id": agent_id, "rejected": True, "reason": "not in the registry"}
+        record, verdict = found
+        if verdict["tier"] == "broken":
+            return rejected(record, broken_reason(verdict))
+        delegation = record.get("delegation") or {}
+        acts_for_user = verify_delegation(delegation, self.user_public_key, record["node_id"], record["public_key"])
+        return {
+            **node_view(record, verdict),
+            "acts_for_user": acts_for_user,
+            "scopes": delegation.get("scopes", []) if acts_for_user else [],
+            "delegation_expires_at": delegation.get("expires_at") if acts_for_user else None,
+        }
+
     def emit_once(self, record: dict, status: str, summary: str, verdict: dict) -> int:
         """Show a node's registry check on the timeline only the first time it is found."""
         if record["node_id"] not in self.seen:
@@ -227,6 +255,9 @@ class Toolbox:
         if not verify_envelope(envelope, record["public_key"], expected_node_id=node_id):
             self.bus.emit(kind, "broken", f"{label}: response signature invalid, dropped", record, verdict["seals"])
             return rejected(record, "response signature does not verify")
+        if not is_fresh(envelope["timestamp"], MAX_REPLY_AGE_S):
+            self.bus.emit(kind, "broken", f"{label}: signed reply is outdated, dropped", record, verdict["seals"])
+            return rejected(record, "signed reply is outdated (possible replay)")
         return Verified(record, verdict, envelope)
 
     def emit_verified(self, kind: str, summary: str, result: Verified) -> int:

@@ -3,7 +3,8 @@
     "issuer": "handelsregister-bs",
     "name": "Handelsregister Basel-Stadt",
     "tier": "gold",
-    "public_key": "DrlKJfqOt4QwD6+6/BbeDtSnFFmacvbCI0E7Xdc37c4="
+    "public_key": "DrlKJfqOt4QwD6+6/BbeDtSnFFmacvbCI0E7Xdc37c4=",
+    "vouches_for_uid": true
   },
   {
     "issuer": "adobe",

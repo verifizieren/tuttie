@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.alpina-grand",
   "name": "Alpina Grand Basel",
+  "uid": "CHE-202.469.662",
   "port": 4008,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
@@ -13,8 +14,6 @@
     "persona": {
       "name": "Lena",
       "role": "reservations agent",
-      "business_size": "large",
-      "about": "Alpina Grand Basel is a 220-room business hotel at Basel SBB and part of the Alpina Hotels chain, with a restaurant, a gym and conference rooms.",
       "tone": "polished and efficient, like a good front desk in a big hotel",
       "priorities": ["keep the hotel full, especially on weekdays", "suggest the executive room or breakfast when it fits the guest", "Alpina members get a better rate"],
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
@@ -23,9 +22,8 @@
     "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
   },
   "facts": {
+    "profile": { "size": "large", "rooms_total": 220, "chain": "Alpina Hotels (12 hotels in Switzerland)", "about": "Business hotel at Basel SBB with a restaurant, a gym and conference rooms." },
     "address": "Centralbahnplatz 1, 4051 Basel",
-    "rooms_total": 220,
-    "chain": "Alpina Hotels (12 hotels in Switzerland)",
     "distance_to_basel_sbb_m": 80,
     "quiet": false,
     "quiet_note": "Soundproof windows, but the station square is busy; courtyard rooms on request.",

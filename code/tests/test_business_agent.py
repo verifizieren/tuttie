@@ -19,7 +19,7 @@ NODES = Path(__file__).resolve().parent.parent / "data" / "nodes"
 REGISTRY = {r["node_id"]: r for r in json.loads((NODES.parent / "registry.json").read_text())}
 # The three hotel agents of the first marketplace example, one per business size.
 HOTELS = {"large": "hotel-alpina-grand.json", "medium": "hotel-rheinblick.json", "small": "guesthouse-am-rhein.json"}
-PERSONA_KEYS = {"name", "role", "business_size", "about", "tone", "priorities", "boundaries"}
+PERSONA_KEYS = {"name", "role", "tone", "priorities", "boundaries"}
 
 
 def config(name: str) -> dict:
@@ -48,12 +48,12 @@ def test_every_hotel_has_the_same_agent_object(size, name):
     spec = config(name)["agent"]
     assert set(spec) == {"persona", "tools", "wakes_on"}
     assert set(spec["persona"]) == PERSONA_KEYS
-    assert spec["persona"]["business_size"] == size
+    assert config(name)["facts"]["profile"]["size"] == size
     assert set(spec["tools"]) <= set(TOOLS)
 
 
 def test_hotel_sizes_differ_in_rooms():
-    rooms = {size: config(name)["facts"]["rooms_total"] for size, name in HOTELS.items()}
+    rooms = {size: config(name)["facts"]["profile"]["rooms_total"] for size, name in HOTELS.items()}
     assert rooms["large"] > rooms["medium"] > rooms["small"]
 
 

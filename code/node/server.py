@@ -91,10 +91,11 @@ def create_app(config: dict) -> FastAPI:
 
     @app.post("/tools/get_policies")
     def get_policies() -> dict:
-        """Signed policies: location, quietness, dogs, check-in, cancellation."""
+        """Signed policies: who the business is (size), location, quietness, dogs, check-in, cancellation."""
         return signed({
             "tool": "get_policies",
             "hotel": config["name"],
+            "profile": facts.get("profile"),
             "address": facts.get("address"),
             "distance_to_basel_sbb_m": facts.get("distance_to_basel_sbb_m"),
             "quiet": facts.get("quiet"),

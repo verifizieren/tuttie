@@ -6,20 +6,20 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (sessions, memory, subagents).
+Last updated: 2026-10-31 (merged: company agents, sessions and subagents with APS UIDs and Tuttie's identity).
 
 ## Done
 
 | Area | What works | Where |
 | --- | --- | --- |
-| APS signing | Canonical JSON, Ed25519 keys, signed envelopes, seals with gold / blue / grey / broken tiers, signed user approvals. 25 tests. | `code/aps/`, `code/tests/` |
+| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them; paying is never delegated). | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
-| Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays). | `code/node/`, `code/data/nodes/` |
-| Company agents | The same agent object for every company: persona, a shared tool catalog with `available` / `planned` tools, a signed agent card (`GET /agent/card`), A2A answers in persona with priced add-ons from the config (`POST /agent`), and wake-ups from the marketplace (`POST /agent/invoke`: interested?, which tool next). Three hotel agents: Alpina Grand Basel (large chain branch, Lena), Hotel Rheinblick (medium, Marco), Gästehaus am Rhein (small independent, Anna). Private negotiation limits never leave the node. | `code/node/agent.py`, `code/node/catalog.py`, `code/node/README.md` |
-| Demo data | Hotels Alpina Grand (gold + blue), Rheinblick (gold + blue), Gästehaus am Rhein (gold), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
+| Business nodes | Signed tools (`get_availability`, `get_policies`, which includes the business profile), `book` (only with the user's signed approval for exactly the right total, no replays). | `code/node/`, `code/data/nodes/` |
+| Company agents | The same agent object for every company: persona, a shared tool catalog with `available` / `planned` tools, a signed agent card (`GET /agent/card`), A2A answers in persona with priced add-ons from the config (`POST /agent`), wake-ups from the marketplace (`POST /agent/invoke`: interested?, which tool next), and sessions. The LLM never sets a price and never sees private facts (`PRIVATE_FACTS`: negotiation limits). Three hotel agents, each with a public profile and private negotiation limits: **Alpina Grand Basel** (large chain branch, 220 rooms, Lena, gold + blue), **Hotel Rheinblick** (medium, family-owned, 42 rooms, Marco, gold + blue), **Gästehaus am Rhein** (small independent, 7 rooms, Anna, gold). | `code/node/agent.py`, `code/node/catalog.py`, `code/node/README.md` |
+| Demo data | The three hotel agents above; also Spalenhof (medium, 48 rooms, blue) and Gundeli (small, 11 rooms, gold, family rooms) as further hotels with profiles, Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
 | Sessions and memory | Shared module for all agents: isolated sessions with their own memory (many in parallel), and context passing where every item is public, negotiation or private (private never leaves). Hotels keep one memory per session and answer with the history. | `code/sessions/`, node `/agent/sessions/...` |
 | Tuttie's subagents | Tuttie spawns one subagent per business with its own memory and only the shareable context; a pool runs them in parallel; every call goes through the trust gate. Live-tested: three hotels in parallel over two rounds, each remembering its own offer, the private budget never shared. Bargaining logic is step 4. | `code/assistant/subagents.py` |
-| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". | `code/assistant/` |
+| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
@@ -29,9 +29,10 @@ Last updated: 2026-10-31 (sessions, memory, subagents).
 
 Build order from [goals.md](goals.md):
 
-1. **Agents** — company agents done (three hotels, same agent object); sessions with memory
-   and Tuttie's parallel subagents done. Next: **Tuttie**, our main agent, as its own agent
-   identity that spawns the subagents from a posting.
+1. **Agents** — done: the three hotel agents (same agent object, personas, profiles, private
+   limits), sessions with memory, Tuttie's identity and its parallel subagents. Next:
+   **Tuttie** as the main agent that reads a posting and spawns the subagents. Tuttie does
+   not sign its own outgoing messages yet; that comes with the marketplace.
 2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
    `documentation/formats.md`). The agents are ready to be woken: the marketplace calls
    `POST /agent/invoke` on every agent subscribed to an event (`wakes_on`). Tools still to
@@ -41,6 +42,29 @@ Build order from [goals.md](goals.md):
 4. **Negotiation and subagents** — the base exists (subagents, sessions, memory, context
    levels); missing: the bargaining logic and the `make_offer` / `counter_offer` tools.
 5. **MCP services** — not started.
+
+### Where to start next
+
+1. **Step 1 check-in with the pitch and design team** (goals.md: every step ends with one):
+   the hotel sizes, profiles and prices, and Tuttie's identity.
+2. **Step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
+   then build `code/marketplace/` (:4010) test-first in the same style as `test_tools.py`.
+   APS is ready for it: Tuttie signs requests with its own key, and businesses check its
+   delegation (`verify_delegation(..., scope="post_requests")`) before answering.
+3. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
+   the Vite dev server).
+
+### Test coverage
+
+77 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
+company agent with a fake LLM, private facts, read tools, the three hotel configs),
+`test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
+`test_sessions.py` and `test_agent_sessions.py` (session memory, isolation, context levels,
+parallel subagents against the real node apps), `test_tools.py` (assistant trust gate and
+Tuttie's identity, with mocked HTTP and the real demo keys).
+Not covered yet: `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
+routes (`assistant/app.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
 (`code/apps/owner/`), presentation site and QR code (`code/apps/presentation/`), a
@@ -71,6 +95,27 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **UIDs are vouched for by the commercial register only.** Every seal signs the node's
+  `uid` (or `null`), so it cannot be swapped later; `handelsregister-bs` has
+  `vouches_for_uid` and its seal is invalid without a well-formed UID. A UID under any
+  other seal is shown as a claim, not as verified. The demo UIDs are made up but have
+  correct check digits.
+- **Tuttie has its own key, separate from the user's.** A seal says who the agent is (the
+  platform, Adobe, vouches for the software: blue); the user's signed delegation says for
+  whom it speaks and with which scopes. The `user` key stays the person's: it signs
+  approvals and delegations, never messages. User agents live in `data/agents/` (in the
+  registry, but no node server) and `issue_seals.py` re-signs the delegation for 365 days
+  on every run.
+- **Private facts never reach an LLM.** The node's agent used to get all `facts` in its
+  prompt; with negotiation floors in the config that would leak them to any agent that asks
+  cleverly. `PRIVATE_FACTS` in `node/agent.py` keeps them out of the prompt and out of every
+  tool reply. Add any new owner-only fact there.
+- **Hotel sizes are in `facts.profile`, not in tags or seals:** owners can edit them without
+  new seals. The demo prices and the dog storyline (Rheinblick, CHF 180 + 15) are unchanged.
+- **Freshness is opt-in per call.** Live replies must be at most 300 s old
+  (`MAX_REPLY_AGE_S` in `assistant/tools.py`); stored envelopes like commitments are
+  verified without it because they have `valid_until`.
 
 - **LLM:** `gpt-6-luna` through the OpenAI **Responses API** with reasoning on
   (`code/llm.py`). Reasoning models only allow tools together with reasoning there;

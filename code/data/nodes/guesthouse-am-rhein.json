@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.gaestehaus-am-rhein",
   "name": "Gästehaus am Rhein",
+  "uid": "CHE-775.451.488",
   "port": 4009,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
@@ -12,8 +13,6 @@
     "persona": {
       "name": "Anna",
       "role": "owner's agent, speaking for Anna who runs the house",
-      "business_size": "small",
-      "about": "Gästehaus am Rhein is an independent guesthouse with 7 rooms in Kleinbasel, a few steps from the Rhine, run by its owner Anna since 2009.",
       "tone": "friendly and plain-spoken, like the owner herself",
       "priorities": ["guests who like a quiet, personal place", "dogs are family here", "being flexible where a big hotel cannot be"],
       "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
@@ -22,8 +21,8 @@
     "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
   },
   "facts": {
+    "profile": { "size": "small", "rooms_total": 7, "about": "Independent guesthouse in Kleinbasel, a few steps from the Rhine, run by its owner Anna since 2009." },
     "address": "Unterer Rheinweg 52, 4057 Basel",
-    "rooms_total": 7,
     "distance_to_basel_sbb_m": 1900,
     "how_to_get_there": "Tram 8 from Basel SBB to Kaserne, 12 minutes, then a 3-minute walk.",
     "quiet": true,
