@@ -315,6 +315,15 @@ Why things are the way they are, so nobody has to rediscover them:
   it again, or opening the wallet after a finished conversation, archives it and starts fresh
   (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
+- **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
+  LiveKit 1.13.11 + LiveKit Agents 1.8.10 with ElevenLabs (Scribe v2 realtime, Flash v2.5).
+  While Tuttie's card is open the wallet is in a LiveKit room; speech becomes a message to the
+  same Tuttie conversation (all tools run as when typing), answers are spoken; concise (short
+  confirmation, answer, Face ID prompt only). Signaling is proxied through the assistant (`/rtc`,
+  forwards the token header), media on TCP 4042 / UDP 4043. Verified end to end through
+  https://web4.mendes.dev with a spoken request. See `code/voice/README.md`.
+- **Posting tags:** only the city (`basel`); an area went into tags and hid the guesthouse in
+  Kleinbasel (the train arrives at Basel SBB). Offers wait up to 45 s (stops when all offered).
 - **Tasks in words, the rest in the eyes:** the line under the eyes shows only what Tuttie is
   doing right now (`currentTask`: "Checking calendar", "2 offers in · checking seals", "Agreed
   with …", "Waiting for your approval", "Booking…") or an error; it is empty while Tuttie only
