@@ -287,6 +287,11 @@ Why things are the way they are, so nobody has to rediscover them:
   it again, or opening the wallet after a finished conversation, archives it and starts fresh
   (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
+- **No status text:** the open card shows no "Listening…" or phase line (only an error if Tuttie
+  cannot be reached). The eyes carry it: listening looks with small glances and a nod while
+  waiting, thinking looks while busy, looking down at the cards while the user swipes (and
+  following a dragged card), the answer's mood for a few seconds, then listening again
+  (`LISTENING`, `WATCHING`, `THINKING` in `lib/activity.js`).
 - **Minimal booking and approval:** the approval sheet shows the hotel, the amount, its seals and a
   short "Also pay city tax (CHF 4)" switch; the booking card shows hotel, price, date and booking
   id, one line for the paid city tax, and "Checked by Tuttie" folded into one line that opens.
