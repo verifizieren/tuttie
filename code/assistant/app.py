@@ -7,14 +7,17 @@ Run from code/: python -m assistant.app
 """
 
 import asyncio
+import io
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
+import qrcode
+import qrcode.image.svg
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -92,6 +95,17 @@ def decide(approval_id: str, req: DecisionRequest) -> dict:
     if decision is None:
         raise HTTPException(status_code=404, detail="no such pending approval")
     return decision
+
+
+@app.get("/phone-qr.svg")
+def phone_qr(request: Request) -> Response:
+    """QR code of the phone page URL, as seen by the browser (works behind the reverse proxy)."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
+    url = os.environ.get("PHONE_URL", f"{scheme}://{host}/phone.html")
+    buffer = io.BytesIO()
+    qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=2).save(buffer)
+    return Response(buffer.getvalue(), media_type="image/svg+xml", headers={"X-Phone-Url": url})
 
 
 @app.get("/events")
