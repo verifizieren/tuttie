@@ -4,8 +4,9 @@
    go into it (date, guests, requirements, tags): the posting is seen by every matching
    business, so the user's real budget limit stays private and is only used for step 3.
 2. The market wakes the matching agents, which send signed offers. Tuttie collects them and
-   re-checks every one itself (the business's seals and the offer's signature): it trusts
-   the market to relay, not to judge.
+   re-checks every one itself (the business's seals, the offer's signature, that it answers
+   this request and is still valid): it trusts the market to relay, not to judge. One offer
+   per hotel counts (its latest).
 3. Tuttie builds the shortlist: verified businesses only, within the private budget, still
    valid, cheapest first (gold before blue at the same price), at most five.
 
@@ -128,25 +129,38 @@ class MarketDesk:
                 if offer_id in seen:
                     continue
                 seen.add(offer_id)
-                checked = await self.check(item, invited.get(item["node_id"], {}))
+                checked = await self.check(item, invited.get(item["node_id"], {}), request_id)
                 if checked:
                     by_hotel[checked["node_id"]] = checked
             if len(by_hotel) >= expected or asyncio.get_running_loop().time() > deadline:
                 return list(by_hotel.values())
             await asyncio.sleep(POLL_S)
 
-    async def check(self, item: dict, invited: dict) -> dict | None:
-        """Re-verify one offer: the business's seals from the registry and the offer's signature."""
+    async def check(self, item: dict, invited: dict, request_id: str) -> dict | None:
+        """Re-verify one relayed offer before Tuttie uses it.
+
+        Checks the business's seals from the registry, the offer's signature (by that
+        business, over exactly the offer shown), that it answers *this* request (`request_id`:
+        a genuine offer from another posting has another date or other needs) and that it is
+        still valid. Anything else is shown as broken and ignored.
+        """
         node_id = item["node_id"]
         record = (await self.http.get(f"{self.registry_url}/nodes/{node_id}")).json()
         verdict = evaluate_record(record, self.authorities)
-        valid = (verdict["tier"] in TRUSTED_TIERS
-                 and verify_envelope(item["envelope"], record["public_key"], expected_node_id=node_id)
-                 and item["envelope"]["payload"] == item["offer"])
         offer = item["offer"]
         summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
-        if not valid:
-            self.bus.emit("marketplace", "broken", f"{summary}: offer does not verify, ignored", record, verdict["seals"])
+        valid_until = parse_timestamp(offer.get("valid_until", ""))
+        problem = None
+        if not (verdict["tier"] in TRUSTED_TIERS
+                and verify_envelope(item["envelope"], record["public_key"], expected_node_id=node_id)
+                and item["envelope"]["payload"] == offer):
+            problem = "offer does not verify"
+        elif offer.get("request_id") != request_id:
+            problem = "offer is for another request"
+        elif valid_until is None or valid_until <= datetime.now(timezone.utc):
+            problem = "offer has expired"
+        if problem:
+            self.bus.emit("marketplace", "broken", f"{summary}: {problem}, ignored", record, verdict["seals"])
             return None
         event = self.bus.emit("marketplace", "verified", summary, record, verdict["seals"],
                               {"phase": "offer", "offer": offer, "agent": invited.get("agent"),

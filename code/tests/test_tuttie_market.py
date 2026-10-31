@@ -142,7 +142,7 @@ def test_tuttie_rejects_an_offer_whose_signature_does_not_match():
         bus = EventBus()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=registry_app)) as http:
             desk = MarketDesk(http, "http://localhost:4000", bus, load_authorities())
-            return await desk.check(item, {}), bus
+            return await desk.check(item, {}, result["request_id"]), bus
 
     checked, bus = asyncio.run(scenario())
     assert checked is None and bus.history[-1]["status"] == "broken"
@@ -257,10 +257,29 @@ def test_one_hotel_sending_two_offers_does_not_end_the_wait_for_the_others():
             desk = MarketDesk(http, "http://reg", EventBus(), load_authorities(),
                               market_url="http://market", offer_wait_s=3)
 
-            async def check(item, invited):
+            async def check(item, invited, request_id):
                 return {**item, "trust_tier": "gold", "source_step": 1}
             desk.check = check
             return await desk.collect("rq-relay", expected=2, invited={})
 
     offers = asyncio.run(scenario())
     assert sorted((o["node_id"], o["offer"]["offer_id"]) for o in offers) == [(other, "of-c"), (RHEINBLICK, "of-b")]
+
+
+@pytest.mark.parametrize("request_id, valid_for, reason", [
+    ("rq-someone-elses", timedelta(hours=2), "another request"),
+    ("rq-relay", timedelta(hours=-1), "expired"),
+])
+def test_tuttie_refuses_a_genuine_offer_for_another_request_or_expired(request_id, valid_for, reason):
+    """A market could relay a hotel's genuine offer from another posting (another date, other
+    needs) or an old one: the signature verifies, but Tuttie must not show or book it."""
+    async def scenario():
+        bus = EventBus()
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=registry_app), base_url="http://reg") as http:
+            desk = MarketDesk(http, "http://reg", bus, load_authorities(), market_url="http://market")
+            item = relayed(RHEINBLICK, "of-old", request_id=request_id, valid_for=valid_for)
+            return await desk.check(item, {}, "rq-relay"), bus
+
+    checked, bus = asyncio.run(scenario())
+    assert checked is None
+    assert bus.history[-1]["status"] == "broken" and reason in bus.history[-1]["summary"]
