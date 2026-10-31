@@ -31,11 +31,15 @@ import os
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 
+from anthropic import AnthropicError
 from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from llm import LLM as ChatLLM
 from node.catalog import AVAILABLE, tools_for
+
+# Errors of either LLM provider (llm.py): the agent falls back instead of failing the request.
+LLM_ERRORS = (ValidationError, json.JSONDecodeError, OpenAIError, AnthropicError)
 
 # Tools a business uses when its config has no "agent" section yet.
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
@@ -237,7 +241,7 @@ class BusinessAgent:
         user = json.dumps(request, ensure_ascii=False)
         try:
             reply = AgentReply.model_validate(await self._llm().complete_json(system, user))
-        except (ValidationError, json.JSONDecodeError, OpenAIError):
+        except LLM_ERRORS:
             return FALLBACK
         return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, reply.arrival_date)}
 
@@ -264,7 +268,7 @@ class BusinessAgent:
         try:
             decision = WakeDecision.model_validate(
                 await self._llm().complete_json(system, json.dumps(event, ensure_ascii=False)))
-        except (ValidationError, json.JSONDecodeError, OpenAIError):
+        except LLM_ERRORS:
             return {"woken_by": kind, "interested": False, "reason": "could not decide right now", "next_tool": None}
         tool = decision.next_tool if decision.next_tool in self.tools else None
         # Answering a new posting means making an offer: that is not left to the LLM's choice.
@@ -298,7 +302,7 @@ class BusinessAgent:
                                          add_on_ids=json.dumps(sorted(self.add_ons)))
             try:
                 choice = OfferChoice.model_validate(await self._llm().complete_json(system, json.dumps(request)))
-            except (ValidationError, json.JSONDecodeError, OpenAIError):
+            except LLM_ERRORS:
                 return None
         room = self.rooms.get(choice.room_type)
         needed = self.add_ons_for(request.get("constraints", {}).get("requirements", []))

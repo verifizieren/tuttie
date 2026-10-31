@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+import httpx
+from anthropic import APIConnectionError
 from openai import OpenAIError
 
 import node.agent
@@ -61,9 +63,21 @@ def test_unknown_or_missing_add_on_gives_no_commitment():
     assert ask(RHEINBLICK, {"answer": "No add-on needed."})[0]["commitment"] is None
 
 
-@pytest.mark.parametrize("reply", [{"add_on": "dog"}, OpenAIError("down"), {"answer": "x", "arrival_date": "soon"}])
+CLAUDE_DOWN = APIConnectionError(request=httpx.Request("POST", "https://api.anthropic.com"))
+
+
+@pytest.mark.parametrize("reply", [{"add_on": "dog"}, OpenAIError("down"), CLAUDE_DOWN,
+                                   {"answer": "x", "arrival_date": "soon"}])
 def test_invalid_reply_or_llm_error_gives_the_safe_fallback(reply):
     assert ask(RHEINBLICK, reply)[0] == FALLBACK
+
+
+def test_a_claude_error_on_wake_up_declines_instead_of_failing():
+    agent = BusinessAgent(RHEINBLICK)
+    agent.llm = FakeLLM(CLAUDE_DOWN)
+    decision = asyncio.run(agent.invoke({"type": "posting.created", "posting": {}}))
+    assert decision["interested"] is False and decision["next_tool"] is None
+    assert asyncio.run(agent.make_offer({"request_id": "r", "expires_at": "x", "request": {"payload": {}}})) is None
 
 
 def test_private_facts_never_reach_the_llm():
