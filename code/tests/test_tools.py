@@ -131,3 +131,11 @@ def test_book_requires_signed_availability_and_known_extras():
     assert "get_availability" in asyncio.run(toolbox.book(RHEINBLICK, "2026-11-14", "double", "A"))["error"]
     asyncio.run(toolbox.call_tool(RHEINBLICK, "get_availability", {"date": "2026-11-14"}))
     assert "unknown extras" in asyncio.run(toolbox.book(RHEINBLICK, "2026-11-14", "double", "A", ["free spa"]))["error"]
+
+
+def test_book_refuses_untrusted_unsigned_node():
+    toolbox, _, contacted = make_toolbox()
+    asyncio.run(toolbox.call_tool("ch.basel.budget-rooms", "get_availability", {"date": "2026-11-14"}))
+    result = asyncio.run(toolbox.book("ch.basel.budget-rooms", "2026-11-14", "double", "A"))
+    assert result["rejected"] is True and not toolbox.approvals.pending
+    assert not any(url.endswith("/tools/book") for url in contacted)

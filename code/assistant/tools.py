@@ -117,6 +117,15 @@ def broken_reason(verdict: dict) -> str:
     return f"seal does not verify: {', '.join(failed)}" if failed else "no seals"
 
 
+def verified_summary(record: dict, verdict: dict) -> str:
+    if verdict["tier"] != "grey":
+        return f"{record['name']}: {verdict['tier']} seal verified"
+    signed = "no seals (unsigned)" if not verdict["seals"] else "self-signed only"
+    unlicensed = [c for c in record["capabilities"] if c not in verdict["capabilities"] and c.startswith("licensed_")]
+    claim = f", claims {', '.join(unlicensed)} without a valid licence" if unlicensed else ""
+    return f"{record['name']}: {signed}, untrusted{claim}"
+
+
 def summarize(tool: str, payload: dict) -> str:
     if payload.get("rooms"):
         rooms = ", ".join(f"{r['room_type']} CHF {r['price_chf']}" for r in payload["rooms"])
@@ -160,7 +169,8 @@ class Toolbox:
                 self.emit_once(record, "broken", f"{record['name']}: {reason}, ignored", verdict)
                 refused.append(rejected(record, reason))
             else:
-                step = self.emit_once(record, "verified", f"{record['name']}: {verdict['tier']} seal verified", verdict)
+                status = "untrusted" if verdict["tier"] == "grey" else "verified"
+                step = self.emit_once(record, status, verified_summary(record, verdict), verdict)
                 verified.append({**node_view(record, verdict), "source_step": step})
         result = {"query": params, "verified": verified, "rejected": refused}
         if not records:
@@ -207,7 +217,9 @@ class Toolbox:
         return Verified(record, verdict, envelope)
 
     def emit_verified(self, kind: str, summary: str, result: Verified) -> int:
-        event = self.bus.emit(kind, "verified", summary, result.record, result.verdict["seals"],
+        """Signature checked; the step is still "untrusted" when the node itself is only grey."""
+        status = "untrusted" if result.verdict["tier"] == "grey" else "verified"
+        event = self.bus.emit(kind, status, summary, result.record, result.verdict["seals"],
                               {"timestamp": result.envelope["timestamp"], "payload": result.payload})
         return event["step"]
 
@@ -237,8 +249,10 @@ class Toolbox:
     async def book(self, node_id: str, date: str, room_type: str, guest_name: str,
                    extras: list[str] | None = None) -> dict:
         found = await self.lookup(node_id)
-        if found is None or found[1]["tier"] == "broken" or "can_book" not in found[1]["capabilities"]:
-            return {"node_id": node_id, "rejected": True, "reason": "node is not verified for bookings"}
+        # A booking takes payment, which untrusted (grey) nodes never get.
+        if found is None or not {"can_book", "can_take_payment"} <= set(found[1]["capabilities"]):
+            return {"node_id": node_id, "rejected": True,
+                    "reason": "node is not trusted for bookings and payments (needs a gold or blue seal)"}
         record, verdict = found
 
         availability = self.availability.get(node_id)
