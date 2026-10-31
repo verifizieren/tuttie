@@ -1,29 +1,65 @@
 // Turns the assistant's timeline events (GET /events, format in documentation/formats.md)
-// into what the wallet shows: the posting, the hotels, their offers, the negotiation, the
-// approval and Tuttie's answer. Pure functions, so the view only ever renders `state`.
+// into what the wallet shows: one conversation as turns (what the user said, Tuttie's answer),
+// plus what happened on the agent web in between: the posting, the hotels and their offers,
+// the cards to pick favourites from, the negotiation, the approval and the booking.
+// Pure functions, so the view only ever renders `state`.
 
 export const EMPTY = {
-  phase: "idle",        // idle | thinking | posted | offers | negotiating | approval | done
+  id: null,             // this conversation, for the history on this device
+  turns: [],            // [{ said, answer, mood }] in order; the last one may still be running
+  phase: "idle",        // idle | thinking | posted | offers | picking | negotiating | approval | booking | booked | done | declined
   request: null,        // the public part of Tuttie's posting
+  marketTurn: null,     // the turn in which the posting happened
   hotels: {},           // node_id -> { name, size, agent, tiers, seals, uid, status, offer, shortlisted, rounds, agreed }
   skipped: [],          // [{ name, reason, tier }] not woken: untrusted or broken
   shortlistDone: false,
-  approval: null,       // { id, amount, hotel, summary, seals, uid } while the user decides
+  cards: null,          // the hotels to pick from (assistant/cards.py), once the offers are in
+  picked: null,         // node ids the user chose as favourites
+  approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate } while the user decides
   booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid, payments } once confirmed
-  answer: "",
-  mood: "neutral",      // how Tuttie's answer feels (assistant/agent.py MOODS)
+  bookingTurn: null,
+  answer: "",           // Tuttie's latest answer
+  mood: "neutral",      // how it feels (assistant/agent.py MOODS)
   thought: "",          // the latest reasoning summary title
 };
 
 const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
+const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/** The turn events belong to: the first one still waiting for an answer, else the last. */
+export function activeTurn(state) {
+  const open = state.turns.findIndex(t => !t.answer);
+  return open === -1 ? state.turns.length - 1 : open;
+}
+
+/** A conversation that has ended: answered, nothing waiting for the user or still running. */
+export const finished = state => Boolean(state.answer) && !state.approval && state.turns.every(t => t.answer);
+
+/** The user said something: a new turn (and a new conversation if there is none). */
+export function startTurn(state, said) {
+  return { ...state, id: state.id || newId(), turns: [...state.turns, { said }], phase: "thinking" };
+}
+
+/** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
+export const cleanAnswer = text => text.split("\n").filter(line => !/^\s*Ignored:/i.test(line)).join("\n")
+  .replace(/\s*\[\d+\]/g, "").trim();
+
+/** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
+const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
 
 function hotel(state, nodeId, name) {
-  return state.hotels[nodeId] || { name, size: null, agent: null, tiers: [], seals: [], uid: null, status: "woken", offer: null,
-                                   shortlisted: false, rounds: [], agreed: null };
+  return state.hotels[nodeId] || { name, size: null, agent: null, tiers: [], seals: [], uid: null, status: "woken",
+                                   offer: null, shortlisted: false, rounds: [], agreed: null };
 }
 
 function withHotel(state, nodeId, name, changes) {
   return { ...state, hotels: { ...state.hotels, [nodeId]: { ...hotel(state, nodeId, name), ...changes } } };
+}
+
+function withAnswer(state, text, mood) {
+  const base = withTurn(state), i = activeTurn(base);
+  const turns = base.turns.map((t, n) => (n === i ? { ...t, answer: text, mood } : t));
+  return { ...base, turns, answer: text, mood, phase: "done" };
 }
 
 /** The next state after one event. Unknown events leave the state as it is. */
@@ -33,7 +69,7 @@ export function applyEvent(state, event) {
     const title = event.summary.match(/^\*\*(.+?)\*\*/);
     return { ...state, thought: title ? title[1] : state.thought, phase: state.phase === "idle" ? "thinking" : state.phase };
   }
-  if (event.kind === "answer") return { ...state, answer: event.summary, mood: detail.mood || "neutral", phase: "done" };
+  if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral");
 
   if (event.kind === "marketplace") {
     if (detail.phase === "posted") {
@@ -43,8 +79,10 @@ export function applyEvent(state, event) {
                            tiers: [info.trust_tier], status: info.status || "woken" };
       }
       const skipped = Object.values(detail.skipped || {}).map(s => ({ name: s.name, reason: s.reason, tier: s.trust_tier }));
-      // A new posting starts a new run: earlier offers, approvals and answers no longer apply.
-      return { ...EMPTY, phase: "posted", request: detail.request, hotels, skipped, thought: state.thought };
+      // A new posting replaces the last one's market, offers, picks and booking in this conversation.
+      const base = withTurn(state);
+      return { ...base, phase: "posted", request: detail.request, marketTurn: activeTurn(base), hotels, skipped,
+               shortlistDone: false, cards: null, picked: null, approval: null, booking: null, bookingTurn: null };
     }
     if (detail.phase === "offer" && event.node_id) {
       return { ...withHotel(state, event.node_id, event.node_name, {
@@ -58,6 +96,7 @@ export function applyEvent(state, event) {
         ([nodeId, h]) => [nodeId, { ...h, shortlisted: Boolean(h.offer && ids.has(h.offer.offer_id)) }]));
       return { ...state, hotels, shortlistDone: true };
     }
+    if (detail.phase === "cards") return { ...state, cards: detail.cards || [], phase: "picking" };
     return state;
   }
 
@@ -69,15 +108,17 @@ export function applyEvent(state, event) {
       rounds: [...h.rounds, step],
       agreed: detail.payload.type === "agreement" ? detail.payload.price_chf : h.agreed,
       status: detail.payload.type === "agreement" ? "agreed" : "negotiating",
-    }), phase: "negotiating" };
+    }), phase: "negotiating", picked: state.picked || [event.node_id] };
   }
 
   // The hotel's signed confirmation, with the checks its action gate passed.
   if (event.kind === "a2t" && detail.payload?.tool === "book" && detail.payload.status === "confirmed") {
     const b = detail.payload;
-    return { ...state, phase: "booked", booking: { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date,
-      room: b.room_type, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
-      payments: [] } };
+    const base = withTurn(state);
+    return { ...base, phase: "booked", bookingTurn: activeTurn(base),
+             booking: { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
+                        extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
+                        payments: [] } };
   }
 
   // A charge paid after the booking (e.g. the city tax), with the hotel's signed receipt.
@@ -105,11 +146,13 @@ export function statusLine(state) {
     case "thinking": return state.thought || "Thinking…";
     case "posted": return `Asked ${Object.keys(state.hotels).length} hotels…`;
     case "offers": return `${offers} offer${offers === 1 ? "" : "s"} in`;
+    case "picking": return "Pick your favourites";
     case "negotiating": return "Negotiating…";
     case "approval": return "Waiting for your approval";
     case "booking": return "Booking…";
     case "booked": return "Booked";
     case "declined": return "You declined";
+    case "done": return "← new chat · history →";
     default: return "";
   }
 }
@@ -136,6 +179,6 @@ export const BUSY = new Set(["thinking", "posted", "negotiating", "booking"]);
 
 /** The face's expression for a phase (names from lib/face.js). */
 export const EXPRESSION = {
-  thinking: "skepticism", posted: "amazement", offers: "happiness", negotiating: "suspicion",
+  thinking: "skepticism", posted: "amazement", offers: "happiness", picking: "happiness", negotiating: "suspicion",
   approval: "pleading", booking: "neutral", booked: "happiness", declined: "sadness", done: "happiness",
 };
