@@ -12,7 +12,7 @@ answer the user's needs come first.
 """
 
 MAX_CARDS = 5
-MAX_FEATURES = 7
+MAX_FEATURES = 5
 WALK_M_PER_MIN = 80
 NEAR_STATION_M = 1000
 NEEDS = {  # feature key -> words in the user's requirements that make it matter most

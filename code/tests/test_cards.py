@@ -28,7 +28,7 @@ def shown(card: dict) -> list[tuple[str, bool, str]]:
 def test_the_users_needs_come_first_then_the_rest():
     card = hotel_card(item("guesthouse", 135), GUESTHOUSE_FACTS, NEEDS, 160, shortlisted=True)
     assert shown(card)[:3] == [("dog", True, "Dogs free"), ("quiet", True, "Quiet"), ("late", True, "Late arrival")]
-    assert ("kids", False, "No kids' beds") in shown(card) and len(card["features"]) == 7
+    assert ("kids", False, "No kids' beds") in shown(card) and len(card["features"]) == 5
     assert card["rating"] == {"score": 4.8, "reviews": 64} and card["over_budget_chf"] is None
 
 
