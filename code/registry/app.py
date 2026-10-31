@@ -15,6 +15,7 @@ app = FastAPI(title="APS registry")
 
 
 def load_records() -> list[dict]:
+    """All registry records (read on every request, so a re-issued registry.json is live)."""
     return json.loads(REGISTRY_PATH.read_text())
 
 
@@ -30,6 +31,7 @@ def search(tags: str = "", capability: str = "") -> list[dict]:
 
 @app.get("/nodes/{node_id}")
 def get_node(node_id: str) -> dict:
+    """One registry record by node id."""
     for record in load_records():
         if record["node_id"] == node_id:
             return record

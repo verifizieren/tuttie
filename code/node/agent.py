@@ -34,12 +34,15 @@ COMMITMENT_DAYS = 30  # validity when the arrival date is unknown
 
 
 class AgentReply(BaseModel):
+    """What the node's LLM must return: an answer and at most one add-on id."""
     answer: str
     add_on: str | None = None
     arrival_date: date | None = None
 
 
 class NodeAgent:
+    """The node's own A2A agent; its LLM never sets a price."""
+
     def __init__(self, config: dict):
         facts = config.get("facts", {})
         self.add_ons = {a["id"]: a for a in facts.get("add_ons", [])}
@@ -63,6 +66,7 @@ class NodeAgent:
         }
 
     async def answer(self, question: str, context: dict) -> dict:
+        """Answer a question from another agent; falls back to a safe reply on any LLM error."""
         self.llm = self.llm or LLM()
         user = json.dumps({"question": question, "context": context}, ensure_ascii=False)
         try:

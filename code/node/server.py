@@ -40,6 +40,7 @@ class BookRequest(BaseModel):
 
 
 def create_app(config: dict) -> FastAPI:
+    """Build the FastAPI app for one node config."""
     node_id = config["node_id"]
     facts = config.get("facts", {})
     signing_key = load_signing_key(node_id)
@@ -50,10 +51,12 @@ def create_app(config: dict) -> FastAPI:
     app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
+        """Wrap a response payload in this node's signed envelope."""
         return sign_envelope(node_id, payload, signing_key)
 
     @app.post("/tools/get_availability")
     def get_availability(req: AvailabilityRequest) -> dict:
+        """Signed list of available rooms and prices for a date."""
         rooms = [
             {k: room[k] for k in ("room_type", "price_chf", "rate")}
             for room in facts.get("rooms", []) if room.get("available")
@@ -69,6 +72,7 @@ def create_app(config: dict) -> FastAPI:
 
     @app.post("/tools/get_policies")
     def get_policies() -> dict:
+        """Signed policies: location, quietness, dogs, check-in, cancellation."""
         return signed({
             "tool": "get_policies",
             "hotel": config["name"],
@@ -87,6 +91,7 @@ def create_app(config: dict) -> FastAPI:
         the node promised, whatever the caller claims.
         """
         def refuse(reason: str) -> dict:
+            """A signed refusal with the reason."""
             return signed({"tool": "book", "status": "refused", "reason": reason})
 
         approval = req.approval
@@ -127,6 +132,7 @@ def create_app(config: dict) -> FastAPI:
 
     @app.post("/agent")
     async def agent(req: AgentRequest) -> dict:
+        """The node's own agent answers another agent (A2A), signed."""
         return signed(await node_agent.answer(req.question, req.context))
 
     return app

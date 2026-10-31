@@ -36,6 +36,8 @@ def to_tool(schema: dict) -> dict:
 
 
 class LLM:
+    """Thin client for the OpenAI Responses API with optional reasoning settings."""
+
     def __init__(self, model: str | None = None):
         self.client = AsyncOpenAI()  # reads OPENAI_API_KEY
         self.model = model or os.environ.get("LLM_MODEL", "gpt-6-luna")
