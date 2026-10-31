@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# Demo keys in keys/ are committed on purpose so every teammate gets the same
+# signed registry. Any non-demo key goes in keys/local/, which stays private.
+keys/local/
