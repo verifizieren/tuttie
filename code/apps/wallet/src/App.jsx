@@ -94,10 +94,10 @@ export default function App() {
   // The user said goodbye (Tuttie's end_conversation): once the goodbye is shown and spoken, the
   // card closes itself, as if swiped down.
   useEffect(() => {
-    if (agent.closing !== "ready" || reveal || mode === "closed") return undefined;
+    if (agent.closing !== "ready" || reveal || mode === "closed" || approval) return undefined;  // never away from an approval
     const timer = setTimeout(close, CLOSE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [agent.closing, reveal, mode]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agent.closing, reveal, mode, approval]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!notice) return undefined;
     const timer = setTimeout(() => setNotice(""), NOTICE_MS);
