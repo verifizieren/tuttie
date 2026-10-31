@@ -52,6 +52,11 @@ def room_conversation(request: Request, room: str):
     return request.app.state.conversations.get(session_id)
 
 
+def passed_headers(headers) -> dict:
+    """The headers LiveKit needs from the client: newer clients send the room token here."""
+    return {"Authorization": headers["authorization"]} if "authorization" in headers else {}
+
+
 def agent_only(request: Request) -> None:
     """The voice agent's endpoints need the LiveKit secret (it runs on this server, next to us)."""
     if not configured() or request.headers.get("authorization") != f"Bearer {API_SECRET}":
@@ -108,7 +113,7 @@ async def rtc_validate(request: Request) -> Response:
     """LiveKit's connection check, passed to the local LiveKit server."""
     url = LIVEKIT_URL.replace("ws", "http", 1) + "/rtc/validate"
     async with httpx.AsyncClient(timeout=10) as http:
-        upstream = await http.get(url, params=request.query_params)
+        upstream = await http.get(url, params=request.query_params, headers=passed_headers(request.headers))
     return Response(upstream.content, status_code=upstream.status_code, media_type=upstream.headers.get("content-type"))
 
 
@@ -119,7 +124,7 @@ async def rtc_proxy(ws: WebSocket, rest: str = "") -> None:
     await ws.accept()
     target = f"{LIVEKIT_URL}/rtc{'/' + rest if rest else ''}?{ws.url.query}"
     try:
-        async with websockets.connect(target, max_size=None) as upstream:
+        async with websockets.connect(target, max_size=None, additional_headers=passed_headers(ws.headers)) as upstream:
             async def to_livekit():
                 while True:
                     message = await ws.receive()
