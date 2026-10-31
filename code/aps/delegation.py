@@ -5,8 +5,10 @@ The user's key signs the agent's id and public key, the scopes it gets and an ex
 A business that receives a message from the agent can check the delegation against the
 user's public key, so nobody can run an agent "for" a user without the user's key.
 
-Paying is deliberately not a scope: every payment still needs the user's own signed
-approval on the phone (aps/approval.py), whatever the agent is delegated to do.
+Scopes: "ask_agents", "post_requests", "negotiate", and "book" (the agent may run the book
+action for the user; aps/gate.py checks it). A scope never replaces the user's approval:
+every booking and payment still needs the user's own signed approval on the phone for its
+exact amount (aps/approval.py). Paying is not a scope (yet; see the open payment mandate).
 """
 
 from datetime import datetime
@@ -15,7 +17,7 @@ from nacl.signing import SigningKey
 
 from aps.envelope import parse_timestamp, sign_bytes, utc_now, verify_bytes
 
-SCOPES = {"post_requests", "ask_agents", "negotiate"}
+SCOPES = {"post_requests", "ask_agents", "negotiate", "book"}  # "book" still needs a signed approval per booking
 FIELDS = ("agent_id", "agent_public_key", "scopes", "issued_at", "expires_at")
 
 

@@ -173,7 +173,7 @@ signed by the `user` key:
 {
   "agent_id": "ch.tuttie.alex-muster",
   "agent_public_key": "<b64, must equal the record's public_key>",
-  "scopes": ["ask_agents", "negotiate", "post_requests"],
+  "scopes": ["ask_agents", "book", "negotiate", "post_requests"],
   "issued_at": "2026-10-31T12:00:00Z",
   "expires_at": "2027-10-31T12:00:00Z",
   "signature": "<user key over canonical {agent_id, agent_public_key, scopes, issued_at, expires_at}>"
@@ -181,8 +181,10 @@ signed by the `user` key:
 ```
 
 A delegation is valid only for the agent id and key in its own registry record, until
-`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`). Paying
-is not a scope: every payment still needs the user's signed approval (below). The
+`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`, `book`).
+`book` lets the agent call the book action for the user (checked by the action gate); each
+booking still needs the user's signed approval for its exact amount (below). Paying is not a
+scope. The
 assistant serves its own checked identity at `GET /identity`
 (`{node_id, name, trust_tier, verified_by, capabilities, acts_for_user, scopes, ...}`).
 
@@ -224,6 +226,31 @@ calling agent (Tuttie); the MCP tool gets it as its arguments, unchanged:
   `verify_call(call, public_key, tool=)` + `NonceBook.use(agent_id, nonce)` on the service's
   side. Whether the action is *allowed* (seals, scope, approval, agreement) is decided by the
   action gate (below).
+
+## Action gate (`aps/gate.py`)
+
+Every action tool asks one gate before it runs: `await gate.check_action(call, needs)` with
+`Needs(tool, scope, approval=True|False, amount_chf=<total the business computed>)`. The gate
+stops at the first missing signature and answers a `Verdict {ok, reason, checks, caller,
+approval, agreement, amount_chf}`:
+
+| # | Check (name in `checks`) | Refusal `reason` |
+| --- | --- | --- |
+| 1 | signed call for this tool | `the call is not a signed call` / `the call is for <x>, not <tool>` |
+| 2 | `caller`: known user agent, gold or blue | `the caller is not a known user agent` / `the caller's seals do not verify` / `the caller has no verified seal` |
+| 3 | fresh (≤ 300 s) | `the call is outdated (possible replay)` |
+| 4 | `signature` with the record's key | `the call is not signed by the caller's key` |
+| 5 | nonce not seen | `the call was already used (replayed nonce)` |
+| 6 | `delegation` with the scope, signed by the user, not expired | `the user has not delegated <scope> to this agent (...)` |
+| 7 | `agreement` (only if `args.agreement`): own signature, valid, unused | `the agreement is not signed by this hotel` / `... has expired` / `... was already booked` / `this business does not negotiate, ...` |
+| 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` |
+
+The amount is the agreement's price if the call carries one, else the business's own total;
+the caller's figures are never used. Reasons name what is missing and never a private limit.
+Nothing is used up by a check: after the action succeeded, the service calls
+`gate.commit(verdict)` (approval and agreement become used). The nonce is used as soon as the
+signature verified, so a refused call is not retried unchanged. `checks` is what the wallet
+shows ("approval ✓ delegation ✓ agreement ✓").
 
 ## DRAFT: marketplace messages (Tuttie, issues #8 #10)
 

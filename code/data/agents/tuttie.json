@@ -6,5 +6,5 @@
   "capabilities": ["can_post_requests", "can_negotiate"],
   "tags": ["tuttie", "user-agent"],
   "seals": [{ "issuer": "adobe", "tier": "blue" }],
-  "delegation": { "scopes": ["ask_agents", "negotiate", "post_requests"], "valid_days": 365 }
+  "delegation": { "scopes": ["ask_agents", "book", "negotiate", "post_requests"], "valid_days": 365 }
 }

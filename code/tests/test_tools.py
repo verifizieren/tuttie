@@ -165,7 +165,7 @@ def test_identity_shows_tuttie_sealed_and_acting_for_the_user():
     toolbox, bus, _ = make_toolbox()
     me = asyncio.run(toolbox.identity("ch.tuttie.alex-muster"))
     assert me["trust_tier"] == "blue" and me["acts_for_user"] is True
-    assert set(me["scopes"]) == {"ask_agents", "negotiate", "post_requests"}
+    assert set(me["scopes"]) == {"ask_agents", "book", "negotiate", "post_requests"}
     assert bus.history == []  # identity checks are for the wallet, not the timeline
 
 

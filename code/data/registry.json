@@ -264,12 +264,13 @@
       "agent_public_key": "00T3JRuLqKIfZuw8jYEaJWTgJiL9+2nwTrS5xt05M7M=",
       "scopes": [
         "ask_agents",
+        "book",
         "negotiate",
         "post_requests"
       ],
-      "issued_at": "2026-10-31T12:31:06Z",
-      "expires_at": "2027-10-31T12:31:06Z",
-      "signature": "vgPZ5fKYtv6muQDrHwDYHxmkEpETq1PRjpM9kg7GoKtDyt4b3S5I4XrJ0Ip9EsIZomWgoqbvwawpZERsXmNtDA=="
+      "issued_at": "2026-10-31T13:10:55Z",
+      "expires_at": "2027-10-31T13:10:55Z",
+      "signature": "d3B1fG9YKqassiWuqQmxR7+mA67ncYIajG4nKH51JDzpNjov33+ay7w3ScfLQGzqB6uJG/gmOBVEvMSSXDSgCw=="
     }
   }
 ]
