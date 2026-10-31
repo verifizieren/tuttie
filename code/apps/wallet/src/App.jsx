@@ -6,12 +6,19 @@
 //           swipes the card down or switches to typing; taps never send Tuttie away
 //   typing  card open with a text field; the eyes close while the user types
 //
-// UI only for now: voice and text are not connected to the agent backend yet.
+// Text goes to Tuttie (POST /chat); what Tuttie then does on the agent web arrives on the
+// event stream and is shown under its eyes (Activity), including the approval sheet. Voice
+// recognition is its own work area (code/voice) and not connected yet.
 import { useEffect, useRef, useState } from "react";
+import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
+import ApprovalSheet from "./components/ApprovalSheet.jsx";
 import BankCard from "./components/BankCard.jsx";
+import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
+import { sendChat } from "./lib/api.js";
+import { EXPRESSION, statusLine } from "./lib/activity.js";
 
 const STATUS = {
   closed: "Tap Tuttie to talk",
@@ -29,7 +36,9 @@ export default function App() {
   const canvas = useRef(null);
   const openedAt = useRef(0);
   const face = useFace(canvas);
+  const [agent, startRun] = useAgentStream();
   useVisibleViewport();
+  const busy = Boolean(agent.request || agent.answer || agent.phase !== "idle");
 
   // The face follows the mode: awake and briefly happy in voice mode, asleep otherwise.
   useEffect(() => {
@@ -63,20 +72,40 @@ export default function App() {
     if (performance.now() - openedAt.current > OPEN_GUARD_MS) setMode("typing");
   }
 
-  function send(text) {
+  // While Tuttie works, its face follows what is happening on the agent web.
+  useEffect(() => {
+    if (mode === "voice" && EXPRESSION[agent.phase]) face.current?.set(EXPRESSION[agent.phase], 500);
+  }, [agent.phase, mode, face]);
+
+  // An approval needs the user: open the card if it is closed.
+  useEffect(() => {
+    if (agent.approval && mode === "closed") startVoice();
+  }, [agent.approval]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function send(text) {
     setSaid(`“${text}”`);
-    setStatus("Not connected to the agent web yet");
+    startRun();
+    setMode("voice");  // Tuttie is awake while it works
+    try {
+      await sendChat(text);
+    } catch {
+      setStatus("Tuttie is unreachable right now");
+    }
   }
 
-  const classes = ["app", mode !== "closed" && "open", mode === "voice" && "voice", mode === "typing" && "typing"];
+  const classes = ["app", mode !== "closed" && "open", mode === "voice" && "voice", mode === "typing" && "typing",
+                   busy && "busy"];
   return (
     <div className={classes.filter(Boolean).join(" ")}>
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} said={said} status={status}
+      <AgentCard canvasRef={canvas} mode={mode} said={busy ? "" : said} status={statusLine(agent) || status}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen}
-                 onKeyboard={startTyping} onSend={send} />
+                 onKeyboard={startTyping} onSend={send}>
+        <Activity state={agent} />
+        <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
+      </AgentCard>
     </div>
   );
 }

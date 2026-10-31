@@ -1,5 +1,6 @@
 // The Tuttie card: the agent's face on a dark card, a quiet name label, and (when open) a grab
-// bar and the controls. Gestures (tap, swipe up, swipe down) come from useCardGestures.
+// bar, what Tuttie is doing (children: activity, approval sheet) and the controls. Gestures
+// (tap, swipe up, swipe down) come from useCardGestures.
 import { useRef } from "react";
 import useCardGestures from "../hooks/useCardGestures.js";
 import AgentControls from "./AgentControls.jsx";
@@ -12,7 +13,7 @@ import AgentControls from "./AgentControls.jsx";
  * @param onTap      tap on the open card
  * Other props are passed on to AgentControls.
  */
-export default function AgentCard({ canvasRef, mode, onOpen, onClose, onTap, ...controls }) {
+export default function AgentCard({ canvasRef, mode, onOpen, onClose, onTap, children, ...controls }) {
   const card = useRef(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -25,6 +26,7 @@ export default function AgentCard({ canvasRef, mode, onOpen, onClose, onTap, ...
       <div className="edge" />
       <div className="grabber" />
       <span className="label">Tuttie</span>
+      {children}
       <AgentControls mode={mode} {...controls} />
     </div>
   );
