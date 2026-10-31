@@ -49,8 +49,9 @@
   .node { font-weight: 700; }
   .status { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--green); }
   .broken .status { color: var(--red); }
-  .step.untrusted { border-left-color: var(--grey); }
+  .step.untrusted { border-left-color: var(--grey); background: var(--grey-bg); }
   .untrusted .status { color: var(--grey); }
+  .untrusted .summary { text-decoration: line-through; color: var(--grey); }
   .summary { margin-top: 4px; }
   .broken .summary { text-decoration: line-through; color: var(--red); }
   .seal { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 2px 9px 2px 3px; border-radius: 999px; border: 2px solid; }
@@ -58,7 +59,7 @@
   .seal.invalid svg { filter: grayscale(1); opacity: .6; }
   .seal.gold { color: var(--gold); background: var(--gold-bg); }
   .seal.blue { color: var(--blue); background: var(--blue-bg); }
-  .seal.grey { color: var(--grey); background: var(--grey-bg); }
+  .seal.grey { color: var(--grey); background: var(--grey-bg); text-decoration: line-through; }
   .seal.invalid { color: var(--red); background: var(--red-bg); text-decoration: line-through; }
   .empty { color: var(--muted); }
   .cite { font-size: 13px; font-weight: 700; padding: 0 6px; border-radius: 6px; border: 1px solid; vertical-align: 2px; }
