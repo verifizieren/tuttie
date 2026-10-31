@@ -377,6 +377,13 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Hotel offers in one call:** for a new posting the hotel agent decides and chooses its offer
   (room, add-ons) in one LLM call (`WAKE_OFFER_PROMPT`, `offer_choice` kept out of the signed
   reply); offers reach the guest ~1.3 s sooner (answer ~5 s after the context in a headless run).
+- **Voice fixes after the presence/history merge:** the wallet joins the voice room only once
+  the conversation is loaded (`useVoice(..., conversationId)`): a token fetched in parallel with
+  the first `/history` created a second session, so speech went into a conversation the screen
+  did not show (409 on `/events`). LiveKit runs with `singlePeerConnection: false` (classic
+  publish + subscribe connections): iPhones joined the room but never sent an ICE check with the
+  single connection. Chromium verified end to end (fresh browser, spoken request -> answer);
+  Firefox can't be tested headless (no audio device).
 - **Voice on phones:** ICE from phones failed (no UDP into the team server; iPhones don't use
   plain TCP). A coturn relay on TCP 4044 (`code/voice/turnserver.conf`, started by run_all when
   `TURN_SECRET` is set) carries their audio; LiveKit hands it to clients. Relays only to the
