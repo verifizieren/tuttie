@@ -49,7 +49,7 @@ Each seal signature = issuer's key over canonical
 | --- | --- |
 | gold | issued by a government authority (handelsregister-bs, bar-association-ch) |
 | blue | issued by a company registry (adobe) or a platform |
-| grey | self-signed; exists, low weight, never enough for payments or licensed capabilities |
+| grey | self-signed or unsigned ("untrusted"); exists, low weight, never enough for payments or licensed capabilities |
 | broken | a claimed seal or the envelope does not verify; content is dropped |
 
 - A seal is valid only if its issuer is in `data/authorities.json`, the claimed tier
@@ -57,7 +57,7 @@ Each seal signature = issuer's key over canonical
 - A seal whose `issuer` equals the node's own `node_id` is self-signed: valid only
   with tier `grey`, verified with the node's own public key.
 - If **any** claimed seal is invalid, the node is `broken`. Otherwise its tier is the
-  highest tier among its seals.
+  highest tier among its seals; a node with no seals at all is `grey` (unsigned).
 - Licensed capabilities (listed under an authority's `licenses`, e.g.
   `licensed_legal_ch` for `bar-association-ch`) are granted only with a valid seal
   from that authority. `can_take_payment` needs tier blue or higher.
@@ -103,12 +103,13 @@ Key ids: authority issuer ids, node ids, and `user` (signs approvals).
   "node_id": "ch.basel.hotel-rheinblick",
   "node_name": "Hotel Rheinblick",
   "seals": [{ "issuer": "handelsregister-bs", "tier": "gold", "valid": true }],
-  "status": "verified | broken | pending | approved | declined | info",
+  "status": "verified | untrusted | broken | pending | approved | declined | info",
   "summary": "get_availability: double room 14 Nov, CHF 180",
   "detail": {}
 }
 ```
 
+`untrusted` marks a node whose seals are valid but only grey (self-signed or unsigned).
 `thinking` events carry a reasoning summary of the assistant's LLM in `summary`
 (usually `"**Title**\n\nbody"`), with `status: "info"` and no node. The SSE stream also
 sends a named `reset` event when a new demo starts; the UI then clears itself.
