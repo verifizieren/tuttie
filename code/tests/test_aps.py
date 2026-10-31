@@ -317,3 +317,37 @@ def test_demo_tuttie_acts_for_the_demo_user():
     assert tuttie["kind"] == "user-agent"
     assert verify_delegation(tuttie["delegation"], load_public_key("user"), tuttie["node_id"],
                              tuttie["public_key"], scope="post_requests")
+
+
+# --- key files and remaining edge cases ----------------------------------------------------
+
+
+def test_key_files_are_created_once_and_round_trip(tmp_path):
+    from aps.keys import generate_key_file, load_public_key as load_public, load_signing_key as load_signing
+
+    path = generate_key_file("ch.test.node", tmp_path / "keys")
+    first = path.read_text()
+    assert generate_key_file("ch.test.node", tmp_path / "keys").read_text() == first  # kept, not regenerated
+    key = load_signing(("ch.test.node"), tmp_path / "keys")
+    assert public_key_b64(key) == load_public("ch.test.node", tmp_path / "keys") == json.loads(first)["public_key"]
+    env = sign_envelope("ch.test.node", {"ok": True}, key)
+    assert verify_envelope(env, load_public("ch.test.node", tmp_path / "keys"))
+
+
+def test_incomplete_approval_decision_does_not_verify():
+    from aps.approval import sign_decision, verify_decision
+
+    user_key = SigningKey.generate()
+    approval = {"id": "ap-1", "action": "book", "payee_node_id": "ch.test.node", "amount_chf": 195}
+    decision = sign_decision(approval, "approved", user_key)
+    del decision["decided_at"]
+    assert not verify_decision(decision, public_key_b64(user_key))
+    assert not verify_decision(None, public_key_b64(user_key))
+
+
+def test_self_signed_seal_cannot_claim_a_higher_tier(authorities):
+    _, auths = authorities
+    node_key = SigningKey.generate()
+    record = make_record(node_key)
+    record["seals"] = [issue_seal(record, record["node_id"], "gold", node_key)]
+    assert evaluate_record(record, auths)["tier"] == "broken"
