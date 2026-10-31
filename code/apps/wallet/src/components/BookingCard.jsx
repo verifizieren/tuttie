@@ -38,7 +38,7 @@ export default function BookingCard({ booking }) {
         <div className="payment" key={i}>
           <Check />
           <span><b>{payment.purpose[0].toUpperCase() + payment.purpose.slice(1)} CHF {payment.amount}</b>
-            <small>{payment.paidWith === "mandate" ? "Paid with your mandate, no need to ask" : "Paid after your approval"}</small>
+            <small>{payment.paidWith === "mandate" ? "Paid with your mandate" : "Paid after your approval"}</small>
           </span>
         </div>
       ))}
