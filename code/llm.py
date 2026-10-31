@@ -2,10 +2,11 @@
 
 Shared by the assistant (tool loop) and the business nodes (their own A2A agents).
 
-Swap providers by reimplementing LLM.complete; the rest of the assistant only sees
-plain chat messages as dicts.
+Swap providers by reimplementing LLM.complete and LLM.complete_json; callers only
+see plain dicts.
 """
 
+import json
 import os
 
 from openai import AsyncOpenAI
@@ -27,3 +28,12 @@ class LLM:
                 for c in message.tool_calls
             ]
         return result
+
+    async def complete_json(self, system: str, user: str) -> dict:
+        """One-shot completion that must return a JSON object."""
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            response_format={"type": "json_object"},
+        )
+        return json.loads(response.choices[0].message.content or "{}")
