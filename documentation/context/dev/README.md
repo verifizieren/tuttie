@@ -12,10 +12,12 @@ cd baselhack2026/code
 python3 -m venv .venv              # or: uv venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env               # add OPENAI_API_KEY (ask the team)
-./run.sh                           # registry :4000, nodes :4001-4007, assistant + apps :4040
+./run.sh                           # builds the wallet (needs Node.js 20+), then starts
+                                   # registry :4000, nodes :4001-4007, assistant + apps :4040
 ```
 
-- Wallet (the app): <http://localhost:4040/> · first prototype: `/old/console/`
+- Wallet (the app): <http://localhost:4040/> (redirects to `/wallet/`); working on the UI:
+  `cd apps/wallet && npm run dev` for hot reload on <http://localhost:4041/wallet/>
 - Live team instance: <https://web4.mendes.dev> (shared server, ports 4000-4049)
 
 ## Before every push
@@ -23,6 +25,7 @@ cp .env.example .env               # add OPENAI_API_KEY (ask the team)
 ```bash
 .venv/bin/pytest -q                                  # all tests green
 .venv/bin/python scripts/demo_headless.py approved   # the real flow still works end to end
+(cd apps/wallet && npm run build)                    # the wallet still builds
 ```
 
 ## Working rules
