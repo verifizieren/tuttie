@@ -200,6 +200,10 @@ Why things are the way they are, so nobody has to rediscover them:
   started from (`base_version`); a stale one gets 409. A damaged deployment file stops the node
   at start: it must never run with other prices than the owner deployed. Rolling back is
   deploying an old version again, so history only grows. Drafts live in the owner's browser.
+    Tests never read the machine's real deployments: `tests/conftest.py` points `OWNER_DATA_DIR`
+    at a temporary folder (a deploy made while trying the owner view once broke two unrelated
+    tests). Facts the owner view does not edit yet (`photos`, `rating`, `amenities`) are kept as
+    they are by every deploy.
 - **Bookings and offers made before a deploy:** `book` without an agreement uses the room's
   *current* price, so a user approval for the old price no longer matches and the gate refuses
   it; offers, agreements and commitments are signed with their own `valid_until` and keep their

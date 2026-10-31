@@ -17,15 +17,19 @@ from pathlib import Path
 from node.settings import Settings, canonical, snapshot, validate
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DIR = Path(os.environ.get("OWNER_DATA_DIR", ROOT / "data" / "deployments"))
 ORIGINAL_NOTE = "Original configuration"
+
+
+def default_dir() -> Path:
+    """Where versions are kept: `OWNER_DATA_DIR` if set (read per call, so tests can redirect it)."""
+    return Path(os.environ.get("OWNER_DATA_DIR") or ROOT / "data" / "deployments")
 
 
 class DeploymentStore:
     """The version history of one node's settings; safe to use from several request threads."""
 
     def __init__(self, node_id: str, base_config: dict, directory: Path | None = None):
-        self.path = (directory or DEFAULT_DIR) / f"{node_id}.json"
+        self.path = (directory or default_dir()) / f"{node_id}.json"
         self.lock = threading.Lock()
         self.original = {"version": 0, "deployed_at": None, "note": ORIGINAL_NOTE,
                          "settings": canonical(snapshot(base_config))}
