@@ -16,6 +16,7 @@ PAYMENT_CAPABILITIES = {"can_take_payment"}
 
 
 def seal_body(record: dict, issuer: str, tier: str) -> dict:
+    """The fields a seal signs: who the node is, its key and what it may do, plus issuer and tier."""
     return {
         "node_id": record["node_id"],
         "public_key": record["public_key"],
@@ -26,6 +27,7 @@ def seal_body(record: dict, issuer: str, tier: str) -> dict:
 
 
 def issue_seal(record: dict, issuer: str, tier: str, signing_key: SigningKey) -> dict:
+    """Seal `record` as `issuer` at `tier`, signed with the issuer's key."""
     return {"issuer": issuer, "tier": tier, "signature": sign_bytes(signing_key, seal_body(record, issuer, tier))}
 
 

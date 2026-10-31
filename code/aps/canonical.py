@@ -10,8 +10,10 @@ def canonical(obj) -> bytes:
 
 
 def b64encode(data: bytes) -> str:
+    """Bytes -> base64 text (keys and signatures travel as base64)."""
     return base64.b64encode(data).decode()
 
 
 def b64decode(text: str) -> bytes:
+    """Base64 text -> bytes; rejects anything that is not strict base64."""
     return base64.b64decode(text.encode(), validate=True)

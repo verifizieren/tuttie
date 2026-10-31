@@ -26,17 +26,21 @@ def generate_key_file(key_id: str, keys_dir: Path = KEYS_DIR) -> Path:
 
 
 def load_signing_key(key_id: str, keys_dir: Path = KEYS_DIR) -> SigningKey:
+    """The private key stored in keys/<key_id>.json."""
     data = json.loads((keys_dir / f"{key_id}.json").read_text())
     return SigningKey(b64decode(data["private_key"]))
 
 
 def load_public_key(key_id: str, keys_dir: Path = KEYS_DIR) -> str:
+    """The base64 public key stored in keys/<key_id>.json."""
     return json.loads((keys_dir / f"{key_id}.json").read_text())["public_key"]
 
 
 def public_key_b64(signing_key: SigningKey) -> str:
+    """The base64 public key that belongs to `signing_key`."""
     return b64encode(bytes(signing_key.verify_key))
 
 
 def verify_key_from_b64(public_key: str) -> VerifyKey:
+    """A verify key from its base64 form."""
     return VerifyKey(b64decode(public_key))

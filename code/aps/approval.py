@@ -13,6 +13,7 @@ FIELDS = ("approval_id", "action", "payee_node_id", "amount_chf", "decision", "d
 
 
 def sign_decision(approval: dict, decision: str, signing_key: SigningKey) -> dict:
+    """Sign the user's decision on an approval request with the user's key."""
     if decision not in DECISIONS:
         raise ValueError(f"decision must be one of {sorted(DECISIONS)}")
     body = {
@@ -27,6 +28,7 @@ def sign_decision(approval: dict, decision: str, signing_key: SigningKey) -> dic
 
 
 def verify_decision(decision: dict, public_key: str) -> bool:
+    """True if the decision is complete and signed by `public_key`."""
     try:
         body = {k: decision[k] for k in FIELDS}
     except (KeyError, TypeError):

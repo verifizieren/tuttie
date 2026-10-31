@@ -10,6 +10,7 @@ from aps.keys import verify_key_from_b64
 
 
 def utc_now() -> str:
+    """Current time as an ISO 8601 UTC timestamp, the format used in envelopes."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -28,6 +29,7 @@ def verify_bytes(public_key: str, obj, signature: str) -> bool:
 
 
 def sign_envelope(node_id: str, payload: dict, signing_key: SigningKey, timestamp: str | None = None) -> dict:
+    """Wrap `payload` in an envelope signed by the node's key."""
     body = {"node_id": node_id, "timestamp": timestamp or utc_now(), "payload": payload}
     return {**body, "signature": sign_bytes(signing_key, body)}
 
