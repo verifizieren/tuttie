@@ -6,6 +6,7 @@
 // pycozmo, drawn with antialiased vector shapes instead of a 128x64 bitmap.
 //
 // Usage: const face = new TuttieFace(canvas); face.set("happiness"); face.lookAt(x, y);
+//        face.sleep() closes the eyes (no saccades or blinks, slow breathing); face.wake() opens them.
 
 // ---------- Parameter layout (identical to pycozmo) ----------
 // Face: 0 center_x, 1 center_y, 2 scale_x, 3 scale_y, 4 angle. Eyes start at 5 and 24.
@@ -133,6 +134,7 @@ class TuttieFace {
     this.from = this.current; this.to = this.current; this.start = 0; this.duration = 1;
     this.gaze = [0, 0];
     this.nextSaccade = 0; this.nextBlink = performance.now() + 2500; this.blinking = 0;
+    this.asleep = false;
     this.resize();
     new ResizeObserver(() => this.resize()).observe(canvas);
     requestAnimationFrame(t => this.frame(t));
@@ -142,6 +144,20 @@ class TuttieFace {
   set(name, ms = 450) {
     this.base = expressionParams(name);
     this.animateTo(this.withGaze(this.base), ms);
+  }
+
+  /** Close the eyes: the agent is inactive. */
+  sleep(ms = 600) {
+    this.asleep = true;
+    this.gaze = [0, 0];
+    this.set("asleep", ms);
+  }
+
+  /** Open the eyes again, optionally into an expression. */
+  wake(name = "neutral", ms = 350) {
+    this.asleep = false;
+    this.nextSaccade = performance.now() + 1200;
+    this.set(name, ms);
   }
 
   /** Look in a direction: x, y in -1..1. */
@@ -171,17 +187,18 @@ class TuttieFace {
     const t = Math.min(1, (now - this.start) / this.duration);
     this.current = lerp(this.from, this.to, easeInOut(t));
     // Idle life, as in pycozmo's ProceduralFaceGenerator: small saccades and random blinks.
-    if (t >= 1 && now > this.nextSaccade) {
+    if (!this.asleep && t >= 1 && now > this.nextSaccade) {
       this.nextSaccade = now + 900 + Math.random() * 2600;
       this.lookAt((Math.random() - .5) * .8, (Math.random() - .5) * .5);
     }
-    if (now > this.nextBlink) { this.blinking = now; this.nextBlink = now + 2200 + Math.random() * 3800; }
+    if (!this.asleep && now > this.nextBlink) { this.blinking = now; this.nextBlink = now + 2200 + Math.random() * 3800; }
     this.draw(now);
     requestAnimationFrame(next => this.frame(next));
   }
 
   draw(now) {
     const p = this.current.slice();
+    if (this.asleep) p[1] += Math.sin(now / 900) * 3;  // slow breathing while the eyes are closed
     const blink = this.blinking ? Math.min(1, (now - this.blinking) / 180) : 1;
     const closed = 1 - Math.abs(Math.sin(Math.PI * blink));  // 1 open → 0 closed → 1 open
     const { ctx, canvas, layer } = this;
