@@ -198,3 +198,37 @@ and never sent: `facts.negotiation = {"floor_chf": 175, "max_rounds": 3}`.
 
 The last offer or counter that both sides accept, signed by the business. It is what the
 user approves on the phone (see Approval) and what `book` redeems, like a commitment today.
+
+## Business agent (implemented, issue #10)
+
+Every company on the agent web has the same agent object, in the `agent` section of its node
+config (`code/data/nodes/*.json`, code in `code/node/agent.py`):
+
+```json
+"agent": {
+  "persona": {
+    "name": "Lena", "role": "reservations agent", "business_size": "large | medium | small",
+    "about": "who the business is", "tone": "how the agent speaks",
+    "priorities": ["what it tries to achieve"], "boundaries": ["what it must never do"]
+  },
+  "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
+  "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+}
+```
+
+Tools come from the shared catalog `code/node/catalog.py`; each has a status, `available` or
+`planned` (`make_offer`, `counter_offer` and `pay` are planned). Private negotiation limits
+live in `facts.negotiation` and never reach a prompt, a reply or the card.
+
+Endpoints of every node (all answers are signed envelopes):
+
+| Endpoint | Payload of the answer |
+| --- | --- |
+| `GET /agent/card` | `{node_id, business, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}` |
+| `POST /agent` `{question, context}` | A2A reply `{answer, commitment}` (see above) |
+| `POST /agent/invoke` `{event}` | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to |
+
+`event` is a marketplace event, e.g. `{"type": "posting.created", "posting": {...}}`
+(postings: see "DRAFT: marketplace messages"). The marketplace will wake the agents
+subscribed to an event; an interested agent then uses `next_tool`, e.g. `make_offer` once it
+exists.
