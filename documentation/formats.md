@@ -510,6 +510,25 @@ Rheinblick double + dog at CHF 195, budget 200: 175 → 189 → 182 → 187 → 
 **No `negotiation.counter` wake-up:** counters go straight to the signed `counter_offer` tool,
 which answers each round at once, so the marketplace never sends this event.
 
+## Public information services: weather and trains (`code/services/`)
+
+Services on the agent web that are not businesses Tuttie books with: in the registry with
+`"kind": "service"`, sealed (commercial register gold + Adobe blue), tools over MCP at `/mcp/`,
+every answer a signed envelope like a hotel's. Configs in `data/services/*.json` (`"service":
+"weather" | "trains"`, `"offline_sample": true`); ports 4011 (weather), 4012 (trains). Tuttie finds
+them with `search_registry` (tags `weather` / `train`, capability `weather_forecast` /
+`train_timetable`) and calls them with `call_tool` (read tools, no signed call needed).
+
+| Tool | Arguments | Signed payload |
+| --- | --- | --- |
+| `get_forecast` | `place`, `date` (YYYY-MM-DD, today … +15 days) | `{tool, service, place, country, date, sky, temperature_min_c, temperature_max_c, rain_chance_pct, wind_max_kmh, evening_and_night: [{time, temperature_c, rain_chance_pct, sky}], source}` |
+| `get_connections` | `origin`, `destination`, `date`, `time` (HH:MM), `arrive_by` (bool: `time` is the latest arrival) | `{tool, service, from, to, date, time, arrive_by, connections: [{departure, departure_platform, arrival, arrival_platform, arrival_date, duration_min, changes, trains: ["IC 1", ...]}], source}` |
+
+`source` is `open-meteo.com` / `transport.opendata.ch` for live data, or `sample data (...
+offline)` when the source cannot be reached (Tuttie then says the live data was unavailable).
+A request that cannot be answered (bad date, unknown place, no connection) is a signed
+`{tool, service, status: "refused", reason}`.
+
 ## Business agent (implemented, issue #10)
 
 Every company on the agent web has the same agent object, in the `agent` section of its node
