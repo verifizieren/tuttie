@@ -42,3 +42,12 @@ def test_least_recently_used_conversation_is_dropped(monkeypatch):
     assert store.get("a") is a  # a is now the most recently used
     store.get("c")
     assert list(store.by_session) == ["a", "c"]
+
+
+def test_history_is_this_browsers_timeline_only():
+    with TestClient(app) as alice, TestClient(app) as bob:
+        alice.post("/reset")
+        bob.post("/reset")
+        app.state.conversations.get(alice.cookies[SESSION_COOKIE]).bus.emit("answer", "verified", "Hi Alice")
+        assert [e["summary"] for e in alice.get("/history").json()] == ["Hi Alice"]
+        assert bob.get("/history").json() == []

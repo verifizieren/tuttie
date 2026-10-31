@@ -109,6 +109,12 @@ def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(
     return decision
 
 
+@app.get("/history")
+def history(conv: Conversation = Depends(conversation)) -> list[dict]:
+    """This conversation's timeline so far, so the wallet can decide on opening whether to start fresh."""
+    return conv.bus.history
+
+
 @app.get("/events")
 def events(conv: Conversation = Depends(conversation)) -> StreamingResponse:
     """This conversation's timeline as Server-Sent Events."""
