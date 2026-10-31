@@ -1,4 +1,4 @@
-# Wallet app (issue #2) — React + Vite PWA, not connected to the backend yet
+# Wallet app (issue #2) — React + Vite PWA, the human layer of the agent web
 
 The phone is the main stage of the demo, and this is the real product: the demo is only a
 run through this same app (`code/demo/` feeds the storyline's input), so every screen must
@@ -15,9 +15,15 @@ Live at <https://web4.mendes.dev/wallet/>.
   Tuttie away.
 - **Text is a fallback** behind a small keyboard icon; the eyes close while typing, and the
   keyboard never opens by accident.
-- Not connected yet: voice and text only make the eyes react. The backend already offers
-  what the next steps need: `POST /chat`, the timeline at `GET /events`, and signed phone
-  approvals at `GET /approvals/pending` and `POST /approvals/{id}`.
+- **Connected:** typed requests go to Tuttie (`POST /chat`). The wallet follows Tuttie's
+  timeline (`GET /events`) and shows, under its eyes, what Tuttie posted (the budget stays
+  private), which hotels were asked or skipped, their offers with seal colours and size, the
+  shortlist, the bargaining (offer → agreed price) and Tuttie's answer. The face follows each
+  phase (curious, happy about offers, sceptical while bargaining).
+- **Approvals happen in the wallet:** a sheet shows hotel, seals and amount; approving runs a
+  Face ID-style confirmation before the decision goes to `POST /approvals/{id}`, where the
+  assistant signs it with the user's key.
+- Voice recognition is not connected yet (its own work area, `code/voice/`).
 
 ## Code
 
@@ -26,9 +32,13 @@ index.html                 entry page (PWA meta tags)
 vite.config.js             base /wallet/, dev server on 4041 with API proxy to 4040
 public/                    manifest.json, sw.js (service worker), icons/
 src/main.jsx               loads the styles, registers the service worker, renders <App/>
-src/App.jsx                the screen and its modes: closed / voice / typing
-src/components/            BankCard, AgentCard (face card), AgentControls (status, keyboard, text)
-src/hooks/                 useCardGestures (iOS-sheet swipes), useFace, useVisibleViewport (keyboard-safe)
+src/App.jsx                the screen and its modes: closed / voice / typing; sends requests to Tuttie
+src/components/            BankCard, AgentCard (face card), AgentControls (status, keyboard, text),
+                           Activity (posting, offers, shortlist, bargaining, answer), ApprovalSheet (Face ID)
+src/hooks/                 useCardGestures (iOS-sheet swipes), useFace, useVisibleViewport (keyboard-safe),
+                           useAgentStream (follows GET /events)
+src/lib/activity.js        turns timeline events into what the wallet shows (pure reducer)
+src/lib/api.js             POST /chat, POST /approvals/{id}, POST /reset
 src/lib/face.js            procedural eyes: port of pycozmo's face and 25 expressions (MIT)
 src/wallet.css             layout; brand colours and fonts come from apps/shared/tuttie.css
 ```

@@ -23,7 +23,7 @@ Last updated: 2026-10-31 (bargaining, step 4: counter_offer within private limit
 | Marketplace (agent layer) | Built against the draft formats: Tuttie's signed postings in (seals, freshness, user delegation `post_requests`), matching businesses woken in parallel at `POST /agent/invoke` (broken ones never contacted), only verified businesses whose agent card subscribes to new postings, signed offers in (only from invited businesses, fresh, for this request, still valid); it decides nothing. Formats as strict Pydantic models in one place. | `code/marketplace/` (:4010) |
 | Bargaining (step 4) | Hotel side: the `counter_offer` tool, stateless like `book` (the counter carries the hotel's own signed offer and last counter), checks Tuttie's seals, signature, freshness and the user's `negotiate` delegation; the hotel meets halfway and never goes below its private floor or past its rounds, compared in code (`negotiation/rules.py`), never in a prompt or reply. Tuttie's side: one subagent per offer, all in parallel in their own sessions, counters signed with Tuttie's key, the private `max_price_chf` only compared in code; ends in a signed Agreement, a rejection or walking away; `best()` picks the cheapest agreement. Booking can redeem an Agreement (`AgreementRedeemer`: own signature, not expired, only once). Formats: `Counter` (+ `final`), `Agreement`, `Rejection`. Mounted in every node (`node/server.py`); Tuttie reaches it through its `negotiate` tool. | `code/negotiation/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
-| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
+| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** requests go to Tuttie; posting, offers, shortlist, bargaining and answer shown under its eyes; approvals in the wallet with a Face ID-style confirmation. | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
 | Repo structure | BaselHack template, work-area folders with scope READMEs, team context folders, concept and architecture docs, draft marketplace formats. | `documentation/`, `code/*/README.md` |
 
@@ -40,9 +40,11 @@ Build order from [goals.md](goals.md):
    config); Tuttie re-checks every offer and builds the shortlist itself (verified, within the
    private budget, cheapest first, at most five). Live-tested end to end with the real LLM.
    Tests: `test_market_agents.py`, `test_tuttie_market.py`.
-3. **Human layer in the wallet** — in progress (dev member 1): connect the wallet to
-   `POST /chat`, `GET /events` and the approvals API; show the posting, the offers, the
-   shortlist and the agreement under Tuttie's eyes.
+3. **Human layer in the wallet** — done: typed requests go to Tuttie; the wallet follows the
+   timeline and shows the posting (budget private), the hotels asked and skipped, offers with
+   seal colours and size, the shortlist, the bargaining and the answer under Tuttie's eyes;
+   approvals happen in the wallet with a Face ID-style confirmation. Tested in a headless
+   iPhone against a separate assistant instance with the real LLM. Missing: voice recognition.
 4. **Negotiation** — done (dev member 2, `code/negotiation/`): `counter_offer` is mounted in
    every node and available; Tuttie's `negotiate` tool hands the shortlist to
    `TuttieNegotiator.negotiate_all` with the budget as a private item and shows `best()`'s
@@ -79,9 +81,9 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** the human layer in the wallet (step 3): chat and voice-mode text go to
-   `POST /chat`; the wallet follows `GET /events` and shows the posting, incoming offers, the
-   shortlist and the agreement under Tuttie's eyes; approvals on the phone.
+1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
+   whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
+   pitch needs first.
 2. **dev member 2:** all hooks are in (counter_offer mounted and available, `book` redeems
    agreements, Tuttie negotiates the shortlist and books the agreement). Run the bargaining live
    (`scripts/demo_headless.py approved "<a request that asks for a better price>"`) and tune the
