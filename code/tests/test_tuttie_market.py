@@ -44,7 +44,8 @@ def stub_llm(monkeypatch):
 
 
 def run_find(negotiate_budget: float | None = None, book_agreement: bool = False,
-             favourites: list[str] | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
+             favourites: list[str] | None = None, resume_before_booking: bool = False,
+             **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -72,6 +73,14 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
             if negotiate_budget is not None:
                 result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget, node_ids=favourites)
                 if book_agreement:  # the user approves on the phone while book waits
+                    if resume_before_booking:
+                        from assistant.conversations import Conversations
+                        chats = Conversations(http, "http://localhost:4000", llm=object())
+                        original = chats.get("browser")
+                        original.assistant.toolbox = toolbox
+                        chats.switch("browser")
+                        assert chats.get("browser").assistant.toolbox.agreements == {}
+                        toolbox = chats.switch("browser", original.id).assistant.toolbox
                     async def phone():
                         while not toolbox.approvals.pending:
                             await asyncio.sleep(0.01)
@@ -152,6 +161,15 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
     assert result["booking"]["date"] == "2026-11-14"  # the posted night, even if the LLM passes another date
+
+
+def test_resumed_chat_can_book_its_signed_agreement_after_starting_a_new_chat():
+    result, _, _ = run_find(negotiate_budget=200, book_agreement=True, resume_before_booking=True,
+                            date="2026-11-14", tags=["basel-sbb"], budget_chf=200)
+    agreed = result["negotiation"]["best"]["price_chf"]
+    assert result["approved_chf"] == agreed
+    assert result["booking"]["status"] == "confirmed"
+    assert result["booking"]["total_chf"] == agreed
 
 
 def test_the_cards_show_every_offer_with_signed_features_shortlist_first():

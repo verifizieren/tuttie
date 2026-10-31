@@ -104,7 +104,7 @@ function order(hotels) {
  *  with forged or missing seals are not shown at all: Tuttie never asked them. */
 function Market({ state, readOnly, onPick, onLean }) {
   const [openId, setOpenId] = useState(null);
-  const swiping = state.cards && !state.picked && !readOnly;
+  const swiping = state.cards && !state.picked && !readOnly && Boolean(onPick);
   // The chosen hotel, until the booking card replaces it.
   const liked = state.booking ? [] : order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
   return (

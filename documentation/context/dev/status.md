@@ -10,6 +10,16 @@ Last updated: 2026-10-31 (presence hooks for the eye animations; app packages re
 
 ## Done
 
+- Resumable wallet history: New chat retains the prior assistant and verified booking
+  context in a bounded, browser-owned server cache. History → Continue chat restores its
+  timeline, tool state and signed agreements; legacy/expired entries remain readable and
+  explain that a fresh request is required. Reload keeps the selected conversation. Voice
+  rooms reconnect on selection and reject utterances from an inactive chat. History text
+  no longer uses the live view's fade mask. Validation: 318 Python tests, 25 wallet tests,
+  wallet build; browser regression with API fixtures covers new → history → continue →
+  choose → approve → booked, plus expired history. Real signed agreement redemption after
+  switching is covered by the in-process backend test (only the LLM is stubbed).
+
 | Area | What works | Where |
 | --- | --- | --- |
 | APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them: `ask_agents`, `post_requests`, `negotiate`, `book`; paying is never delegated). **For MCP actions:** signed calls (`aps/call.py`: the agent signs tool + args + nonce + time; replays fail the 300 s window or the nonce book) and one action gate (`aps/gate.py` `check_action(call, needs)`: caller seals, signature, nonce, delegation scope, the hotel's own agreement, the user's approval for exactly the amount; a refusal names the missing signature, `checks` lists what passed). | `code/aps/`, `code/tests/` |
@@ -334,8 +344,11 @@ Why things are the way they are, so nobody has to rediscover them:
 - **One conversation at a time, history on the device:** no sideways gestures on Tuttie's
   card. A dock under the open card has three buttons: history (earlier conversations, kept in
   `localStorage`, `lib/history.js`), new chat, and the keyboard. Swiping Tuttie down and opening
-  it again, or opening the wallet after a finished conversation, archives it and starts fresh
-  (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
+  it again archives it and starts fresh (`POST /conversations`), unless a request or approval
+  waits. Reload keeps the selected conversation (`GET /history`, `X-Conversation-ID`).
+  History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
+  old or expired entries stay read-only. Saved conversations are in memory, capped at 200
+  globally in addition to the 200 active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
   LiveKit 1.13.11 + LiveKit Agents 1.8.10 with ElevenLabs (Scribe v2 realtime, Flash v2.5).

@@ -289,7 +289,10 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .history-item small { font-size: 13px; color: var(--muted); }
 .history-item time { font-size: 12px; color: var(--dim); }
 .history-empty { color: var(--muted); font-size: 14px; padding: 24px 4px; text-align: center; }
-.history .activity { position: relative; inset: auto; top: auto; bottom: auto; flex: 1; opacity: 1; pointer-events: auto; }
+.history .activity { position: relative; inset: auto; top: auto; bottom: auto; flex: 1; min-height: 0;
+                     opacity: 1; pointer-events: auto; -webkit-mask-image: none; mask-image: none; }
+.history-error { color: var(--text); padding: 10px 18px; font-size: 14px; line-height: 1.5; }
+.history-bar button:disabled { opacity: .5; cursor: wait; }
 @keyframes slide-in { from { opacity: 0; transform: translateX(-24px); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 

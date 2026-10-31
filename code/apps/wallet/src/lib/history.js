@@ -1,7 +1,7 @@
 // Past conversations, kept on this device only (localStorage), newest first. A conversation is
 // archived when the user starts a new chat, when Tuttie is opened again after being swiped down,
-// or when the wallet opens after it finished. The server forgets it then (POST /reset); the
-// wallet keeps what it showed.
+// or when Tuttie is opened again after being swiped down. The server retains the assistant
+// in memory; the snapshot supplies the display and user messages when resuming it.
 // Storage can be missing or full (private mode): then history simply stays empty.
 
 const KEY = "tuttie.history";
@@ -44,7 +44,7 @@ export function archive(state) {
 }
 
 /** Remember the open conversation's id and turns (the server only keeps the timeline). */
-export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })) });
+export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })), picked: state.picked });
 
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
 export const loadCurrent = () => read(CURRENT, null);

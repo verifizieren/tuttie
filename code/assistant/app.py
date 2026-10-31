@@ -15,7 +15,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     """Keep the conversations and one shared HTTP client for the service's lifetime."""
     async with httpx.AsyncClient(timeout=20) as http:
         app.state.conversations = Conversations(http, REGISTRY_URL)
-        app.state.voice_rooms = {}  # LiveKit room -> session id (assistant/voice.py)
+        app.state.voice_rooms = {}  # LiveKit room -> (session id, conversation id)
         yield
 
 
@@ -73,6 +73,7 @@ FIRST_TOOLS = {"book", "negotiate"}
 class ChatRequest(BaseModel):
     message: str
     first_tool: str | None = None  # one of FIRST_TOOLS
+    conversation_id: str | None = None
 
 
 class DecisionRequest(BaseModel):
@@ -83,6 +84,8 @@ class DecisionRequest(BaseModel):
 @app.post("/chat", status_code=202)
 async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
     """Start answering a message; the answer arrives as an "answer" event."""
+    if req.conversation_id is not None and req.conversation_id != conv.id:
+        raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
     if req.first_tool is not None and req.first_tool not in FIRST_TOOLS:
         raise HTTPException(status_code=422, detail=f"first_tool must be one of {sorted(FIRST_TOOLS)}")
     conv.start(req.message, req.first_tool)
@@ -94,6 +97,29 @@ def reset(conv: Conversation = Depends(conversation)) -> dict:
     """Start this conversation over: stop its chats, decline its approvals, clear its timeline."""
     conv.reset()
     return {"ok": True}
+
+
+def switch_conversation(request: Request, conversation_id: str | None = None) -> dict:
+    """Select only a conversation owned by the caller; expired history stays read-only."""
+    try:
+        conv = request.app.state.conversations.switch(request.state.session_id, conversation_id)
+    except KeyError:
+        raise HTTPException(status_code=410, detail="This conversation has expired. Start a new request to check current offers.") from None
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
+    return {"id": conv.id, "events": list(conv.bus.history)}
+
+
+@app.post("/conversations")
+async def new_conversation(request: Request) -> dict:
+    """Keep the previous assistant and its verified facts available for resuming."""
+    return switch_conversation(request)
+
+
+@app.post("/conversations/{conversation_id}/resume")
+async def resume_conversation(conversation_id: str, request: Request) -> dict:
+    """Restore the assistant, toolbox, approvals and timeline together."""
+    return switch_conversation(request, conversation_id)
 
 
 @app.get("/identity")
@@ -120,14 +146,17 @@ def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(
 
 
 @app.get("/history")
-def history(conv: Conversation = Depends(conversation)) -> list[dict]:
+def history(response: Response, conv: Conversation = Depends(conversation)) -> list[dict]:
     """This conversation's timeline so far, so the wallet can decide on opening whether to start fresh."""
+    response.headers["X-Conversation-ID"] = conv.id
     return conv.bus.history
 
 
 @app.get("/events")
-def events(conv: Conversation = Depends(conversation)) -> StreamingResponse:
+def events(conversation_id: str | None = None, conv: Conversation = Depends(conversation)) -> StreamingResponse:
     """This conversation's timeline as Server-Sent Events."""
+    if conversation_id is not None and conversation_id != conv.id:
+        raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
     return StreamingResponse(conv.bus.stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 

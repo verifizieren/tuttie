@@ -40,7 +40,7 @@ src/hooks/                 useCardGestures (iOS-sheet swipes), useFace, useVisib
 src/lib/activity.js        turns timeline events into what the wallet shows (pure reducer)
 src/lib/presence.js        what Tuttie is doing, as one signal for the eyes (pure; tests: npm test)
 src/lib/faceDirector.js    moves the eyes from that signal: looks per state, reactions to cues
-src/lib/api.js             POST /chat, POST /approvals/{id}, POST /reset
+src/lib/api.js             POST /chat, POST /approvals/{id}, POST /conversations, POST /conversations/{id}/resume
 src/lib/face.js            procedural eyes: port of pycozmo's face and 25 expressions (MIT)
 src/wallet.css             layout; brand colours and fonts come from apps/shared/tuttie.css
 ```
@@ -110,3 +110,12 @@ appear inside the wallet (`documentation/context/dev/goals.md`, steps 3 and 4). 
 calm: no glow borders, a faint halo on the eyes, brand from `apps/shared/tuttie.css`. A
 design example lives locally in `code/.context/` (not in git); take its look, keep it more
 minimal.
+
+## Continuing an earlier chat
+
+New chat keeps the previous assistant on the server. Open History, choose a conversation,
+then Continue chat to restore its context and signed offers before typing or choosing a hotel.
+Reload keeps the selected chat. Offers are still verified for expiry by the normal booking gate.
+Conversations are in memory and bounded: after eviction or a server restart, history remains
+readable but cannot resume; make a fresh request. Older browser-only archives cannot be restored.
+Switching is refused while a request or approval is pending. Voice reconnects to the selected chat.

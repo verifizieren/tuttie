@@ -48,10 +48,13 @@ def public_url(request: Request) -> str:
 
 def room_conversation(request: Request, room: str):
     """The conversation a voice room belongs to, or 404."""
-    session_id = request.app.state.voice_rooms.get(room)
-    if session_id is None:
+    owner = request.app.state.voice_rooms.get(room)
+    if owner is None:
         raise HTTPException(status_code=404, detail="unknown voice room")
-    return request.app.state.conversations.get(session_id)
+    try:
+        return request.app.state.conversations.active(*owner)
+    except KeyError:
+        raise HTTPException(status_code=409, detail="voice room belongs to an inactive conversation") from None
 
 
 def passed_headers(headers) -> dict:
@@ -71,7 +74,8 @@ def voice_token(request: Request) -> dict:
     if not configured():
         raise HTTPException(status_code=503, detail="voice is not configured")
     room = f"tuttie-{secrets.token_urlsafe(12)}"
-    request.app.state.voice_rooms[room] = request.state.session_id
+    conv = request.app.state.conversations.get(request.state.session_id)
+    request.app.state.voice_rooms[room] = (request.state.session_id, conv.id)
     token = (api.AccessToken(API_KEY, API_SECRET)
              .with_identity(f"user-{secrets.token_hex(4)}")
              .with_name("You")

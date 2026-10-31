@@ -46,7 +46,7 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history, lastChange] = useAgentStream();
+  const [agent, actions, history, lastChange, switching, connectionError] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
   const [quiet, setQuiet] = useState(false);  // the user typed: Tuttie answers in text only
   // A new answer in voice mode: shown as Tuttie speaks it ({ answer, id, text } while revealing).
@@ -54,8 +54,8 @@ export default function App() {
   // What Tuttie is doing, and the eyes following it (lib/presence.js, lib/faceDirector.js).
   const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
   useFaceDirector(presence, face);
-  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, onSpeech,
-                                                                    presence.levels);
+  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
+                                                                    presence.levels, agent.id);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
   function onSpeech({ id, text, done }) {
@@ -80,7 +80,7 @@ export default function App() {
     setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !agent.approval) actions.newConversation(agent);
+      if (closedOnce.current && !agent.approval) actions.newConversation(agent).catch(e => setError(e.message));
       closedOnce.current = false;
     }
     setMode("voice");
@@ -93,11 +93,14 @@ export default function App() {
   }
 
   // A new conversation from the dock: the current one goes into the history.
-  function newChat() {
+  async function newChat() {
     setShowHistory(false);
     if (agent.approval) return;  // the user must decide the waiting approval first
-    actions.newConversation(agent);
-    presence.cue("new_chat");
+    try {
+      await actions.newConversation(agent);
+      setError("");
+      presence.cue("new_chat");
+    } catch (e) { setError(e.message); }
   }
 
   function tapWhileOpen() {
@@ -119,15 +122,16 @@ export default function App() {
   // `shown` is what the history keeps of the user's words; `text` is what Tuttie gets. A typed
   // message makes Tuttie answer quietly, in text only.
   async function send(text, firstTool = null, shown = text, typed = false) {
+    if (switching || connectionError) return setError(connectionError || "Please wait for the conversation to load");
     if (typed) setQuiet(true);
     actions.say(shown);
     setShowHistory(false);
     setMode("voice");  // Tuttie is awake while it works
     setError("");
     try {
-      await sendChat(text, firstTool);
-    } catch {
-      setError("Tuttie is unreachable right now");
+      await sendChat(text, firstTool, agent.id);
+    } catch (e) {
+      setError(e.message || "Tuttie is unreachable right now");
     }
   }
 
@@ -152,10 +156,11 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || currentTask(agent)}
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : currentTask(agent))}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
-        <Activity state={agent} onPick={pick} onLean={lean} reveal={reveal} />
-        {showHistory && <History entries={history} onClose={() => setShowHistory(false)} />}
+        <Activity key={agent.id} state={agent} onPick={switching ? undefined : pick} onLean={lean} reveal={reveal} />
+        {showHistory && <History entries={history.filter(e => e.id !== agent.id)} onClose={() => setShowHistory(false)}
+          onResume={async entry => { await actions.resume(entry); setShowHistory(false); setError(""); setMode("voice"); }} />}
         <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
       </AgentCard>
       <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping}
