@@ -1,4 +1,4 @@
-/* Tuttie brand: colours, fonts and seal badges shared by all apps.
+/* Tuttie brand: colours and fonts shared by all apps.
    Taken from the team's design example: dark, Inter, terracotta accent. */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
@@ -23,12 +23,3 @@ body {
 }
 button { font: inherit; font-weight: 600; color: #fff; border: 0; border-radius: 10px; padding: 10px 18px; background: var(--accent); cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-
-/* Seal badges (built by seals.js): issuer logo + name, tier shown only by colour. */
-.seal { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 2px 9px 2px 3px; border-radius: 20px; border: 1px solid; }
-.seal svg { width: 18px; height: 18px; flex: none; }
-.seal.gold { color: var(--gold); border-color: var(--gold-line); background: var(--gold-bg); }
-.seal.blue { color: var(--blue); border-color: var(--blue-line); background: var(--blue-bg); }
-.seal.grey { color: var(--grey); border-color: var(--grey-line); background: var(--grey-bg); text-decoration: line-through; }
-.seal.invalid { color: var(--red); border-color: var(--red-line); background: var(--red-bg); text-decoration: line-through; }
-.seal.invalid svg { filter: grayscale(1); opacity: .6; }
