@@ -19,13 +19,16 @@ cp .env.example .env               # add OPENAI_API_KEY (ask the team)
 
 - Wallet (the app): <http://localhost:4040/> (redirects to `/wallet/`); working on the UI:
   `cd apps/wallet && npm run dev` for hot reload on <http://localhost:4041/wallet/>
+- Owner view (edit and deploy, needs `OWNER_TOKEN` in `.env`): <http://localhost:4040/owner/?node=http://localhost:4009>;
+  hot reload: `cd apps/owner && npm run dev` on <http://localhost:4042/owner/>
 - Live team instance: <https://web4.mendes.dev> (shared server, ports 4000-4049)
 
 ## Before every push
 
 ```bash
-scripts/check.sh            # tests, wallet build, then the real flow (demo_headless.py approved); ~1 min
-scripts/check.sh --no-llm   # without the LLM step (no key, or just a quick check)
+scripts/check.sh                                  # tests, wallet build, and real flow; ~1 min
+(cd apps/owner && npm test && npm run build)      # owner helpers pass and the app builds
+scripts/check.sh --no-llm                         # skip the real flow when no key is available
 ```
 
 It stops at the first failure and names the step. `./run.sh` prefixes every service's log

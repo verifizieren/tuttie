@@ -1,0 +1,21 @@
+{
+  "name": "tuttie-owner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tuttie owner view: a read-only page where a business sees what its agent offers.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test src/"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.7.0",
+    "vite": "6.4.4"
+  }
+}

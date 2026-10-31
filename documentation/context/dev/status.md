@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (pitch story confirmed live with the real LLM; `scripts/check.sh`, named service logs, missing-key warning, Ctrl+C stops within 3 s).
+Last updated: 2026-10-31 (owner view can edit and deploy; test and docs review: APS and negotiation at 100 %; pitch story confirmed live with the real LLM; `scripts/check.sh`, named service logs, missing-key warning, Ctrl+C stops within 3 s).
 
 ## Done
 
@@ -25,6 +25,7 @@ Last updated: 2026-10-31 (pitch story confirmed live with the real LLM; `scripts
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Dev tooling | `./run.sh` shows every service's log lines with its name, warns without an OpenAI key and stops everything within 3 s on Ctrl+C; `scripts/check.sh` runs the checks before a push (tests, wallet build, real flow; `--no-llm` without the LLM). | `code/run.sh`, `code/scripts/run_all.py`, `code/scripts/check.sh` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** requests go to Tuttie; posting, offers, shortlist, bargaining and answer shown under its eyes; approvals in the wallet with a Face ID-style confirmation. | `code/apps/wallet/` |
+| Owner view | React + Vite, desktop first: one business (default Gästehaus am Rhein), live from its node and **editable**. The owner edits a draft (kept in the browser), reviews the changes in words and deploys; the node validates, stores the next numbered version and its tools, agent and bargaining limits use it from the next request (no restart). Editable: profile, location, rooms and prices, add-ons, charges, policies, persona (not its boundaries), responding to postings, negotiation limits. Fixed: UID, seals, tags, capabilities, tools. Versions list with "restore as draft"; a stale draft cannot overwrite a newer deploy (409). Needs the owner token (`OWNER_TOKEN` in `code/.env`; unset = refused). Served at `/owner/` by the assistant; dev server on 4042. | `code/apps/owner/`, `code/node/owner.py`, `settings.py`, `deployments.py` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
 | Repo structure | BaselHack template, work-area folders with scope READMEs, team context folders, concept and architecture docs, draft marketplace formats. | `documentation/`, `code/*/README.md` |
 
@@ -130,7 +131,7 @@ Build order from [goals.md](goals.md):
 
 ### Test coverage
 
-259 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+287 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -152,7 +153,7 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
-(`code/apps/owner/`), presentation site and QR code (`code/apps/presentation/`), a
+presentation site and QR code (`code/apps/presentation/`), a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -180,6 +181,29 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **The owner view reads and changes the node, behind a token.** The live data comes from the
+  node's own config (`node/owner.py`), not from the signed public tools, because add-ons and the
+  private negotiation limits are not public. The nodes' ports are open on the team server, so the
+  endpoints need `OWNER_TOKEN` and refuse everyone when it is unset; it is a stand-in for the
+  owner's own key. Cross-origin access (token in a header, no cookies) is limited to the
+  `/owner` routes, which are their own small app mounted on the node.
+- **Deploying = a new version of a slice of the config, applied live.** What an owner may change
+  is `node/settings.py` (strict Pydantic models: prices are whole francs, unknown fields are
+  errors, the floor cannot exceed the standard room's price); everything sealed, the tools and
+  the persona's boundaries stay fixed. Versions are `data/deployments/<node_id>.json`
+  (git-ignored runtime state, `node/deployments.py`); version 0 is the committed config, which
+  is never rewritten. The node applies the latest version over a *copy* of its config at start
+  and after each deploy: `create_app` works on that copy, tools read `facts()` per call,
+  `BusinessAgent.apply` re-reads persona and facts, and `CounterOfferTool.limits` / `add_ons`
+  are properties, so no restart or rebuilt router is needed. A deploy carries the version it
+  started from (`base_version`); a stale one gets 409. A damaged deployment file stops the node
+  at start: it must never run with other prices than the owner deployed. Rolling back is
+  deploying an old version again, so history only grows. Drafts live in the owner's browser.
+- **Bookings and offers made before a deploy:** `book` without an agreement uses the room's
+  *current* price, so a user approval for the old price no longer matches and the gate refuses
+  it; offers, agreements and commitments are signed with their own `valid_until` and keep their
+  prices.
 
 - **MCP actions are signed calls through one gate.** Reading tools stay unsigned on the way in
   (their answers are signed); actions need the caller's signature over tool + args, so an

@@ -9,6 +9,9 @@ the **same agent object** (`agent.py`) with its own persona.
 | `server.py` | endpoints: signed tools (`/tools/*`), the agent (`/agent`, `/agent/card`, `/agent/invoke`) and its sessions (`/agent/sessions/...`) |
 | `agent.py` | `BusinessAgent`: persona, tools, A2A answers with priced add-ons, wake-ups from the marketplace |
 | `catalog.py` | the shared tool catalog with status `available` or `planned` |
+| `owner.py` | the owner view's API (`apps/owner`): `GET /owner/overview`, `GET /owner/versions`, `POST /owner/deploy`, protected by `OWNER_TOKEN` |
+| `settings.py` | what an owner may change (strict models), `validate`, `apply` to the live config |
+| `deployments.py` | the version history of deployed settings in `data/deployments/` (git-ignored) |
 
 Formats: `documentation/formats.md`, "Business agent" and "Sessions and context passing".
 Every session is an isolated conversation with its own memory (`code/sessions/`), so a hotel

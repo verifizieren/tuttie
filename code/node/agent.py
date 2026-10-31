@@ -116,10 +116,16 @@ class BusinessAgent:
     """The agent of one company: persona, tools and facts from its node config."""
 
     def __init__(self, config: dict):
-        spec = config.get("agent", {})
-        facts = config.get("facts", {})
         self.node_id = config["node_id"]
         self.business = config["name"]
+        self.llm: LLM | None = None  # created on first use, so nodes start without an API key
+        self.apply(config)
+
+    def apply(self, config: dict) -> None:
+        """(Re)read persona, tools, wake-ups and facts from the config, e.g. after the owner
+        deployed new settings (node/owner.py); the next request uses them."""
+        spec = config.get("agent", {})
+        facts = config.get("facts", {})
         self.persona = spec.get("persona", {"name": f"{config['name']} agent", "role": f"Agent of {config['name']}"})
         self.tools = tools_for(spec.get("tools", DEFAULT_TOOLS))
         self.wakes_on = spec.get("wakes_on", DEFAULT_WAKES_ON)
@@ -127,7 +133,6 @@ class BusinessAgent:
         self.add_ons = {a["id"]: a for a in facts.get("add_ons", [])}
         self.rooms = {r["room_type"]: r for r in facts.get("rooms", []) if r.get("available")}
         self.facts_json = json.dumps(public_facts(facts), indent=2, ensure_ascii=False)
-        self.llm: LLM | None = None  # created on first use, so nodes start without an API key
 
     # ---------- Who the agent is ----------
 

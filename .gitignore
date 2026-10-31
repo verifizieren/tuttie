@@ -11,3 +11,6 @@ CLAUDE.md
 # Local reference material (e.g. design examples); not part of the repo.
 .context/
 .coverage
+
+# Settings the owner deployed through the owner view (runtime state, per machine).
+code/data/deployments/

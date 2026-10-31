@@ -14,6 +14,7 @@ signed offer to the posting's offer_url in the background (make_offer).
 
 import argparse
 import asyncio
+import copy
 import json
 import secrets
 from contextlib import asynccontextmanager
@@ -31,7 +32,11 @@ from aps.keys import load_public_key
 from negotiation.agreement import AgreementRedeemer
 from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
 from node.agent import BusinessAgent
+from node.deployments import DeploymentStore
 from node.mcp_tools import mcp_app, mcp_server
+from node.owner import owner_app
+from node.settings import apply as apply_settings
+from node.settings import validate as validate_settings
 from sessions import SessionClosed, SessionStore
 
 
@@ -59,14 +64,25 @@ class BookRequest(BaseModel):
     agreement: dict | None = None  # this node's signed Agreement from a negotiation (negotiation/agreement.py)
 
 
-def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=registry_lookup) -> FastAPI:
+def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=registry_lookup,
+               deployments_dir: Path | None = None) -> FastAPI:
     """Build the FastAPI app for one node config.
 
     `http` is the client used to send offers to the marketplace, `lookup` how the action gate
     and the bargaining tool find registry records (tests pass in-process ones for both).
+    The owner's deployed settings (node/deployments.py, kept in `deployments_dir`) are applied
+    over a copy of `config`; the app works on that copy, which a deploy changes in place.
     """
+    store = DeploymentStore(config["node_id"], config, deployments_dir)
+    config = copy.deepcopy(config)
+    if store.versions:
+        apply_settings(config, validate_settings(store.current["settings"])[0])  # checked when loaded
     node_id = config["node_id"]
-    facts = config.get("facts", {})
+
+    def facts() -> dict:
+        """The business's facts as deployed right now (an owner deploy replaces them)."""
+        return config.get("facts", {})
+
     signing_key = load_signing_key(node_id)
     own_public_key = public_key_b64(signing_key)
     agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
@@ -86,7 +102,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         """Signed list of available rooms and prices for a date."""
         rooms = [
             {k: room[k] for k in ("room_type", "price_chf", "rate")}
-            for room in facts.get("rooms", []) if room.get("available")
+            for room in facts().get("rooms", []) if room.get("available")
         ]
         return signed({
             "tool": "get_availability",
@@ -99,19 +115,20 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
 
     def get_policies() -> dict:
         """Signed policies: who the business is (size), location, quietness, dogs, check-in, cancellation."""
+        current = facts()  # one read: a deploy meanwhile must not mix old and new values
         return signed({
             "tool": "get_policies",
             "hotel": config["name"],
-            "profile": facts.get("profile"),
-            "address": facts.get("address"),
-            "distance_to_basel_sbb_m": facts.get("distance_to_basel_sbb_m"),
-            "quiet": facts.get("quiet"),
-            "quiet_note": facts.get("quiet_note"),
-            "policies": facts.get("policies", {}),
-            "photos": facts.get("photos", []),      # image paths, served with the wallet (apps/wallet/public)
-            "rating": facts.get("rating"),          # guests' average score out of 5, with the count
-            "amenities": facts.get("amenities", {}),  # breakfast, wifi, parking, kids' beds
-            "charges": facts.get("charges", []),  # collected after a booking with pay
+            "profile": current.get("profile"),
+            "address": current.get("address"),
+            "distance_to_basel_sbb_m": current.get("distance_to_basel_sbb_m"),
+            "quiet": current.get("quiet"),
+            "quiet_note": current.get("quiet_note"),
+            "policies": current.get("policies", {}),
+            "photos": current.get("photos", []),      # image paths, served with the wallet (apps/wallet/public)
+            "rating": current.get("rating"),          # guests' average score out of 5, with the count
+            "amenities": current.get("amenities", {}),  # breakfast, wifi, parking, kids' beds
+            "charges": current.get("charges", []),  # collected after a booking with pay
         })
 
     async def book(call: dict) -> dict:
@@ -136,7 +153,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
         total, items = None, []
         if req.agreement is None:
-            room = next((r for r in facts.get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
+            room = next((r for r in facts().get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
             if room is None:
                 return refuse(f"no available room of type {req.room_type}")
             total = room["price_chf"]
@@ -166,7 +183,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "extras": items,
             "total_chf": verdict.amount_chf,
             "approval_id": verdict.approval["approval_id"],
-            "arrival": facts.get("policies", {}).get("late_arrival"),
+            "arrival": facts().get("policies", {}).get("late_arrival"),
             "checked": verdict.checks + (["commitments"] if req.extras and verdict.agreement is None else []),
         })
 
@@ -186,7 +203,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         if body is None:
             return refuse("the call is not a signed call")
         purpose, booking_id = body["args"].get("purpose"), body["args"].get("booking_id")
-        charge = next((c for c in facts.get("charges", []) if c["purpose"] == purpose), None)
+        charge = next((c for c in facts().get("charges", []) if c["purpose"] == purpose), None)
         if charge is None:
             return refuse(f"this business has no charge for {purpose!r}")
         if not isinstance(booking_id, str) or booking_id not in bookings:
@@ -228,6 +245,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     app = FastAPI(title=config["name"], lifespan=lifespan)
     app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
     app.mount("/mcp", mcp_app(tools))
+    # The owner view (apps/owner): read the live business, deploy new settings (node/owner.py).
+    app.mount("/owner", owner_app(config, store, lambda: business_agent.apply(config)))
 
     @app.post("/agent")
     async def agent(req: AgentRequest) -> dict:

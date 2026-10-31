@@ -90,14 +90,22 @@ class CounterOfferTool:
     """Checks a counter and decides the hotel's answer within its private limits."""
 
     def __init__(self, config: dict, lookup: Lookup = registry_lookup):
+        self.config = config  # live: the owner can deploy new settings (node/owner.py)
         self.node_id = config["node_id"]
-        facts = config.get("facts", {})
-        self.add_ons = facts.get("add_ons", [])
-        self.limits = Limits.from_facts(facts)  # private: compared here, never sent
         self.own_public_key = public_key_b64(load_signing_key(self.node_id))
         self.user_public_key = load_public_key("user")
         self.authorities = load_authorities()
         self.lookup = lookup
+
+    @property
+    def add_ons(self) -> list[dict]:
+        """The add-ons as the owner has them right now."""
+        return self.config.get("facts", {}).get("add_ons", [])
+
+    @property
+    def limits(self) -> Limits | None:
+        """The owner's private limits right now: compared here, never sent."""
+        return Limits.from_facts(self.config.get("facts", {}))
 
     def own(self, envelope: dict | None, model, what: str):
         """A payload this hotel signed itself, parsed with `model`."""
@@ -150,8 +158,9 @@ class CounterOfferTool:
                 raise CounterOfferRefused("previous counter does not belong to this round")
             previous_price, previous_final = last.price_chf, last.final
 
-        lowest = floor_total(offer.price_chf, offer.includes, self.add_ons, self.limits) if self.limits else None
-        decision = decide(counter.price_chf, counter.round, previous_price, previous_final, lowest, self.limits)
+        limits, add_ons = self.limits, self.add_ons  # read once: a deploy must not change them mid-answer
+        lowest = floor_total(offer.price_chf, offer.includes, add_ons, limits) if limits else None
+        decision = decide(counter.price_chf, counter.round, previous_price, previous_final, lowest, limits)
         if decision.kind == "agreement":
             reply = Agreement(request_id=offer.request_id, offer_id=offer.offer_id, round=counter.round,
                               item=offer.item, price_chf=decision.price_chf, includes=offer.includes,
