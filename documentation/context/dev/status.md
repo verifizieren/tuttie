@@ -536,6 +536,13 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Gestures:** release decisions use the speed of the last 100 ms; the card keeps its
   shape while dragged. Headless browsers send pointer events too slowly to test flicks;
   dispatch `PointerEvent`s in the page instead.
+- **Hardening (1 Nov):** the weather and train services fall back to their marked sample data
+  only on a real outage (no connection, timeout, 5xx, garbled answer); a 4xx or empty answer is
+  a signed refusal, so nobody gets a signed made-up timetable. `trains.check_request` refuses
+  past dates and origin == destination. No app serves `/docs`, `/redoc` or `/openapi.json`
+  unless `API_DOCS=1` (`code/apidocs.py`, local development). The `tuttie_session` cookie is
+  `Secure` when the request came over https (directly or `X-Forwarded-Proto: https` from
+  nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
 
 ## Environment
 
