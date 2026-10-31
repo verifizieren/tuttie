@@ -32,7 +32,12 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   0.3-2 s; the voice model loaded once per worker, two workers kept ready; the wallet joins the
   room ahead. From starting to speak a hotel request to hearing the answer: about 8 s (context,
   market, bargaining, answer), was 14 s.
-- Amounts are said in francs ("CHF 128" is spoken as "128 francs").
+- Tuttie writes for the ear (`assistant/agent.py`): one to three short sentences, no lists,
+  markdown or ids (booking ids and receipt numbers stay in the wallet), numbers as people say
+  them. `spoken()` in `voice/agent.py` makes the rest sayable: amounts in francs ("CHF 128" is
+  spoken as "128 francs"), degrees, percent, 24-hour times as people say them ("18:00" is "6
+  pm", "00:52" is "12:52 am", also "midnight", "noon"), and any note in square brackets is
+  dropped.
 - Voice: the demo server uses "Germain" (`TUTTIE_VOICE_ID=XJeDCVLci9KGsGtVpFLM`,
   a library voice, needs a paid plan); without it the free "Eric".
 - The wallet shows each spoken answer word by word in step with the voice (LiveKit
