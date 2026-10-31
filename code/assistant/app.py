@@ -63,8 +63,13 @@ def conversation(request: Request) -> Conversation:
     return request.app.state.conversations.get(request.state.session_id)
 
 
+# Steps the wallet may fix for a message: after swiping the cards, Tuttie negotiates first.
+FIRST_TOOLS = {"negotiate"}
+
+
 class ChatRequest(BaseModel):
     message: str
+    first_tool: str | None = None  # one of FIRST_TOOLS
 
 
 class DecisionRequest(BaseModel):
@@ -75,7 +80,9 @@ class DecisionRequest(BaseModel):
 @app.post("/chat", status_code=202)
 async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
     """Start answering a message; the answer arrives as an "answer" event."""
-    conv.start(req.message)
+    if req.first_tool is not None and req.first_tool not in FIRST_TOOLS:
+        raise HTTPException(status_code=422, detail=f"first_tool must be one of {sorted(FIRST_TOOLS)}")
+    conv.start(req.message, req.first_tool)
     return {"accepted": True}
 
 

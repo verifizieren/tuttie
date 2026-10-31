@@ -89,12 +89,16 @@ class Assistant:
         self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.toolbox.reset()
 
-    async def chat(self, text: str) -> str:
-        """Answer one user message, calling tools until the LLM gives a final answer."""
+    async def chat(self, text: str, first_tool: str | None = None) -> str:
+        """Answer one user message, calling tools until the LLM gives a final answer.
+
+        `first_tool` makes the LLM start with that tool, for messages whose next step is fixed
+        (the user swiped the cards: negotiate with the liked hotels). After it, the LLM decides.
+        """
         async with self.lock:
             self.messages.append({"role": "user", "content": text})
-            for _ in range(MAX_ROUNDS):
-                message = await self.llm.complete(self.messages, SCHEMAS)
+            for round_ in range(MAX_ROUNDS):
+                message = await self.llm.complete(self.messages, SCHEMAS, first_tool if round_ == 0 else None)
                 for thought in message.pop("reasoning", []):
                     self.bus.emit("thinking", "info", thought)
                 self.messages.append(message)

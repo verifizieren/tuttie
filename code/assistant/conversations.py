@@ -29,15 +29,15 @@ class Conversation:
         self.assistant = Assistant(llm, Toolbox(http, registry_url, self.bus, self.approvals), self.bus)
         self.chats: set[asyncio.Task] = set()
 
-    def start(self, message: str) -> None:
+    def start(self, message: str, first_tool: str | None = None) -> None:
         """Answer a message in the background; the answer arrives as an "answer" event."""
-        task = asyncio.create_task(self._run(message))
+        task = asyncio.create_task(self._run(message, first_tool))
         self.chats.add(task)
         task.add_done_callback(self.chats.discard)
 
-    async def _run(self, message: str) -> None:
+    async def _run(self, message: str, first_tool: str | None) -> None:
         try:
-            await self.assistant.chat(message)
+            await self.assistant.chat(message, first_tool)
         except asyncio.CancelledError:
             raise
         except Exception as error:  # surface any failure on screen instead of hanging the wallet

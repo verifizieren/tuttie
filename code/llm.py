@@ -48,10 +48,14 @@ class LLM:
             reasoning["summary"] = summary
         self.options = {"reasoning": reasoning} if reasoning else {}
 
-    async def complete(self, messages: list[dict], tools: list[dict]) -> dict:
-        """Return {"role", "content", "tool_calls"?, "reasoning": [summary texts], "provider_items"}."""
+    async def complete(self, messages: list[dict], tools: list[dict], tool_choice: str | None = None) -> dict:
+        """Return {"role", "content", "tool_calls"?, "reasoning": [summary texts], "provider_items"}.
+
+        `tool_choice` names a tool the model must call in this turn.
+        """
+        forced = {"tool_choice": {"type": "function", "name": tool_choice}} if tool_choice else {}
         response = await self.client.responses.create(
-            model=self.model, input=to_input(messages), tools=[to_tool(t) for t in tools], **self.options)
+            model=self.model, input=to_input(messages), tools=[to_tool(t) for t in tools], **self.options, **forced)
         items = [item.model_dump(exclude_none=True) for item in response.output]
         summaries = [part["text"] for item in items if item["type"] == "reasoning"
                      for part in item.get("summary", []) if part.get("text")]
