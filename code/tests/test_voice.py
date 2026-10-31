@@ -90,13 +90,37 @@ def test_temperatures_and_percentages_are_said_in_words():
 
 
 def test_times_are_said_as_people_say_them():
-    assert spoken("Around 9 °C at 18:00, 8 at 20:00, train at 00:52, back by 12:00, until 00:00, 7:05.") == \
-        "Around 9 degrees at 6 pm, 8 at 8 pm, train at 12:52 am, back by noon, until midnight, 7:05 am."
+    assert spoken("Around 9 °C at 18:00, 8 at 20:00, train at 00:52, back by 12:00, until 00:00, from 10:30.") == \
+        "Around 9 degrees at 6 pm, 8 at 8 pm, train at 12:52 am, back by noon, until midnight, from 10:30 am."
 
 
-def test_notes_in_brackets_are_not_read_out():
-    assert spoken("The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3].") == \
+def test_times_already_said_in_12_hours_are_kept():
+    # Tuttie is asked to write "8:30 pm": the voice must not add a second (wrong) am or pm.
+    assert spoken("At 8:30 pm, then 12:52 am, 6:00 PM, 1:00 to 2:00 am, or 7:05.") == \
+        "At 8:30 pm, then 12:52 am, 6:00 PM, 1:00 to 2:00 am, or 7:05."
+
+
+def test_citation_and_id_notes_in_brackets_are_not_read_out():
+    assert spoken("The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3, 4].") == \
         "The total is 128 francs. Tax paid. Fine."
+
+
+def test_facts_in_brackets_are_kept_without_the_brackets():
+    # A fee or a condition must never be hidden just because the model put it in brackets.
+    assert spoken("Total CHF 128 [+ CHF 40 cleaning fee]. Booked [non-refundable, no cancellation].") == \
+        "Total 128 francs + 40 francs cleaning fee. Booked non-refundable, no cancellation."
+
+
+def test_durations_and_links_are_not_mangled():
+    assert spoken("The trip takes 1:30 hours, 18:00:30 sharp. [Rheinblick](https://x.y) is good.") == \
+        "The trip takes 1:30 hours, 18:00:30 sharp. Rheinblick is good."
+
+
+def test_long_runs_of_spaces_are_fast():
+    import time
+    start = time.perf_counter()
+    spoken(" " * 50000 + "x")
+    assert time.perf_counter() - start < 0.2
 
 
 def test_amounts_are_said_in_francs():

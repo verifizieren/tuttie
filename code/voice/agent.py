@@ -68,8 +68,24 @@ def francs(match: re.Match) -> str:
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
-BRACKETS = re.compile(r"\s*\[[^\]\n]{0,60}\]")   # notes the model put in brackets: [3], [confirmed]
-CLOCK = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")  # 24-hour times: 18:00, 00:52
+LINK = re.compile(r"\[([^\]\n]*)\]\([^)\n]*\)")          # a markdown link: keep its text only
+NOTE = re.compile(r"[ \t]?\[([^\]\n]{0,60})\]")             # a note the model put in square brackets
+# Notes that carry nothing to say: citations ([3], [3, 4]), one-word labels ([confirmed]) and ids
+# ([receipt RC-A14786]: the wallet shows those). Any other note may be a fact (a fee, a
+# condition), so only its brackets go.
+EMPTY_NOTE = re.compile(r"\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*")
+# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration:
+# "18:00", "00:52" yes; "8:30 pm", "1:30 hours", "18:00:30" no.
+CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))",
+                   re.IGNORECASE)
+
+
+def note(match: re.Match) -> str:
+    """A bracketed note: dropped if it says nothing, else kept without its brackets."""
+    inner = match.group(1).strip()
+    if not inner or EMPTY_NOTE.fullmatch(inner):
+        return ""
+    return (" " if match.group(0)[0] in " \t" else "") + inner
 
 
 def clock(match: re.Match) -> str:
@@ -84,7 +100,7 @@ def clock(match: re.Match) -> str:
 def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
-    text = BRACKETS.sub("", answer)
+    text = NOTE.sub(note, LINK.sub(r"\1", answer))
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
