@@ -81,7 +81,7 @@ async def main(decision: str, request: str) -> None:
         seals = " ".join(s["tier"] if s["valid"] else f"BROKEN({s['issuer']})" for s in event["seals"])
         print(f"{event['step']:>2} {event['kind']:<9} {event['status']:<9} {event['node_name'] or '':<20} {seals:<12} "
               f"{event['summary'][:110]}")
-    print(f"\n{answer}")
+    print(f"\n{answer}\n(mood: {bus.history[-1]['detail'].get('mood')})")
 
 
 if __name__ == "__main__":
