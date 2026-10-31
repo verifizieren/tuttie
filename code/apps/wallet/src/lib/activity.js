@@ -132,7 +132,8 @@ export function applyEvent(state, event) {
   if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)) {
     const h = hotel(state, event.node_id, event.node_name);
     const step = { price: detail.payload.price_chf, final: Boolean(detail.payload.final), type: detail.payload.type };
-    const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter(p => p != null).join(" → ");
+    const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter(p => p != null)
+      .map(p => `CHF ${p}`).join(" → ");
     const line = step.type === "agreement" ? `Agreed with ${h.name} · CHF ${step.price}` : `Bargaining with ${h.name} · ${trail}`;
     return { ...withHotel(progress(state, "tool", line), event.node_id, event.node_name, {
       rounds: [...h.rounds, step],

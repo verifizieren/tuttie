@@ -6,14 +6,17 @@ import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
 import { SealList, SealMarks } from "./Seals.jsx";
 
-/** The turn's progress: a context line, then a tool line joined to it. Each updates in place. */
-function Steps({ turn }) {
+/** The turn's progress: a context line, then a tool line joined to it. Each updates in place.
+ *  `latest` is the line that finished last in the whole conversation: its dot is green. */
+function Steps({ turn, latest }) {
   const lines = [turn.context, turn.tool].filter(Boolean);
   if (!lines.length) return null;
   return (
     <ol className="steps">
       {lines.map((line, i) => (
-        <li key={i} className={line.done ? "done" : "active"}><i className="dot" /><span>{line.text}</span></li>
+        <li key={i} className={line.done ? (line === latest ? "done latest" : "done") : "active"}>
+          <i className="dot" /><span>{line.text}</span>
+        </li>
       ))}
     </ol>
   );
@@ -22,11 +25,11 @@ function Steps({ turn }) {
 /** The price column: the offer, the bargaining trail, or the agreed price. */
 function Price({ hotel }) {
   if (hotel.agreed) {
-    return <span className="price"><s>{hotel.offer?.price_chf}</s> <b>CHF {hotel.agreed}</b></span>;
+    return <span className="price"><s>CHF {hotel.offer?.price_chf}</s> <b>CHF {hotel.agreed}</b></span>;
   }
   if (hotel.rounds.length) {
     const last = hotel.rounds[hotel.rounds.length - 1];
-    return <span className="price">{hotel.offer?.price_chf} → <b>{last.price}</b>{last.final ? " final" : ""}</span>;
+    return <span className="price">CHF {hotel.offer?.price_chf} → <b>CHF {last.price}</b>{last.final ? " final" : ""}</span>;
   }
   if (hotel.offer) return <span className="price"><b>CHF {hotel.offer.price_chf}</b></span>;
   const waiting = { interested: "preparing offer…", declined: "no offer", woken: "asked…" };
@@ -128,11 +131,12 @@ export default function Activity({ state, onPick, onLean }) {
   }, [state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
+  const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
   return (
     <div className="activity" ref={box} data-scroll>
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
-          <Steps turn={turn} />
+          <Steps turn={turn} latest={latest} />
           {i === state.marketTurn && state.request && <Market state={state} onPick={onPick} onLean={onLean} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
           {turn.answer && <Answer text={turn.answer} />}
