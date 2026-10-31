@@ -178,8 +178,9 @@ class TuttieFace {
   }
 
   resize() {
-    const ratio = window.devicePixelRatio || 1;
-    const { width, height } = this.canvas.getBoundingClientRect();
+    // Layout size (ignores CSS transforms), rendered 1.5x sharper so a scaled-up face stays crisp.
+    const ratio = Math.min(3, (window.devicePixelRatio || 1) * 1.5);
+    const width = this.canvas.clientWidth, height = this.canvas.clientHeight;
     for (const c of [this.canvas, this.layer]) { c.width = Math.max(1, width * ratio); c.height = Math.max(1, height * ratio); }
   }
 
