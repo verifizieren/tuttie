@@ -12,7 +12,7 @@ Last updated: 2026-10-31.
 
 | Area | What works | Where |
 | --- | --- | --- |
-| APS signing | Canonical JSON, Ed25519 keys, signed envelopes, seals with gold / blue / grey / broken tiers, signed user approvals. 25 tests. | `code/aps/`, `code/tests/` |
+| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals. | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
 | Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config. | `code/node/`, `code/data/nodes/` |
 | Demo data | Hotels Rheinblick (gold + blue), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
@@ -34,6 +34,30 @@ Build order from [goals.md](goals.md):
    connect the wallet to `POST /chat`, `GET /events` and the approvals API.
 4. **Negotiation and subagents** — not started.
 5. **MCP services** — not started.
+
+### Where to start next
+
+1. **APS for step 1 — UIDs and freshness done.** Still open in APS: Tuttie's own named key
+   and identity (today the `user` key only signs approvals), and signing marketplace
+   messages once their formats are agreed.
+2. **Finish step 1 (small, data first).** Reshape the three hotels into the planned sizes in
+   `code/data/nodes/` (e.g. Rheinblick = branch of a chain, Spalenhof = mid-sized, Gundeli =
+   small independent), give each `facts.add_ons` and `facts.negotiation`
+   (`floor_chf`, `max_rounds`). Re-run `issue_seals.py` if capabilities or keys change.
+3. **Tests for `node/agent.py`** with a fake LLM: the commitment is built from the config,
+   unknown add-on ids give no commitment, and the fallback reply on LLM errors. Offers in step 2
+   reuse this logic, so it should be pinned down first.
+4. **Then step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
+   then build `code/marketplace/` (:4010) test-first in the same style as `test_tools.py`.
+
+### Test coverage
+
+38 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+seals, tiers, UIDs, approvals), `test_node_book.py` (node `book`: approval, commitments, replay),
+`test_tools.py` (assistant trust gate with mocked HTTP and the real demo keys).
+Not covered yet: `node/agent.py`, the node's `get_availability`, `get_policies` and `/agent`
+endpoints, `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
+routes (`assistant/app.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
 (`code/apps/owner/`), presentation site and QR code (`code/apps/presentation/`), a
@@ -62,6 +86,15 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **UIDs are vouched for by the commercial register only.** Every seal signs the node's
+  `uid` (or `null`), so it cannot be swapped later; `handelsregister-bs` has
+  `vouches_for_uid` and its seal is invalid without a well-formed UID. A UID under any
+  other seal is shown as a claim, not as verified. The demo UIDs are made up but have
+  correct check digits.
+- **Freshness is opt-in per call.** Live replies must be at most 300 s old
+  (`MAX_REPLY_AGE_S` in `assistant/tools.py`); stored envelopes like commitments are
+  verified without it because they have `valid_until`.
 
 - **LLM:** `gpt-6-luna` through the OpenAI **Responses API** with reasoning on
   (`code/llm.py`). Reasoning models only allow tools together with reasoning there;
