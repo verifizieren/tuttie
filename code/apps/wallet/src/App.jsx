@@ -48,6 +48,8 @@ const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once mor
 const DECIDE_FIRST = "Decide on the booking first";
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
+const price = card => card.agreed_chf ?? card.price_chf ?? Infinity;
+
 export default function App() {
   const [mode, setMode] = useState("closed");
   const [error, setError] = useState("");  // the only text under the eyes: Tuttie cannot be reached
@@ -224,11 +226,12 @@ export default function App() {
     }
   }
 
-  // The user swiped through the cards: book the best liked deal (the lowest agreed price). If
+  // The user swiped through the cards: book the best liked deal (the lowest agreed price; a card
+  // without any price comes last). If
   // the choice cannot reach Tuttie (even after one more try), the cards come back, so swiping
   // again sends it again.
   async function pick(liked) {
-    const best = [...liked].sort((a, b) => (a.agreed_chf ?? a.price_chf) - (b.agreed_chf ?? b.price_chf))[0];
+    const best = [...liked].sort((a, b) => price(a) - price(b))[0];
     actions.pick([best.node_id]);
     const sent = await send(`Book ${best.name} (${best.node_id})${best.agreed_chf != null ? " at the agreed price" : ""}.`,
                             "book", `Book ${best.name}`, false, true);
