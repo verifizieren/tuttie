@@ -16,9 +16,11 @@ import argparse
 import asyncio
 import copy
 import json
+import os
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 from dotenv import load_dotenv
@@ -30,6 +32,7 @@ from aps.approval import booking_terms
 from aps.call import call_body
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
+from marketplace.messages import PostingCreated
 from negotiation.agreement import AgreementRedeemer
 from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
 from node.agent import BusinessAgent
@@ -39,6 +42,33 @@ from node.owner import owner_app
 from node.settings import apply as apply_settings
 from node.settings import validate as validate_settings
 from sessions import SessionClosed, SessionStore
+
+
+LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+
+def market_url() -> str:
+    """The marketplace this node sends offers to (same variables as marketplace/app.py)."""
+    return os.environ.get("MARKETPLACE_URL", f"http://localhost:{os.environ.get('MARKETPLACE_PORT', '4010')}")
+
+
+def offer_url_allowed(offer_url: str, request_id: str, market: str) -> bool:
+    """Whether `offer_url` is the market's own offer door for this request.
+
+    The node signs and POSTs an offer to it, so it must never be an arbitrary address (SSRF):
+    same scheme, host (any loopback name counts as one) and port as `market`, and exactly the
+    path /postings/{request_id}/offers.
+    """
+    try:
+        url, allowed = urlsplit(offer_url), urlsplit(market)
+        same_port = (url.port or 80) == (allowed.port or 80)
+    except ValueError:
+        return False
+    host, allowed_host = url.hostname or "", allowed.hostname or ""
+    same_host = host == allowed_host or (host in LOOPBACK and allowed_host in LOOPBACK)
+    expected_path = f"{allowed.path.rstrip('/')}/postings/{request_id}/offers"
+    return (url.scheme == allowed.scheme and same_host and same_port and url.path == expected_path
+            and not url.query and not url.fragment and not url.username)
 
 
 class AgentRequest(BaseModel):
@@ -319,8 +349,18 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         """The marketplace wakes the agent on a change; it answers whether and how it would respond.
 
         The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
-        (marketplace/messages.py, PostingCreated).
+        (marketplace/messages.py, PostingCreated). A new posting must be a valid PostingCreated
+        whose offer_url is the configured market's offer door for it (offer_url_allowed); else
+        422, before any LLM runs.
         """
+        if event.get("type") == "posting.created":
+            try:
+                posting = PostingCreated.model_validate(event).posting
+            except ValidationError as error:
+                raise HTTPException(status_code=422, detail=f"not a valid posting.created event: "
+                                                            f"{error.errors()[0]['msg']}") from None
+            if not offer_url_allowed(posting.offer_url, posting.request_id, market_url()):
+                raise HTTPException(status_code=422, detail="offer_url is not this marketplace's offer address")
         decision = await business_agent.invoke(event)
         choice = decision.pop("offer_choice", None)  # chosen while deciding; not part of the reply
         if (event.get("type") == "posting.created" and decision.get("interested")

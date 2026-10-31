@@ -157,3 +157,52 @@ def test_a_room_too_small_for_a_dog_is_never_offered_to_a_dog_guest():
 
 def test_an_unknown_room_choice_falls_back_to_the_cheapest_fitting_room():
     assert offer_for(RHEINBLICK, "Double Room", ["quiet"])["item"].startswith("double ")
+
+
+# --- POST /agent/invoke: no LLM call or offer for a bad or foreign posting --------------
+
+from node.server import offer_url_allowed  # noqa: E402
+
+
+def posting_event(offer_url="http://localhost:4010/postings/rq-x1/offers", **changes):
+    posting = {"request_id": "rq-x1", "requester_id": "ch.tuttie.alex-muster", "request": {},
+               "offer_url": offer_url, "expires_at": "2026-11-13T22:00:00Z", **changes}
+    return {"type": "posting.created", "posting": posting}
+
+
+@pytest.fixture
+def no_llm(monkeypatch):
+    """Any LLM call fails the test: a refused event must be refused before the agent thinks."""
+    class Forbidden:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("the LLM must not run for a refused event")
+    monkeypatch.setattr(node.agent, "LLM", Forbidden)
+    monkeypatch.delenv("MARKETPLACE_URL", raising=False)
+    monkeypatch.delenv("MARKETPLACE_PORT", raising=False)
+
+
+@pytest.mark.parametrize("event", [
+    {"type": "posting.created"},  # no posting (was a 500 KeyError)
+    {"type": "posting.created", "posting": "x"},
+    posting_event(offer_url="http://attacker.example/collect"),
+    posting_event(offer_url="http://169.254.169.254/postings/rq-x1/offers"),
+    posting_event(offer_url="http://localhost:4001/postings/rq-x1/offers"),  # another port
+    posting_event(offer_url="http://localhost:4010/postings/rq-other/offers"),  # another request
+    posting_event(offer_url="http://localhost:4010/admin"),
+    posting_event(offer_url="http://user@localhost:4010/postings/rq-x1/offers"),
+    posting_event(unexpected="field"),
+])
+def test_invoke_refuses_an_invalid_or_foreign_posting_with_422(no_llm, event):
+    response = TestClient(create_app(RHEINBLICK)).post("/agent/invoke", json=event)
+    assert response.status_code == 422
+
+
+def test_offer_url_must_be_the_markets_offer_door():
+    market = "http://localhost:4010"
+    assert offer_url_allowed("http://localhost:4010/postings/rq-1/offers", "rq-1", market)
+    assert offer_url_allowed("http://127.0.0.1:4010/postings/rq-1/offers", "rq-1", market)
+    assert offer_url_allowed("https://market.example/m/postings/rq-1/offers", "rq-1", "https://market.example/m/")
+    assert not offer_url_allowed("https://market.example/postings/rq-1/offers", "rq-1", "http://market.example")
+    assert not offer_url_allowed("http://localhost:4010/postings/rq-1/offers?x=1", "rq-1", market)
+    assert not offer_url_allowed("http://[bad/postings/rq-1/offers", "rq-1", market)
+    assert not offer_url_allowed("http://localhost:99999/postings/rq-1/offers", "rq-1", market)
