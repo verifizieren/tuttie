@@ -3,11 +3,13 @@
 // plus what happened on the agent web in between: the posting, the hotels and their offers,
 // the cards to swipe, the negotiation, the approval and the booking. Each turn has two
 // progress lines that update in place: what Tuttie knows (context) and what it does (tools).
-// Pure functions, so the view only ever renders `state`.
+// Every request (typed or spoken) is a turn the server opens with a "turn" event; the events of
+// its run carry its id (`event.turn`), so they always land in their own turn: a new request
+// never overwrites an earlier answer or booking. Pure functions, so the view only ever renders `state`.
 
 export const EMPTY = {
   id: null,             // this conversation, for the history on this device
-  turns: [],            // [{ said, answer, mood, context, tool }]; context/tool: { text, done } progress lines
+  turns: [],            // [{ id, said, source, answer, mood, context, tool, booking }]; context/tool: { text, done } progress lines
   phase: "idle",        // idle | thinking | posted | offers | picking | negotiating | approval | booking | booked | done | declined
   request: null,        // the public part of Tuttie's posting
   marketTurn: null,     // the turn in which the posting happened
@@ -18,7 +20,7 @@ export const EMPTY = {
   swipes: [],           // queued live commands; preserve rapid consecutive choices
   picked: null,         // node ids the user liked
   approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate } while the user decides
-  booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid, payments } once confirmed
+  booking: null,        // the latest { id, hotel, total, date, room, extras, checked, seals, uid, payments }; each stays in its turn
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
   mood: "neutral",      // how it feels (assistant/agent.py MOODS)
@@ -34,12 +36,29 @@ export function activeTurn(state) {
   return open === -1 ? state.turns.length - 1 : open;
 }
 
+/** The turn an event belongs to: the one with its id, else (events without one) the active turn. */
+export function turnOf(state, turnId) {
+  const i = turnId ? state.turns.findIndex(t => t.id === turnId) : -1;
+  return i === -1 ? activeTurn(state) : i;
+}
+
 /** A conversation that has ended: answered, nothing waiting for the user or still running. */
 export const finished = state => Boolean(state.answer) && !state.approval && state.turns.every(t => t.answer);
 
 /** The user said something: a new turn (and a new conversation if there is none). */
-export function startTurn(state, said) {
-  return { ...state, id: state.id || newId(), turns: [...state.turns, { said }], phase: "thinking", closing: null };
+export function startTurn(state, said, id = null, source = "text") {
+  const turn = id ? { id, said, source } : { said };
+  return { ...state, id: state.id || newId(), turns: [...state.turns, turn], phase: "thinking", closing: null };
+}
+
+/** The server opened a turn ("turn" event): bind it to the message just sent from this wallet
+ *  (same words, no id yet), or add it (a spoken request, or a reload). Never twice. */
+function openTurn(state, { turn_id: id, said = "", source = "text" }) {
+  if (!id || state.turns.some(t => t.id === id)) return state;
+  const local = state.turns.findIndex(t => !t.id && !t.answer && t.said === said);
+  if (local === -1) return startTurn(state, said, id, source);
+  const turns = state.turns.map((t, n) => (n === local ? { ...t, id, source } : t));
+  return { ...state, turns, phase: "thinking", closing: null };
 }
 
 /** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
@@ -49,9 +68,9 @@ export const cleanAnswer = text => text.split("\n").filter(line => !/^\s*Ignored
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
 
-/** Update one progress line ("context" or "tool") of the turn events belong to. */
-function progress(state, line, text, done = false) {
-  const base = withTurn(state), i = activeTurn(base);
+/** Update one progress line ("context" or "tool") of the turn the event belongs to. */
+function progress(state, line, text, done = false, turnId = null) {
+  const base = withTurn(state), i = turnOf(base, turnId);
   return { ...base, turns: base.turns.map((t, n) => (n === i ? { ...t, [line]: { text, done } } : t)) };
 }
 
@@ -66,13 +85,24 @@ function withHotel(state, nodeId, name, changes) {
   return { ...state, hotels: { ...state.hotels, [nodeId]: { ...hotel(state, nodeId, name), ...changes } } };
 }
 
-function withAnswer(state, text, mood) {
-  const base = withTurn(state), i = activeTurn(base);
+function withAnswer(state, text, mood, turnId) {
+  const base = withTurn(state), i = turnOf(base, turnId);
   // Tuttie has answered: nothing in this turn is still running, so its progress lines are done.
   const settle = line => (line ? { ...line, done: true } : line);
   const turns = base.turns.map((t, n) => (n === i ? { ...t, answer: text, mood, context: settle(t.context),
                                                        tool: settle(t.tool) } : t));
-  return { ...base, turns, answer: text, mood, phase: "done", closing: state.closing === "asked" ? "ready" : state.closing };
+  // A late answer to an earlier turn never replaces the answer to a later one.
+  const newest = turns.slice(i + 1).every(t => !t.answer);
+  const waiting = turns.slice(i + 1).some(t => !t.answer);
+  const closing = state.closing === "asked" ? "ready" : state.closing;
+  if (!newest) return { ...base, turns, closing };
+  return { ...base, turns, answer: text, mood, phase: waiting ? "thinking" : "done", closing };
+}
+
+/** The latest booking, kept both as `state.booking` and in the turn it was made in. */
+function withBooking(state, booking) {
+  const turns = state.turns.map((t, n) => (n === state.bookingTurn ? { ...t, booking } : t));
+  return { ...state, turns, booking };
 }
 
 /** A charge paid after the booking (e.g. the city tax), from the hotel's signed receipt. */
@@ -80,12 +110,14 @@ function withPayment(state, receipt) {
   if (!state.booking) return state;
   const payment = { purpose: receipt.purpose, amount: receipt.amount_chf, paidWith: receipt.paid_with,
                     checked: receipt.checked || [] };
-  return { ...state, booking: { ...state.booking, payments: [...state.booking.payments, payment] } };
+  return withBooking(state, { ...state.booking, payments: [...state.booking.payments, payment] });
 }
 
 /** The next state after one event. Unknown events leave the state as it is. */
 export function applyEvent(state, event) {
   const detail = event.detail || {};
+  const at = event.turn || null;  // the turn the event belongs to (documentation/formats.md)
+  if (event.kind === "turn") return openTurn(state, detail);
   if (event.kind === "wallet" && detail.action === "swipe" && ["like", "pass"].includes(detail.verdict)) {
     if (!state.cards || state.picked || detail.cards_step !== state.cardsStep) return state;
     const swipe = { id: event.step, verdict: detail.verdict };
@@ -94,10 +126,10 @@ export function applyEvent(state, event) {
   }
   if (event.kind === "thinking") return state.phase === "idle" ? { ...state, phase: "thinking" } : state;
   if (event.kind === "close") return { ...state, closing: "asked" };
-  if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral");
-  if (event.kind === "context") return progress(state, "context", event.summary, detail.phase === "found");
+  if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral", at);
+  if (event.kind === "context") return progress(state, "context", event.summary, detail.phase === "found", at);
   if (event.kind === "payment" && detail.payload?.status === "paid") {
-    return withPayment(progress(state, "tool", `Booked · ${detail.payload.purpose} paid`, true), detail.payload);
+    return withPayment(progress(state, "tool", `Booked · ${detail.payload.purpose} paid`, true, at), detail.payload);
   }
 
   if (event.kind === "marketplace") {
@@ -108,9 +140,10 @@ export function applyEvent(state, event) {
                            tiers: [info.trust_tier], status: info.status || "woken" };
       }
       const skipped = Object.values(detail.skipped || {}).map(s => ({ name: s.name, reason: s.reason, tier: s.trust_tier }));
-      // A new posting replaces the last one's market, offers, picks and booking in this conversation.
-      const base = progress(state, "tool", `Asked ${Object.keys(hotels).length} hotels`);
-      return { ...base, phase: "posted", request: detail.request, marketTurn: activeTurn(base), hotels, skipped,
+      // A new posting replaces the last one's market, offers and picks in this conversation; an
+      // earlier booking stays in its own turn.
+      const base = progress(state, "tool", `Asked ${Object.keys(hotels).length} hotels`, false, at);
+      return { ...base, phase: "posted", request: detail.request, marketTurn: turnOf(base, at), hotels, skipped,
                shortlistDone: false, cards: null, cardsStep: null, swipes: [], picked: null, approval: null, booking: null, bookingTurn: null };
     }
     if (detail.phase === "offer" && event.node_id) {
@@ -119,17 +152,17 @@ export function applyEvent(state, event) {
         size: detail.profile?.size || hotel(state, event.node_id).size,
       });
       const n = offerCount(next);
-      return { ...progress(next, "tool", `${n} offer${n === 1 ? "" : "s"} in · checking seals`), phase: "offers" };
+      return { ...progress(next, "tool", `${n} offer${n === 1 ? "" : "s"} in · checking seals`, false, at), phase: "offers" };
     }
     if (detail.phase === "shortlist") {
       const ids = new Set(detail.shortlist || []);
       const hotels = Object.fromEntries(Object.entries(state.hotels).map(
         ([nodeId, h]) => [nodeId, { ...h, shortlisted: Boolean(h.offer && ids.has(h.offer.offer_id)) }]));
-      return { ...progress(state, "tool", "Comparing offers"), hotels, shortlistDone: true };
+      return { ...progress(state, "tool", "Comparing offers", false, at), hotels, shortlistDone: true };
     }
     if (detail.phase === "cards") {
       const n = (detail.cards || []).length;
-      return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true),
+      return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true, at),
                cards: detail.cards || [], cardsStep: event.step, swipes: [], phase: "picking" };
     }
     return state;
@@ -145,7 +178,7 @@ export function applyEvent(state, event) {
     const cards = step.type === "agreement" && state.cards
       ? state.cards.map(c => c.node_id === event.node_id ? { ...c, agreed_chf: step.price } : c)
       : state.cards;
-    return { ...withHotel(progress(state, "tool", line), event.node_id, event.node_name, {
+    return { ...withHotel(progress(state, "tool", line, false, at), event.node_id, event.node_name, {
       rounds: [...h.rounds, step],
       agreed: detail.payload.type === "agreement" ? detail.payload.price_chf : h.agreed,
       status: detail.payload.type === "agreement" ? "agreed" : "negotiating",
@@ -155,21 +188,21 @@ export function applyEvent(state, event) {
   // The hotel's signed confirmation, with the checks its action gate passed.
   if (event.kind === "a2t" && detail.payload?.tool === "book" && detail.payload.status === "confirmed") {
     const b = detail.payload;
-    const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true);
-    return { ...base, phase: "booked", bookingTurn: activeTurn(base),
-             booking: { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
-                        extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
-                        payments: [] } };
+    const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true, at);
+    return withBooking({ ...base, phase: "booked", bookingTurn: turnOf(base, at) },
+                       { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
+                         extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
+                         payments: [] });
   }
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
-      return { ...progress(state, "tool", "Waiting for your approval"), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
+      return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
         hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid,
         offerMandate: detail.offer_mandate || null } };
     }
     const approved = event.status === "approved";
-    return { ...progress(state, "tool", approved ? "Booking…" : "You declined", !approved), approval: null,
+    return { ...progress(state, "tool", approved ? "Booking…" : "You declined", !approved, at), approval: null,
              phase: approved ? "booking" : "declined" };
   }
   return state;
