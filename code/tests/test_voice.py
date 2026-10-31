@@ -57,7 +57,11 @@ def test_the_agent_only_gets_new_events():
 
 
 def test_answers_are_spoken_without_citations_markdown_or_emoji():
-    assert spoken("Booked **BK-1** for CHF 128 [16]. 🐶\nIgnored: scam (broken seal)") == "Booked BK-1 for CHF 128."
+    assert spoken("Booked **BK-1** for CHF 128 [16]. 🐶\nIgnored: scam (broken seal)") == "Booked BK-1 for 128 francs."
+
+
+def test_amounts_are_said_in_francs():
+    assert spoken("CHF 1 tax, 70 CHF over, CHF 12.50 left, in CHF.") == "1 franc tax, 70 francs over, 12.50 francs left, in francs."
 
 
 def test_it_keeps_quiet_except_when_the_user_must_approve():

@@ -59,9 +59,17 @@ ENDPOINTING = {"min_delay": .3, "max_delay": 2.0}
 UPDATES = {"approval": "Please confirm with Face ID."}
 
 
+def francs(match: re.Match) -> str:
+    """An amount as it is said: "CHF 128" is "128 francs", "CHF 1" is "1 franc"."""
+    amount = match.group(1) or match.group(2)
+    return f"{amount} {'franc' if amount == '1' else 'francs'}"
+
+
 def spoken(answer: str) -> str:
-    """An answer as it should sound: no citations, no markdown, no emoji."""
+    """An answer as it should sound: amounts in francs, no citations, no markdown, no emoji."""
     text = re.sub(r"\s*\[\d+\]", "", answer)
+    text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
+    text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"[*_`#]", "", text)
     text = re.sub(r"[\U0001F000-\U0001FFFF☀-➿]", "", text)
     return " ".join(line for line in text.splitlines() if not line.strip().lower().startswith("ignored:")).strip()
