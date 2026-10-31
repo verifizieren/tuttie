@@ -38,6 +38,8 @@
       "late_arrival": "Arrivals until 02:00 are fine: Anna sends a door code on the day.",
       "cancellation": "Free cancellation until 48h before arrival."
     },
+    "rating": {"score": 4.8, "reviews": 64},
+    "amenities": {"breakfast": true, "wifi": true, "parking": false, "kids_beds": false},
     "charges": [
       { "purpose": "city tax", "price_chf": 4, "note": "Basel city tax for one guest and night, collected after booking" }
     ],

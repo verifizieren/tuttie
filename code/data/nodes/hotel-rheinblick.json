@@ -38,6 +38,8 @@
       "late_arrival": "After 22:00 guests collect their key from the key box at the entrance with a code sent on booking.",
       "cancellation": "Best rate is non-refundable. Flexible rate can be cancelled free of charge until 48h before arrival."
     },
+    "rating": {"score": 4.5, "reviews": 412},
+    "amenities": {"breakfast": true, "wifi": true, "parking": true, "kids_beds": true},
     "charges": [
       { "purpose": "city tax", "price_chf": 4, "note": "Basel city tax for one guest and night, collected after booking" }
     ],

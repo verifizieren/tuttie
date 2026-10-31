@@ -24,6 +24,8 @@
       "late_arrival": "Reception closes at 23:00; no check-in after that.",
       "cancellation": "Free cancellation until 24h before arrival."
     },
+    "rating": {"score": 4.4, "reviews": 287},
+    "amenities": {"breakfast": true, "wifi": true, "parking": false, "kids_beds": false},
     "charges": [
       { "purpose": "city tax", "price_chf": 4, "note": "Basel city tax for one guest and night, collected after booking" }
     ],
