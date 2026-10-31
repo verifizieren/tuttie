@@ -130,6 +130,10 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .bubble.tuttie ul { margin: 0; padding-left: 18px; }
 .bubble.tuttie li + li { margin-top: 4px; }
 .bubble.tuttie b { font-weight: 650; color: #fff; }
+/* While Tuttie speaks the answer: the words said so far, and a soft caret. */
+.bubble.tuttie.speaking p { min-height: 1.5em; }
+.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px;
+         background: var(--accent); animation: breathe 1s ease-in-out infinite; }
 
 
 .hotel { padding: 0; border-radius: 16px;

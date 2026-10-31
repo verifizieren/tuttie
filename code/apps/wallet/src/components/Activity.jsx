@@ -67,8 +67,12 @@ function Inline({ text }) {
     part.startsWith("**") ? <b key={i}>{part.slice(2, -2)}</b> : <span key={i}>{part}</span>);
 }
 
-/** Tuttie's answer as a highlighted bubble: paragraphs, "- " lines as a list, **bold** kept. */
-function Answer({ text }) {
+/** Tuttie's answer as a highlighted bubble: paragraphs, "- " lines as a list, **bold** kept.
+ *  While Tuttie is still saying it (`spoken`), only the words said so far are shown. */
+function Answer({ text, spoken }) {
+  if (spoken != null) {
+    return <div className="bubble tuttie speaking"><p>{spoken}<span className="caret" aria-hidden="true" /></p></div>;
+  }
   const blocks = [];
   for (const line of text.split("\n").map(l => l.trim())) {
     if (!line) continue;
@@ -119,8 +123,9 @@ function Market({ state, readOnly, onPick, onLean }) {
  * @param readOnly  an earlier conversation from the history: nothing to swipe
  * @param onPick    (liked cards) => void
  * @param onLean    (x in -1..1) => void while a card is dragged
+ * @param reveal    { answer, text } while Tuttie speaks its latest answer
  */
-export default function Activity({ state, readOnly = false, onPick, onLean }) {
+export default function Activity({ state, readOnly = false, onPick, onLean, reveal = null }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
   // New content comes last; bring it into view when it arrives.
@@ -142,7 +147,7 @@ export default function Activity({ state, readOnly = false, onPick, onLean }) {
           <Steps turn={turn} latest={latest} />
           {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} onLean={onLean} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
-          {turn.answer && <Answer text={turn.answer} />}
+          {turn.answer && <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />}
         </div>
       ))}
     </div>

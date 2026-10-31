@@ -7,7 +7,8 @@
 //   typing  card open with a text field; the eyes close while the user types
 //
 // Text goes to Tuttie (POST /chat); in voice mode the user simply talks (hooks/useVoice.js,
-// code/voice) and Tuttie answers aloud. What Tuttie does on the agent web arrives on the event
+// code/voice) and Tuttie answers aloud, its answer appearing word by word as it speaks. After a
+// typed message Tuttie stays quiet (text only) until the user taps its face or the mic button. What Tuttie does on the agent web arrives on the event
 // stream and is shown under its eyes (Activity), including the approval sheet.
 //
 // There is one conversation at a time: once the user swipes Tuttie down, the next opening
@@ -30,6 +31,7 @@ import { BUSY, EXPRESSION, LISTENING, MOOD, THINKING, WATCHING, currentTask } fr
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
 const OPEN_GUARD_MS = 700;
+const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
 const LOOK_MS = 1600;      // how long each look of a loop (thinking, listening, watching) lasts
 const SETTLE_MS = { idle: 1300, done: 3500, declined: 3500 };  // the first face holds this long before listening
 
@@ -43,7 +45,26 @@ export default function App() {
   const face = useFace(canvas);
   const [agent, actions, history] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
-  const { unlockAudio, muted, toggleMute } = useVoice(mode === "voice", face);
+  const [quiet, setQuiet] = useState(false);  // the user typed: Tuttie answers in text only
+  // A new answer in voice mode: shown as Tuttie speaks it ({ answer, id, text } while revealing).
+  const [reveal, setReveal] = useState(null);
+  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, face, onSpeech);
+
+  // Only a speech stream that starts after the answer arrived is the answer being read out.
+  function onSpeech({ id, text, done }) {
+    setReveal(r => {
+      if (!r || (r.id && r.id !== id)) return r;
+      if (done) return null;  // spoken to the end: show the whole answer with its formatting
+      return { ...r, id, text };
+    });
+  }
+
+  useEffect(() => {
+    if (!agent.answer || voice !== "live") return setReveal(null);
+    setReveal({ answer: agent.answer, id: null, text: "" });
+    const fallback = setTimeout(() => setReveal(r => (r && !r.id ? null : r)), REVEAL_WAIT_MS);
+    return () => clearTimeout(fallback);
+  }, [agent.answer]);  // eslint-disable-line react-hooks/exhaustive-deps
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -58,6 +79,7 @@ export default function App() {
 
   function startVoice() {
     unlockAudio();
+    setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
       if (closedOnce.current && !agent.approval) actions.newConversation(agent);
@@ -83,6 +105,7 @@ export default function App() {
 
   function tapWhileOpen() {
     unlockAudio();
+    setQuiet(false);  // tapping Tuttie's face brings its voice back after typing
     if (mode !== "voice") return startVoice();
     face.current?.set("excitement", 250);  // a tap never ends voice mode, Tuttie just reacts
     setTimeout(() => face.current?.set("neutral", 500), 600);
@@ -122,8 +145,10 @@ export default function App() {
     if (agent.approval && mode === "closed") startVoice();
   }, [agent.approval]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // `shown` is what the history keeps of the user's words; `text` is what Tuttie gets.
-  async function send(text, firstTool = null, shown = text) {
+  // `shown` is what the history keeps of the user's words; `text` is what Tuttie gets. A typed
+  // message makes Tuttie answer quietly, in text only.
+  async function send(text, firstTool = null, shown = text, typed = false) {
+    if (typed) setQuiet(true);
     actions.say(shown);
     setShowHistory(false);
     setMode("voice");  // Tuttie is awake while it works
@@ -157,13 +182,13 @@ export default function App() {
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
       <AgentCard canvasRef={canvas} mode={mode} status={error || currentTask(agent)}
-                 onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={send}>
-        <Activity state={agent} onPick={pick} onLean={lean} />
+                 onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
+        <Activity state={agent} onPick={pick} onLean={lean} reveal={reveal} />
         {showHistory && <History entries={history} onClose={() => setShowHistory(false)} />}
         <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
       </AgentCard>
       <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping}
-            muted={muted} onMute={toggleMute} />
+            muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
     </div>
   );
 }
