@@ -252,6 +252,16 @@ def test_current_deals_preserves_signed_total():
     assert deal["agreement"]["includes"] == ["dog"]
 
 
+def test_current_deals_carry_the_signed_policies_for_follow_ups():
+    toolbox, _, _ = make_toolbox()
+    toolbox.market.last_offers = [{"node_id": RHEINBLICK, "name": "Hotel Rheinblick", "offer": {"price_chf": 220}}]
+    assert asyncio.run(toolbox.current_deals())["deals"][0]["policies"] is None  # not fetched: no guessing
+    asyncio.run(toolbox.load_policies(RHEINBLICK))
+    toolbox.policies[RHEINBLICK] |= {"policies": {"check_in": "from 15:00"}, "photos": ["a.jpg"]}
+    policies = asyncio.run(toolbox.current_deals())["deals"][0]["policies"]
+    assert policies["policies"] == {"check_in": "from 15:00"} and "photos" not in policies
+
+
 def test_voice_swipe_targets_current_deck():
     toolbox, bus, _ = make_toolbox()
     assert "error" in asyncio.run(toolbox.swipe_card("like"))

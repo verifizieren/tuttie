@@ -218,6 +218,18 @@ class Verified:
         return self.envelope["payload"]
 
 
+# What a hotel's signed get_policies tells that the user may ask about later; photos and the
+# rating are left out to keep the facts note small.
+POLICY_FACTS = ("address", "distance_to_basel_sbb_m", "quiet_note", "policies", "amenities", "charges")
+
+
+def policy_facts(payload: dict | None) -> dict | None:
+    """The answerable part of a hotel's signed policies, or None if they were not fetched."""
+    if not payload:
+        return None
+    return {key: payload[key] for key in POLICY_FACTS if payload.get(key) is not None}
+
+
 def load_authorities() -> dict:
     """The trusted authorities from data/authorities.json, by issuer id."""
     return {a["issuer"]: a for a in json.loads(AUTHORITIES_PATH.read_text())}
@@ -315,12 +327,16 @@ class Toolbox:
         return await tools[name](**args)
 
     async def current_deals(self) -> dict:
-        """Return remembered verified facts, including agreements absent from raw availability."""
+        """Return remembered verified facts, including agreements absent from raw availability,
+        and each hotel's signed policies (check-in, pets, cancellation, address) when known, so
+        follow-up questions about a hotel are answered from its signed facts, not from memory."""
         return {"deals": [{"node_id": item["node_id"], "name": item["name"],
                            "offered_chf": item["offer"]["price_chf"],
-                           "agreement": self.agreements.get(item["node_id"], {}).get("payload")}
+                           "agreement": self.agreements.get(item["node_id"], {}).get("payload"),
+                           "policies": policy_facts(self.policies.get(item["node_id"]))}
                           for item in self.market.last_offers],
-                "note": "A signed agreement overrides the original room rate. A final counter is not an agreement."}
+                "note": "A signed agreement overrides the original room rate. A final counter is not an agreement. "
+                        "policies are the hotel's signed get_policies (null: not fetched yet, use call_tool)."}
 
     async def swipe_card(self, verdict: str) -> dict:
         if verdict not in {"like", "pass"}:
