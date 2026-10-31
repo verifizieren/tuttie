@@ -66,7 +66,9 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
       const [{ url, token }, { Room, RoomEvent, Track }] = await Promise.all([response.json(), import("livekit-client")]);
       if (closed) return;
       watchIce();  // a failed connection on a phone is reported to the server's log
-      lk = new Room({ adaptiveStream: true, dynacast: true });
+      // The classic two connections (publish, subscribe), not the newer single one: phones'
+      // Safari joined but never connected with it.
+      lk = new Room({ adaptiveStream: true, dynacast: true, singlePeerConnection: false });
       lk.on(RoomEvent.TrackSubscribed, track => {
         if (track.kind !== Track.Kind.Audio) return;
         const audio = track.attach();  // Tuttie's voice, silent until voice mode is on
