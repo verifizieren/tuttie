@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 
 import httpx
 
@@ -11,6 +12,11 @@ from assistant.tools import SCHEMAS, Toolbox
 from llm import LLM
 
 MAX_ROUNDS = 12
+
+# How the answer feels; the wallet shows it on Tuttie's face. The LLM ends every answer with
+# "Mood: <one of these>", which is stripped from the text and sent as detail.mood.
+MOODS = ("happy", "excited", "proud", "thoughtful", "surprised", "confused", "sad", "sorry", "worried", "neutral")
+MOOD_LINE = re.compile(r"\n?\s*Mood:\s*(\w+)\s*\.?\s*$", re.IGNORECASE)
 
 GUEST_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
 
@@ -45,7 +51,19 @@ Rules:
 - Your final answer MUST start with a line "Ignored: <name> (<reason>)" for every rejected node and \
 every business the marketplace skipped because of a broken seal; leave the line out if there is none.
 - Cite the source of every factual claim with its source_step in square brackets, e.g. "CHF 180 [3]".
-- Be concise: a few short sentences, prices in CHF."""
+- Be concise: a few short sentences, prices in CHF.
+- Small talk is welcome: answer warmly and briefly, with a bit of personality, no tools needed.
+- End EVERY answer with a last line "Mood: <mood>" saying how your answer feels, one of: \
+{", ".join(MOODS)}. E.g. a good deal is "excited", bad news "sorry", a joke "happy"."""
+
+
+def split_mood(text: str) -> tuple[str, str]:
+    """Split the trailing "Mood: x" line off an answer; unknown or missing moods are neutral."""
+    match = MOOD_LINE.search(text)
+    if not match:
+        return text.strip(), "neutral"
+    mood = match.group(1).lower()
+    return text[:match.start()].strip(), mood if mood in MOODS else "neutral"
 
 
 class Assistant:
@@ -73,8 +91,8 @@ class Assistant:
                     self.bus.emit("thinking", "info", thought)
                 self.messages.append(message)
                 if not message.get("tool_calls"):
-                    answer = message["content"] or ""
-                    self.bus.emit("answer", "verified", answer)
+                    answer, mood = split_mood(message["content"] or "")
+                    self.bus.emit("answer", "verified", answer, detail={"mood": mood})
                     return answer
                 for call in message["tool_calls"]:
                     result = await self.run_tool(call["function"]["name"], call["function"]["arguments"])
@@ -84,7 +102,7 @@ class Assistant:
                         "content": json.dumps(result, ensure_ascii=False),
                     })
             answer = "Sorry, I could not finish this request."
-            self.bus.emit("answer", "broken", answer)
+            self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
             return answer
 
     async def run_tool(self, name: str, raw_args: str) -> dict:
