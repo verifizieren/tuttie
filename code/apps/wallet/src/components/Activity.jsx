@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
+import { deckStart } from "../lib/activity.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 /** The turn's progress: a context line, then a tool line joined to it. Each updates in place.
@@ -30,7 +31,7 @@ function Price({ hotel }) {
   }
   if (hotel.rounds.length) {
     const last = hotel.rounds[hotel.rounds.length - 1];
-    return <span className="price">CHF {hotel.offer?.price_chf} → <b>CHF {last.price}</b>{last.final ? " final" : ""}</span>;
+    return <span className="price">CHF {hotel.offer?.price_chf} → <b>CHF {last.price}</b>{last.final ? " quoted" : ""}</span>;
   }
   if (hotel.offer) return <span className="price"><b>CHF {hotel.offer.price_chf}</b></span>;
   const waiting = { interested: "preparing offer…", declined: "no offer", woken: "asked…" };
@@ -122,9 +123,10 @@ function Market({ state }) {
  * @param readOnly  an earlier conversation from the history: nothing to swipe
  * @param onPick    (liked cards) => void
  * @param onLean    (x in -1..1) => void while a card is dragged
+ * @param onDeck    ({ index, liked }) => void after each swiped card (kept for a reload)
  * @param reveal    { answer, text } while Tuttie speaks its latest answer
  */
-export default function Activity({ state, readOnly = false, onPick, onLean, reveal = null }) {
+export default function Activity({ state, readOnly = false, onPick, onLean, onDeck, reveal = null }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
   const swiping = Boolean(state.cards && !state.picked && !readOnly && onPick);
@@ -135,31 +137,50 @@ export default function Activity({ state, readOnly = false, onPick, onLean, reve
   }, [readOnly, swiping, state.turns.length, last?.answer, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
-  // The cards to swipe get the card's space to themselves, in place: no list behind them.
+  // The cards to swipe get the card's space to themselves, in place: no list behind them, only
+  // Tuttie's newest answer since the cards came (its recommendation, or the answer to a question
+  // asked meanwhile), shown as it is spoken while it is spoken.
   if (swiping) {
+    const note = state.turns.slice(state.marketTurn ?? 0).findLast(t => t.answer)?.answer;
+    const spoken = note && reveal?.answer === note ? reveal.text : null;
     return (
       <div className="activity swiping">
-        <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} />
+        <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes}
+              start={deckStart(state)} onProgress={onDeck} />
+        {note && <p className="deck-note">{spoken ?? note}</p>}
       </div>
     );
   }
+  // Live progress has one context line and one tool line, even after follow-ups/searches.
+  // Keep the per-turn account only in history.
+  const liveProgress = state.turns.reduce((lines, turn) => ({
+    context: turn.context || lines.context, tool: turn.tool || lines.tool,
+  }), {});
   const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
-  // What Tuttie did stays (steps, the chosen hotel, the booking); of what it said, only its
-  // current answer is shown. The history (readOnly) keeps every answer.
-  const current = state.turns.length - 1;
+  // What Tuttie did stays (steps, the chosen hotel, every booking in its own turn); of what it
+  // said, only its current answer (the newest one) is shown, until the next answer replaces it.
+  // The history (readOnly) keeps every answer.
+  const current = state.turns.findLastIndex(t => t.answer);
   return (
     <div className="activity" ref={box} data-scroll>
-      {state.turns.map((turn, i) => (
-        <div className="turn" key={i}>
+      {!readOnly && <Steps turn={liveProgress} latest={latest} />}
+      {state.turns.map((turn, i) => {
+        const showMarket = i === state.marketTurn && state.request && !state.booking && state.picked?.length;
+        // Archived chats from before bookings were kept per turn only have `state.booking`.
+        const booking = turn.booking || (i === state.bookingTurn && state.booking);
+        const showAnswer = turn.answer && (readOnly || i === current);
+        // Empty historical turns still take a flex gap; omit them from the live layout.
+        if (!readOnly && !showMarket && !booking && !showAnswer) return null;
+        return <div className="turn" key={turn.id || i}>
           {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
-          <Steps turn={turn} latest={latest} />
-          {i === state.marketTurn && state.request && <Market state={state} />}
-          {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
-          {turn.answer && (readOnly || i === current) && (
+          {readOnly && <Steps turn={turn} latest={latest} />}
+          {showMarket && <Market state={state} />}
+          {booking && <BookingCard booking={booking} />}
+          {showAnswer && (
             <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />
           )}
-        </div>
-      ))}
+        </div>;
+      })}
     </div>
   );
 }

@@ -6,7 +6,8 @@ the **same agent object** (`agent.py`) with its own persona.
 
 | File | What it does |
 | --- | --- |
-| `server.py` | endpoints: signed tools (`/tools/*`), the agent (`/agent`, `/agent/card`, `/agent/invoke`) and its sessions (`/agent/sessions/...`) |
+| `server.py` | endpoints: the tools over MCP (`/mcp/`), `counter_offer` (also `POST /tools/counter_offer`), the agent (`/agent`, `/agent/card`, `/agent/invoke`, which also sends `make_offer`'s signed offer to the market), its sessions (`/agent/sessions/...`) and the owner API (`/owner/...`) |
+| `mcp_tools.py` | the MCP server: `get_availability`, `get_policies`, `book`, `pay`, `counter_offer`; `book` and `pay` need a signed call and pass the action gate (`aps/gate.py`) |
 | `agent.py` | `BusinessAgent`: persona, tools, A2A answers with priced add-ons, wake-ups from the marketplace |
 | `catalog.py` | the shared tool catalog with status `available` or `planned` |
 | `owner.py` | the owner view's API (`apps/owner`): `GET /owner/overview`, `GET /owner/versions`, `POST /owner/deploy`, protected by `OWNER_TOKEN` |
@@ -40,5 +41,5 @@ the default agent until they get an `agent` section.
 4. Restart (`./run.sh`, or `systemctl --user restart tuttie` on the server) and check
    `GET http://localhost:<port>/agent/card`.
 
-Planned tools (`make_offer`, `counter_offer`, `pay`) are only described in `catalog.py`; agents
-already know them and say when they would use one.
+Every tool in `catalog.py` is available: `get_availability`, `get_policies`, `book`,
+`make_offer`, `counter_offer` and `pay`. The `planned` status stays for tools added later.

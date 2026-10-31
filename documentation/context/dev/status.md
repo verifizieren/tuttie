@@ -6,9 +6,126 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, live data, Tuttie uses them).
+Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view and the wallet's swipe deck are done; presentation site and demo runner are open).
 
 ## Done
+
+- **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
+  timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
+  silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
+  attempts "Connection lost · retrying"), the wallet retries with backoff (0.5 s up to 10 s),
+  first catches up from `GET /history` by step (or reloads if the conversation changed or its
+  timeline was reset) and then reconnects; it also checks `/history` every 10 s while an
+  answer is awaited, and when the page becomes visible or the network comes back. A failed
+  first load retries the same way and re-enables sending. A message whose `POST /chat` fails
+  is dropped (it no longer stays an open turn that swallows later events); a sent one is
+  bound by the returned `turn_id`. Another tab starting/resuming a chat (`storage` event on
+  `tuttie.current`) or a 409 on send switches this tab to the server's conversation and
+  refreshes its history list. The swipe deck's position (index + liked hotels) is saved per
+  conversation on this device (`state.deck`, `saveCurrent`) and restored on reload.
+  Verified: 50 wallet tests; Playwright on a local test instance (real server events, LLM out
+  of credit so answers were error answers): aborted first `/chat` then the second answer shows;
+  stream killed + `/events` and `/history` blocked shows Reconnecting → Connection lost, the
+  answer finished meanwhile appears after recovery; first `/history` 502 twice recovers and
+  sends; tab two follows tab one's new chat and lists the old chat in History; deck with fake
+  cards stays at 2 of 3 after a reload. Not tested on a real phone.
+- **Wallet recovery** (`lib/recovery.js`, `hooks/useVoice.js`, `App.jsx`): a failed voice join
+  (token or connection) is now "unavailable": in voice mode the line under the eyes says
+  "Voice unavailable · tap to retry", it is tried again after 2, 4, 8, ... up to 30 s, and at
+  once on a tap or when voice mode starts again (back from typing). A server without voice
+  (503 on `/voice/token`) is "disabled": text only, no note, no retries. A booking choice from
+  the swipe cards that does not reach Tuttie (network or 5xx, never a 4xx) is sent once more;
+  if that fails too the cards come back with "Tuttie could not be reached — swipe again to
+  book". New chat while Tuttie works (409) shows "Tuttie is still working — new chat after
+  this answer" for 4 s instead of the server's text. Verified with Playwright against the
+  built wallet and a mocked backend (no LLM, no LiveKit); not verified with live voice. Open:
+  on short screens with a long timeline the approval sheet (an overlay at the bottom) can
+  cover the chosen hotel row; not a spacing fix, left as is.
+
+- **Turns with ids** (fix "messages disappear or get overwritten"): every typed or spoken
+  request is a server turn (`assistant/conversations.py` `start` returns its id and emits a
+  `turn` event; `assistant/events.py` stamps every event with the running turn via a
+  ContextVar). The wallet attaches events by `event.turn` (`lib/activity.js`), binds its own
+  typed message to the server turn, adds spoken ones, keeps every booking in its turn (a new
+  search no longer drops the last BookingCard) and shows the newest answer until the next one
+  arrives; a late answer never replaces a newer one. History restore rebuilds turns from the
+  server timeline. The voice agent says no filler for a `turn` event. Format in
+  `documentation/formats.md` (UI event). Not verified in a browser or with live voice.
+- Wallet hardening (2026-10-31, branch wip/hunt-wallet): reopening Tuttie after a swipe down
+  starts a new chat only when the current one is finished (`startsFresh` in lib/history.js), so
+  a deck waiting to be swiped or a running request is never lost; the approval sheet takes one
+  decision per tap, no longer shows "Approved" while declining and says when a decision failed;
+  an error boundary (components/Boundary.jsx) keeps a render failure in the chat or history from
+  blanking the wallet; the booking card tolerates older bookings without checks or payments.
+  Checked in headless Chromium (iPhone 14 Pro) on a test instance: type → deck → swipe →
+  approve/decline → booking → follow-up → new chat → history → continue, reloads at the deck
+  and at the sheet, close/reopen while working and at the deck, a failing and a slow decision.
+- Backend hardening (2026-10-31): a failed turn (LLM refused, over its usage limit, timed out, or a
+  tool crashed) ends with a friendly answer and the chat stays usable (open tool calls get a
+  result); empty messages are answered without the LLM; LLM calls time out after 40 s
+  (`LLM_TIMEOUT_S`, one retry); hotel agents also fall back on Anthropic errors; a hotel never
+  offers a room whose note rules out a need (Anna's single for a dog guest), and an unknown room
+  choice gets the cheapest real room. Tests: `test_agent_errors.py`, `test_node_agent.py`, `test_llm.py`.
+- Budget leak fixed (2026-11-01, bug #18, branch wip/budget-leak): Tuttie's counters were capped
+  at the private budget, so a hotel far above it got the budget itself as a counter (CHF 160 to
+  Rheinblick and Alpina). Now a counter comes only from the offer and the hotel's prices: open
+  10 % below the offer, else 20 % below, else walk away without a counter; move halfway, or hold
+  the last counter when the step would not stay below the budget. A hotel price at or below the
+  budget is still accepted. Demo numbers unchanged (Gästehaus 121/126 → 128, Rheinblick
+  175/182 → 185 at budget 200). Also in code, not the prompt: `post_request` drops requirements
+  that name a price or the budget's number, and `ask_agent` refuses a question naming a private
+  amount. Tests: `test_budget_leak.py`.
+- API hardening (2026-11-01, branch wip/harden-api): reading endpoints (`/history`,
+  `/approvals/pending`, `/approvals/{id}`, `/reset`, `/identity`) no longer create a
+  conversation, so crawlers and QR previews without cookies cannot fill the store and evict
+  real chats; `/history` names the id the first conversation will get (HMAC of the session) and
+  `/events` with that id or any action creates it. Hotel nodes: `POST /agent/invoke` validates a
+  `posting.created` event (422), accepts only an `offer_url` of the configured market
+  (`MARKETPLACE_URL`, default `http://localhost:4010`; set it on the nodes too if the market
+  moves) and only a fresh request signed by a verified user agent (403), all before the LLM.
+  `get_availability` and `book` refuse (signed) a night that is not `YYYY-MM-DD`, in the past
+  or over a year ahead, and guests outside 1-10. Tests: `test_conversations.py`,
+  `test_node_agent.py`, `test_node_book.py`. Note: tests use the night 2026-11-14 and will fail
+  after it has passed.
+  The hotel nodes are public (4001-4012), so `/agent`, `/agent/invoke` and `/agent/sessions*`
+  now need the deployment's agent key (`AGENT_WEB_KEY`, header `X-Agent-Web-Key`, 401
+  otherwise; `aps/agent_key.py`). `run_all.py` makes a new key per run and passes it to every
+  service; the market and Tuttie send it. **A Tuttie started by hand next to the running
+  services (test instance on 4046) needs the same key: put `AGENT_WEB_KEY` in `code/.env` and
+  restart the service once.** Unset (tests), the doors stay open. `POST /voice/token`: at most
+  10 new rooms a minute per conversation and 300 per client address, else 429 (the wallet
+  retries on its own); rooms are not reused because the voice agent closes its session when
+  the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
+
+- Demo-story polish (2026-10-31, branch wip/story-polish), from live runs: (1) the facts note
+  Tuttie gets every round (`current_deals`) now carries each card hotel's signed policies
+  (check-in, dogs, cancellation, address, amenities, charges; `policy_facts` in
+  assistant/tools.py), so "what time is check-in?" after booking is answered from signed facts;
+  (2) after swiping, the wallet's booking message names the other liked hotels with their
+  prices (`lib/picks.js`), and after a decline Tuttie offers the next one in one question
+  (prompt rule 4); (3) Tuttie's recommendation stays visible under the deck (`.deck-note`,
+  3 lines max) and the prompt asks it to invite a swipe, never "shall I book"; (4) a card over
+  the user's private budget says "over your budget" under the price (wallet only; judged on
+  the agreed price). Checked at iPhone 14 Pro with a static build and fake events.
+
+- Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
+  reaches the visible swipe deck, single-word commands survive voice filtering; verified
+  agreement facts are available to price follow-ups and final counters say quoted.
+  Validation: 341 Python tests, 34 wallet tests and production build pass. Local Chrome
+  received live like/pass SSE events, advanced both cards and requested CHF 128 approval
+  for the liked hotel without browser errors. The Chrome run used deterministic sample
+  offers, not a microphone or an LLM. Broader audit: explicit English/German card synonyms
+  dispatch without the model; every follow-up completion receives fresh signed deal data;
+  later agreements update card prices, rapid choices queue, leaving a deck cancels its
+  delayed action, new searches clear old signed-price caches, live status renders once.
+  Chrome also passed two consecutive searches with rapid choices and one progress group.
+  Repeat-booking follow-up: a new posting initializes fresh hotel offers/rounds/agreed
+  prices and clears deck commands; empty historical turns no longer create flex gaps in
+  the live view. Chrome passed two consecutive typed search → choice → approved booking
+  flows at CHF 128 with no empty turns, duplicate bookings or browser errors. Verified
+  web4 still serves the old photo-bar assets; PR #16 remains unmerged.
+  Not deployed; live voice/provider testing needs credentials.
+
 
 - Wallet and local development fixes (2026-10-31): zero-duration face transitions finish
   immediately, preventing invalid coordinates when the first frame shares the startup
@@ -36,15 +153,16 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 | Demo data | The three hotel agents above; also Spalenhof (medium, 48 rooms, blue) and Gundeli (small, 11 rooms, gold, family rooms) as further hotels with profiles, Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
 | Sessions and memory | Shared module for all agents: isolated sessions with their own memory (many in parallel), and context passing where every item is public, negotiation or private (private never leaves). Hotels keep one memory per session and answer with the history. | `code/sessions/`, node `/agent/sessions/...` |
 | Tuttie's subagents | Tuttie spawns one subagent per business with its own memory and only the shareable context; a pool runs them in parallel; every call goes through the trust gate. Live-tested: three hotels in parallel over two rounds, each remembering its own offer, the private budget never shared. Bargaining logic is step 4. | `code/assistant/subagents.py` |
-| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
+| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, short voice-first answers (each result keeps its `source_step` for traceability), reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
 | Marketplace (agent layer) | Built against the draft formats: Tuttie's signed postings in (seals, freshness, user delegation `post_requests`), matching businesses woken in parallel at `POST /agent/invoke` (broken ones never contacted), only verified businesses whose agent card subscribes to new postings, signed offers in (only from invited businesses, fresh, for this request, still valid); it decides nothing. Formats as strict Pydantic models in one place. | `code/marketplace/` (:4010) |
 | Bargaining (step 4) | Hotel side: the `counter_offer` tool, stateless like `book` (the counter carries the hotel's own signed offer and last counter), checks Tuttie's seals, signature, freshness and the user's `negotiate` delegation; the hotel meets halfway and never goes below its private floor or past its rounds, compared in code (`negotiation/rules.py`), never in a prompt or reply. Tuttie's side: one subagent per offer, all in parallel in their own sessions, counters signed with Tuttie's key, the private `max_price_chf` only compared in code; ends in a signed Agreement, a rejection or walking away; `best()` picks the cheapest agreement. Booking can redeem an Agreement (`AgreementRedeemer`: own signature, not expired, only once). Formats: `Counter` (+ `final`), `Agreement`, `Rejection`. Mounted in every node (`node/server.py`); Tuttie reaches it through its `negotiate` tool. | `code/negotiation/` |
 | Tuttie's presence (hooks for the eyes) | One signal for the eye animations: the state (asleep, listening, speaking, typing, error, waiting, watching, negotiating, searching, booking, thinking, done, idle), voice levels ~20×/s and one-off cues (offer, agreement, scam_blocked, approved, booked, paid, ...), from mode, conversation, voice, approval and errors. Read with `usePresenceState` / `usePresenceEvents`, or `face.onPresence(event)`. The eyes are moved only by `lib/faceDirector.js` from that signal (looks per state, voice pulsing, reactions to cues); a new face with the same methods works as it is, one with `onPresence` animates it itself. Tests: `npm test` in apps/wallet. | `code/apps/wallet/src/lib/presence.js`, `hooks/usePresence.js`, wallet README |
 | Weather and trains | Two sealed public information services on the agent web (gold): `get_forecast` (Open-Meteo) and `get_connections` (transport.opendata.ch), signed MCP tools, marked sample data without internet, signed refusals. Tuttie finds them in the registry and checks their answers like any node (rule 6 of its prompt; `READ_TOOLS`). Live-tested with the real LLM: "Will it rain in Basel on 14 Nov?" and "which train from Zürich before midnight" (IR 36, 22:36 → 23:52). | `code/services/`, `code/data/services/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Dev tooling | `./run.sh` shows every service's log lines with its name, warns without an OpenAI key and stops everything within 3 s on Ctrl+C; `scripts/check.sh` runs the checks before a push (tests, wallet build, real flow; `--no-llm` without the LLM). | `code/run.sh`, `code/scripts/run_all.py`, `code/scripts/check.sh` |
-| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** requests go to Tuttie; posting, offers, shortlist, bargaining and answer shown under its eyes; approvals in the wallet with a Face ID-style confirmation. | `code/apps/wallet/` |
-| Owner view | React + Vite, one minimal page in the wallet's look, live from the business's node and **editable**: rooms (price, offered), extras (price), negotiation (on/off, lowest price, rounds), agent (name, tone, answers new requests). Its sidebar labels are Overview, Agent, Negotiation and Versions; Rooms and prices, Add-ons and Policies are removed. Edits are a draft in the browser; the owner reviews the changes in words and deploys; the node validates, stores the next numbered version and its tools, agent and bargaining limits use it from the next request (no restart). The node can change more (profile, policies, charges, rows) and keeps a version history (`GET /owner/versions`); the page shows neither on purpose. A stale draft cannot overwrite a newer deploy (409). Needs the owner token (`OWNER_TOKEN` in `code/.env`; unset = refused). Served at `/owner/` by the assistant; dev server on 4042. | `code/apps/owner/`, `code/node/owner.py`, `settings.py`, `deployments.py` |
+| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** spoken or typed requests go to Tuttie; posting, offers and bargaining shown under its eyes; the hotels as a swipe deck (photos, rating, features, agreed price); approvals in the wallet with a Face ID-style confirmation and an optional city-tax mandate; booking card with what Tuttie checked; dock with history, new chat, keyboard and mic mute; earlier conversations can be continued. | `code/apps/wallet/` |
+| Voice | Talk to Tuttie in the wallet. Self-hosted LiveKit (signaling proxied by the assistant at `/rtc`, media TCP 4042 / UDP 4043, coturn TURN relay on TCP 4044 for phones); ElevenLabs Scribe v2 realtime (speech-to-text) and Flash v2.5 (voice), English only. The voice agent decides nothing: what the user says goes to the same Tuttie conversation as typing (`POST /voice/say`), the answers and the Face ID prompt are spoken (`GET /voice/events`). Spoken request to spoken answer about 8 s. Not yet confirmed on a real iPhone over the TURN relay. | `code/voice/`, `code/assistant/voice.py`, `apps/wallet/src/hooks/useVoice.js` |
+| Owner view | React + Vite, one minimal page in the wallet's look, live from the business's node and **editable**: rooms (price, offered), extras (price), negotiation (on/off, lowest price, rounds), agent (name, tone, answers new requests). The tabs at the top (Overview, Agent, Negotiation, Versions) are labels only; the page shows the four blocks. Edits are a draft in the browser; the owner reviews the changes in words and deploys; the node validates, stores the next numbered version and its tools, agent and bargaining limits use it from the next request (no restart). The node can change more (profile, policies, charges, rows) and keeps a version history (`GET /owner/versions`); the page shows neither on purpose. A stale draft cannot overwrite a newer deploy (409). Needs the owner token (`OWNER_TOKEN` in `code/.env`; unset = refused). Served at `/owner/` by the assistant; dev server on 4042. | `code/apps/owner/`, `code/node/owner.py`, `settings.py`, `deployments.py` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
 | Repo structure | BaselHack template, work-area folders with scope READMEs, team context folders, concept and architecture docs, draft marketplace formats. | `documentation/`, `code/*/README.md` |
 
@@ -60,16 +178,23 @@ Build order from [goals.md](goals.md):
    subscribed businesses; interested agents send signed offers (`make_offer`, prices from the
    config); Tuttie re-checks every offer and builds the shortlist itself (verified, within the
    private budget, cheapest first, at most five). Live-tested end to end with the real LLM.
+   Offer checks (2026-11-01): the wait counts hotels, not offers (one hotel's two offers
+   ended it early: likely the "only Rheinblick offered" sighting), one offer per hotel (its
+   latest); offers for another request or past `valid_until` are refused; Tuttie accepts an
+   Agreement only at or below its own last counter and on the offer's unchanged terms.
    Tests: `test_market_agents.py`, `test_tuttie_market.py`.
 3. **Human layer in the wallet** — done: typed requests go to Tuttie; the wallet follows the
    timeline and shows the posting (budget private), the hotels asked and skipped, offers with
    seal colours and size, the shortlist, the bargaining and the answer under Tuttie's eyes;
    approvals happen in the wallet with a Face ID-style confirmation. Tested in a headless
-   iPhone against a separate assistant instance with the real LLM. Missing: voice recognition.
+   iPhone against a separate assistant instance with the real LLM. Voice is done too (see
+   the Voice row above).
 4. **Negotiation** — done (dev member 2, `code/negotiation/`): `counter_offer` is mounted in
    every node and available; Tuttie's `negotiate` tool hands the shortlist to
    `TuttieNegotiator.negotiate_all` with the budget as a private item and shows `best()`'s
-   signed Agreement. Tuttie negotiates only when the user asks for a better price. `book`
+   signed Agreement. Tuttie bargains right after the offers arrive (inside `post_request`), before the user sees
+   anything, so the swipe cards show the agreed prices; after swiping, Tuttie books the cheapest
+   liked deal. `book`
    redeems a hotel's signed Agreement once (`AgreementRedeemer`), and Tuttie books it with
    `use_agreement` after the user approves exactly the agreed price on the phone. Tests:
    `test_node_book.py`, `test_tuttie_market.py` (post → shortlist → negotiate → book).
@@ -131,9 +256,9 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
-   whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
-   pitch needs first.
+1. **dev member 1:** voice is done; next the demo runner (`code/demo/`) and the presentation
+   site (`code/apps/presentation/`), whichever the pitch needs first; confirm voice on a real
+   iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
 3. **dev member 2:** **Confirmed live** (real LLM, `demo_headless.py`, 2026-10-31): the pitch
@@ -170,7 +295,7 @@ the owner's limits live, once per answer (fine). Open points, none blocking:
 
 ### Test coverage
 
-326 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
+336 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -191,8 +316,8 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
-Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
-presentation site and QR code (`code/apps/presentation/`), a
+Other open items: the demo runner (`code/demo/`), the presentation site and QR code
+(`code/apps/presentation/`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -220,6 +345,15 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **A booking is bound to the selected offer, in code.** Offers and Agreements carry
+  `room_type`, `date` and `rate` (cancellation terms) as fields; the hotel copies them into the
+  Agreement unchanged. `book(use_agreement=true)` books exactly those terms and refuses LLM
+  arguments that would change room, night or extras (before the phone is asked); the approval
+  carries the `terms`, the user's key signs them, and the node refuses an agreement booked as
+  another room/night/rate or an approval for other terms. Before this, the LLM's `room_type`
+  went to the node unchecked, so a non-refundable deal could be booked as the flexible rate.
+  The approval sheet and booking card show the room and rate.
 
 - **The owner view reads and changes the node, behind a token.** The live data comes from the
   node's own config (`node/owner.py`), not from the signed public tools, because add-ons and the
@@ -265,7 +399,8 @@ Why things are the way they are, so nobody has to rediscover them:
 
 - **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
   (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
-  below its floor; Tuttie opens 10 % below and moves halfway, within the private budget. An
+  below its floor; Tuttie opens 10 % below and moves halfway, always below the private budget,
+  and no counter price is ever computed from the budget (bug #18, see above). An
   LLM could leak a limit or invent a price; code can be tested for both.
 - **Strategy tuned for a visible story, not maximum savings:** with a 15 % opening and halfway
   hotel steps, the hotels hit their floor in round 1 and the bargaining ended after two
@@ -344,8 +479,9 @@ Why things are the way they are, so nobody has to rediscover them:
   5 feature icons (green yes / red no, needs first) and the agreed price with the offer crossed
   out. Swipe right = like, left = pass; the first card nudges once to show it can be swiped,
   and Tuttie's eyes follow the drag. Up/down drags scroll the conversation. After the last card
-  the wallet sends the cheapest liked deal with `first_tool: "book"`; the user approves as
-  usual. `scripts/demo_headless.py` likes the recommended cards like the wallet.
+  the wallet sends the cheapest liked deal with `first_tool: "book"` and names the other liked
+  hotels (offered after a decline); the user approves as usual. `scripts/demo_headless.py`
+  likes every card like the wallet and asks for the check-in time after booking.
 - **Progress lines:** each turn shows two joined lines that update in place and wrap downwards:
   context, then tools (asked N hotels → offers in, checking seals → comparing → bargaining →
   N hotels for you; later booking, booked).
@@ -355,7 +491,9 @@ Why things are the way they are, so nobody has to rediscover them:
   it again archives it and starts fresh (`POST /conversations`), unless a request or approval
   waits. Reload keeps the selected conversation (`GET /history`, `X-Conversation-ID`).
   History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
-  old or expired entries stay read-only. Saved conversations are in memory, capped at 200
+  the keyboard in an open past chat resumes that chat before typing, and the dock's History
+  button always returns to the list. Old or expired entries stay read-only: a 404/410 shows
+  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 200
   globally in addition to the 200 active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
@@ -389,7 +527,8 @@ Why things are the way they are, so nobody has to rediscover them:
   loaded or resumed chat never closes itself; a new message cancels it). No voice filler for it.
 - **Chat layout:** actions stay in the chat (steps, chosen hotel, booking card, payments); of
   Tuttie's answers only the current one is shown (the history shows all). While the swipe cards
-  are up they fill the conversation's space alone (`.activity.swiping`), no old answer behind.
+  are up they fill the conversation's space (`.activity.swiping`) with only Tuttie's short
+  recommendation under them.
 - **iPhone voice:** Safari sets up WebRTC connections only while the page uses the microphone.
   Joining the room ahead with the mic off left iPhones stuck in ICE "checking" (no checks, no
   relay allocation; wallet report `closed while checking`). The first tap now captures the mic,
@@ -419,6 +558,14 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
+- **Answers are written to be heard** (`assistant/agent.py`): one to three short sentences, no
+  lists, markdown, emoji or square brackets, no ids or codes (node ids, booking ids, receipt
+  numbers: the wallet shows them), numbers as people say them ("CHF 128", "6 pm", "14
+  November", "about 9 degrees", "25 percent"); no "[3]" step citations any more (results still
+  carry `source_step`); a booking is confirmed as "booked" plus the total. The voice
+  (`spoken()` in `voice/agent.py`) drops any [...] note and says 24-hour times as "6 pm",
+  "12:52 am", "midnight", "noon"; the wallet (`cleanAnswer`, `lib/history.js`) hides any [...]
+  note. Reason: "18:00" was read as "1800", and "[confirmed]" / "[receipt RC-...]" showed up.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
 - **Broken vs untrusted:** a forged or invalid seal is broken (red); self-signed or unsigned
@@ -433,11 +580,20 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Gestures:** release decisions use the speed of the last 100 ms; the card keeps its
   shape while dragged. Headless browsers send pointer events too slowly to test flicks;
   dispatch `PointerEvent`s in the page instead.
+- **Hardening (1 Nov):** the weather and train services fall back to their marked sample data
+  only on a real outage (no connection, timeout, 5xx, garbled answer); a 4xx or empty answer is
+  a signed refusal, so nobody gets a signed made-up timetable. `trains.check_request` refuses
+  past dates and origin == destination. No app serves `/docs`, `/redoc` or `/openapi.json`
+  unless `API_DOCS=1` (`code/apidocs.py`, local development). The `tuttie_session` cookie is
+  `Secure` when the request came over https (directly or `X-Forwarded-Proto: https` from
+  nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
 
 ## Environment
 
-- **Team server:** only ports 4000-4049 are open. Registry 4000, nodes 4001-4007,
-  assistant and apps 4040, wallet dev server 4041, marketplace 4010 (planned).
+- **Team server:** only ports 4000-4049 are open. Registry 4000, nodes 4001-4009,
+  marketplace 4010, weather and trains 4011-4012, assistant and apps 4040, wallet dev server
+  4041, LiveKit media TCP 4042 / UDP 4043, TURN relay TCP 4044 (owner dev server also 4042:
+  use it locally only).
 - **Service:** `systemctl --user restart tuttie` deploys Python changes (`run.sh` also
   rebuilds the wallet); logs: `journalctl --user -u tuttie -f`. Do not start `./run.sh` by
   hand on the server, the ports would clash.

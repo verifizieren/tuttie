@@ -17,6 +17,8 @@ answers. All logic, tools and signatures stay in the assistant.
 import asyncio
 import os
 import secrets
+import time
+from collections import deque
 from datetime import timedelta
 
 import httpx
@@ -26,10 +28,15 @@ from fastapi.responses import Response, StreamingResponse
 from livekit import api
 from pydantic import BaseModel
 
+from assistant.inputs import UserText
+
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
 API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 TOKEN_TTL_S = 2 * 60 * 60
+ROOMS_PER_CONVERSATION_PER_MIN = 10  # a flaky phone retries after 2, 4, 8 ... s; a loop gets 429
+ROOMS_PER_CLIENT_PER_MIN = 300  # per client address a minute: a venue's Wi-Fi shares one, and every page load asks
+MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; the oldest are forgotten
 
 router = APIRouter()
 
@@ -68,14 +75,62 @@ def agent_only(request: Request) -> None:
         raise HTTPException(status_code=401, detail="voice agent only")
 
 
+class RoomThrottle:
+    """Counts new voice rooms per conversation and per client address over the last minute.
+
+    Every room starts a voice agent job (a process with speech recognition), so a loop of
+    token requests must not open rooms without end. A room is never handed out twice: the
+    voice agent leaves a room when the wallet disconnects, so a reused room could stay silent.
+    """
+
+    def __init__(self):
+        self.recent: dict[object, deque] = {}  # owner (session, conversation) or client address -> times
+
+    def _count(self, key, now: float) -> int:
+        """New rooms for `key` in the last minute; a key with none is forgotten."""
+        times = self.recent.get(key)
+        if times is None:
+            return 0
+        while times and now - times[0] > 60:
+            times.popleft()
+        if not times:
+            del self.recent[key]
+        return len(times)
+
+    def allow(self, owner: tuple[str, str], client: str, now: float) -> bool:
+        """Count a new room and say yes, or say no if the conversation or the client has had enough."""
+        if (self._count(owner, now) >= ROOMS_PER_CONVERSATION_PER_MIN
+                or self._count(client, now) >= ROOMS_PER_CLIENT_PER_MIN):
+            return False
+        for key in (owner, client):
+            self.recent.setdefault(key, deque()).append(now)
+        if len(self.recent) > 2 * MAX_VOICE_ROOMS:  # forget keys with nothing in the last minute
+            for key in list(self.recent):
+                self._count(key, now)
+        return True
+
+
 @router.post("/voice/token")
-def voice_token(request: Request) -> dict:
-    """A LiveKit token for a fresh room tied to this browser's conversation."""
+async def voice_token(request: Request) -> dict:
+    """A LiveKit token for a fresh room tied to this browser's conversation.
+
+    429 if the conversation asked for more than ROOMS_PER_CONVERSATION_PER_MIN rooms in the
+    last minute, or its client address for more than ROOMS_PER_CLIENT_PER_MIN (the wallet
+    tries again later on its own).
+    """
     if not configured():
         raise HTTPException(status_code=503, detail="voice is not configured")
-    room = f"tuttie-{secrets.token_urlsafe(12)}"
     conv = request.app.state.conversations.get(request.state.session_id)
-    request.app.state.voice_rooms[room] = (request.state.session_id, conv.id)
+    owner = (request.state.session_id, conv.id)
+    client = request.client.host if request.client else "unknown"  # uvicorn takes it from nginx's header
+    if not request.app.state.voice_throttle.allow(owner, client, time.monotonic()):
+        raise HTTPException(status_code=429, detail="Too many voice connections. Please try again in a minute.",
+                            headers={"Retry-After": "60"})
+    room = f"tuttie-{secrets.token_urlsafe(12)}"
+    rooms = request.app.state.voice_rooms
+    rooms[room] = owner
+    while len(rooms) > MAX_VOICE_ROOMS:
+        rooms.pop(next(iter(rooms)))
     token = (api.AccessToken(API_KEY, API_SECRET)
              .with_identity(f"user-{secrets.token_hex(4)}")
              .with_name("You")
@@ -88,14 +143,14 @@ def voice_token(request: Request) -> dict:
 
 class Said(BaseModel):
     room: str
-    text: str
+    text: UserText
 
 
 @router.post("/voice/say", status_code=202, dependencies=[Depends(agent_only)])
 async def voice_say(said: Said, request: Request) -> dict:
-    """What the user said, as a message in the room's conversation (like typing it)."""
-    room_conversation(request, said.room).start(said.text)
-    return {"accepted": True}
+    """What the user said, as a new turn in the room's conversation (like typing it)."""
+    turn_id = room_conversation(request, said.room).start(said.text, source="voice")
+    return {"accepted": True, "turn_id": turn_id}
 
 
 async def live_only(bus):
@@ -109,7 +164,7 @@ async def live_only(bus):
 
 
 @router.get("/voice/events", dependencies=[Depends(agent_only)])
-def voice_events(room: str, request: Request) -> StreamingResponse:
+async def voice_events(room: str, request: Request) -> StreamingResponse:
     """New events of the room's conversation as Server-Sent Events, for the voice agent to speak from."""
     return StreamingResponse(live_only(room_conversation(request, room).bus), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

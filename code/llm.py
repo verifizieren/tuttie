@@ -21,6 +21,9 @@ from openai import AsyncOpenAI
 
 CLAUDE_MAX_TOKENS = 4096    # Tuttie's answers are one to three sentences; tool calls are small
 CLAUDE_EFFORTS = {"low", "medium", "high"}  # thinking can be off only up to "high"
+# A hung provider must not hang a turn: the SDKs' default timeout is 10 minutes (with retries).
+TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "40"))
+MAX_RETRIES = 1
 
 
 def to_input(messages: list[dict]) -> list[dict]:
@@ -56,7 +59,7 @@ class LLM:
 
     def __init__(self, model: str | None = None, reasoning: bool = True):
         """`reasoning=False` for a non-reasoning model (no reasoning options are sent)."""
-        self.client = AsyncOpenAI()  # reads OPENAI_API_KEY
+        self.client = AsyncOpenAI(timeout=TIMEOUT_S, max_retries=MAX_RETRIES)  # reads OPENAI_API_KEY
         self.model = model or os.environ.get("LLM_MODEL", "gpt-6-luna")
         self.options = {}
         if not reasoning:
@@ -135,7 +138,7 @@ class ClaudeLLM:
 
     def __init__(self, model: str | None = None):
         """The key comes from ANTHROPIC_API_KEY; the effort from LLM_REASONING_EFFORT (default low)."""
-        self.client = AsyncAnthropic()
+        self.client = AsyncAnthropic(timeout=TIMEOUT_S, max_retries=MAX_RETRIES)
         self.model = model or os.environ["LLM_MODEL"]
         effort = os.environ.get("LLM_REASONING_EFFORT", "")
         self.options = {"thinking": {"type": "disabled"},

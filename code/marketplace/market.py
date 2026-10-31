@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 import httpx
 from pydantic import ValidationError
 
-from aps import evaluate_record, verify_envelope
+from aps import agent_key, evaluate_record, verify_envelope
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh, parse_timestamp
 from marketplace.messages import Offer, Posting, PostingCreated, Request
@@ -174,7 +174,7 @@ class Market:
         it is advisory only, since only a signed offer counts."""
         try:
             response = await self.http.post(f"{record['endpoint']}/agent/invoke", json=event,
-                                            timeout=INVOKE_TIMEOUT_S)
+                                            headers=agent_key.headers(), timeout=INVOKE_TIMEOUT_S)
         except httpx.HTTPError as error:
             return {"status": "unreachable", "detail": type(error).__name__}
         if response.status_code != 200:

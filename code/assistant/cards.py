@@ -75,6 +75,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
     ordered = sorted(features(facts), key=lambda f: f["key"] not in wanted)
     profile = facts.get("profile") or item.get("profile") or {}
     price = offer["price_chf"]
+    final = agreed_chf if agreed_chf is not None else price  # what the user would pay
     return {
         "node_id": item["node_id"],
         "name": item["name"],
@@ -88,7 +89,8 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
         "item": offer["item"],
         "price_chf": price,
         "agreed_chf": agreed_chf,
-        "over_budget_chf": round(price - budget_chf, 2) if budget_chf is not None and price > budget_chf else None,
+        # For the user's own wallet only (the hotel never sees the card or the budget).
+        "over_budget_chf": round(final - budget_chf, 2) if budget_chf is not None and final > budget_chf else None,
         "includes": offer["includes"],
         "features": ordered[:MAX_FEATURES],
         "shortlisted": shortlisted,

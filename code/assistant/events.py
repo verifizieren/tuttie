@@ -2,10 +2,18 @@
 
 Every event follows the UI event contract in documentation/formats.md. New
 subscribers first get the history, so a reloaded page shows the whole run.
+
+Events carry the id of the user turn they belong to (`turn`): the request that started the run
+that emitted them (see `current_turn`), so the wallet attaches them to the right message.
 """
 
 import asyncio
 import json
+from contextvars import ContextVar
+
+# The user turn being answered in this task. Set by the conversation for each request's run;
+# tasks started inside it (tools, subagents) inherit it, so their events carry it too.
+current_turn: ContextVar[str | None] = ContextVar("current_turn", default=None)
 
 
 class EventBus:
@@ -16,10 +24,14 @@ class EventBus:
         self.subscribers: set[asyncio.Queue] = set()
 
     def emit(self, kind: str, status: str, summary: str, record: dict | None = None,
-             seals: list[dict] | None = None, detail: dict | None = None) -> dict:
-        """Add a timeline step and send it to all subscribers; returns the event."""
+             seals: list[dict] | None = None, detail: dict | None = None, turn: str | None = None) -> dict:
+        """Add a timeline step and send it to all subscribers; returns the event.
+
+        `turn` defaults to the turn being answered in this task (`current_turn`), else None.
+        """
         event = {
             "step": len(self.history) + 1,
+            "turn": turn or current_turn.get(),
             "kind": kind,
             "node_id": record["node_id"] if record else None,
             "node_name": record["name"] if record else None,

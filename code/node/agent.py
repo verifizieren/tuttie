@@ -28,14 +28,19 @@ what the model does not know, no clever question can extract.
 
 import json
 import os
+import re
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 
+from anthropic import AnthropicError
 from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from llm import LLM as ChatLLM
 from node.catalog import AVAILABLE, tools_for
+
+# Errors of either LLM provider (llm.py): the agent falls back instead of failing the request.
+LLM_ERRORS = (ValidationError, json.JSONDecodeError, OpenAIError, AnthropicError)
 
 # Tools a business uses when its config has no "agent" section yet.
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
@@ -61,6 +66,9 @@ def covers(text: str) -> set[str]:
     text = text.lower()
     return {need for need, words in NEED_WORDS.items() if any(word in text for word in words)}
 
+
+# A room note with these words rules a need out (e.g. "too small for a dog").
+RESTRICTION = re.compile(r"\b(too small|not|no)\b")
 
 # Facts only the node's own code may use; they never reach an LLM or another agent.
 PRIVATE_FACTS = ("negotiation",)
@@ -237,7 +245,7 @@ class BusinessAgent:
         user = json.dumps(request, ensure_ascii=False)
         try:
             reply = AgentReply.model_validate(await self._llm().complete_json(system, user))
-        except (ValidationError, json.JSONDecodeError, OpenAIError):
+        except LLM_ERRORS:
             return FALLBACK
         return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, reply.arrival_date)}
 
@@ -264,7 +272,7 @@ class BusinessAgent:
         try:
             decision = WakeDecision.model_validate(
                 await self._llm().complete_json(system, json.dumps(event, ensure_ascii=False)))
-        except (ValidationError, json.JSONDecodeError, OpenAIError):
+        except LLM_ERRORS:
             return {"woken_by": kind, "interested": False, "reason": "could not decide right now", "next_tool": None}
         tool = decision.next_tool if decision.next_tool in self.tools else None
         # Answering a new posting means making an offer: that is not left to the LLM's choice.
@@ -288,8 +296,10 @@ class BusinessAgent:
 
         The LLM only chooses a room type and add-on ids (already chosen when it was woken, as
         `choice`, or asked now); the price is the room's price plus the add-ons' prices from the
-        config. An unknown room or add-on, or any LLM error, means no offer: it is better to
-        stay silent than to offer something the hotel cannot honour.
+        config. A room whose note rules out one of the guest's needs (e.g. too small for a dog),
+        or a room type the hotel does not have, is replaced by the cheapest fitting room (a hotel
+        that said it is interested must not keep the guest waiting for an offer). An unknown
+        add-on or an LLM error means no offer: better silent than an offer it cannot honour.
         """
         request = posting.get("request", {}).get("payload", {})
         if choice is None:
@@ -298,10 +308,11 @@ class BusinessAgent:
                                          add_on_ids=json.dumps(sorted(self.add_ons)))
             try:
                 choice = OfferChoice.model_validate(await self._llm().complete_json(system, json.dumps(request)))
-            except (ValidationError, json.JSONDecodeError, OpenAIError):
+            except LLM_ERRORS:
                 return None
-        room = self.rooms.get(choice.room_type)
-        needed = self.add_ons_for(request.get("constraints", {}).get("requirements", []))
+        requirements = request.get("constraints", {}).get("requirements", [])
+        room = self.room_for(choice.room_type, covers(" ".join(requirements)))
+        needed = self.add_ons_for(requirements)
         # The LLM's own picks only for what the needed ones do not cover yet (e.g. breakfast).
         extra = [a for a in choice.add_ons if a not in needed and not covers(self.add_ons.get(a, {}).get("item", ""))
                  & covers(" ".join(self.add_ons[n]["item"] for n in needed))]
@@ -314,11 +325,24 @@ class BusinessAgent:
             "request_id": posting["request_id"],
             "offer_id": f"of-{self.node_id.rsplit('.', 1)[-1]}-{secrets.token_hex(3)}",
             "item": f"{room['room_type']} room {date_text}".strip(),
+            "room_type": room["room_type"],
+            "date": date_text or None,
+            "rate": room["rate"],
             "price_chf": room["price_chf"] + sum(a["price_chf"] for a in chosen),
             "includes": [a["item"] for a in chosen],
             "conditions": [room["rate"], *[c for a in chosen for c in a["conditions"]]],
             "valid_until": posting["expires_at"],
         }
+
+    def room_for(self, room_type: str, needs: set[str]) -> dict | None:
+        """The chosen room if it suits the needs, else the cheapest available room that does."""
+        def fits(room: dict) -> bool:
+            note = room.get("note") or ""
+            return not (RESTRICTION.search(note.lower()) and covers(note) & needs)
+        room = self.rooms.get(room_type)
+        if room is not None and fits(room):
+            return room
+        return min((r for r in self.rooms.values() if fits(r)), key=lambda r: r["price_chf"], default=None)
 
     def add_ons_for(self, requirements: list[str]) -> list[str]:
         """The add-ons a request needs (a dog, a late arrival, children), chosen in code so

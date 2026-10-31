@@ -10,6 +10,7 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .app {
   position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-h, 100dvh);
   max-width: 430px; margin: 0 auto; overflow: hidden;
+  overflow: clip;  /* never scrolled by the browser (e.g. focus on a short screen): the stack stays in place */
   --top: max(16px, env(safe-area-inset-top)); --bottom: max(16px, env(safe-area-inset-bottom));
   --head: 56px; --peek: clamp(50px, 15vw, 64px);
   --card-w: calc(min(100vw, 430px) - 32px); --card-h: calc(var(--card-w) / 1.586);
@@ -231,7 +232,9 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 /* While swiping, the cards fill the conversation's space and stay put: nothing scrolls behind them. */
 .activity.swiping { overflow: hidden; padding-bottom: 12px; -webkit-mask-image: none; mask-image: none; }
 .activity.swiping .deck { flex: 1; min-height: 0; }
-.activity.swiping .deck-stack { flex: 1; height: auto; min-height: 280px; max-height: 440px; }
+.activity.swiping .deck-stack { flex: 1; height: auto; min-height: 230px; max-height: 440px; }
+/* A short screen (landscape, small phones): the card shrinks so its price stays in view. */
+@media (max-height: 640px) { .activity.swiping .deck-stack { min-height: 120px; } }
 .swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel2);
               border: 1px solid var(--line); touch-action: none; user-select: none; -webkit-user-select: none;
               cursor: grab; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
@@ -240,9 +243,9 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
                                    display: block; pointer-events: none; background: #1d1d22; }
 .swipe-photo::after { content: ""; position: absolute; inset: 0; pointer-events: none;
                       background: linear-gradient(to bottom, rgba(0, 0, 0, .35), transparent 22%, transparent 62%, rgba(14, 14, 18, .96)); }
-.photo-bars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 4px; }
-.photo-bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
-.photo-bars i.on { background: #fff; }
+.hotel-bars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 4; display: flex; gap: 4px; pointer-events: none; }
+.hotel-bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+.hotel-bars i.on { background: #fff; }
 /* Keyboard only: pointer taps on the photo are read by the deck (Deck.jsx), which also counts a
    finger's small wobble as a tap; a native click would often be dropped on phones. */
 .photo-prev, .photo-next { position: absolute; top: 0; bottom: 0; width: 34%; z-index: 1; border: 0; padding: 0;
@@ -266,6 +269,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .swipe-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
 .swipe-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
 .swipe-price s { font-size: 13px; color: var(--dim); }
+/* Only on the user's own device: the budget never leaves it towards a hotel. */
+.swipe-price .over-budget { font-size: 11px; color: var(--muted); letter-spacing: .01em; }
 .stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px;
          font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; pointer-events: none; }
 .stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
@@ -278,6 +283,9 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
   60% { transform: translateX(22px) rotate(1.5deg); }
 }
 .deck-count { text-align: center; font-size: 12px; color: var(--dim); }
+/* Tuttie's recommendation under the cards: short, and never pushing the cards off the card. */
+.deck-note { flex: none; margin: 0 4px; font-size: 13px; line-height: 1.35; color: var(--muted); text-align: center;
+             display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .deck-empty { display: grid; gap: 10px; justify-items: center; padding: 18px; font-size: 14px; color: var(--muted); }
 .deck-empty button { font: inherit; color: var(--accent); background: none; border: 0; cursor: pointer; }
 
@@ -295,6 +303,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .history-item b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-item small { font-size: 13px; color: var(--muted); }
 .history-item time { font-size: 12px; color: var(--dim); }
+.history-error { margin: 0 16px 8px; padding: 10px 12px; border-radius: 12px; font-size: 14px; color: #f2b8a8;
+                 background: rgba(217, 119, 87, .12); border: 1px solid rgba(217, 119, 87, .35); }
 .history-empty { color: var(--muted); font-size: 14px; padding: 24px 4px; text-align: center; }
 .history .activity { position: relative; inset: auto; top: auto; bottom: auto; flex: 1; min-height: 0;
                      opacity: 1; pointer-events: auto; -webkit-mask-image: none; mask-image: none; }
@@ -307,8 +317,14 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; padding: 18px 18px 20px; border-radius: 26px;
          background: #1c1c1f; box-shadow: 0 -12px 40px rgba(0, 0, 0, .6); animation: sheet .45s var(--ease) both; }
 @keyframes sheet { from { transform: translateY(110%); } }
+/* Only on the open card: in the stack the sheet would show (and take taps) over the bank cards. */
+.app:not(.open) .sheet { visibility: hidden; pointer-events: none; }
+/* A short screen (landscape phone): the sheet scrolls instead of losing its top. */
+.sheet { max-height: calc(100% - 20px); overflow-y: auto; overscroll-behavior: contain; }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
+.sheet-terms { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.sheet-terms span { display: block; }
 .sheet .seal-list { margin-bottom: 16px; background: #2a2a2e; }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sheet-buttons button { padding: 15px; border-radius: 16px; font-size: 16px; }
@@ -329,5 +345,13 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .faceid-ok circle { fill: var(--green); transform-origin: center; animation: pop .45s cubic-bezier(.34, 1.4, .5, 1) both; }
 .faceid-ok path { fill: none; stroke: #04140c; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
                   stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s var(--ease) .2s forwards; }
+.faceid-no circle { fill: var(--panel2); stroke: var(--line2); }
+.faceid-no path { stroke: var(--muted); stroke-dasharray: 48; stroke-dashoffset: 48; }
+.faceid-wait { width: 44px; height: 44px; margin: 4px; border-radius: 50%; border: 3px solid var(--line2);
+               border-top-color: var(--muted); animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sheet-error { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--red); }
+.sheet-close { grid-template-columns: 1fr; }
+.sheet-note { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--accent); }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }

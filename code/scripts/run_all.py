@@ -10,6 +10,7 @@ cannot answer, and nothing else would say so.
 """
 
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -108,6 +109,17 @@ def prefix_output(name: str, stream, colour: int | None, width: int) -> None:
         sys.stdout.flush()
 
 
+def service_env(settings: dict, environ=os.environ) -> dict:
+    """The environment every service starts with.
+
+    It carries the agent key the services share (aps/agent_key.py): the one in code/.env or
+    the environment if set, else a new random one for this run.
+    """
+    env = {**environ, "PYTHONUNBUFFERED": "1"}  # lines appear when printed, not when a buffer fills
+    env["AGENT_WEB_KEY"] = settings.get("AGENT_WEB_KEY") or secrets.token_urlsafe(32)
+    return env
+
+
 def main() -> None:
     """Start all services, show their output with names, stop all of them on Ctrl+C or when one exits."""
     if warning := key_warning():
@@ -116,7 +128,7 @@ def main() -> None:
     to_start = services(settings)
     width = max(len(name) for name, _ in to_start)
     colourful = sys.stdout.isatty() and "NO_COLOR" not in os.environ
-    env = {**os.environ, "PYTHONUNBUFFERED": "1"}  # lines appear when printed, not when a buffer fills
+    env = service_env(settings)
     if settings.get("LIVEKIT_API_KEY"):  # the LiveKit server takes its key pair from the environment
         env["LIVEKIT_KEYS"] = f"{settings['LIVEKIT_API_KEY']}: {settings['LIVEKIT_API_SECRET']}"
     processes: list[tuple[str, subprocess.Popen]] = []

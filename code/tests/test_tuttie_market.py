@@ -6,7 +6,7 @@ Runs the real registry, market and company agents in process; only the LLM is a 
 import asyncio
 import copy
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -21,7 +21,7 @@ from marketplace.app import create_app as create_market_app
 from marketplace.market import Market
 from assistant.approvals import ApprovalBook
 from assistant.tools import Toolbox
-from negotiation_helpers import registry_lookup
+from negotiation_helpers import RHEINBLICK, registry_lookup, signed_offer
 from node.server import create_app
 from registry.app import app as registry_app
 from tests.mcp_helpers import in_process_link
@@ -45,7 +45,7 @@ def stub_llm(monkeypatch):
 
 def run_find(negotiate_budget: float | None = None, book_agreement: bool = False,
              favourites: list[str] | None = None, resume_before_booking: bool = False,
-             **kwargs) -> tuple[dict, EventBus, Market]:
+             book_args: dict | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -85,12 +85,17 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
                         while not toolbox.approvals.pending:
                             await asyncio.sleep(0.01)
                         approval = next(iter(toolbox.approvals.pending.values()))
-                        result["approved_chf"] = approval["amount_chf"]
+                        result["approved_chf"], result["approval"] = approval["amount_chf"], approval
                         toolbox.approvals.decide(approval["id"], "approved")
                     tap = asyncio.create_task(phone())
-                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", "2026-11-15", "double",
-                                                           "Alex Muster", use_agreement=True)
-                    await tap
+                    args = book_args if book_args is not None else {"room_type": "double"}
+                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", guest_name="Alex Muster",
+                                                           use_agreement=True, **args)
+                    if "error" in result["booking"]:
+                        tap.cancel()  # refused before asking the phone
+                        result["pending"] = list(toolbox.approvals.pending.values())
+                    else:
+                        await tap
             return result, bus, market
 
     return asyncio.run(scenario())
@@ -137,7 +142,7 @@ def test_tuttie_rejects_an_offer_whose_signature_does_not_match():
         bus = EventBus()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=registry_app)) as http:
             desk = MarketDesk(http, "http://localhost:4000", bus, load_authorities())
-            return await desk.check(item, {}), bus
+            return await desk.check(item, {}, result["request_id"]), bus
 
     checked, bus = asyncio.run(scenario())
     assert checked is None and bus.history[-1]["status"] == "broken"
@@ -160,7 +165,36 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     agreed = result["negotiation"]["best"]["price_chf"]
     assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
-    assert result["booking"]["date"] == "2026-11-14"  # the posted night, even if the LLM passes another date
+    assert result["booking"]["date"] == "2026-11-14"  # the agreed night
+
+
+def test_booking_an_agreement_books_and_approves_exactly_the_offer_terms():
+    result, bus, _ = run_find(negotiate_budget=200, book_agreement=True, book_args={}, date="2026-11-14",
+                              tags=["basel-sbb"], budget_chf=200)
+    deal = next(o["agreement"] for o in result["negotiation"]["outcomes"] if o["node_id"] == "ch.basel.hotel-rheinblick")
+    assert (deal["room_type"], deal["date"], deal["rate"]) == ("double", "2026-11-14", "best rate, non-refundable")
+    # The phone shows, and the user's key signs, the same room, night, rate and price.
+    terms = result["approval"]["terms"]
+    assert terms == {"room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable",
+                     "includes": deal["includes"], "offer_id": deal["offer_id"]}
+    assert "non-refundable" in result["approval"]["summary"]
+    pending = next(e for e in bus.history if e["kind"] == "approval" and e["status"] == "pending")
+    assert pending["detail"]["terms"] == terms and pending["detail"]["amount_chf"] == deal["price_chf"]
+    booking = result["booking"]
+    assert booking["status"] == "confirmed" and "mismatch" not in booking
+    assert (booking["room_type"], booking["rate"], booking["offer_id"], booking["total_chf"]) == \
+        ("double", "best rate, non-refundable", deal["offer_id"], deal["price_chf"])
+
+
+@pytest.mark.parametrize("args, wrong", [({"room_type": "double-flex"}, "room_type 'double-flex'"),
+                                         ({"room_type": "double", "date": "2026-11-15"}, "date 2026-11-15"),
+                                         ({"extras": ["late check-in"]}, "extras")])
+def test_book_refuses_llm_arguments_that_would_change_the_agreement(args, wrong):
+    result, _, _ = run_find(negotiate_budget=200, book_agreement=True, book_args=args, date="2026-11-14",
+                            tags=["basel-sbb"], budget_chf=200)
+    error = result["booking"]["error"]
+    assert wrong in error and "best rate, non-refundable" in error
+    assert result["pending"] == [] and "approval" not in result  # the phone was never asked
 
 
 def test_resumed_chat_can_book_its_signed_agreement_after_starting_a_new_chat():
@@ -197,3 +231,55 @@ def test_negotiate_can_be_limited_to_some_hotels():
     result, _, _ = run_find(negotiate_budget=300, favourites=["ch.basel.alpina-grand"], date="2026-11-14",
                             tags=["basel-sbb"], budget_chf=300)
     assert [o["hotel"] for o in result["negotiation"]["outcomes"]] == ["Alpina Grand Basel"]
+
+
+def relayed(node_id, offer_id, request_id="rq-relay", valid_for=timedelta(hours=2)):
+    """A hotel's genuinely signed offer as the market relays it."""
+    envelope = signed_offer(node_id, offer_id=offer_id, request_id=request_id, valid_for=valid_for)
+    return {"node_id": node_id, "name": node_id, "offer": envelope["payload"], "envelope": envelope}
+
+
+def test_one_hotel_sending_two_offers_does_not_end_the_wait_for_the_others():
+    """The wait counts hotels, not offers: Rheinblick's two offers must not stop it before
+    Gästehaus (the second expected hotel) has offered. Rheinblick keeps one offer, its latest."""
+    other = "ch.basel.gaestehaus-am-rhein"
+    polls = {"n": 0}
+
+    def market(request):
+        polls["n"] += 1
+        offers = [relayed(RHEINBLICK, "of-a"), relayed(RHEINBLICK, "of-b")]
+        if polls["n"] >= 2:
+            offers.append(relayed(other, "of-c"))
+        return httpx.Response(200, json={"offers": offers})
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(market)) as http:
+            desk = MarketDesk(http, "http://reg", EventBus(), load_authorities(),
+                              market_url="http://market", offer_wait_s=3)
+
+            async def check(item, invited, request_id):
+                return {**item, "trust_tier": "gold", "source_step": 1}
+            desk.check = check
+            return await desk.collect("rq-relay", expected=2, invited={})
+
+    offers = asyncio.run(scenario())
+    assert sorted((o["node_id"], o["offer"]["offer_id"]) for o in offers) == [(other, "of-c"), (RHEINBLICK, "of-b")]
+
+
+@pytest.mark.parametrize("request_id, valid_for, reason", [
+    ("rq-someone-elses", timedelta(hours=2), "another request"),
+    ("rq-relay", timedelta(hours=-1), "expired"),
+])
+def test_tuttie_refuses_a_genuine_offer_for_another_request_or_expired(request_id, valid_for, reason):
+    """A market could relay a hotel's genuine offer from another posting (another date, other
+    needs) or an old one: the signature verifies, but Tuttie must not show or book it."""
+    async def scenario():
+        bus = EventBus()
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=registry_app), base_url="http://reg") as http:
+            desk = MarketDesk(http, "http://reg", bus, load_authorities(), market_url="http://market")
+            item = relayed(RHEINBLICK, "of-old", request_id=request_id, valid_for=valid_for)
+            return await desk.check(item, {}, "rq-relay"), bus
+
+    checked, bus = asyncio.run(scenario())
+    assert checked is None
+    assert bus.history[-1]["status"] == "broken" and reason in bus.history[-1]["summary"]

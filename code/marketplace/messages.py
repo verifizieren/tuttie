@@ -17,6 +17,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 from aps.envelope import parse_timestamp
 
 ID = r"^[a-z0-9][a-z0-9-]{0,63}$"
+DAY = r"^\d{4}-\d{2}-\d{2}$"
 TAG = re.compile(r"^[a-z0-9-]{1,40}$")
 
 
@@ -65,11 +66,18 @@ class Request(Message):
 
 class Offer(Message):
     """A business agent's answer to a request (signed by the business's node key).
-    Its price comes from the node config, never from an LLM (the node's make_offer tool)."""
+    Its price comes from the node config, never from an LLM (the node's make_offer tool).
+
+    `room_type`, `date` and `rate` (the cancellation terms) are the bookable terms: an
+    Agreement copies them, and booking with that Agreement books exactly them.
+    """
     type: Literal["offer"] = "offer"
     request_id: Annotated[str, Field(pattern=r"^rq-[a-z0-9-]{1,40}$")]
     offer_id: Annotated[str, Field(pattern=ID)]
     item: Annotated[str, Field(min_length=1, max_length=120)]
+    room_type: Annotated[str, Field(min_length=1, max_length=40)] | None = None
+    date: Annotated[str, Field(pattern=DAY)] | None = None
+    rate: Annotated[str, Field(min_length=1, max_length=120)] | None = None
     price_chf: float = Field(gt=0)
     includes: list[str] = Field(default_factory=list, max_length=10)
     conditions: list[str] = Field(default_factory=list, max_length=10)
@@ -95,12 +103,16 @@ class Counter(Message):
 
 class Agreement(Message):
     """The price both sides accept, signed by the business. It is what the user approves on the
-    phone and what booking redeems, like a commitment."""
+    phone and what booking redeems, like a commitment. Its terms (room_type, date, rate,
+    includes, conditions) are the offer's, unchanged: only the price was negotiated."""
     type: Literal["agreement"] = "agreement"
     request_id: Annotated[str, Field(pattern=r"^rq-[a-z0-9-]{1,40}$")]
     offer_id: Annotated[str, Field(pattern=ID)]
     round: int = Field(ge=1)
     item: Annotated[str, Field(min_length=1, max_length=120)]
+    room_type: Annotated[str, Field(min_length=1, max_length=40)] | None = None
+    date: Annotated[str, Field(pattern=DAY)] | None = None
+    rate: Annotated[str, Field(min_length=1, max_length=120)] | None = None
     price_chf: float = Field(gt=0)
     includes: list[str] = Field(default_factory=list, max_length=10)
     conditions: list[str] = Field(default_factory=list, max_length=10)

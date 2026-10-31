@@ -89,6 +89,40 @@ def test_temperatures_and_percentages_are_said_in_words():
         "Between 6.4 and 11.6 degrees, around 8 degrees, a 25 percent chance."
 
 
+def test_times_are_said_as_people_say_them():
+    assert spoken("Around 9 °C at 18:00, 8 at 20:00, train at 00:52, back by 12:00, until 00:00, from 10:30.") == \
+        "Around 9 degrees at 6 pm, 8 at 8 pm, train at 12:52 am, back by noon, until midnight, from 10:30 am."
+
+
+def test_times_already_said_in_12_hours_are_kept():
+    # Tuttie is asked to write "8:30 pm": the voice must not add a second (wrong) am or pm.
+    assert spoken("At 8:30 pm, then 12:52 am, 6:00 PM, 1:00 to 2:00 am, or 7:05.") == \
+        "At 8:30 pm, then 12:52 am, 6:00 PM, 1:00 to 2:00 am, or 7:05."
+
+
+def test_citation_and_id_notes_in_brackets_are_not_read_out():
+    assert spoken("The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3, 4].") == \
+        "The total is 128 francs. Tax paid. Fine."
+
+
+def test_facts_in_brackets_are_kept_without_the_brackets():
+    # A fee or a condition must never be hidden just because the model put it in brackets.
+    assert spoken("Total CHF 128 [+ CHF 40 cleaning fee]. Booked [non-refundable, no cancellation].") == \
+        "Total 128 francs + 40 francs cleaning fee. Booked non-refundable, no cancellation."
+
+
+def test_durations_and_links_are_not_mangled():
+    assert spoken("The trip takes 1:30 hours, 18:00:30 sharp. [Rheinblick](https://x.y) is good.") == \
+        "The trip takes 1:30 hours, 18:00:30 sharp. Rheinblick is good."
+
+
+def test_long_runs_of_spaces_are_fast():
+    import time
+    start = time.perf_counter()
+    spoken(" " * 50000 + "x")
+    assert time.perf_counter() - start < 0.2
+
+
 def test_amounts_are_said_in_francs():
     assert spoken("CHF 1 tax, 70 CHF over, CHF 12.50 left, in CHF.") == "1 franc tax, 70 francs over, 12.50 francs left, in francs."
 
@@ -131,3 +165,42 @@ def test_old_voice_room_cannot_send_into_a_new_chat(monkeypatch):
         assert response.status_code == 409
         assert client.get('/history').json() == []
         assert client.post(f'/conversations/{old_id}/resume').status_code == 200
+
+
+def test_short_card_commands_are_not_discarded_as_noise():
+    for command in ("Like.", "Pass!", "Next", "Weiter", "Überspringen", "Gefällt mir"):
+        assert meaningful(command)
+    assert not meaningful("um") and not meaningful("(laughs)")
+
+
+def test_reject_skip_and_similar_short_choices_survive_speech_filter():
+    for command in ("Reject", "Skip", "Dislike", "Ablehnen", "Behalten", "No thanks"):
+        assert meaningful(command)
+
+
+def test_a_token_loop_gets_429_after_its_share_of_rooms(monkeypatch):
+    """Each new room starts a voice agent job: one conversation gets a few a minute, then 429."""
+    configure(monkeypatch)
+    monkeypatch.setattr(voice, "ROOMS_PER_CONVERSATION_PER_MIN", 3)
+    with TestClient(app) as client:
+        responses = [client.post("/voice/token") for _ in range(5)]
+        assert [r.status_code for r in responses] == [200] * 3 + [429] * 2
+        assert len({r.json()["room"] for r in responses[:3]}) == 3  # never a room twice
+        assert responses[-1].headers["retry-after"] == "60"
+
+
+def test_one_client_address_cannot_open_rooms_without_end(monkeypatch):
+    configure(monkeypatch)
+    monkeypatch.setattr(voice, "ROOMS_PER_CLIENT_PER_MIN", 4)
+    with TestClient(app):  # the service starts with a fresh counter
+        # Cookie-less: every call is a new browser and conversation, from the same address.
+        statuses = [TestClient(app).post("/voice/token").status_code for _ in range(6)]
+    assert statuses == [200] * 4 + [429] * 2
+
+
+def test_the_room_counter_forgets_after_a_minute():
+    counter, owner = voice.RoomThrottle(), ("s", "c")
+    for _ in range(voice.ROOMS_PER_CONVERSATION_PER_MIN):
+        assert counter.allow(owner, "1.2.3.4", now=0)
+    assert not counter.allow(owner, "1.2.3.4", now=1)
+    assert counter.allow(owner, "1.2.3.4", now=61)

@@ -44,7 +44,8 @@ def signed_offer(node_id: str = RHEINBLICK, room: str = "double", add_ons: tuple
     chosen = [a for a in facts.get("add_ons", []) if a["id"] in add_ons]
     payload = {"type": "offer", "request_id": request_id,
                "offer_id": offer_id or f"of-{node_id.rsplit('.', 1)[-1]}-1",
-               "item": f"{room} room 2026-11-14", "price_chf": room_entry["price_chf"] + sum(a["price_chf"] for a in chosen),
+               "item": f"{room} room 2026-11-14", "room_type": room, "date": "2026-11-14",
+               "rate": room_entry["rate"], "price_chf": room_entry["price_chf"] + sum(a["price_chf"] for a in chosen),
                "includes": [a["item"] for a in chosen], "conditions": [room_entry["rate"]],
                "valid_until": stamp(datetime.now(timezone.utc) + valid_for)}
     return sign_envelope(node_id, payload, load_signing_key(node_id))

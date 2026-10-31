@@ -15,15 +15,21 @@ Live at <https://web4.mendes.dev/wallet/>.
   Tuttie away.
 - **Text is a fallback** behind a small keyboard icon; the eyes close while typing, and the
   keyboard never opens by accident.
-- **Connected:** typed requests go to Tuttie (`POST /chat`). The wallet follows Tuttie's
-  timeline (`GET /events`) and shows, under its eyes, what Tuttie posted (the budget stays
-  private), which hotels were asked or skipped, their offers with seal colours and size, the
-  shortlist, the bargaining (offer → agreed price) and Tuttie's answer. The face follows each
-  phase (curious, happy about offers, sceptical while bargaining).
+- **Connected:** spoken or typed requests go to Tuttie (`POST /chat`, or the voice agent).
+  The wallet follows Tuttie's timeline (`GET /events`) and shows, under its eyes, two progress
+  lines (what Tuttie knows, what it does), then the hotels as a **swipe deck** (photos, rating,
+  features in green or red, the agreed price with the hotel's own offer crossed out; right =
+  like, left = pass), the chosen hotel, the booking and Tuttie's current answer. Tapping a
+  hotel shows who vouches for it. The face follows each phase through Tuttie's presence (below).
 - **Approvals happen in the wallet:** a sheet shows hotel, seals and amount; approving runs a
   Face ID-style confirmation before the decision goes to `POST /approvals/{id}`, where the
-  assistant signs it with the user's key.
-- Voice recognition is not connected yet (its own work area, `code/voice/`).
+  assistant signs it with the user's key. The sheet can also allow a small mandate, so the
+  city tax is paid right after the booking without a second prompt. The booking card shows
+  what Tuttie checked ("Checked by Tuttie") and the paid tax.
+- **Voice** (`hooks/useVoice.js`, server side in `code/voice/`): the wallet joins the
+  conversation's LiveKit room with the microphone off; opening Tuttie's card switches it on.
+- **Dock** under the open card: history of earlier conversations (they can be continued), new
+  chat, keyboard, microphone mute.
 
 ## Code
 
@@ -34,10 +40,15 @@ public/                    manifest.json, sw.js (service worker), icons/
 src/main.jsx               loads the styles, registers the service worker, renders <App/>
 src/App.jsx                the screen and its modes: closed / voice / typing; sends requests to Tuttie
 src/components/            BankCard, AgentCard (face card), AgentControls (status, keyboard, text),
-                           Activity (posting, offers, shortlist, bargaining, answer), ApprovalSheet (Face ID)
+                           Activity (progress, cards, booking, answer), Deck (swipe cards), FeatureIcon,
+                           BookingCard, Seals, ApprovalSheet (Face ID), Dock, History
 src/hooks/                 useCardGestures (iOS-sheet swipes), useFace, useVisibleViewport (keyboard-safe),
-                           useAgentStream (follows GET /events), usePresence (Tuttie's presence, below)
+                           useAgentStream (follows GET /events), usePresence (Tuttie's presence, below),
+                           useVoice (LiveKit room, microphone, spoken answers)
 src/lib/activity.js        turns timeline events into what the wallet shows (pure reducer)
+src/lib/conversation.js    rebuilds a conversation from the server's timeline
+src/lib/history.js         earlier conversations on this device (localStorage)
+src/lib/iceReport.js       reports voice connection facts to the server (POST /voice/diag)
 src/lib/presence.js        what Tuttie is doing, as one signal for the eyes (pure; tests: npm test)
 src/lib/faceDirector.js    moves the eyes from that signal: looks per state, reactions to cues
 src/lib/api.js             POST /chat, POST /approvals/{id}, POST /conversations, POST /conversations/{id}/resume
@@ -105,8 +116,8 @@ by `code/scripts/make_icons.py`.
 
 ## Direction (agreed by the team)
 
-Minimal, voice first, the agent as a face; offers, shortlist, negotiation and approvals will
-appear inside the wallet (`documentation/context/dev/goals.md`, steps 3 and 4). Keep the look
+Minimal, voice first, the agent as a face; offers, negotiation and approvals appear inside
+the wallet (`documentation/context/dev/goals.md`, steps 3 and 4). Keep the look
 calm: no glow borders, a faint halo on the eyes, brand from `apps/shared/tuttie.css`. A
 design example lives locally in `code/.context/` (not in git); take its look, keep it more
 minimal.

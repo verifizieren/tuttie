@@ -16,19 +16,30 @@ import argparse
 import asyncio
 import copy
 import json
+import os
+import re
 import secrets
 from contextlib import asynccontextmanager
+from datetime import date as Date
+from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ValidationError
 
-from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
+from apidocs import api_docs
+from aps import agent_key
+from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
+from aps.approval import booking_terms
 from aps.call import call_body
+from aps.envelope import is_fresh
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
+from marketplace.messages import PostingCreated
 from negotiation.agreement import AgreementRedeemer
 from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
 from node.agent import BusinessAgent
@@ -38,6 +49,88 @@ from node.owner import owner_app
 from node.settings import apply as apply_settings
 from node.settings import validate as validate_settings
 from sessions import SessionClosed, SessionStore
+
+
+SWISS_TIME = ZoneInfo("Europe/Zurich")
+ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+MAX_DAYS_AHEAD = 365  # how far ahead a business takes bookings
+MAX_GUESTS = 10
+
+
+def stay_problem(day, guests=1, today: Date | None = None) -> str | None:
+    """Why a night and guest count cannot be offered or booked, or None.
+
+    The night must be a YYYY-MM-DD date from today (Swiss time) up to MAX_DAYS_AHEAD; guests
+    a whole number from 1 to MAX_GUESTS. A business signs its answers, so it never signs
+    rooms for a night that does not exist or has passed.
+    """
+    today = today or datetime.now(SWISS_TIME).date()
+    if not isinstance(day, str) or not ISO_DAY.match(day):
+        return "date must be YYYY-MM-DD"
+    try:
+        night = Date.fromisoformat(day)
+    except ValueError:
+        return "date must be YYYY-MM-DD"
+    if not today <= night <= today + timedelta(days=MAX_DAYS_AHEAD):
+        return f"bookable nights are from {today} to {today + timedelta(days=MAX_DAYS_AHEAD)}"
+    if isinstance(guests, bool) or not isinstance(guests, int) or not 1 <= guests <= MAX_GUESTS:
+        return f"guests must be a whole number from 1 to {MAX_GUESTS}"
+    return None
+
+
+LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+MAX_REQUEST_AGE_S = 300  # as fresh as the market wants a posted request (marketplace/market.py)
+
+
+def market_url() -> str:
+    """The marketplace this node sends offers to (same variables as marketplace/app.py)."""
+    return os.environ.get("MARKETPLACE_URL", f"http://localhost:{os.environ.get('MARKETPLACE_PORT', '4010')}")
+
+
+def offer_url_allowed(offer_url: str, request_id: str, market: str) -> bool:
+    """Whether `offer_url` is the market's own offer door for this request.
+
+    The node signs and POSTs an offer to it, so it must never be an arbitrary address (SSRF):
+    same scheme, host (any loopback name counts as one) and port as `market`, and exactly the
+    path /postings/{request_id}/offers.
+    """
+    try:
+        url, allowed = urlsplit(offer_url), urlsplit(market)
+        same_port = (url.port or 80) == (allowed.port or 80)
+    except ValueError:
+        return False
+    host, allowed_host = url.hostname or "", allowed.hostname or ""
+    same_host = host == allowed_host or (host in LOOPBACK and allowed_host in LOOPBACK)
+    expected_path = f"{allowed.path.rstrip('/')}/postings/{request_id}/offers"
+    return (url.scheme == allowed.scheme and same_host and same_port and url.path == expected_path
+            and not url.query and not url.fragment and not url.username)
+
+
+async def requester_problem(posting, lookup, authorities: dict, now=None) -> str | None:
+    """Why a posting's request is not a fresh one signed by a verified user agent, or None.
+
+    Only then is a posting worth an LLM call: a made-up posting costs the business nothing.
+    """
+    envelope, requester = posting.request, posting.requester_id
+    record = await lookup(requester)
+    if not record or record.get("kind") != "user-agent":
+        return "the requester is not a user agent in the registry"
+    if evaluate_record(record, authorities)["tier"] not in ("gold", "blue"):
+        return "the requester's seals do not verify"
+    if not verify_envelope(envelope, record["public_key"], expected_node_id=requester):
+        return "the request is not signed by the requester"
+    if not is_fresh(envelope["timestamp"], MAX_REQUEST_AGE_S, now):
+        return "the request is outdated"
+    payload = envelope.get("payload")
+    if not isinstance(payload, dict) or payload.get("request_id") != posting.request_id:
+        return "the signed request is for another posting"
+    return None
+
+
+def agent_caller(request: Request) -> None:
+    """Only the deployment's own services may make the agent think (aps/agent_key.py): 401 otherwise."""
+    if not agent_key.allowed(request.headers.get(agent_key.HEADER)):
+        raise HTTPException(status_code=401, detail="this agent answers only its marketplace and known agents")
 
 
 class AgentRequest(BaseModel):
@@ -87,7 +180,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     own_public_key = public_key_b64(signing_key)
     agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
     # Checks every signed action call: caller, signature, delegation, agreement, approval.
-    gate = ActionGate(node_id, own_public_key, load_public_key("user"), load_authorities(), lookup, agreements)
+    authorities = load_authorities()
+    gate = ActionGate(node_id, own_public_key, load_public_key("user"), authorities, lookup, agreements)
     bookings: set[str] = set()  # booking ids confirmed here, so charges can follow them
     paid: set[tuple[str, str]] = set()  # (booking id, purpose) already charged
     business_agent = BusinessAgent(config)
@@ -99,7 +193,9 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         return sign_envelope(node_id, payload, signing_key)
 
     def get_availability(date: str, guests: int = 1) -> dict:
-        """Signed list of available rooms and prices for a date."""
+        """Signed list of available rooms and prices for a date, or a signed refusal (stay_problem)."""
+        if problem := stay_problem(date, guests):
+            return signed({"tool": "get_availability", "status": "refused", "reason": problem})
         rooms = [
             {k: room[k] for k in ("room_type", "price_chf", "rate")}
             for room in facts().get("rooms", []) if room.get("available")
@@ -137,8 +233,10 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         The hotel computes the total itself: the room's price plus extras, which must be its own
         signed A2A commitments; an agreement in the call (its own signed deal) replaces it with
         the agreed price. The gate then checks the caller, its signature, the user's delegation
-        for "book" and the user's approval for exactly that amount. The confirmation lists the
-        checks it rests on.
+        for "book" and the user's approval for exactly that amount. An agreement binds the
+        booking to its offer: another room type, night or rate, or extras on top, are refused,
+        and so is an approval signed for other terms (aps/approval.py, booking_terms). The
+        confirmation names the rate booked and lists the checks it rests on.
         """
         def refuse(reason: str) -> dict:
             """A signed refusal with the reason."""
@@ -151,11 +249,15 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             req = BookRequest(**body["args"])
         except ValidationError as error:
             return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
+        if problem := stay_problem(req.date):
+            return refuse(problem)
         total, items = None, []
+        if req.agreement is not None and req.extras:
+            return refuse("an agreement fixes what is included: book it without extras")
+        room = next((r for r in facts().get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
+        if room is None:
+            return refuse(f"no available room of type {req.room_type}")
         if req.agreement is None:
-            room = next((r for r in facts().get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
-            if room is None:
-                return refuse(f"no available room of type {req.room_type}")
             total = room["price_chf"]
             for extra in req.extras:
                 commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
@@ -167,8 +269,20 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         verdict = await gate.check_action(call, Needs("book", scope="book", approval=True, amount_chf=total))
         if not verdict.ok:
             return refuse(verdict.reason)
-        if verdict.agreement is not None:
-            items = list(verdict.agreement.includes)
+        deal = verdict.agreement
+        if deal is not None:
+            # The agreement is the selected offer: book exactly its room, night and rate.
+            if deal.room_type is not None and req.room_type != deal.room_type:
+                return refuse(f"the agreement is for a {deal.room_type} room, not {req.room_type}")
+            if deal.date is not None and req.date != deal.date:
+                return refuse(f"the agreement is for the night of {deal.date}, not {req.date}")
+            if deal.rate is not None and room["rate"] != deal.rate:
+                return refuse(f"the agreement is for the rate {deal.rate!r}, not {room['rate']!r}")
+            items = list(deal.includes)
+        terms = booking_terms(req.room_type, req.date, room["rate"], items, deal.offer_id if deal else None)
+        approved = verdict.approval.get("terms") if verdict.approval else None
+        if approved is not None and approved != terms:
+            return refuse("the approval is for other terms than this booking (room, night, rate or extras)")
         gate.commit(verdict)  # the approval and the agreement cannot be used again
         booking_id = "BK-" + secrets.token_hex(3).upper()
         bookings.add(booking_id)
@@ -179,6 +293,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "hotel": config["name"],
             "date": req.date,
             "room_type": req.room_type,
+            "rate": room["rate"],  # the cancellation terms booked
+            "offer_id": deal.offer_id if deal else None,
             "guest_name": req.guest_name,
             "extras": items,
             "total_chf": verdict.amount_chf,
@@ -242,13 +358,13 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         async with tools.session_manager.run():
             yield
 
-    app = FastAPI(title=config["name"], lifespan=lifespan)
+    app = FastAPI(title=config["name"], lifespan=lifespan, **api_docs())
     app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
     app.mount("/mcp", mcp_app(tools))
     # The owner view (apps/owner): read the live business, deploy new settings (node/owner.py).
     app.mount("/owner", owner_app(config, store, lambda: business_agent.apply(config)))
 
-    @app.post("/agent")
+    @app.post("/agent", dependencies=[Depends(agent_caller)])
     async def agent(req: AgentRequest) -> dict:
         """The company's agent answers another agent (A2A), signed."""
         return signed(await business_agent.answer(req.question, req.context))
@@ -264,14 +380,14 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         except KeyError:
             raise HTTPException(status_code=404, detail="no such session") from None
 
-    @app.post("/agent/sessions")
+    @app.post("/agent/sessions", dependencies=[Depends(agent_caller)])
     def open_session(req: SessionOpenRequest) -> dict:
         """Open an isolated conversation with its own memory (one per negotiation)."""
         session = sessions.open(req.peer, req.purpose, req.context)
         session.add("system", "opened", {"peer": req.peer, "purpose": req.purpose})
         return signed({"session_id": session.id, "agent": business_agent.persona["name"], "purpose": req.purpose})
 
-    @app.post("/agent/sessions/{session_id}/messages")
+    @app.post("/agent/sessions/{session_id}/messages", dependencies=[Depends(agent_caller)])
     async def session_message(session_id: str, req: SessionMessageRequest) -> dict:
         """Answer a message inside a session; the agent sees the session's history."""
         session = find_session(session_id)
@@ -284,24 +400,38 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             session.add("self", "reply", reply)
         return signed({"session_id": session.id, "turn": len(session.turns), **reply})
 
-    @app.get("/agent/sessions/{session_id}")
+    @app.get("/agent/sessions/{session_id}", dependencies=[Depends(agent_caller)])
     def read_session(session_id: str) -> dict:
         """The session's whole memory, signed (for audits and the timeline)."""
         return signed(find_session(session_id).to_dict())
 
-    @app.post("/agent/sessions/{session_id}/close")
+    @app.post("/agent/sessions/{session_id}/close", dependencies=[Depends(agent_caller)])
     def close_session(session_id: str) -> dict:
         """End a session; its memory stays readable."""
         find_session(session_id)
         return signed({"session_id": session_id, "status": sessions.close(session_id).status})
 
-    @app.post("/agent/invoke")
+    @app.post("/agent/invoke", dependencies=[Depends(agent_caller)])
     async def agent_invoke(event: dict = Body(...)) -> dict:
         """The marketplace wakes the agent on a change; it answers whether and how it would respond.
 
         The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
-        (marketplace/messages.py, PostingCreated).
+        (marketplace/messages.py, PostingCreated). A new posting must be a valid PostingCreated
+        whose offer_url is the configured market's offer door for it (offer_url_allowed); else
+        422. Its request must be fresh and signed by a verified user agent (requester_problem);
+        else 403. Both are checked before any LLM runs.
         """
+        if event.get("type") == "posting.created":
+            try:
+                posting = PostingCreated.model_validate(event).posting
+            except ValidationError as error:
+                raise HTTPException(status_code=422, detail=f"not a valid posting.created event: "
+                                                            f"{error.errors()[0]['msg']}") from None
+            if not offer_url_allowed(posting.offer_url, posting.request_id, market_url()):
+                raise HTTPException(status_code=422, detail="offer_url is not this marketplace's offer address")
+            problem = await requester_problem(posting, lookup, authorities)
+            if problem:
+                raise HTTPException(status_code=403, detail=problem)
         decision = await business_agent.invoke(event)
         choice = decision.pop("offer_choice", None)  # chosen while deciding; not part of the reply
         if (event.get("type") == "posting.created" and decision.get("interested")

@@ -134,7 +134,8 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 ```json
 {
   "step": 3,
-  "kind": "registry | a2t | a2a | marketplace | payment | approval | answer | thinking",
+  "turn": "t2",
+  "kind": "turn | registry | a2t | a2a | marketplace | payment | approval | answer | thinking",
   "node_id": "ch.basel.hotel-rheinblick",
   "node_name": "Hotel Rheinblick",
   "seals": [{ "issuer": "handelsregister-bs", "tier": "gold", "valid": true }],
@@ -144,6 +145,16 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 }
 ```
 
+Every request is a **turn**: a typed message (`POST /chat`) or a spoken one (`POST
+/voice/say`) opens it with a `turn` event (`status: "pending"`, `summary` = the user's words,
+`detail: {turn_id, said, source: "text" | "voice"}`), emitted at once, also while an earlier
+request still runs. Every event of that request's run, its `answer` included, carries the id
+in `turn` (`null` for events outside any request). Turn ids (`t1`, `t2`, ...) are unique within
+a conversation. `POST /chat` and `POST /voice/say` return `{accepted, turn_id}`; `/chat` also
+takes `said`, what the user sees as their message when it differs from `message` (after
+swiping the cards: `"Book Hotel X"`). The wallet attaches events to their turn by this id, live
+and when it restores `GET /history`, so a new request never overwrites an earlier answer or
+booking.
 `untrusted` marks a node whose seals are valid but only grey (self-signed or unsigned).
 `thinking` events carry a reasoning summary of the assistant's LLM in `summary`
 (usually `"**Title**\n\nbody"`), with `status: "info"` and no node. The SSE stream also
@@ -163,7 +174,13 @@ messages | mail | calendar | preferences, then `found`; private items such as th
 never in them). `POST /chat {message, first_tool?}`: `first_tool` (`book` or `negotiate`)
 makes that tool the first step; the wallet sends `book` after the user swiped the cards. A
 booking of an agreed deal is always for the posted night. `GET /history` returns this browser's timeline so far (the same
-events the stream replays). Answers no longer list ignored businesses; the wallet shows them.
+events the stream replays) and its conversation id in `X-Conversation-ID`. Reading never
+creates a conversation: for a browser without one, `/history` answers `[]` with the id its
+first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a decision 404.
+`POST /voice/token` answers 429 (`Retry-After: 60`) after 10 new rooms a minute for one
+conversation or 300 for one client address; a room is never handed out twice.
+Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does
+following the promised id on `GET /events?conversation_id=<id>`; another id there is a 409. Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
 `assistant/agent.py`, e.g. `excited`, `sorry`); the wallet shows it on Tuttie's face.
 
@@ -223,6 +240,14 @@ charge right after the booking without asking. The pending `approval` event carr
 `detail.offer_mandate`; a paid charge is a `payment` event with the receipt in
 `detail.payload`.
 
+A booking approval also carries `terms` (`aps/approval.py`, `booking_terms`):
+`{room_type, date, rate, includes, offer_id?}` (`offer_id` only when an Agreement is
+redeemed). The wallet shows them under the amount, and the signed decision includes them
+(`sign_decision` adds `terms` to the signed body whenever the approval has them;
+`verify_decision` checks them when present). The node books only if the decision's `terms`
+equal the terms it is about to book, so an approval for the non-refundable double cannot
+book the flexible rate. The pending `approval` event carries `detail.terms`.
+
 ## Business tools over MCP (`node/mcp_tools.py`)
 
 Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
@@ -232,10 +257,20 @@ Each result is the node's signed envelope as JSON text; the caller verifies it a
 node's registry record like any APS reply. Reading tools are open; the actions take a signed
 call (below) and run only through the action gate (`aps/gate.py`):
 
+- `get_availability {date, guests}`: `date` must be `YYYY-MM-DD`, from today (Swiss time) up
+  to 365 days ahead, `guests` a whole number 1-10; otherwise the signed answer is
+  `{tool: "get_availability", status: "refused", reason}` without rooms. `book` refuses such a
+  `date` the same way.
 - `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
   signed commitments, or its own signed agreement) and asks the gate with
-  `Needs("book", scope="book", approval=True, amount_chf=total)`. The confirmation
-  `{status: "confirmed", booking_id, total_chf, extras, checked, ...}` lists the gate's checks,
+  `Needs("book", scope="book", approval=True, amount_chf=total)`. With an agreement the
+  call must name the agreement's `room_type`, `date` and a room with its `rate`, and carry no
+  `extras` (refusals: `the agreement is for a <room> room, not <x>` / `... for the night of
+  <date>, not <x>` / `... for the rate ..., not ...` / `an agreement fixes what is included:
+  book it without extras`); an approval with other `terms` is refused (`the approval is for
+  other terms than this booking ...`). The confirmation
+  `{status: "confirmed", booking_id, total_chf, room_type, rate, offer_id, extras, checked, ...}`
+  names the rate booked (`offer_id` null without an agreement) and lists the gate's checks,
   e.g. `["caller", "signature", "delegation", "agreement", "approval"]`, plus `"commitments"`
   when extras were redeemed.
 - `pay`: `args = {purpose, booking_id, mandate | approval}`. The amount is the charge's
@@ -387,6 +422,11 @@ When the marketplace accepts a request it wakes every matching, non-broken busin
 ```
 
 The business can verify the requester itself from `request` (seals, signature, delegation).
+A node checks before its agent thinks: the event must be a valid `PostingCreated` and
+`offer_url` exactly `<MARKETPLACE_URL>/postings/<request_id>/offers` (default
+`http://localhost:4010`, any loopback name counts) or the answer is 422; `request` must be
+signed by `requester_id`, a registered user agent with gold or blue seals, at most 5 minutes
+old and for this `request_id`, or the answer is 403.
 Its answer, e.g. `{"interested": true, "next_tool": "make_offer"}` (plain or as the payload
 of a signed envelope), is recorded but advisory; only a signed offer counts.
 
@@ -397,7 +437,10 @@ of a signed envelope), is recorded but advisory; only a signed offer counts.
   "type": "offer",
   "request_id": "rq-7f3a",
   "offer_id": "of-rheinblick-1",
-  "item": "double room 14 Nov",
+  "item": "double room 2026-11-14",
+  "room_type": "double",
+  "date": "2026-11-14",
+  "rate": "best rate, non-refundable",
   "price_chf": 195,
   "includes": ["late check-in after 22:00 with dog"],
   "conditions": ["non-refundable"],
@@ -406,6 +449,9 @@ of a signed envelope), is recorded but advisory; only a signed offer counts.
 ```
 
 Prices come from the node config (`facts.rooms`, `facts.add_ons`), never from an LLM.
+`room_type`, `date` and `rate` (the room's cancellation terms from `facts.rooms`) are the
+bookable terms; they are optional in the model (older offers lack them) but `make_offer`
+always sets them.
 Sent as a signed envelope to the posting's `offer_url`. The marketplace accepts it only from
 an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_until`.
 
@@ -445,7 +491,8 @@ the guest can only accept it (a counter at that price) or walk away.
 ```json
 {
   "type": "agreement", "request_id": "rq-7f3a", "offer_id": "of-rheinblick-1", "round": 2,
-  "item": "double room 2026-11-14", "price_chf": 185,
+  "item": "double room 2026-11-14", "room_type": "double", "date": "2026-11-14",
+  "rate": "best rate, non-refundable", "price_chf": 185,
   "includes": ["late check-in after 22:00 with dog"], "conditions": ["non-refundable"],
   "valid_until": "2026-11-13T22:00:00Z"
 }
@@ -454,7 +501,10 @@ the guest can only accept it (a counter at that price) or walk away.
 The price both sides accept. It is what the user approves on the phone (see Approval) and
 what booking redeems instead of the list price (`negotiation/agreement.py`,
 `AgreementRedeemer`): only with this hotel's own signature, before `valid_until`, and only
-once per `offer_id`; the user's approval must be for exactly `price_chf`. `book` takes it as
+once per `offer_id`; the user's approval must be for exactly `price_chf`. `room_type`,
+`date` and `rate` are copied unchanged from the offer: the agreement is the selected offer,
+and booking it books exactly those terms (Tuttie's `book(use_agreement=true)` refuses LLM
+arguments that would change them, before the phone is asked). `book` takes it as
 an optional `agreement` field once the hook in `node/server.py` is in.
 
 ### Rejection (business → guest agent)
@@ -497,7 +547,14 @@ its floor, and its price is final in the last round or once it reaches the floor
 its own session. The user's real limit is the private context item `max_price_chf`: compared
 in Tuttie's code, never shared or sent. Tuttie opens 10 % below the offer, then moves halfway
 toward the hotel's price, accepts a final or close price within the limit and walks away
-otherwise. The cheapest Agreement is what the user approves.
+otherwise. A signed Agreement counts only at or below Tuttie's last counter (so never above
+the limit) and with the offer's `request_id`, `offer_id`, `item`, `room_type`, `date`, `rate`,
+`includes` and `conditions` unchanged; anything else ends that negotiation as `refused`. The
+cheapest Agreement is what the user approves.
+
+**Tuttie collecting offers** (`assistant/marketplace.py`): Tuttie re-checks every relayed offer
+(seals, signature, `request_id` equal to its own posting, `valid_until` not passed) and keeps
+one offer per hotel, its latest; it waits until every interested hotel has one (or 45 s).
 
 **Strategy numbers** (tuned for the demo; preview with `scripts/bargain_preview.py`):
 `OPENING_DISCOUNT = 0.10` and `TUTTIE_STEP = 0.5` (`negotiation/tuttie.py`), `HOTEL_STEP =
@@ -549,7 +606,11 @@ Tools come from the shared catalog `code/node/catalog.py`; each has a status, `a
 `planned` (`make_offer`, `counter_offer` and `pay` are planned). Private negotiation limits
 live in `facts.negotiation` and never reach a prompt, a reply or the card.
 
-Endpoints of every node (all answers are signed envelopes):
+Endpoints of every node (all answers are signed envelopes). Every endpoint below except
+`GET /agent/card` makes the agent think (an LLM call on the business's account), so when the
+deployment sets `AGENT_WEB_KEY` (`aps/agent_key.py`; `scripts/run_all.py` makes one per run)
+it answers HTTP 401 unless the request carries the key in `X-Agent-Web-Key`. The marketplace
+and Tuttie send it; tools over MCP and `counter_offer` are not affected.
 
 | Endpoint | Payload of the answer |
 | --- | --- |

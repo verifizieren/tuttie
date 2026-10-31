@@ -20,7 +20,8 @@ NODE_REPLIES = {  # by MCP tool name or agent path
     "get_availability": {"date": "2026-11-14", "rooms": [{"room_type": "double", "price_chf": 180, "rate": "x"}]},
     "/agent": {"answer": "Fine.", "commitment": {"item": "late check-in with dog", "price_chf": 15,
                                                  "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}},
-    "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195},
+    "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195, "room_type": "double",
+             "date": "2026-11-14", "rate": "x", "offer_id": None},
     "get_policies": {"tool": "get_policies", "charges": [{"purpose": "city tax", "price_chf": 4}]},
     "pay": {"tool": "pay", "status": "paid", "amount_chf": 4, "checked": ["caller", "signature", "delegation", "mandate"]},
 }
@@ -142,6 +143,21 @@ def test_book_waits_for_approval_and_sends_signed_decision_and_commitment():
     assert call["args"]["approval"]["decision"] == "approved"
     assert call["args"]["extras"][0]["payload"]["commitment"]["price_chf"] == 15
     assert [e["status"] for e in bus.history if e["kind"] == "approval"] == ["pending", "approved"]
+    # The user signed the room, night, rate and extras along with the amount.
+    assert call["args"]["approval"]["terms"] == {"room_type": "double", "date": "2026-11-14", "rate": "x",
+                                                 "includes": ["late check-in with dog"]}
+    assert "mismatch" not in result
+
+
+def test_a_confirmation_for_other_terms_than_approved_is_flagged():
+    from assistant.tools import booked_other_terms
+    terms = {"room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable", "includes": [],
+             "offer_id": "of-1"}
+    same = {"total_chf": 172, "room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable",
+            "offer_id": "of-1"}
+    assert booked_other_terms(same, 172, terms) == []
+    flexible = {**same, "room_type": "double-flex", "rate": "flexible", "total_chf": 205}
+    assert booked_other_terms(flexible, 172, terms) == ["total_chf", "room_type", "rate"]
 
 
 def test_book_declined_never_calls_the_node():
@@ -225,3 +241,33 @@ def test_saying_goodbye_asks_the_wallet_to_close_the_card():
     result = asyncio.run(toolbox.dispatch("end_conversation", {}))
     assert result["closing"] is True
     assert bus.history[-1]["kind"] == "close"
+
+
+def test_current_deals_preserves_signed_total():
+    toolbox, _, _ = make_toolbox()
+    toolbox.market.last_offers = [{"node_id": RHEINBLICK, "name": "Hotel Rheinblick", "offer": {"price_chf": 220}}]
+    toolbox.agreements[RHEINBLICK] = {"payload": {"type": "agreement", "price_chf": 209, "includes": ["dog"]}}
+    deal = asyncio.run(toolbox.current_deals())["deals"][0]
+    assert deal["offered_chf"] == 220 and deal["agreement"]["price_chf"] == 209
+    assert deal["agreement"]["includes"] == ["dog"]
+
+
+def test_current_deals_carry_the_signed_policies_for_follow_ups():
+    toolbox, _, _ = make_toolbox()
+    toolbox.market.last_offers = [{"node_id": RHEINBLICK, "name": "Hotel Rheinblick", "offer": {"price_chf": 220}}]
+    assert asyncio.run(toolbox.current_deals())["deals"][0]["policies"] is None  # not fetched: no guessing
+    asyncio.run(toolbox.load_policies(RHEINBLICK))
+    toolbox.policies[RHEINBLICK] |= {"policies": {"check_in": "from 15:00"}, "photos": ["a.jpg"]}
+    policies = asyncio.run(toolbox.current_deals())["deals"][0]["policies"]
+    assert policies["policies"] == {"check_in": "from 15:00"} and "photos" not in policies
+
+
+def test_voice_swipe_targets_current_deck():
+    toolbox, bus, _ = make_toolbox()
+    assert "error" in asyncio.run(toolbox.swipe_card("like"))
+    cards = bus.emit("marketplace", "verified", "2 hotels", detail={"phase": "cards", "cards": []})
+    assert asyncio.run(toolbox.swipe_card("pass"))["sent"] == "pass"
+    assert bus.history[-1]["detail"] == {"action": "swipe", "verdict": "pass", "cards_step": cards["step"]}
+    assert "error" in asyncio.run(toolbox.swipe_card("invalid"))
+    bus.emit("marketplace", "verified", "New request", detail={"phase": "posted"})
+    assert "error" in asyncio.run(toolbox.swipe_card("like"))

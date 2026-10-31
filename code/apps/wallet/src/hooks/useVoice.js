@@ -9,8 +9,11 @@
 // text, word by word in step with its voice (LiveKit's "lk.transcription" streams), so the wallet
 // can show an answer as it is spoken.
 // When the wallet is hidden (another app, locked phone) the room is left; it rejoins on return.
+// A failed join (token or connection) is "unavailable": while voice mode is on it is tried again
+// with a growing wait (lib/recovery.js), and at once on retry() or when voice mode starts again.
 import { useEffect, useRef, useState } from "react";
 import { report, watchIce } from "../lib/iceReport.js";
+import { voiceRetryDelay } from "../lib/recovery.js";
 
 const LEVEL_MS = 50;       // how often the voice levels go to the presence (and so to the eyes)
 const RETRY_MS = 2000;     // rejoin after a dropped connection
@@ -28,10 +31,12 @@ function visible() {
  * @param onLevels  (speaking, hearing) => void: both voice levels (0..1), every LEVEL_MS while live,
  *                  and (0, 0) when voice stops; feeds Tuttie's presence (hooks/usePresence.js)
  * @param conversationId  the conversation on screen (null while loading): the room belongs to it
- * @returns { state, unlockAudio, muted, toggleMute }: state is "off" | "connecting" | "ready"
- *          (joined, waiting in the background) | "live" (voice mode on) | "unavailable"; call
- *          unlockAudio() from a tap if the browser blocked Tuttie's voice; muted keeps the
- *          microphone off (e.g. in a noisy room) until toggled again
+ * @returns { state, unlockAudio, muted, toggleMute, retry }: state is "off" | "connecting" |
+ *          "ready" (joined, waiting in the background) | "live" (voice mode on) | "unavailable"
+ *          (the join failed; tried again) | "disabled" (the server has no voice: text only);
+ *          call unlockAudio() from a tap if the browser blocked Tuttie's voice; muted keeps the
+ *          microphone off (e.g. in a noisy room) until toggled again; retry() joins again now
+ *          if voice is unavailable
  */
 export default function useVoice(active, onSpeech, onLevels, conversationId) {
   const speech = useRef(onSpeech);
@@ -42,6 +47,9 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
   activeRef.current = active;
   const [joined, setJoined] = useState(null);  // the connected Room, or null
   const [state, setState] = useState("off");
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const failures = useRef(0);  // failed joins in a row: the next automatic try waits longer
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
@@ -70,7 +78,8 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
     setState("connecting");
     (async () => {
       const response = await fetch("/voice/token", { method: "POST" });
-      if (!response.ok) throw new Error("voice is not configured");
+      if (response.status === 503) throw Object.assign(new Error("voice is not configured"), { disabled: true });
+      if (!response.ok) throw new Error(`voice token failed: HTTP ${response.status}`);
       const [{ url, token }, { Room, RoomEvent, Track, createLocalAudioTrack }] =
         await Promise.all([response.json(), import("livekit-client")]);
       if (closed) return;
@@ -116,11 +125,19 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
       await lk.connect(url, token);
       if (closed) { mic?.stop(); return; }
       if (mic) await lk.localParticipant.publishTrack(mic, { source: Track.Source.Microphone });
+      failures.current = 0;
       setJoined(lk);
       setState("ready");
     })().catch(error => {
       report({ state: "connect failed", error: String(error?.message || error).slice(0, 300) });
-      if (!closed) setState("unavailable");
+      if (closed) return;
+      closed = true;  // this try is over: a half-open room is left without a second retry
+      lk?.disconnect();
+      if (error?.disabled) return setState("disabled");
+      setState("unavailable");
+      failures.current += 1;
+      // While the card is closed nothing is tried; opening it again tries at once (below).
+      if (activeRef.current) retry = setTimeout(() => setAttempt(n => n + 1), voiceRetryDelay(failures.current));
     });
 
     return () => {
@@ -132,6 +149,11 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
       if (!activeRef.current) setWanted(false);  // left while closed: join again on the next tap
     };
   }, [shown, attempt, conversationId, wanted]);
+
+  // Voice mode starts again (tap on the face, back from typing) after a failed join: try now.
+  useEffect(() => {
+    if (active && stateRef.current === "unavailable") setAttempt(n => n + 1);
+  }, [active]);
 
   // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the presence.
   useEffect(() => {
@@ -164,5 +186,10 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
     setMuted(m => !m);
   }
 
-  return { state, unlockAudio, muted, toggleMute };
+  /** Join again now if voice is unavailable (e.g. the user tapped "tap to retry"). */
+  function retry() {
+    if (stateRef.current === "unavailable") setAttempt(n => n + 1);
+  }
+
+  return { state, unlockAudio, muted, toggleMute, retry };
 }

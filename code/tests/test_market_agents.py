@@ -20,6 +20,7 @@ from marketplace.app import load_authorities
 from marketplace.market import Market
 from node.server import create_app
 from registry.app import app as registry_app
+from negotiation_helpers import registry_lookup
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 TUTTIE = "ch.tuttie.alex-muster"
@@ -55,7 +56,7 @@ def test_market_wakes_the_matching_company_agents():
         apps = {4000: registry_app}
         for path in (DATA / "nodes").glob("*.json"):
             config = json.loads(path.read_text())
-            apps[config["port"]] = create_app(config)
+            apps[config["port"]] = create_app(config, lookup=registry_lookup)
         async with httpx.AsyncClient(transport=PortRouter(apps)) as http:
             market = Market(http, "http://localhost:4000", load_authorities(), load_public_key("user"),
                             "http://localhost:4010")
@@ -87,7 +88,7 @@ def test_woken_agents_send_signed_offers_back_to_the_market():
             apps = {4000: registry_app}
             for path in (DATA / "nodes").glob("*.json"):
                 config = json.loads(path.read_text())
-                apps[config["port"]] = create_app(config, http=http)  # nodes post offers through `http`
+                apps[config["port"]] = create_app(config, http=http, lookup=registry_lookup)  # nodes post offers through `http`
             market_app = create_market_app(http)
             market_app.state.market = Market(http, "http://localhost:4000", load_authorities(),
                                              load_public_key("user"), "http://localhost:4010")

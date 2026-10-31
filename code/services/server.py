@@ -9,8 +9,10 @@ forecast or a timetable exactly like a hotel's price: seals first, then the sign
     trains   get_connections(origin, destination, date, time, arrive_by) → services/trains.py
 
 The data is live (Open-Meteo, transport.opendata.ch). When that source cannot be reached, the
-service answers with a clearly marked sample (`source`), so a demo without internet still runs;
-a request that cannot be answered (unknown place, date out of range) is a signed refusal.
+service answers with a clearly marked sample (`source`), so a demo without internet still runs.
+Only an outage (no connection, timeout, 5xx, a garbled answer) gets the sample; a request that
+cannot be answered (unknown place, date out of range, a 4xx or empty answer from the source) is
+a signed refusal, never sample data.
 
 Run: python -m services.server --config data/services/weather.json   (run_all.py starts them)
 """
@@ -25,6 +27,7 @@ import httpx
 from fastapi import FastAPI
 from mcp.server.mcpserver import MCPServer
 
+from apidocs import api_docs
 from aps import load_signing_key, sign_envelope
 from node.mcp_tools import mcp_app
 from services import trains, weather
@@ -44,7 +47,10 @@ def tool_functions(service: str, signed: Callable[[dict], dict], http: Callable[
             return signed({"tool": tool, **await live()})
         except unavailable as refusal:
             return refuse(str(refusal))
-        except (httpx.HTTPError, KeyError, ValueError, IndexError, TypeError):  # source down or answered oddly
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code < 500:  # the source refused this request: no made-up data for it
+                return refuse(f"the data source refused the request ({error.response.status_code})")
+        except (httpx.TransportError, KeyError, ValueError, IndexError, TypeError):  # down, slow or garbled
             pass
         if not offline_sample:
             return refuse("the data source cannot be reached")
@@ -110,7 +116,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None) -> FastAPI:
         if http is None and client["http"] is not None:
             await client["http"].aclose()
 
-    app = FastAPI(title=config["name"], lifespan=lifespan)
+    app = FastAPI(title=config["name"], lifespan=lifespan, **api_docs())
     app.state.mcp = tools  # in-process MCP clients (tests, headless demo) connect to this directly
     app.mount("/mcp", mcp_app(tools))
     return app

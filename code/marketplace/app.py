@@ -16,6 +16,7 @@ import httpx
 from fastapi import FastAPI, Request as HttpRequest
 from fastapi.responses import JSONResponse
 
+from apidocs import api_docs
 from aps.keys import load_public_key
 from marketplace.market import Market, MarketError
 
@@ -41,7 +42,7 @@ def create_app(http: httpx.AsyncClient | None = None) -> FastAPI:
         if http is None:
             await client.aclose()
 
-    app = FastAPI(title="Tuttie marketplace", lifespan=lifespan)
+    app = FastAPI(title="Tuttie marketplace", lifespan=lifespan, **api_docs())
 
     @app.exception_handler(MarketError)
     async def refused(_: HttpRequest, error: MarketError) -> JSONResponse:

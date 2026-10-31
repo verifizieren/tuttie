@@ -27,15 +27,20 @@ class TrainsUnavailable(Exception):
     """No connections can be given; the message says why (safe to send back)."""
 
 
-def check_request(origin: str, destination: str, day: str, time: str) -> None:
-    """Raise TrainsUnavailable unless the stations, date and time are well formed."""
+def check_request(origin: str, destination: str, day: str, time: str, today: Date | None = None) -> None:
+    """Raise TrainsUnavailable unless the stations, date and time are well formed, the stations
+    differ and the date is not in the past."""
     for name, value in (("from", origin), ("to", destination)):
         if not isinstance(value, str) or not STATION.match(value.strip()):
             raise TrainsUnavailable(f"{name} must be a station or place name, e.g. Zürich HB")
+    if origin.strip().casefold() == destination.strip().casefold():
+        raise TrainsUnavailable("from and to must be different stations")
     try:
-        Date.fromisoformat(day)
+        wanted = Date.fromisoformat(day)
     except (TypeError, ValueError):
         raise TrainsUnavailable("date must be YYYY-MM-DD") from None
+    if wanted < (today or Date.today()):
+        raise TrainsUnavailable("date must be today or later")
     if not isinstance(time, str) or not TIME.match(time):
         raise TrainsUnavailable("time must be HH:MM (24 h)")
 

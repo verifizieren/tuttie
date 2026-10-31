@@ -1,11 +1,13 @@
 // Past conversations, kept on this device only (localStorage), newest first. A conversation is
 // archived when the user starts a new chat, when Tuttie is opened again after being swiped down,
-// or when Tuttie is opened again after being swiped down. The server retains the assistant
+// or when another conversation is resumed from the history. The server retains the assistant
 // in memory; the snapshot supplies the display and user messages when resuming it.
 // Storage can be missing or full (private mode): then history simply stays empty.
+import { withoutNotes } from "./activity.js";
 
-const KEY = "tuttie.history";
-const CURRENT = "tuttie.current";  // the open conversation's own parts the server does not keep
+export const HISTORY_KEY = "tuttie.history";
+export const CURRENT_KEY = "tuttie.current";  // the open conversation's own parts the server does not keep
+const KEY = HISTORY_KEY, CURRENT = CURRENT_KEY;
 const MAX_ENTRIES = 30;
 
 function read(key, fallback) {
@@ -22,14 +24,23 @@ function write(key, value) {
   } catch { /* storage unavailable: nothing to keep */ }
 }
 
+// Storage written by an older wallet, or edited by hand, may not have the shape the screen
+// expects: anything else is ignored rather than crashing the wallet.
+const isChat = state => Boolean(state) && typeof state === "object" && Array.isArray(state.turns)
+  && state.turns.every(t => t && typeof t === "object");
+const isEntry = entry => Boolean(entry) && typeof entry === "object" && typeof entry.id === "string" && isChat(entry.state);
+
 /** All archived conversations, newest first. */
-export const loadHistory = () => read(KEY, []);
+export function loadHistory() {
+  const list = read(KEY, []);
+  return Array.isArray(list) ? list.filter(isEntry) : [];
+}
 
 /** A short line for the list: the booking, or the start of Tuttie's last answer. */
 function outcome(state) {
   if (state.booking) return `Booked ${state.booking.hotel} · CHF ${state.booking.total}`;
   const last = [...state.turns].reverse().find(t => t.answer)?.answer || "";
-  return last.replace(/\*\*/g, "").replace(/\s*\[\d+\]/g, "").split(/(?<=[.!?])\s/)[0].slice(0, 90);
+  return withoutNotes(last.replace(/\*\*/g, "")).split(/(?<=[.!?])\s/)[0].slice(0, 90);
 }
 
 /** Archive a conversation (replacing an earlier copy of the same one); returns the new list. */
@@ -43,8 +54,36 @@ export function archive(state) {
   return list;
 }
 
-/** Remember the open conversation's id and turns (the server only keeps the timeline). */
-export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })), picked: state.picked });
+/** Remember the open conversation's id, turns, pick and deck position (the server only keeps the timeline). */
+export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })), picked: state.picked,
+                                                    deck: state.deck });
 
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
-export const loadCurrent = () => read(CURRENT, null);
+export function loadCurrent() {
+  const current = read(CURRENT, null);
+  return isChat(current) ? current : null;
+}
+
+/** Whether opening Tuttie again after it was swiped down starts a new chat: only once the
+ *  current one is over. A chat still running, waiting for an approval or with hotel cards not
+ *  yet swiped stays, so an accidental swipe down never loses the user's place. */
+export function startsFresh(state) {
+  if (!state.turns.length) return false;  // nothing to put away
+  if (state.approval || (state.cards && !state.picked)) return false;
+  return Boolean(state.answer) && state.turns.every(t => t.answer);
+}
+
+/** The line shown in the history when a past chat cannot be continued (lib/api.js errors carry
+ *  the HTTP status): expired chats say so plainly, nothing silently starts elsewhere. */
+export function resumeFailure(error) {
+  if (error?.status === 404 || error?.status === 410) {
+    return "This chat has expired and can no longer be continued. Start a new chat to check current offers.";
+  }
+  if (error?.status === 409) return error.message || "This chat cannot be continued right now.";
+  return `Could not continue this chat: ${error?.message || "Tuttie is unreachable right now"}`;
+}
+
+/** The past chat open in the history that the keyboard should continue, if any: never the chat
+ *  already on screen (`currentId`), and nothing while the list is shown (`openId` null). */
+export const viewedChat = (entries, openId, currentId) =>
+  (openId && openId !== currentId && entries.find(e => e.id === openId)) || null;

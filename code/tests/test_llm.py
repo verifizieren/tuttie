@@ -31,3 +31,11 @@ def test_tool_schemas_are_converted():
                                                "parameters": {"type": "object", "properties": {}}}}
     assert to_claude_tool(schema) == {"name": "book", "description": "Book.",
                                       "input_schema": {"type": "object", "properties": {}}}
+
+
+def test_both_providers_time_out_instead_of_hanging(monkeypatch):
+    import llm
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    for client in (llm.LLM("gpt-4.1").client, llm.LLM("claude-haiku-5-5").client):
+        assert client.timeout == llm.TIMEOUT_S <= 60 and client.max_retries == llm.MAX_RETRIES

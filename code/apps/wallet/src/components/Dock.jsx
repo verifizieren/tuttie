@@ -39,7 +39,7 @@ function KeyboardIcon() {
 /**
  * @param onHistory   show earlier conversations
  * @param onNewChat   start a new conversation (the current one goes into the history)
- * @param onKeyboard  switch to typing
+ * @param onKeyboard  switch to typing (in a past chat open in the history: continue that chat first)
  * @param muted       the microphone is off
  * @param onMute      turn the microphone off or on
  */

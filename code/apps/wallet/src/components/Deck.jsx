@@ -27,9 +27,6 @@ function Photos({ photos, name, flipRef }) {
         : <div className="photo-missing" />}
       {photos.length > 1 && (
         <>
-          <div className="photo-bars" aria-hidden="true">
-            {photos.map((_, i) => <i key={i} className={i === shown ? "on" : ""} />)}
-          </div>
           {/* For the keyboard only (Enter / Space): pointer taps are read by the deck (pointer-events: none). */}
           <button type="button" className="photo-prev" aria-label="Previous photo" data-tap onClick={() => flip(-1)} />
           <button type="button" className="photo-next" aria-label="Next photo" data-tap onClick={() => flip(1)} />
@@ -39,11 +36,14 @@ function Photos({ photos, name, flipRef }) {
   );
 }
 
-function HotelCard({ card, hotel, style, handlers, verdict, className = "", flipRef = null }) {
+function HotelCard({ card, hotel, position, count, style, handlers, verdict, className = "", flipRef = null }) {
   const price = card.agreed_chf ?? card.price_chf;
   return (
     <article className={`swipe-card ${className}`} style={style} {...handlers}>
       <Photos photos={card.photos || []} name={card.name} flipRef={flipRef} />
+      <div className="hotel-bars" role="img" aria-label={`Hotel ${position + 1} of ${count}`}>
+        {Array.from({ length: count }, (_, i) => <i key={i} className={i === position ? "on" : ""} />)}
+      </div>
       <div className="swipe-top">
         <SealMarks seals={hotel?.seals || []} tiers={[card.trust_tier]} />
         {card.rating && <span className="rating" aria-label={`rated ${card.rating.score} of 5`}>★ {card.rating.score}</span>}
@@ -52,7 +52,7 @@ function HotelCard({ card, hotel, style, handlers, verdict, className = "", flip
       <div className="swipe-name">{card.name}</div>
       <div className="swipe-foot">
         <ul className="feature-icons">
-          {card.features.map(f => (
+          {(card.features || []).map(f => (
             <li key={f.key} className={f.ok ? "yes" : "no"} title={f.label} aria-label={f.label}>
               <FeatureIcon name={f.key} />
             </li>
@@ -61,6 +61,7 @@ function HotelCard({ card, hotel, style, handlers, verdict, className = "", flip
         <div className="swipe-price">
           {card.agreed_chf != null && <s>CHF {card.price_chf}</s>}
           <b>CHF {price}</b>
+          {card.over_budget_chf != null && <small className="over-budget">over your budget</small>}
         </div>
       </div>
     </article>
@@ -72,19 +73,24 @@ function HotelCard({ card, hotel, style, handlers, verdict, className = "", flip
  * @param hotels  the wallet's hotel state, for the verified seals
  * @param onDone  (liked cards) => void, after the last card
  * @param onLean  (x in -1..1) => void while a card is dragged, 0 when it is let go (Tuttie's eyes follow)
+ * @param start   where the user was in this deck before a reload ({ index, liked node ids }), see
+ *                lib/activity.js deckStart
+ * @param onProgress ({ index, liked node ids }) => void after each card, so a reload can continue
  */
-export default function Deck({ cards, hotels, onDone, onLean }) {
-  const [index, setIndex] = useState(0);
-  const [liked, setLiked] = useState([]);
+export default function Deck({ cards, hotels, onDone, onLean, commands = [], start = null, onProgress }) {
+  const [index, setIndex] = useState(start?.index || 0);
+  const [liked, setLiked] = useState(() => cards.filter(c => start?.liked.includes(c.node_id)));
   const [drag, setDrag] = useState(null);     // { dx, dy } while the finger moves the top card sideways
   const [flying, setFlying] = useState(null); // "like" | "pass" while the top card leaves
-  const [nudge, setNudge] = useState(true);   // the first card shows once that it moves sideways
+  const [nudge, setNudge] = useState(!start?.index);  // the first card shows once that it moves sideways
+  const flight = useRef(null);
+  const consumed = useRef(null);
   const gesture = useRef(null);               // { x, y, t, axis, scroller, scrollTop }
   const flipTop = useRef(null);               // flips the top card's photos (set by its Photos)
 
   useEffect(() => {
     const done = setTimeout(() => setNudge(false), 1600);
-    return () => clearTimeout(done);
+    return () => { clearTimeout(done); clearTimeout(flight.current); };
   }, []);
 
   function lean(x) {
@@ -92,18 +98,28 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
   }
 
   function decide(verdict) {
+    if (flying || index >= cards.length) return;
     setFlying(verdict);
     lean(verdict === "like" ? 1 : -1);
-    setTimeout(() => {
+    flight.current = setTimeout(() => {
       const nextLiked = verdict === "like" ? [...liked, cards[index]] : liked;
       setLiked(nextLiked);
       setFlying(null);
       setDrag(null);
       setIndex(index + 1);
       lean(0);
+      onProgress?.({ index: index + 1, liked: nextLiked.map(c => c.node_id) });
       if (index + 1 >= cards.length && nextLiked.length) onDone(nextLiked);
     }, FLY_MS);
   }
+
+  // Consume each live command once; leave the next command pending during a swipe.
+  useEffect(() => {
+    const command = commands.find(c => c.id > (consumed.current ?? -1));
+    if (!command || flying || index >= cards.length) return;
+    consumed.current = command.id;
+    decide(command.verdict);
+  }, [commands, flying, index]);
 
   const handlers = {
     onPointerDown: e => {
@@ -150,7 +166,7 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
     return liked.length ? null : (
       <div className="deck-empty">
         You passed on every hotel.
-        <button type="button" onClick={() => { setIndex(0); setLiked([]); }}>See them again</button>
+        <button type="button" onClick={() => { setIndex(0); setLiked([]); onProgress?.({ index: 0, liked: [] }); }}>See them again</button>
       </div>
     );
   }
@@ -166,11 +182,11 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
       <div className="deck-stack">
         {index + 1 < cards.length && (
           <HotelCard key={cards[index + 1].node_id} card={cards[index + 1]} hotel={hotels[cards[index + 1].node_id]}
-                     style={{ transform: "scale(.95) translateY(10px)", opacity: .6 }} handlers={{}} />
+                     position={index + 1} count={cards.length} style={{ transform: "scale(.95) translateY(10px)", opacity: .6 }} handlers={{}} />
         )}
         <HotelCard key={cards[index].node_id} card={cards[index]} hotel={hotels[cards[index].node_id]}
                    style={nudge && index === 0 && !drag ? undefined : top} className={nudge && index === 0 && !drag ? "nudge" : ""}
-                   handlers={handlers} verdict={verdict} flipRef={flipTop} />
+                   position={index} count={cards.length} handlers={handlers} verdict={verdict} flipRef={flipTop} />
       </div>
       <div className="deck-count">{index + 1} of {cards.length}</div>
     </section>

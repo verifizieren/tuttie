@@ -23,6 +23,8 @@ import os
 import re
 from pathlib import Path
 
+from assistant.card_commands import card_choice
+
 import httpx
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, JobProcess, StopResponse, cli
@@ -66,10 +68,40 @@ def francs(match: re.Match) -> str:
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
+LINK = re.compile(r"\[([^\]\n]*)\]\([^)\n]*\)")          # a markdown link: keep its text only
+NOTE = re.compile(r"[ \t]?\[([^\]\n]{0,60})\]")             # a note the model put in square brackets
+# Notes that carry nothing to say: citations ([3], [3, 4]), one-word labels ([confirmed]) and ids
+# ([receipt RC-A14786]: the wallet shows those). Any other note may be a fact (a fee, a
+# condition), so only its brackets go.
+EMPTY_NOTE = re.compile(r"\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*")
+# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration:
+# "18:00", "00:52" yes; "8:30 pm", "1:30 hours", "18:00:30" no.
+CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))",
+                   re.IGNORECASE)
+
+
+def note(match: re.Match) -> str:
+    """A bracketed note: dropped if it says nothing, else kept without its brackets."""
+    inner = match.group(1).strip()
+    if not inner or EMPTY_NOTE.fullmatch(inner):
+        return ""
+    return (" " if match.group(0)[0] in " \t" else "") + inner
+
+
+def clock(match: re.Match) -> str:
+    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight"."""
+    hour, minute = int(match.group(1)), int(match.group(2))
+    if minute == 0 and hour in (0, 12):
+        return "midnight" if hour == 0 else "noon"
+    said = str(hour % 12 or 12) + (f":{minute:02d}" if minute else "")
+    return f"{said} {'am' if hour < 12 else 'pm'}"
+
+
 def spoken(answer: str) -> str:
-    """An answer as it should sound: amounts in francs, temperatures in degrees, no citations,
-    no markdown, no emoji."""
-    text = re.sub(r"\s*\[\d+\]", "", answer)
+    """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
+    (6 pm), no bracketed notes, no markdown, no emoji."""
+    text = NOTE.sub(note, LINK.sub(r"\1", answer))
+    text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
@@ -82,7 +114,7 @@ def spoken(answer: str) -> str:
 def meaningful(text: str) -> bool:
     """A real request, not a noise tag like "(laughs)" or a stray word from the room."""
     words = re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", text))
-    return len(words) >= MIN_WORDS
+    return card_choice(text) is not None or len(words) >= MIN_WORDS
 
 
 def filler_kind(text: str) -> str:
@@ -160,8 +192,9 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
                 agent.asked = None  # answered without (or after) a tool: no filler any more
                 say(spoken(event["summary"]))
                 continue
-            # The first tool for the request gets a filler; closing the card does not (a goodbye follows).
-            if event["kind"] not in ("thinking", "close") and (line := agent.filler()):
+            # The first tool for the request gets a filler; opening the turn, thinking and closing the
+            # card do not (a goodbye follows).
+            if event["kind"] not in ("turn", "thinking", "close") and (line := agent.filler()):
                 say(line)
             if prompt := update_for(event, said):
                 say(prompt)

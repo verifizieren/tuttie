@@ -60,22 +60,25 @@ Scams are not blocked one by one; they become invisible, because they cannot sig
 - **Platforms and registries** get a new role: they vouch (seals) instead of owning the
   customer.
 
-## What is built (31 Oct)
+## What is built (1 Nov)
 
-Working and tested (136 tests): APS signing with Ed25519 seals, Swiss UIDs, signed approvals
-and delegations; the registry; business nodes with signed tools and booking; one company-agent
-object for every business with personas and private limits; three hotel agents (Alpina Grand
-Basel, large chain; Hotel Rheinblick, medium; Gästehaus am Rhein, small, owner Anna); the
-marketplace agent layer (signed postings in, signed offers out); sessions with memory and
-parallel subagents; Tuttie posting signed requests and building its own shortlist; bargaining
-within private limits (Tuttie negotiates when the user asks for a better price); booking a
-signed agreement after the user approves exactly that price; Tuttie's own sealed identity.
-The whole agent side runs end to end: post → offers → shortlist → negotiate → book
-(`test_tuttie_market.py`, and live with the real LLM). Also built: the wallet app UI (card
-stack, Tuttie's face, a voice-mode screen), not connected to the backend yet.
+Working and tested (336 Python tests, plus the wallet's and owner view's own tests): APS
+signing with Ed25519 seals, Swiss UIDs, signed approvals, delegations, signed calls and an
+action gate for `book` and `pay`; the registry; business nodes with tools over MCP; one
+company-agent object for every business with personas and private limits; three hotel agents
+(Alpina Grand Basel, large chain; Hotel Rheinblick, medium; Gästehaus am Rhein, small, owner
+Anna); the marketplace agent layer (signed postings in, signed offers out); sessions with
+memory and parallel subagents; Tuttie posting signed requests with a private budget and
+bargaining with the hotels within their private limits before the user sees the offers;
+booking a signed agreement after the user approves exactly that price; the city tax paid with
+the user's mandate; Tuttie's own sealed identity; sealed weather and train services.
+The wallet is connected: spoken or typed requests, the hotels as a swipe deck with agreed
+prices, approvals with a Face ID-style confirmation, the signed booking. Voice is live
+(self-hosted LiveKit, ElevenLabs). The owner view lets a business change prices, extras,
+negotiation limits and its agent, deployed as versions.
 
-Not yet: the wallet showing requests, offers, the agreement and the approval (the "human
-layer", in progress); the owner view; voice; the presentation site. See [status.md](../dev/status.md).
+Not yet: the presentation site; the demo runner (`code/demo/`); voice confirmed on a real
+iPhone. See [status.md](../dev/status.md).
 
 ## The pitch
 

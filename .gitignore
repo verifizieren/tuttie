@@ -7,7 +7,7 @@ __pycache__/
 # signed registry. Any non-demo key goes in keys/local/, which stays private.
 code/keys/local/
 # Local working notes for the AI assistant; never pushed.
-CLAUDE.md
+/CLAUDE.md
 # Local reference material (e.g. design examples); not part of the repo.
 .context/
 .coverage

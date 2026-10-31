@@ -9,16 +9,22 @@ const ISSUERS = { "handelsregister-bs": "Registered in the Handelsregister", ado
 
 /** What Tuttie checked, as short lines the user understands. */
 function checks(booking) {
+  const checked = booking.checked || [];  // an older booking kept in the history may have none
   const lines = (booking.seals || []).filter(s => s.valid).map(s => ISSUERS[s.issuer] || `Sealed by ${s.issuer}`);
-  if (booking.checked.includes("agreement")) lines.push("The hotel signed the agreed price");
-  if (booking.checked.includes("commitments")) lines.push("The hotel signed the extras");
+  if (checked.includes("agreement")) lines.push("The hotel signed the agreed price");
+  if (checked.includes("commitments")) lines.push("The hotel signed the extras");
   lines.push("The hotel signed the booking");
-  if (booking.checked.includes("approval")) lines.push("Approved by you");
-  return lines;
+  if (checked.includes("approval")) lines.push("Approved by you");
+  return [...new Set(lines)];  // two seals from one issuer read as one line (and one React key)
 }
 
-const capitalize = text => text[0].toUpperCase() + text.slice(1);
-const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const capitalize = (text = "") => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** "14 Nov" for an ISO date; the date as given if it cannot be read. */
+function day(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date || "" : parsed.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
 
 function Check() {
   return (
@@ -36,11 +42,12 @@ export default function BookingCard({ booking }) {
     <div className="booking">
       <div className="booking-top">
         <SealMarks seals={booking.seals} />
-        <span className="booking-hotel">{booking.hotel}<small>{day(booking.date)} · {booking.id}</small></span>
+        <span className="booking-hotel">{booking.hotel}<small>{[day(booking.date), booking.id].filter(Boolean).join(" · ")}</small>
+          {booking.rate && <small>{booking.room} room · {booking.rate}</small>}</span>
         <span className="booking-total">CHF {booking.total}</span>
       </div>
-      {booking.payments.map((payment, i) => (
-        <div className="payment" key={i}><Check />{capitalize(payment.purpose)} CHF {payment.amount} paid</div>
+      {(booking.payments || []).map((payment, i) => (
+        <div className="payment" key={i}><Check />{capitalize(payment.purpose || "charge")} CHF {payment.amount} paid</div>
       ))}
       <button type="button" className="checks-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Check /> Checked by Tuttie <span className="checks-count">{lines.length}</span>
