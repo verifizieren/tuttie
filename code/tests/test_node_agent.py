@@ -139,3 +139,21 @@ def test_the_add_ons_a_request_needs_are_chosen_in_code_fewest_first():
     assert BusinessAgent(RHEINBLICK).add_ons_for(needs) == ["late-checkin-dog"]  # one add-on covers both
     assert BusinessAgent(HOTELS["hotel-alpina-grand"]).add_ons_for(needs) == ["dog"]  # 24h reception: no late check-out for an arrival
     assert BusinessAgent(RHEINBLICK).add_ons_for(["quiet"]) == []
+
+
+def offer_for(config: dict, room_type: str, requirements: list[str]) -> dict | None:
+    """make_offer with the LLM's room choice already made."""
+    posting = {"request_id": "r1", "expires_at": "2026-11-14T12:00:00Z",
+               "request": {"payload": {"constraints": {"date": "2026-11-14", "requirements": requirements}}}}
+    return asyncio.run(BusinessAgent(config).make_offer(posting, node.agent.OfferChoice(room_type=room_type)))
+
+
+def test_a_room_too_small_for_a_dog_is_never_offered_to_a_dog_guest():
+    anna = HOTELS["guesthouse-am-rhein"]
+    offer = offer_for(anna, "single", ["quiet", "dog-friendly", "arrival around 01:00"])
+    assert offer["item"].startswith("double") and offer["price_chf"] == 135  # the demo story's offer
+    assert offer_for(anna, "single", ["quiet"])["item"].startswith("single")  # without a dog the single is fine
+
+
+def test_an_unknown_room_choice_falls_back_to_the_cheapest_fitting_room():
+    assert offer_for(RHEINBLICK, "Double Room", ["quiet"])["item"].startswith("double ")

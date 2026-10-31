@@ -28,6 +28,7 @@ what the model does not know, no clever question can extract.
 
 import json
 import os
+import re
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -65,6 +66,9 @@ def covers(text: str) -> set[str]:
     text = text.lower()
     return {need for need, words in NEED_WORDS.items() if any(word in text for word in words)}
 
+
+# A room note with these words rules a need out (e.g. "too small for a dog").
+RESTRICTION = re.compile(r"\b(too small|not|no)\b")
 
 # Facts only the node's own code may use; they never reach an LLM or another agent.
 PRIVATE_FACTS = ("negotiation",)
@@ -292,8 +296,10 @@ class BusinessAgent:
 
         The LLM only chooses a room type and add-on ids (already chosen when it was woken, as
         `choice`, or asked now); the price is the room's price plus the add-ons' prices from the
-        config. An unknown room or add-on, or any LLM error, means no offer: it is better to
-        stay silent than to offer something the hotel cannot honour.
+        config. A room whose note rules out one of the guest's needs (e.g. too small for a dog),
+        or a room type the hotel does not have, is replaced by the cheapest fitting room (a hotel
+        that said it is interested must not keep the guest waiting for an offer). An unknown
+        add-on or an LLM error means no offer: better silent than an offer it cannot honour.
         """
         request = posting.get("request", {}).get("payload", {})
         if choice is None:
@@ -304,8 +310,9 @@ class BusinessAgent:
                 choice = OfferChoice.model_validate(await self._llm().complete_json(system, json.dumps(request)))
             except LLM_ERRORS:
                 return None
-        room = self.rooms.get(choice.room_type)
-        needed = self.add_ons_for(request.get("constraints", {}).get("requirements", []))
+        requirements = request.get("constraints", {}).get("requirements", [])
+        room = self.room_for(choice.room_type, covers(" ".join(requirements)))
+        needed = self.add_ons_for(requirements)
         # The LLM's own picks only for what the needed ones do not cover yet (e.g. breakfast).
         extra = [a for a in choice.add_ons if a not in needed and not covers(self.add_ons.get(a, {}).get("item", ""))
                  & covers(" ".join(self.add_ons[n]["item"] for n in needed))]
@@ -326,6 +333,16 @@ class BusinessAgent:
             "conditions": [room["rate"], *[c for a in chosen for c in a["conditions"]]],
             "valid_until": posting["expires_at"],
         }
+
+    def room_for(self, room_type: str, needs: set[str]) -> dict | None:
+        """The chosen room if it suits the needs, else the cheapest available room that does."""
+        def fits(room: dict) -> bool:
+            note = room.get("note") or ""
+            return not (RESTRICTION.search(note.lower()) and covers(note) & needs)
+        room = self.rooms.get(room_type)
+        if room is not None and fits(room):
+            return room
+        return min((r for r in self.rooms.values() if fits(r)), key=lambda r: r["price_chf"], default=None)
 
     def add_ons_for(self, requirements: list[str]) -> list[str]:
         """The add-ons a request needs (a dog, a late arrival, children), chosen in code so
