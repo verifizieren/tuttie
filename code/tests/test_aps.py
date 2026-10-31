@@ -178,6 +178,19 @@ def test_approval_decision_verifies_and_detects_tampering():
         sign_decision(approval, "maybe", user_key)
 
 
+def test_approval_terms_are_signed_with_the_decision():
+    from aps.approval import booking_terms, sign_decision, verify_decision
+
+    user_key = SigningKey.generate()
+    terms = booking_terms("double", "2026-11-14", "best rate, non-refundable", [], "of-rheinblick-1")
+    approval = {"id": "ap-2", "action": "book", "payee_node_id": "ch.test.node", "amount_chf": 172, "terms": terms}
+    decision = sign_decision(approval, "approved", user_key)
+    assert decision["terms"] == terms and verify_decision(decision, public_key_b64(user_key))
+    flexible = {**terms, "room_type": "double-flex", "rate": "flexible"}
+    assert not verify_decision({**decision, "terms": flexible}, public_key_b64(user_key))
+    assert not verify_decision({k: v for k, v in decision.items() if k != "terms"}, public_key_b64(user_key))
+
+
 # --- envelope freshness -------------------------------------------------------------
 
 
