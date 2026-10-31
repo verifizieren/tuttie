@@ -272,7 +272,7 @@ an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_
 `status` is `interested`, `declined`, `invited` (no clear answer) or `unreachable`.
 Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410 or 422.
 
-### Counter-offer (either side, during negotiation)
+### Counter-offer (either side, during negotiation; implemented in `code/negotiation/`)
 
 ```json
 {
@@ -281,17 +281,65 @@ Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410 or 422.
   "round": 2,
   "price_chf": 185,
   "includes": ["late check-in after 22:00 with dog"],
-  "conditions": ["non-refundable"]
+  "conditions": ["non-refundable"],
+  "final": false
 }
 ```
 
-A business agent may only counter within limits set by its owner, kept in the node config
-and never sent: `facts.negotiation = {"floor_chf": 175, "max_rounds": 3}`.
+Only the price is negotiable: `includes` and `conditions` must equal the offer's. Round 1 is
+the guest's first counter; the business answers every round with a Counter of the same round,
+an Agreement or a Rejection. `final: true` (business only) marks its last price: after that
+the guest can only accept it (a counter at that price) or walk away.
 
-### Agreement
+### Agreement (business → guest agent, signed by the business)
 
-The last offer or counter that both sides accept, signed by the business. It is what the
-user approves on the phone (see Approval) and what `book` redeems, like a commitment today.
+```json
+{
+  "type": "agreement", "request_id": "rq-7f3a", "offer_id": "of-rheinblick-1", "round": 2,
+  "item": "double room 2026-11-14", "price_chf": 185,
+  "includes": ["late check-in after 22:00 with dog"], "conditions": ["non-refundable"],
+  "valid_until": "2026-11-13T22:00:00Z"
+}
+```
+
+The price both sides accept. It is what the user approves on the phone (see Approval) and
+what booking redeems, like a commitment today.
+
+### Rejection (business → guest agent)
+
+`{"type": "rejection", "offer_id", "round", "reason"}`: the business ends the negotiation
+(fixed prices, its final price was not accepted, or no rounds left); its offer still stands.
+
+### `counter_offer` tool (every node, `POST /tools/counter_offer`)
+
+Stateless, like `book`: each call carries everything the hotel needs, each part signed by
+whoever is responsible for it.
+
+```json
+{
+  "counter": "<the user agent's signed envelope, payload: Counter>",
+  "offer":   "<this hotel's own signed Offer envelope>",
+  "last":    "<this hotel's own signed previous Counter envelope, null in round 1>"
+}
+```
+
+The hotel checks: the offer and `last` carry its own signature (so nobody can make it
+"remember" a price it never proposed), the offer is still valid, the counter comes from a
+sealed user agent whose delegation grants `negotiate`, is fresh (≤ 300 s) and belongs to
+this offer and round. The answer is a signed `{"tool": "counter_offer", ...Counter |
+Agreement | Rejection}`, or `{"tool": "counter_offer", "status": "refused", "reason"}`.
+
+**Limits** (`negotiation/rules.py`, compared in code only): `facts.negotiation =
+{"floor_chf", "max_rounds"}` is private, never sent and never in a prompt. `floor_chf` is the
+lowest price for the standard room (`double`, else the cheapest); other rooms may drop by
+the same share; add-ons are never discounted. The hotel meets the guest halfway, never below
+its floor, and its price is final in the last round or once it reaches the floor.
+
+**Tuttie's side** (`negotiation/tuttie.py`): one subagent per offer, all in parallel, each in
+its own session. The user's real limit is the private context item `max_price_chf`: compared
+in Tuttie's code, never shared or sent. Tuttie opens 15 % below the offer, then moves halfway
+toward the hotel's price, accepts a final or close price within the limit and walks away
+otherwise. The cheapest Agreement is what the user approves.
 
 ## Business agent (implemented, issue #10)
 

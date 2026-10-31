@@ -1,4 +1,4 @@
-"""Marketplace message formats in one place (draft of documentation/formats.md).
+"""Marketplace and negotiation message formats in one place (draft of documentation/formats.md).
 
 Every message here is the `payload` of an APS signed envelope; the envelope says who
 sent it, these models say what it may contain. They are strict (unknown fields are
@@ -77,13 +77,42 @@ class Offer(Message):
 
 
 class Counter(Message):
-    """Negotiation step (either side). Defined for completeness; negotiation is step 4."""
+    """One negotiation step about a signed offer (either side, step 4; code/negotiation/).
+
+    Only the price is negotiable: includes and conditions must equal the offer's. Round 1 is
+    the guest's first counter; the business answers each round with a Counter of the same
+    round, an Agreement or a Rejection. `final` marks the business's last price: after it,
+    only accepting that price (or walking away) is left.
+    """
     type: Literal["counter"] = "counter"
     offer_id: Annotated[str, Field(pattern=ID)]
     round: int = Field(ge=1)
     price_chf: float = Field(gt=0)
     includes: list[str] = Field(default_factory=list, max_length=10)
     conditions: list[str] = Field(default_factory=list, max_length=10)
+    final: bool = False
+
+
+class Agreement(Message):
+    """The price both sides accept, signed by the business. It is what the user approves on the
+    phone and what booking redeems, like a commitment."""
+    type: Literal["agreement"] = "agreement"
+    request_id: Annotated[str, Field(pattern=r"^rq-[a-z0-9-]{1,40}$")]
+    offer_id: Annotated[str, Field(pattern=ID)]
+    round: int = Field(ge=1)
+    item: Annotated[str, Field(min_length=1, max_length=120)]
+    price_chf: float = Field(gt=0)
+    includes: list[str] = Field(default_factory=list, max_length=10)
+    conditions: list[str] = Field(default_factory=list, max_length=10)
+    valid_until: Timestamp
+
+
+class Rejection(Message):
+    """The business ends the negotiation without an agreement; its offer still stands."""
+    type: Literal["rejection"] = "rejection"
+    offer_id: Annotated[str, Field(pattern=ID)]
+    round: int = Field(ge=1)
+    reason: Annotated[str, Field(min_length=1, max_length=200)]
 
 
 class Posting(Message):
