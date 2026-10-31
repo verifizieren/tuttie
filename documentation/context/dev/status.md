@@ -19,6 +19,15 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   arrives; a late answer never replaces a newer one. History restore rebuilds turns from the
   server timeline. The voice agent says no filler for a `turn` event. Format in
   `documentation/formats.md` (UI event). Not verified in a browser or with live voice.
+- Wallet hardening (2026-10-31, branch wip/hunt-wallet): reopening Tuttie after a swipe down
+  starts a new chat only when the current one is finished (`startsFresh` in lib/history.js), so
+  a deck waiting to be swiped or a running request is never lost; the approval sheet takes one
+  decision per tap, no longer shows "Approved" while declining and says when a decision failed;
+  an error boundary (components/Boundary.jsx) keeps a render failure in the chat or history from
+  blanking the wallet; the booking card tolerates older bookings without checks or payments.
+  Checked in headless Chromium (iPhone 14 Pro) on a test instance: type → deck → swipe →
+  approve/decline → booking → follow-up → new chat → history → continue, reloads at the deck
+  and at the sheet, close/reopen while working and at the deck, a failing and a slow decision.
 
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
