@@ -224,7 +224,9 @@ export default function App() {
     actions.pick([best.node_id]);
     const sent = await send(`Book ${best.name} (${best.node_id})${best.agreed_chf != null ? " at the agreed price" : ""}.`,
                             "book", `Book ${best.name}`, false, true);
-    if (!sent) actions.pick(null);
+    if (sent) return;
+    actions.pick(null);
+    setError("Tuttie could not be reached — swipe again to book");
   }
 
   // While a hotel card is dragged, Tuttie looks the same way (the face director follows `lean`).
