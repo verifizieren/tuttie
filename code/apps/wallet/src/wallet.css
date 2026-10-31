@@ -168,6 +168,21 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .checks .seal-row + .seal-row::before { left: 45px; }
 .check-ok { width: 20px; height: 20px; }
 
+.payment { display: flex; align-items: center; gap: 11px; margin: -4px 0 12px 48px; }
+.payment b { display: block; font-size: 14px; font-weight: 600; }
+.payment small { display: block; font-size: 12px; color: var(--muted); }
+
+/* The offered mandate on the approval sheet: an iOS-style switch. */
+.mandate { display: flex; align-items: center; gap: 12px; margin: -4px 0 16px; padding: 11px 12px;
+           border-radius: 14px; background: #2a2a2e; font-size: 14px; }
+.mandate span { flex: 1; }
+.mandate input { appearance: none; flex: none; width: 46px; height: 28px; margin: 0; border-radius: 14px;
+                 background: #48484e; position: relative; transition: background .2s var(--ease); cursor: pointer; }
+.mandate input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
+                        background: #fff; transition: transform .2s var(--ease); }
+.mandate input:checked { background: var(--green); }
+.mandate input:checked::after { transform: translateX(18px); }
+
 /* Businesses Tuttie never asked. */
 .hotel.skipped { cursor: default; }
 .hotel.skipped .hotel-line { cursor: default; }

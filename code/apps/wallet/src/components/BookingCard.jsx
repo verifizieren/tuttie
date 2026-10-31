@@ -34,6 +34,14 @@ export default function BookingCard({ booking }) {
         <span className="booking-total">CHF {booking.total}</span>
       </div>
       <div className="booking-id">Booking <b>{booking.id}</b></div>
+      {booking.payments.map((payment, i) => (
+        <div className="payment" key={i}>
+          <Check />
+          <span><b>{payment.purpose[0].toUpperCase() + payment.purpose.slice(1)} CHF {payment.amount}</b>
+            <small>{payment.paidWith === "mandate" ? "Paid with your mandate, no need to ask" : "Paid after your approval"}</small>
+          </span>
+        </div>
+      ))}
       {booking.checked.length > 0 && (
         <div className="seal-list checks">
           <div className="seal-head">Checked by the hotel before booking</div>

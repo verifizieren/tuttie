@@ -9,7 +9,7 @@ export const EMPTY = {
   skipped: [],          // [{ name, reason, tier }] not woken: untrusted or broken
   shortlistDone: false,
   approval: null,       // { id, amount, hotel, summary, seals, uid } while the user decides
-  booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid } once the hotel confirmed
+  booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid, payments } once confirmed
   answer: "",
   mood: "neutral",      // how Tuttie's answer feels (assistant/agent.py MOODS)
   thought: "",          // the latest reasoning summary title
@@ -76,13 +76,22 @@ export function applyEvent(state, event) {
   if (event.kind === "a2t" && detail.payload?.tool === "book" && detail.payload.status === "confirmed") {
     const b = detail.payload;
     return { ...state, phase: "booked", booking: { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date,
-      room: b.room_type, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid } };
+      room: b.room_type, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid,
+      payments: [] } };
+  }
+
+  // A charge paid after the booking (e.g. the city tax), with the hotel's signed receipt.
+  if (event.kind === "payment" && detail.payload?.status === "paid" && state.booking) {
+    const r = detail.payload;
+    const payment = { purpose: r.purpose, amount: r.amount_chf, paidWith: r.paid_with, checked: r.checked || [] };
+    return { ...state, booking: { ...state.booking, payments: [...state.booking.payments, payment] } };
   }
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
       return { ...state, phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
-        hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid } };
+        hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid,
+        offerMandate: detail.offer_mandate || null } };
     }
     return { ...state, approval: null, phase: event.status === "approved" ? "booking" : "declined" };
   }

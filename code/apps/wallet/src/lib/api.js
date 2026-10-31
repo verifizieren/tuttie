@@ -14,8 +14,10 @@ async function post(path, body) {
 /** Ask Tuttie something; the answer arrives later as an "answer" event on the stream. */
 export const sendChat = message => post("/chat", { message });
 
-/** The user's decision on a pending approval; the assistant signs it with the user's key. */
-export const decide = (approvalId, decision) => post(`/approvals/${approvalId}`, { decision });
+/** The user's decision on a pending approval; the assistant signs it with the user's key.
+ *  `allowMandate` also signs the mandate the approval offered (e.g. for the city tax). */
+export const decide = (approvalId, decision, allowMandate = false) =>
+  post(`/approvals/${approvalId}`, { decision, allow_mandate: allowMandate });
 
 /** Start over: a new conversation and an empty timeline. */
 export const resetConversation = () => post("/reset");
