@@ -3,7 +3,7 @@
 The real registry and node apps are served through an in-memory transport; the
 LLM, signatures and verification are real. A fake phone taps the decision.
 
-Usage (from code/): .venv/bin/python scripts/demo_headless.py [approved|declined]
+Usage (from code/): .venv/bin/python scripts/demo_headless.py [approved|declined] ["request"]
 """
 
 import asyncio
@@ -50,7 +50,7 @@ async def fake_phone(approvals: ApprovalBook, decision: str) -> None:
             approvals.decide(approval["id"], decision)
 
 
-async def main(decision: str) -> None:
+async def main(decision: str, request: str) -> None:
     apps = {REGISTRY_PORT: registry_app}
     for path in (ROOT / "data" / "nodes").glob("*.json"):
         config = json.loads(path.read_text())
@@ -60,10 +60,10 @@ async def main(decision: str) -> None:
     async with httpx.AsyncClient(transport=PortRouter(apps), timeout=60) as http:
         toolbox = Toolbox(http, f"http://localhost:{REGISTRY_PORT}", bus, approvals)
         phone = asyncio.create_task(fake_phone(approvals, decision))
-        answer = await Assistant(LLM(), toolbox, bus).chat(REQUEST)
+        answer = await Assistant(LLM(), toolbox, bus).chat(request)
         phone.cancel()
 
-    for event in bus.history[:-1]:
+    for event in [e for e in bus.history[:-1] if e["kind"] != "thinking"]:
         seals = " ".join(s["tier"] if s["valid"] else f"BROKEN({s['issuer']})" for s in event["seals"])
         print(f"{event['step']:>2} {event['kind']:<9} {event['status']:<9} {event['node_name'] or '':<20} {seals:<12} "
               f"{event['summary'][:110]}")
@@ -71,4 +71,4 @@ async def main(decision: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "approved"))
+    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "approved", sys.argv[2] if len(sys.argv) > 2 else REQUEST))
