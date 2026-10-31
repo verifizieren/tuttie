@@ -6,9 +6,9 @@
 //           swipes the card down or switches to typing; taps never send Tuttie away
 //   typing  card open with a text field; the eyes close while the user types
 //
-// Text goes to Tuttie (POST /chat); what Tuttie then does on the agent web arrives on the
-// event stream and is shown under its eyes (Activity), including the approval sheet. Voice
-// recognition is its own work area (code/voice) and not connected yet.
+// Text goes to Tuttie (POST /chat); in voice mode the user simply talks (hooks/useVoice.js,
+// code/voice) and Tuttie answers aloud. What Tuttie does on the agent web arrives on the event
+// stream and is shown under its eyes (Activity), including the approval sheet.
 //
 // There is one conversation at a time: once the user swipes Tuttie down, the next opening
 // starts a fresh one (unless an approval still waits for the user). The dock under the open
@@ -23,6 +23,7 @@ import History from "./components/History.jsx";
 import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
+import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { BUSY, EXPRESSION, LISTENING, MOOD, THINKING, WATCHING, currentTask } from "./lib/activity.js";
 
@@ -42,6 +43,7 @@ export default function App() {
   const face = useFace(canvas);
   const [agent, actions, history] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
+  const [, unlockAudio] = useVoice(mode === "voice", face);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -55,6 +57,7 @@ export default function App() {
   }, [mode, face]);
 
   function startVoice() {
+    unlockAudio();
     if (mode === "closed") {
       openedAt.current = performance.now();
       if (closedOnce.current && !agent.approval) actions.newConversation(agent);
@@ -79,6 +82,7 @@ export default function App() {
   }
 
   function tapWhileOpen() {
+    unlockAudio();
     if (mode !== "voice") return startVoice();
     face.current?.set("excitement", 250);  // a tap never ends voice mode, Tuttie just reacts
     setTimeout(() => face.current?.set("neutral", 500), 600);
