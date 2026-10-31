@@ -63,7 +63,7 @@ def test_llm_error_after_a_tool_call_answers_and_keeps_the_chat_valid():
     error = RuntimeError("provider down")
     assistant, llm, bus = make([call("end_conversation"), error, answer("Hello again")])
     text = asyncio.run(assistant.chat("bye"))
-    assert "went wrong" in text
+    assert "try again" in text
     assert bus.history[-1]["kind"] == "answer" and bus.history[-1]["status"] == "broken"
     assert tool_ids_without_result(assistant.messages) == []
     assert asyncio.run(assistant.chat("hi")) == "Hello again"
@@ -100,3 +100,13 @@ def test_a_cancelled_turn_leaves_no_open_tool_call():
         return await assistant.chat("hi")
     assert asyncio.run(run()) == "fine"
     assert tool_ids_without_result(llm.sent[-1]) == []
+
+
+def test_a_refused_llm_call_ends_the_turn_with_a_friendly_answer():
+    import anthropic
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+    refused = anthropic.BadRequestError("usage limits reached", response=response, body=None)
+    assistant, llm, bus = make([refused, answer("Back again")])
+    assert "try again" in asyncio.run(assistant.chat("I want to book something"))
+    assert bus.history[-1]["kind"] == "answer" and bus.history[-1]["detail"]["mood"] == "sorry"
+    assert asyncio.run(assistant.chat("hello?")) == "Back again"
