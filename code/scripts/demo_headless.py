@@ -84,7 +84,15 @@ async def main(decision: str, request: str) -> None:
         mcp = McpLink(lambda endpoint: Client(servers[endpoint]))
         toolbox = Toolbox(http, f"http://localhost:{REGISTRY_PORT}", bus, approvals, mcp=mcp)
         phone = asyncio.create_task(fake_phone(approvals, decision))
-        answer = await Assistant(LLM(), toolbox, bus).chat(request)
+        assistant = Assistant(LLM(), toolbox, bus)
+        answer = await assistant.chat(request)
+        # Like the wallet: the user picks the recommended cards as favourites, Tuttie negotiates and books.
+        cards = [e for e in bus.history if e["detail"].get("phase") == "cards"]
+        favourites = [c for c in (cards[-1]["detail"]["cards"] if cards else []) if c["shortlisted"]]
+        if favourites:
+            print(f"\nwallet: favourites {[c['name'] for c in favourites]}\n{answer}\n")
+            answer = await assistant.chat("Negotiate with my favourites and book the best deal: "
+                                          + ", ".join(f"{c['name']} ({c['node_id']})" for c in favourites) + ".")
         phone.cancel()
 
     for event in [e for e in bus.history[:-1] if e["kind"] != "thinking"]:
