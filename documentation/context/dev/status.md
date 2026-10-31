@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31.
+Last updated: 2026-10-31 (company agents).
 
 ## Done
 
@@ -14,8 +14,9 @@ Last updated: 2026-10-31.
 | --- | --- | --- |
 | APS signing | Canonical JSON, Ed25519 keys, signed envelopes, seals with gold / blue / grey / broken tiers, signed user approvals. 25 tests. | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
-| Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config. | `code/node/`, `code/data/nodes/` |
-| Demo data | Hotels Rheinblick (gold + blue), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
+| Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays). | `code/node/`, `code/data/nodes/` |
+| Company agents | The same agent object for every company: persona, a shared tool catalog with `available` / `planned` tools, a signed agent card (`GET /agent/card`), A2A answers in persona with priced add-ons from the config (`POST /agent`), and wake-ups from the marketplace (`POST /agent/invoke`: interested?, which tool next). Three hotel agents: Alpina Grand Basel (large chain branch, Lena), Hotel Rheinblick (medium, Marco), Gästehaus am Rhein (small independent, Anna). Private negotiation limits never leave the node. | `code/node/agent.py`, `code/node/catalog.py`, `code/node/README.md` |
+| Demo data | Hotels Alpina Grand (gold + blue), Rheinblick (gold + blue), Gästehaus am Rhein (gold), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
 | User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". | `code/assistant/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
@@ -26,10 +27,12 @@ Last updated: 2026-10-31.
 
 Build order from [goals.md](goals.md):
 
-1. **Agents** — mostly done; missing: the three hotel agents in the planned sizes (big chain
-   branch, mid-sized, small independent) and Tuttie as a named agent identity.
+1. **Agents** — company agents done (three hotels, same agent object). Next: **Tuttie**, our
+   main agent, as its own agent identity.
 2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
-   `documentation/formats.md`).
+   `documentation/formats.md`). The agents are ready to be woken: the marketplace calls
+   `POST /agent/invoke` on every agent subscribed to an event (`wakes_on`). Tools still to
+   build: `make_offer`, `counter_offer`, `pay` (outlined in `code/node/catalog.py`).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
    connect the wallet to `POST /chat`, `GET /events` and the approvals API.
 4. **Negotiation and subagents** — not started.
@@ -44,6 +47,8 @@ profiles in the readme.
 
 - **One app.** The wallet is the real product; the demo is a run through it. Never build
   separate demo screens. In repo files say "demo", not "scripted demo".
+- **APS (agent protocol and signing) is its own work area with its own owner.** Other work
+  only uses `code/aps/`; changes to it go through that owner.
 - **Signing only through `code/aps/`.** No signature, no action: untrusted (grey) and broken
   (red) nodes can be shown but never transact.
 - **Prices never come from an LLM**: only from node configs and signed messages.
