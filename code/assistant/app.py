@@ -23,6 +23,7 @@ from pydantic import BaseModel
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from assistant.conversations import Conversation, Conversations  # noqa: E402
+from assistant.voice import router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
     """Keep the conversations and one shared HTTP client for the service's lifetime."""
     async with httpx.AsyncClient(timeout=20) as http:
         app.state.conversations = Conversations(http, REGISTRY_URL)
+        app.state.voice_rooms = {}  # LiveKit room -> session id (assistant/voice.py)
         yield
 
 
@@ -128,6 +130,9 @@ def events(conv: Conversation = Depends(conversation)) -> StreamingResponse:
     """This conversation's timeline as Server-Sent Events."""
     return StreamingResponse(conv.bus.stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+app.include_router(voice_router)
 
 
 @app.get("/")
