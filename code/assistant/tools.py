@@ -41,7 +41,8 @@ SCHEMAS = [
         {
             "tags": {"type": "array", "items": {"type": "string"},
                      "description": "Known tags: hotel, basel-sbb, dog-friendly, quiet, legal, consumer-law, switzerland"},
-            "capability": {"type": "string", "description": "e.g. licensed_legal_ch"},
+            "capability": {"type": "string", "enum": ["can_book", "can_take_payment", "licensed_legal_ch"],
+                           "description": "Optional. Omit it for hotels; tags are enough."},
         },
     ),
     function(
@@ -139,6 +140,7 @@ class Toolbox:
         # Signed facts remembered for booking, so prices never come from the LLM.
         self.availability: dict[str, dict] = {}  # node_id -> last get_availability payload
         self.commitments: dict[str, list[dict]] = {}  # node_id -> signed A2A envelopes with a commitment
+        self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
 
     async def dispatch(self, name: str, args: dict) -> dict:
         tools = {"search_registry": self.search_registry, "call_tool": self.call_tool,
@@ -155,13 +157,25 @@ class Toolbox:
             verdict = evaluate_record(record, self.authorities)
             if verdict["tier"] == "broken":
                 reason = broken_reason(verdict)
-                self.bus.emit("registry", "broken", f"{record['name']}: {reason}, ignored", record, verdict["seals"])
+                self.emit_once(record, "broken", f"{record['name']}: {reason}, ignored", verdict)
                 refused.append(rejected(record, reason))
             else:
-                event = self.bus.emit("registry", "verified", f"{record['name']}: {verdict['tier']} seal verified",
-                                      record, verdict["seals"], {"capabilities": verdict["capabilities"]})
-                verified.append({**node_view(record, verdict), "source_step": event["step"]})
-        return {"query": params, "verified": verified, "rejected": refused}
+                step = self.emit_once(record, "verified", f"{record['name']}: {verdict['tier']} seal verified", verdict)
+                verified.append({**node_view(record, verdict), "source_step": step})
+        result = {"query": params, "verified": verified, "rejected": refused}
+        if not records:
+            everything = (await self.http.get(f"{self.registry_url}/search")).json()
+            known = sorted({tag for record in everything for tag in record["tags"]})
+            result["hint"] = f"No node has all these tags. Search with fewer tags; known tags: {known}"
+        return result
+
+    def emit_once(self, record: dict, status: str, summary: str, verdict: dict) -> int:
+        """Show a node's registry check on the timeline only the first time it is found."""
+        if record["node_id"] not in self.seen:
+            event = self.bus.emit("registry", status, summary, record, verdict["seals"],
+                                  {"capabilities": verdict["capabilities"]})
+            self.seen[record["node_id"]] = event["step"]
+        return self.seen[record["node_id"]]
 
     async def lookup(self, node_id: str) -> tuple[dict, dict] | None:
         if not NODE_ID.match(node_id):
