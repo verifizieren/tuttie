@@ -51,6 +51,17 @@ class PortRouter(httpx.AsyncBaseTransport):
         return await self.transports[request.url.port].handle_async_request(request)
 
 
+def booking_request(liked: list[dict]) -> str:
+    """The wallet's message after swiping (lib/picks.js): book the cheapest liked deal, name the rest."""
+    price = lambda c: c["agreed_chf"] if c["agreed_chf"] is not None else c["price_chf"]  # noqa: E731
+    best, *others = sorted(liked, key=price)
+    text = f"Book {best['name']} ({best['node_id']})" + (" at the agreed price." if best["agreed_chf"] is not None else ".")
+    if others:
+        text += " If I decline it, I also liked: " + ", ".join(
+            f"{c['name']} ({c['node_id']}) at CHF {price(c):g}" for c in others) + "."
+    return text
+
+
 async def fake_phone(approvals: ApprovalBook, decision: str) -> None:
     """Stand in for the phone: answer every pending approval with `decision`."""
     while True:
@@ -86,14 +97,16 @@ async def main(decision: str, request: str) -> None:
         phone = asyncio.create_task(fake_phone(approvals, decision))
         assistant = Assistant(LLM(), toolbox, bus)
         answer = await assistant.chat(request)
-        # Like the wallet: the user swipes right on the recommended cards, Tuttie books the cheapest liked deal.
+        # Like the wallet: the user swipes right on every card, Tuttie books the cheapest liked
+        # deal and hears about the others for after a decline (apps/wallet/src/lib/picks.js).
         cards = [e for e in bus.history if e["detail"].get("phase") == "cards"]
-        liked = [c for c in (cards[-1]["detail"]["cards"] if cards else []) if c["shortlisted"]]
+        liked = cards[-1]["detail"]["cards"] if cards else []
         if liked:
-            best = min(liked, key=lambda c: c["agreed_chf"] if c["agreed_chf"] is not None else c["price_chf"])
             print(f"\nwallet: liked {[c['name'] for c in liked]}\n{answer}\n")
-            answer = await assistant.chat(f"Book {best['name']} ({best['node_id']}) at the agreed price.",
-                                          first_tool="book")
+            answer = await assistant.chat(booking_request(liked), first_tool="book")
+            if decision == "approved":
+                print(f"\nbooked: {answer}\nuser: What time is check-in?")
+                answer = await assistant.chat("What time is check-in?")
         phone.cancel()
 
     for event in [e for e in bus.history[:-1] if e["kind"] != "thinking"]:
