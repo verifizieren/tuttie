@@ -49,6 +49,15 @@ export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
 export const loadCurrent = () => read(CURRENT, null);
 
+/** Whether opening Tuttie again after it was swiped down starts a new chat: only once the
+ *  current one is over. A chat still running, waiting for an approval or with hotel cards not
+ *  yet swiped stays, so an accidental swipe down never loses the user's place. */
+export function startsFresh(state) {
+  if (!state.turns.length) return false;  // nothing to put away
+  if (state.approval || (state.cards && !state.picked)) return false;
+  return Boolean(state.answer) && state.turns.every(t => t.answer);
+}
+
 /** The line shown in the history when a past chat cannot be continued (lib/api.js errors carry
  *  the HTTP status): expired chats say so plainly, nothing silently starts elsewhere. */
 export function resumeFailure(error) {

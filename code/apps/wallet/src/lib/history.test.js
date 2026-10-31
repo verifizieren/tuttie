@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resumeFailure, viewedChat } from './history.js';
+import { resumeFailure, startsFresh, viewedChat } from './history.js';
 
 test('an expired chat (404 or 410) gets a clear expiry message', () => {
   for (const status of [404, 410]) {
@@ -25,4 +25,14 @@ test('the keyboard continues only the past chat open in the history', () => {
   assert.equal(viewedChat(entries, null, 'now'), null);         // the list: type into the current chat
   assert.equal(viewedChat(entries, 'old-1', 'old-1'), null);    // already the chat on screen
   assert.equal(viewedChat(entries, 'gone', 'now'), null);       // no longer in the history
+});
+
+test('reopening Tuttie starts fresh only after a finished chat', () => {
+  const done = { turns: [{ said: 'hi', answer: 'Hello' }], answer: 'Hello', approval: null, cards: null, picked: null };
+  assert.equal(startsFresh(done), true);
+  assert.equal(startsFresh({ ...done, turns: [] }), false);                                         // nothing yet
+  assert.equal(startsFresh({ ...done, turns: [...done.turns, { said: 'and?' }] }), false);           // still working
+  assert.equal(startsFresh({ ...done, approval: { id: 'a1' } }), false);                             // waiting for the user
+  assert.equal(startsFresh({ ...done, cards: [{ node_id: 'h' }] }), false);                          // cards to swipe
+  assert.equal(startsFresh({ ...done, cards: [{ node_id: 'h' }], picked: ['h'] }), true);            // swiped and answered
 });

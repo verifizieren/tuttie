@@ -12,7 +12,8 @@
 // stream and is shown under its eyes (Activity), including the approval sheet.
 //
 // There is one conversation at a time: once the user swipes Tuttie down, the next opening
-// starts a fresh one (unless an approval still waits for the user). The dock under the open
+// starts a fresh one, if the current one is over (not while Tuttie works, an approval waits or
+// hotel cards wait to be swiped: an accidental swipe down never loses them). The dock under the open
 // card shows earlier conversations (kept on this device), starts a new one, or switches to typing.
 //
 // Tuttie's presence (hooks/usePresence.js) folds all of this into one signal for the eyes: what
@@ -33,7 +34,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
-import { resumeFailure, viewedChat } from "./lib/history.js";
+import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -98,7 +99,7 @@ export default function App() {
     setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !approval) actions.newConversation(agent).catch(e => setError(e.message));
+      if (closedOnce.current && !approval && startsFresh(agent)) actions.newConversation(agent).catch(e => setError(e.message));
       closedOnce.current = false;
     }
     setMode("voice");
