@@ -1,9 +1,9 @@
 # systemd user service that keeps the whole demo running (registry, nodes, assistant).
-# Install:  cp deploy/two-webs.service ~/.config/systemd/user/ && systemctl --user daemon-reload
-#           systemctl --user enable --now two-webs
-# Deploy new code: systemctl --user restart two-webs     Logs: journalctl --user -u two-webs -f
+# Install:  cp deploy/tuttie.service ~/.config/systemd/user/ && systemctl --user daemon-reload
+#           systemctl --user enable --now tuttie
+# Deploy new code: systemctl --user restart tuttie     Logs: journalctl --user -u tuttie -f
 [Unit]
-Description=Two Webs agent web demo
+Description=Tuttie agent web demo
 After=network-online.target
 
 [Service]
