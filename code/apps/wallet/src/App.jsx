@@ -37,6 +37,7 @@ import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
+import { bookingRequest } from "./lib/picks.js";
 import { newChatFailure, shouldResend, voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
@@ -48,7 +49,6 @@ const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once mor
 const DECIDE_FIRST = "Decide on the booking first";
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
-const price = card => card.agreed_chf ?? card.price_chf ?? Infinity;
 
 export default function App() {
   const [mode, setMode] = useState("closed");
@@ -227,14 +227,14 @@ export default function App() {
   }
 
   // The user swiped through the cards: book the best liked deal (the lowest agreed price; a card
-  // without any price comes last). If
-  // the choice cannot reach Tuttie (even after one more try), the cards come back, so swiping
-  // again sends it again.
+  // without any price comes last); the
+  // other liked hotels are named so Tuttie can offer the next one after a decline (lib/picks.js).
+  // If the choice cannot reach Tuttie (even after one more try), the cards come back, so
+  // swiping again sends it again.
   async function pick(liked) {
-    const best = [...liked].sort((a, b) => price(a) - price(b))[0];
+    const { best, text, shown } = bookingRequest(liked);
     actions.pick([best.node_id]);
-    const sent = await send(`Book ${best.name} (${best.node_id})${best.agreed_chf != null ? " at the agreed price" : ""}.`,
-                            "book", `Book ${best.name}`, false, true);
+    const sent = await send(text, "book", shown, false, true);
     if (sent) return;
     actions.pick(null);
     setError("Tuttie could not be reached — swipe again to book");
