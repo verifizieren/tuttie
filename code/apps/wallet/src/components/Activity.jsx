@@ -138,9 +138,10 @@ export default function Activity({ state, readOnly = false, onPick, onLean, onDe
 
   if (!state.turns.length && !state.request) return null;
   // The cards to swipe get the card's space to themselves, in place: no list behind them, only
-  // Tuttie's short recommendation that came with them (as it is spoken, while it is spoken).
+  // Tuttie's newest answer since the cards came (its recommendation, or the answer to a question
+  // asked meanwhile), shown as it is spoken while it is spoken.
   if (swiping) {
-    const note = state.turns[state.marketTurn]?.answer;
+    const note = state.turns.slice(state.marketTurn ?? 0).findLast(t => t.answer)?.answer;
     const spoken = note && reveal?.answer === note ? reveal.text : null;
     return (
       <div className="activity swiping">
