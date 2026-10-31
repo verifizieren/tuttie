@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, live data, Tuttie uses them).
+Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view and the wallet's swipe deck are done; presentation site and demo runner are open).
 
 ## Done
 
@@ -160,8 +160,9 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 | Weather and trains | Two sealed public information services on the agent web (gold): `get_forecast` (Open-Meteo) and `get_connections` (transport.opendata.ch), signed MCP tools, marked sample data without internet, signed refusals. Tuttie finds them in the registry and checks their answers like any node (rule 6 of its prompt; `READ_TOOLS`). Live-tested with the real LLM: "Will it rain in Basel on 14 Nov?" and "which train from Zürich before midnight" (IR 36, 22:36 → 23:52). | `code/services/`, `code/data/services/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Dev tooling | `./run.sh` shows every service's log lines with its name, warns without an OpenAI key and stops everything within 3 s on Ctrl+C; `scripts/check.sh` runs the checks before a push (tests, wallet build, real flow; `--no-llm` without the LLM). | `code/run.sh`, `code/scripts/run_all.py`, `code/scripts/check.sh` |
-| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** requests go to Tuttie; posting, offers, shortlist, bargaining and answer shown under its eyes; approvals in the wallet with a Face ID-style confirmation. | `code/apps/wallet/` |
-| Owner view | React + Vite, one minimal page in the wallet's look, live from the business's node and **editable**: rooms (price, offered), extras (price), negotiation (on/off, lowest price, rounds), agent (name, tone, answers new requests). Its sidebar labels are Overview, Agent, Negotiation and Versions; Rooms and prices, Add-ons and Policies are removed. Edits are a draft in the browser; the owner reviews the changes in words and deploys; the node validates, stores the next numbered version and its tools, agent and bargaining limits use it from the next request (no restart). The node can change more (profile, policies, charges, rows) and keeps a version history (`GET /owner/versions`); the page shows neither on purpose. A stale draft cannot overwrite a newer deploy (409). Needs the owner token (`OWNER_TOKEN` in `code/.env`; unset = refused). Served at `/owner/` by the assistant; dev server on 4042. | `code/apps/owner/`, `code/node/owner.py`, `settings.py`, `deployments.py` |
+| Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** spoken or typed requests go to Tuttie; posting, offers and bargaining shown under its eyes; the hotels as a swipe deck (photos, rating, features, agreed price); approvals in the wallet with a Face ID-style confirmation and an optional city-tax mandate; booking card with what Tuttie checked; dock with history, new chat, keyboard and mic mute; earlier conversations can be continued. | `code/apps/wallet/` |
+| Voice | Talk to Tuttie in the wallet. Self-hosted LiveKit (signaling proxied by the assistant at `/rtc`, media TCP 4042 / UDP 4043, coturn TURN relay on TCP 4044 for phones); ElevenLabs Scribe v2 realtime (speech-to-text) and Flash v2.5 (voice), English only. The voice agent decides nothing: what the user says goes to the same Tuttie conversation as typing (`POST /voice/say`), the answers and the Face ID prompt are spoken (`GET /voice/events`). Spoken request to spoken answer about 8 s. Not yet confirmed on a real iPhone over the TURN relay. | `code/voice/`, `code/assistant/voice.py`, `apps/wallet/src/hooks/useVoice.js` |
+| Owner view | React + Vite, one minimal page in the wallet's look, live from the business's node and **editable**: rooms (price, offered), extras (price), negotiation (on/off, lowest price, rounds), agent (name, tone, answers new requests). The tabs at the top (Overview, Agent, Negotiation, Versions) are labels only; the page shows the four blocks. Edits are a draft in the browser; the owner reviews the changes in words and deploys; the node validates, stores the next numbered version and its tools, agent and bargaining limits use it from the next request (no restart). The node can change more (profile, policies, charges, rows) and keeps a version history (`GET /owner/versions`); the page shows neither on purpose. A stale draft cannot overwrite a newer deploy (409). Needs the owner token (`OWNER_TOKEN` in `code/.env`; unset = refused). Served at `/owner/` by the assistant; dev server on 4042. | `code/apps/owner/`, `code/node/owner.py`, `settings.py`, `deployments.py` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
 | Repo structure | BaselHack template, work-area folders with scope READMEs, team context folders, concept and architecture docs, draft marketplace formats. | `documentation/`, `code/*/README.md` |
 
@@ -186,11 +187,14 @@ Build order from [goals.md](goals.md):
    timeline and shows the posting (budget private), the hotels asked and skipped, offers with
    seal colours and size, the shortlist, the bargaining and the answer under Tuttie's eyes;
    approvals happen in the wallet with a Face ID-style confirmation. Tested in a headless
-   iPhone against a separate assistant instance with the real LLM. Missing: voice recognition.
+   iPhone against a separate assistant instance with the real LLM. Voice is done too (see
+   the Voice row above).
 4. **Negotiation** — done (dev member 2, `code/negotiation/`): `counter_offer` is mounted in
    every node and available; Tuttie's `negotiate` tool hands the shortlist to
    `TuttieNegotiator.negotiate_all` with the budget as a private item and shows `best()`'s
-   signed Agreement. Tuttie negotiates only when the user asks for a better price. `book`
+   signed Agreement. Tuttie bargains right after the offers arrive (inside `post_request`), before the user sees
+   anything, so the swipe cards show the agreed prices; after swiping, Tuttie books the cheapest
+   liked deal. `book`
    redeems a hotel's signed Agreement once (`AgreementRedeemer`), and Tuttie books it with
    `use_agreement` after the user approves exactly the agreed price on the phone. Tests:
    `test_node_book.py`, `test_tuttie_market.py` (post → shortlist → negotiate → book).
@@ -252,9 +256,9 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
-   whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
-   pitch needs first.
+1. **dev member 1:** voice is done; next the demo runner (`code/demo/`) and the presentation
+   site (`code/apps/presentation/`), whichever the pitch needs first; confirm voice on a real
+   iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
 3. **dev member 2:** **Confirmed live** (real LLM, `demo_headless.py`, 2026-10-31): the pitch
@@ -291,7 +295,7 @@ the owner's limits live, once per answer (fine). Open points, none blocking:
 
 ### Test coverage
 
-326 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
+336 tests, all green (`pytest -q`), no network and no LLM (plus `npm test` in `apps/owner` for the settings helpers): `test_node_owner.py` (the owner endpoints: token, validation, deploy goes live in every tool, versions, restart, stale deploys, CORS only on `/owner`), `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -312,8 +316,8 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
-Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
-presentation site and QR code (`code/apps/presentation/`), a
+Other open items: the demo runner (`code/demo/`), the presentation site and QR code
+(`code/apps/presentation/`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -586,8 +590,10 @@ Why things are the way they are, so nobody has to rediscover them:
 
 ## Environment
 
-- **Team server:** only ports 4000-4049 are open. Registry 4000, nodes 4001-4007,
-  assistant and apps 4040, wallet dev server 4041, marketplace 4010 (planned).
+- **Team server:** only ports 4000-4049 are open. Registry 4000, nodes 4001-4009,
+  marketplace 4010, weather and trains 4011-4012, assistant and apps 4040, wallet dev server
+  4041, LiveKit media TCP 4042 / UDP 4043, TURN relay TCP 4044 (owner dev server also 4042:
+  use it locally only).
 - **Service:** `systemctl --user restart tuttie` deploys Python changes (`run.sh` also
   rebuilds the wallet); logs: `journalctl --user -u tuttie -f`. Do not start `./run.sh` by
   hand on the server, the ports would clash.
