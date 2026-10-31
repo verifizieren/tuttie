@@ -6,11 +6,12 @@ speech-to-text, Silero voice activity) goes into the same conversation the walle
 (POST /voice/say on the assistant), so every tool call runs exactly as when typing: context,
 signed MCP calls, bargaining, booking. It follows that conversation's timeline (GET
 /voice/events) and speaks every answer, also to turns the user started by touch (e.g. the
-booking after swiping), and asks for the Face ID approval, always to the end.
+booking after swiping), and asks for the Face ID approval.
 
-Robust in a noisy room: English only; while Tuttie is working or speaking, new speech is not
-sent on (people around may be talking), and fragments without meaning (one word, noises) are
-dropped.
+The user can talk at any time, also while Tuttie works or speaks; what they say is queued as
+the next message. Robust in a noisy room: English only, fragments without meaning (one word,
+noises) are dropped, and only real words (two or more, half a second) interrupt Tuttie; if a
+noise cut it off and no words follow, it carries on. The wallet can mute the microphone.
 
 Run from code/: python -m voice.agent start   (scripts/run_all.py does this when configured)
 """
@@ -37,6 +38,8 @@ LANGUAGE = "en"  # Tuttie only speaks English; without this, an accent was heard
 MIN_WORDS = 2    # shorter fragments are noise, not a request
 VAD_THRESHOLD = .65  # Silero's default is .5; background voices stay below this more often
 MIN_SPEECH_S = .2    # a click or a clatter is shorter than that
+# Interrupting Tuttie takes real words; a false interruption (no words follow) resumes its speech.
+INTERRUPTION = {"mode": "vad", "min_words": 2, "min_duration": .5, "resume_false_interruption": True}
 STT_MODEL = "scribe_v2_realtime"
 KEYTERMS = ["Tuttie", "Basel", "Gästehaus am Rhein", "Rheinblick", "Alpina", "Luna", "Kleinbasel"]  # heard right
 
@@ -78,39 +81,31 @@ class Tuttie(Agent):
         self.room = room
         self.http = http
         self.turns = 0
-        self.busy = False  # Tuttie is working on something (set from the timeline by follow())
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         text = (new_message.text_content or "").strip()
-        # While Tuttie works or speaks, speech around the phone is not a new request.
-        if meaningful(text) and not self.busy and self.session.agent_state != "speaking":
-            self.busy = True
-            self.session.say(CONFIRMATIONS[self.turns % len(CONFIRMATIONS)], allow_interruptions=False)
+        if meaningful(text):  # noise and stray words are not requests
+            self.session.say(CONFIRMATIONS[self.turns % len(CONFIRMATIONS)])
             self.turns += 1
             await self.http.post("/voice/say", json={"room": self.room, "text": text})
         raise StopResponse()  # Tuttie answers through the timeline, spoken by follow()
 
 
-async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: str) -> None:
-    """Speak every answer (to the end) and the approval prompt from the conversation's timeline,
-    and keep the agent's busy flag: busy from the first event of a turn until its answer."""
+async def follow(session: AgentSession, http: httpx.AsyncClient, room: str) -> None:
+    """Speak every answer and the approval prompt from the conversation's timeline."""
     said: set[str] = set()
     async with http.stream("GET", "/voice/events", params={"room": room}, timeout=None) as stream:
         async for line in stream.aiter_lines():
             if line.startswith("event: reset"):
                 said.clear()
-                agent.busy = False
             if not line.startswith("data:"):
                 continue
             event = json.loads(line[5:])
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
-                agent.busy = False
-                session.say(spoken(event["summary"]), allow_interruptions=False)
-                continue
-            agent.busy = True  # Tuttie works, also on turns the user started by touch
-            if line := update_for(event, said):
-                session.say(line, allow_interruptions=False)
+                session.say(spoken(event["summary"]))
+            elif prompt := update_for(event, said):
+                session.say(prompt)
 
 
 server = AgentServer()
@@ -130,10 +125,10 @@ async def entry(ctx: JobContext) -> None:
         stt=elevenlabs.STT(api_key=key, model=STT_MODEL, keyterms=KEYTERMS, language_code=LANGUAGE,
                            tag_audio_events=False),
         tts=elevenlabs.TTS(api_key=key, voice_id=VOICE_ID, model=TTS_MODEL, language=LANGUAGE),
+        turn_handling={"interruption": INTERRUPTION},
     )
-    agent = Tuttie(ctx.room.name, http)
-    await session.start(agent, room=ctx.room)
-    follower = asyncio.create_task(follow(session, agent, http, ctx.room.name))
+    await session.start(Tuttie(ctx.room.name, http), room=ctx.room)
+    follower = asyncio.create_task(follow(session, http, ctx.room.name))
 
     async def cleanup() -> None:
         follower.cancel()
