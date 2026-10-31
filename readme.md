@@ -25,7 +25,7 @@ This repo follows the BaselHack template:
 
 | Folder | Contents |
 | --- | --- |
-| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `negotiation/` (bargaining), `sessions/` (agent memory), `services/` (weather, trains), `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
 | `documentation/` | concept, architecture, formats, team context |
 | `assets/` | presentation material |
 
@@ -37,13 +37,16 @@ Requires Python 3.11+ and Node.js 20+ (for the wallet).
 cd code
 python3 -m venv .venv            # or: uv venv .venv
 .venv/bin/pip install -r requirements.txt
-cp .env.example .env             # add your OPENAI_API_KEY
-./run.sh                         # builds the wallet, starts registry :4000, nodes :4001-4007, assistant + apps :4040
-.venv/bin/pytest -q              # tests for APS, the trust gate and booking (no network, no LLM)
+cp .env.example .env             # add an LLM key: ANTHROPIC_API_KEY (default models) or OPENAI_API_KEY
+./run.sh                         # builds the apps, starts registry :4000, nodes :4001-4009, marketplace :4010,
+                                 # weather and trains :4011-4012, assistant + apps :4040 (voice too, if configured)
+.venv/bin/pytest -q              # all Python tests (no network, no LLM)
 ```
 
-<http://localhost:4040> opens the Tuttie wallet (phone-first; the agent is not connected to
-it yet, see [status](documentation/context/dev/status.md)). The agent web behind it already works end to end:
+<http://localhost:4040> opens the Tuttie wallet (phone-first), connected to Tuttie: type a
+request, or talk to it when voice is configured (LiveKit and ElevenLabs keys in `.env`, see
+[`code/voice/README.md`](code/voice/README.md)). The owner view is at `/owner/`. The same
+flow also runs without a browser:
 
 ```bash
 .venv/bin/python scripts/demo_headless.py approved   # or: declined
@@ -51,13 +54,17 @@ it yet, see [status](documentation/context/dev/status.md)). The agent web behind
 
 runs the whole flow in one process, with a real LLM, real signatures and a simulated phone:
 
-1. The scam hotel is rejected (forged seal); Hotel Rheinblick verifies as gold.
-2. Signed availability and policies are fetched (A2T).
-3. The assistant asks the hotel's own agent about the 1am arrival with a dog (A2A) and gets
-   a signed, priced commitment.
-4. The user approves on the phone; the decision is signed with the user's key.
-5. The hotel checks the signature, recomputes the total from its own signed commitment and
-   confirms the booking. Each claim in the answer cites its signed source.
+1. Tuttie reads the user's context (calendar, messages, preferences) and posts a signed
+   request on the marketplace; the budget stays private.
+2. The marketplace wakes only verified hotels: the scam hotel (forged seal) and the unsigned
+   one are never asked. The hotels' agents answer with signed offers; prices come from their
+   configs, never from an LLM.
+3. Tuttie's subagents bargain with each hotel in parallel, within the hotels' private limits
+   and the user's private budget, and end with signed agreements.
+4. The simulated phone likes the recommended hotels and approves the booking; the decision is
+   signed with the user's key.
+5. The hotel's action gate checks Tuttie's signed call, its delegation, the agreement and the
+   user's approval before it confirms the booking; the city tax is paid with the user's mandate.
 
 Or query the agent web directly:
 
