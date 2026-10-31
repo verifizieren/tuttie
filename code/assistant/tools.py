@@ -245,23 +245,29 @@ class Toolbox:
         return await self.user.recall(self.bus)
 
     async def post_request(self, **request) -> dict:
-        """Post the request on the market (MarketDesk.find), then show the offers as cards.
+        """Post the request on the market (MarketDesk.find), bargain with the hotels, then show
+        them as cards with the agreed prices.
 
-        The wallet lets the user swipe through the cards and pick favourites; Tuttie negotiates
-        only with those (negotiate with node_ids).
+        The wallet lets the user swipe through the cards; Tuttie then books the best liked deal.
         """
         result = await self.market.find(**request)
         if "error" in result or not self.market.last_offers:
             return result
+        shown = card_order(self.market.last_offers, self.market.last_shortlist)
+        # The agents bargain before the user sees anything: the cards show what was agreed.
+        result["negotiation"] = await self.negotiate(self.market.last_budget, [o["node_id"] for o in shown])
         shortlisted = {o["offer"]["offer_id"] for o in self.market.last_shortlist}
         cards = []
-        for item in card_order(self.market.last_offers, self.market.last_shortlist):
+        for item in shown:
             facts = await self.load_policies(item["node_id"])
+            agreement = self.agreements.get(item["node_id"])
             cards.append(hotel_card(item, facts, self.market.last_request["constraints"]["requirements"],
-                                    self.market.last_budget, item["offer"]["offer_id"] in shortlisted))
+                                    self.market.last_budget, item["offer"]["offer_id"] in shortlisted,
+                                    agreement["payload"]["price_chf"] if agreement else None))
         self.bus.emit("marketplace", "verified", f"{len(cards)} hotels to choose from",
                       detail={"phase": "cards", "cards": cards})
         result["cards"] = [{"node_id": c["node_id"], "name": c["name"], "price_chf": c["price_chf"],
+                            "agreed_chf": c["agreed_chf"],
                             "rating": c["rating"], "shortlisted": c["shortlisted"],
                             "yes": [f["label"] for f in c["features"] if f["ok"]],
                             "no": [f["label"] for f in c["features"] if not f["ok"]]} for c in cards]
@@ -465,6 +471,8 @@ class Toolbox:
             if agreement is None:
                 return {"error": f"no signed agreement with {node_id}: call negotiate first"}
             amount = agreement["payload"]["price_chf"]
+            # The agreed deal is for the posted night, whatever date the LLM passes.
+            date = self.market.last_request["constraints"]["date"] if self.market.last_request else date
             summary = f"Book {record['name']}, {date}: negotiated {agreement['payload']['item']} = CHF {amount:g}"
             return await self._approve_and_book(record, verdict, date, room_type, guest_name, [], amount,
                                                 summary, agreement)

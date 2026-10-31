@@ -1,7 +1,8 @@
 """Hotel cards for the wallet: what each offer means for this user, from signed facts only.
 
-After the market's offers are in, Tuttie shows up to MAX_CARDS hotels as cards the user swipes
-right (like) or left (pass); Tuttie then negotiates only with the liked ones. A card is built
+After the market's offers are in, Tuttie bargains with the hotels and shows up to MAX_CARDS of
+them as cards with the agreed price; the user swipes right (like) or left (pass), and Tuttie
+books the best liked deal. A card is built
 in code from the hotel's signed offer and its signed policies (get_policies), compared with
 the user's needs and private budget: nothing on it comes from an LLM, and the budget itself
 is never shown to a hotel.
@@ -61,11 +62,12 @@ def features(facts: dict) -> list[dict]:
 
 
 def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: float | None,
-               shortlisted: bool) -> dict:
-    """One hotel's card: rating, price, what is included and its features for this user.
+               shortlisted: bool, agreed_chf: float | None = None) -> dict:
+    """One hotel's card: photos, rating, price, what is included and its features for this user.
 
     `item` is a checked offer from the market (assistant/marketplace.py), `facts` the payload of
-    the hotel's signed get_policies, `shortlisted` whether it fits the private budget.
+    the hotel's signed get_policies, `shortlisted` whether it fits the private budget and
+    `agreed_chf` the price in the hotel's signed agreement, if Tuttie's bargaining got one.
     """
     offer, needs = item["offer"], needs_text(requirements)
     wanted = {key for key, words in NEEDS.items() if any(w in needs for w in words)}
@@ -81,9 +83,11 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
         "about": profile.get("about"),
         "agent": item.get("agent"),
         "rating": facts.get("rating"),
+        "photos": facts.get("photos", []),
         "offer_id": offer["offer_id"],
         "item": offer["item"],
         "price_chf": price,
+        "agreed_chf": agreed_chf,
         "over_budget_chf": round(price - budget_chf, 2) if budget_chf is not None and price > budget_chf else None,
         "includes": offer["includes"],
         "features": ordered[:MAX_FEATURES],

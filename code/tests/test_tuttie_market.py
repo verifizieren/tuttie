@@ -79,7 +79,7 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
                         result["approved_chf"] = approval["amount_chf"]
                         toolbox.approvals.decide(approval["id"], "approved")
                     tap = asyncio.create_task(phone())
-                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", "2026-11-14", "double",
+                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", "2026-11-15", "double",
                                                            "Alex Muster", use_agreement=True)
                     await tap
             return result, bus, market
@@ -99,7 +99,7 @@ def test_tuttie_posts_collects_offers_and_shortlists_within_its_private_budget()
     assert result["shortlist"][0]["price_chf"] == 180 and result["shortlist"][0]["size"] == "medium"
     assert "ch.basel.cheap-hotels" in result["skipped"] and "ch.basel.budget-rooms" in result["skipped"]
     phases = [e["detail"].get("phase") for e in bus.history if e["kind"] == "marketplace"]
-    assert phases[0] == "posted" and phases.count("offer") == 2 and phases[-2:] == ["shortlist", "cards"]
+    assert phases[0] == "posted" and phases.count("offer") == 2 and phases[-3:] == ["shortlist", "agreement", "cards"]
 
 
 def test_without_a_budget_every_verified_offer_is_shortlisted_cheapest_first():
@@ -150,6 +150,7 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     agreed = result["negotiation"]["best"]["price_chf"]
     assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
+    assert result["booking"]["date"] == "2026-11-14"  # the posted night, even if the LLM passes another date
 
 
 def test_the_cards_show_every_offer_with_signed_features_shortlist_first():
@@ -164,9 +165,16 @@ def test_the_cards_show_every_offer_with_signed_features_shortlist_first():
     assert [c["name"] for c in result["cards"]] == ["Hotel Rheinblick", "Alpina Grand Basel"]
 
 
-def test_tuttie_negotiates_only_with_the_users_favourites():
-    result, bus, _ = run_find(negotiate_budget=300, favourites=["ch.basel.alpina-grand"], date="2026-11-14",
-                              tags=["basel-sbb"], budget_chf=300)
+def test_tuttie_bargains_before_the_cards_and_they_show_the_agreed_price():
+    result, bus, _ = run_find(date="2026-11-14", tags=["basel-sbb"], requirements=["quiet", "dog"], budget_chf=200)
+    phases = [e["detail"].get("phase") for e in bus.history if e["kind"] == "marketplace"]
+    assert phases.index("agreement") < phases.index("cards")
+    cards = {c["name"]: c for c in result["cards"]}
+    assert cards["Hotel Rheinblick"]["agreed_chf"] < cards["Hotel Rheinblick"]["price_chf"]
+    assert cards["Alpina Grand Basel"]["agreed_chf"] is None  # over the private budget: no deal
+
+
+def test_negotiate_can_be_limited_to_some_hotels():
+    result, _, _ = run_find(negotiate_budget=300, favourites=["ch.basel.alpina-grand"], date="2026-11-14",
+                            tags=["basel-sbb"], budget_chf=300)
     assert [o["hotel"] for o in result["negotiation"]["outcomes"]] == ["Alpina Grand Basel"]
-    sessions = {e["node_name"] for e in bus.history if e["kind"] == "a2a"}
-    assert sessions == {"Alpina Grand Basel"}  # Rheinblick was never asked to bargain
