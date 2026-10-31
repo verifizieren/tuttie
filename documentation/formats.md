@@ -82,6 +82,10 @@ Each seal signature = issuer's key over canonical
 }
 ```
 
+`facts.add_ons` lists what the node's A2A agent may commit to:
+`[{ "id", "item", "price_chf", "conditions": [...] }]`. The node's LLM only picks an add-on
+id; the signed commitment (item, price, conditions, valid_until) is built from the config.
+
 In `seals`, `"issuer": "self"` means a self-signed grey seal, and
 `"signed_by": "self"` makes the node sign a seal in someone else's name (the scam).
 

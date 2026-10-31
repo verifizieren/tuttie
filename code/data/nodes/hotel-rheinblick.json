@@ -24,6 +24,26 @@
       "check_in": "15:00-22:00 at reception",
       "late_arrival": "After 22:00 guests collect their key from the key box at the entrance with a code sent on booking.",
       "cancellation": "Best rate is non-refundable. Flexible rate can be cancelled free of charge until 48h before arrival."
-    }
+    },
+    "add_ons": [
+      {
+        "id": "late-checkin-dog",
+        "item": "late check-in after 22:00 with dog",
+        "price_chf": 15,
+        "conditions": ["key box at the entrance, code sent on booking", "dog fee CHF 15 per night"]
+      },
+      {
+        "id": "late-checkin",
+        "item": "late check-in after 22:00",
+        "price_chf": 0,
+        "conditions": ["key box at the entrance, code sent on booking"]
+      },
+      {
+        "id": "dog",
+        "item": "dog in the room",
+        "price_chf": 15,
+        "conditions": ["dog fee CHF 15 per night"]
+      }
+    ]
   }
 }
