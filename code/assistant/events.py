@@ -23,6 +23,8 @@ class EventBus:
             "kind": kind,
             "node_id": record["node_id"] if record else None,
             "node_name": record["name"] if record else None,
+            # Covered by the commercial register's seal; the UI only shows it inside a valid gold seal.
+            "uid": record.get("uid") if record else None,
             "seals": seals or [],
             "status": status,
             "summary": summary,
