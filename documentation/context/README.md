@@ -5,6 +5,6 @@ others can find them. Keep it out of `code/`; finished presentation files go to 
 
 | Folder | Team | Issues |
 | --- | --- | --- |
-| [`dev/`](dev/) | Development: backend, apps, signing | #2, #5, #8, #9, #10 |
+| [`dev/`](dev/) | Development: backend, apps, signing; [status](dev/status.md) of the whole project | #2, #5, #8, #9, #10 |
 | [`research/`](research/) | Research: market, business case, numbers | #5, #7 |
 | [`pitch/`](pitch/) | Pitch: storyline, presentation, QR, stage tech | #1, #3, #4, #6 |

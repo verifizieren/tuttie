@@ -11,7 +11,8 @@ work areas and interfaces: `documentation/architecture.md`; message formats:
 - **Test loops.** Every feature comes with tests (`code/tests/`, run `pytest -q`), and we
   run the real flow end to end regularly (`code/scripts/demo_headless.py`). Tests for
   `code/aps/` must always pass.
-- **Documentation.** Update the docs in the same change as the code. Contracts in
+- **Documentation.** Update the docs in the same change as the code, and record what
+  changed in [status.md](status.md) (done, pending, decisions). Contracts in
   `documentation/formats.md` only change after telling the whole team.
 - **Regular check-ups with the pitch and design team**, so what we build can be pitched
   the way the storyline needs it (`documentation/context/pitch/`). The demo is a run

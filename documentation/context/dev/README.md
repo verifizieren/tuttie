@@ -1,6 +1,7 @@
 # Dev team: start here
 
-What we build next and how we work: **[goals.md](goals.md)**.
+What is done, what is pending and our conventions: **[status.md](status.md)** (read it
+first, update it with every change). What we build next: **[goals.md](goals.md)**.
 Concept and demo strategy: `documentation/concept.md` · work areas: `documentation/architecture.md`
 · message formats and trust rules: `documentation/formats.md`.
 
