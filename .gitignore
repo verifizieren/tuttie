@@ -5,6 +5,6 @@ __pycache__/
 .env
 # Demo keys in keys/ are committed on purpose so every teammate gets the same
 # signed registry. Any non-demo key goes in keys/local/, which stays private.
-keys/local/
+code/keys/local/
 # Local working notes for the AI assistant; never pushed.
 CLAUDE.md
