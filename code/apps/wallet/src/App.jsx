@@ -35,6 +35,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
+import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
@@ -50,7 +51,7 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history, lastChange, switching, connectionError] = useAgentStream();
+  const [agent, actions, history, lastChange, switching, connectionError, link] = useAgentStream();
   // An approval the server no longer knows (already decided or expired): the sheet said so and
   // went; the wallet stops waiting for it even if no event about it arrives.
   const [goneApproval, setGoneApproval] = useState(null);
@@ -177,9 +178,12 @@ export default function App() {
     setMode("voice");  // Tuttie is awake while it works
     setError("");
     try {
-      await sendChat(text, firstTool, agent.id, shown);
+      const { turn_id: turnId } = await sendChat(text, firstTool, agent.id, shown);
+      actions.sent(shown, turnId);
     } catch (e) {
-      setError(e.message || "Tuttie is unreachable right now");
+      actions.failed(shown, e);  // not sent: it must not hold the place of the next request's answer
+      setError(e.status === 409 ? "The chat changed elsewhere. Showing the current one, please say it again."
+                                : e.message || "Tuttie is unreachable right now");
     }
   }
 
@@ -204,10 +208,10 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : currentTask(agent))}
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
-          <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} reveal={reveal} />
+          <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} onDeck={actions.deck} reveal={reveal} />
         </Boundary>
         {showHistory && <Boundary key={historyChat.id || "list"} className="history"
                                    message="This earlier chat cannot be shown. Tap History in the dock to go back.">

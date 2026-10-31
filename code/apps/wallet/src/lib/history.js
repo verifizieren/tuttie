@@ -4,8 +4,9 @@
 // in memory; the snapshot supplies the display and user messages when resuming it.
 // Storage can be missing or full (private mode): then history simply stays empty.
 
-const KEY = "tuttie.history";
-const CURRENT = "tuttie.current";  // the open conversation's own parts the server does not keep
+export const HISTORY_KEY = "tuttie.history";
+export const CURRENT_KEY = "tuttie.current";  // the open conversation's own parts the server does not keep
+const KEY = HISTORY_KEY, CURRENT = CURRENT_KEY;
 const MAX_ENTRIES = 30;
 
 function read(key, fallback) {
