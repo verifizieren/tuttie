@@ -281,10 +281,15 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Progress lines:** each turn shows two joined lines that update in place and wrap downwards:
   context, then tools (asked N hotels → offers in, checking seals → comparing → bargaining →
   N hotels for you; later booking, booked).
-- **One conversation at a time:** no history and no sideways gestures on Tuttie's card. Swiping
-  Tuttie down and opening it again starts a fresh conversation (`/reset`), unless an approval
-  waits; opening the wallet resumes only a running conversation (`GET /history`). The user's own
-  words are not shown; businesses with forged or missing seals are never shown either.
+- **One conversation at a time, history on the device:** no sideways gestures on Tuttie's
+  card. A dock under the open card has three buttons: history (earlier conversations, kept in
+  `localStorage`, `lib/history.js`), new chat, and the keyboard. Swiping Tuttie down and opening
+  it again, or opening the wallet after a finished conversation, archives it and starts fresh
+  (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
+  user's own words are not shown; businesses with forged or missing seals are never shown either.
+- **Minimal booking and approval:** the approval sheet shows the hotel, the amount, its seals and a
+  short "Also pay city tax (CHF 4)" switch; the booking card shows hotel, price, date and booking
+  id, one line for the paid city tax, and "Checked by Tuttie" folded into one line that opens.
 - **Tuttie's priorities** (`assistant/agent.py`): what the user says now beats their saved
   context, preferences, budget and Tuttie's own recommendation ("book it anyway" is booked,
   with the phone approval as the final word); then safety on the agent web; then the context;
