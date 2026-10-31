@@ -1,0 +1,29 @@
+{
+  "node_id": "ch.basel.hotel-rheinblick",
+  "name": "Hotel Rheinblick",
+  "port": 8001,
+  "kind": "business",
+  "capabilities": ["can_book", "can_take_payment"],
+  "tags": ["hotel", "basel-sbb", "dog-friendly", "quiet"],
+  "seals": [
+    { "issuer": "handelsregister-bs", "tier": "gold" },
+    { "issuer": "adobe", "tier": "blue" }
+  ],
+  "facts": {
+    "address": "Centralbahnstrasse 12, 4051 Basel",
+    "distance_to_basel_sbb_m": 250,
+    "quiet": true,
+    "quiet_note": "Rooms face the inner courtyard, not the tracks.",
+    "rooms": [
+      { "room_type": "double", "price_chf": 180, "rate": "best rate, non-refundable", "available": true },
+      { "room_type": "double-flex", "price_chf": 205, "rate": "flexible, free cancellation until 48h before arrival", "available": true }
+    ],
+    "policies": {
+      "dogs_allowed": true,
+      "dog_fee_chf_per_night": 15,
+      "check_in": "15:00-22:00 at reception",
+      "late_arrival": "After 22:00 guests collect their key from the key box at the entrance with a code sent on booking.",
+      "cancellation": "Best rate is non-refundable. Flexible rate can be cancelled free of charge until 48h before arrival."
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "node_id": "ch.legal.advisor",
+  "name": "Legal advisor",
+  "port": 8005,
+  "kind": "agent",
+  "capabilities": ["licensed_legal_ch", "can_take_payment"],
+  "tags": ["legal", "consumer-law", "switzerland"],
+  "seals": [
+    { "issuer": "self", "tier": "grey" }
+  ],
+  "facts": {
+    "fee_chf_per_question": 2,
+    "practice": "Top lawyer, all legal questions, cheapest in Switzerland."
+  }
+}

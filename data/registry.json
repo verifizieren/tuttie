@@ -1,0 +1,128 @@
+[
+  {
+    "node_id": "ch.basel.cheap-hotels",
+    "name": "basel-cheap-hotels",
+    "public_key": "uCr04XpGZRgW9+UxjtLTBu5KUWH4HAJCuc4mrJmi8Mw=",
+    "endpoint": "http://localhost:8003",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "basel-sbb",
+      "dog-friendly",
+      "quiet"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "q/JuL8KoMQCgUOWnJv+E7iQVmuNVqFl84JLSU9x40VFzUpCKku6Mg4H+t0/8QOJMr7Y7wKA5GnBc4iHp9V8yAQ=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.basel.hotel-rheinblick",
+    "name": "Hotel Rheinblick",
+    "public_key": "jLSkoHn2gRTVnTmgrGaVofEGKASUUZrOu6/2juOxEeQ=",
+    "endpoint": "http://localhost:8001",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "basel-sbb",
+      "dog-friendly",
+      "quiet"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "q6wLeLzCnXqcEhjf6dpYrEg+4Xu6iwZT/D5G0zAE7pjHqI25vi/L1EIcqR1e6MmmvBfrZ2VFIXbD6Tbr0aaNAw=="
+      },
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "DgZlOEwu8Q55dGBMRkGDzIZfsVauBfHrtVW3PaKQmyzxthQnmGsHtmyQLnF7uePhj5grBh7aeBsfE9ip0eWMAQ=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.basel.hotel-spalenhof",
+    "name": "Hotel Spalenhof",
+    "public_key": "b0wQ00PBLQ9z2NBCgTidoON1HffkRZpAx+5UKOsGj1g=",
+    "endpoint": "http://localhost:8002",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "basel-sbb"
+    ],
+    "seals": [
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "cWHq7e1B8rPDAdOb9BUU0n/Qgf2Mo88hR1lxD71Ih2ijpnhtS5HvXWOyHz0ePDEAX+gIfrJbvH+Sjl41URERBA=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.legal.consumer-law",
+    "name": "Swiss consumer-law agent",
+    "public_key": "fNDGGHiEcWp5BN18M9Ibi5MWtZkRRIf/smEL+N8QIRc=",
+    "endpoint": "http://localhost:8004",
+    "kind": "agent",
+    "capabilities": [
+      "licensed_legal_ch",
+      "can_take_payment"
+    ],
+    "tags": [
+      "legal",
+      "consumer-law",
+      "switzerland"
+    ],
+    "seals": [
+      {
+        "issuer": "bar-association-ch",
+        "tier": "gold",
+        "signature": "G+BYoYxa28BC+/F0wDAsA1Awmlhk3eh41WnGy/79VgpXeUxBwo+N3g/EpcXRV8jE0AA8zprIRnUNzME9TUq8DQ=="
+      },
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "25VXaN/1l7JUtdDhohEHI2lyatbMAOayLDx53urPgoxDYhvB/Ha7av9nylxfFG6t5A6C/HTYJ2i4sSM6UfiJAg=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.legal.advisor",
+    "name": "Legal advisor",
+    "public_key": "jZlmMAnoaf09v1yhHC96oM5MSKpK6VgiRId3NeqXad4=",
+    "endpoint": "http://localhost:8005",
+    "kind": "agent",
+    "capabilities": [
+      "licensed_legal_ch",
+      "can_take_payment"
+    ],
+    "tags": [
+      "legal",
+      "consumer-law",
+      "switzerland"
+    ],
+    "seals": [
+      {
+        "issuer": "ch.legal.advisor",
+        "tier": "grey",
+        "signature": "+6IFidhJi6Imu8hfosnJQ0wzgcU15xpmOU9FRtWDe+OM8jJmEyk26Pk929BGaS7TLycUkec/J7+qdmMAy5TkAQ=="
+      }
+    ]
+  }
+]

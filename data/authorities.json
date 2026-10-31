@@ -1,0 +1,23 @@
+[
+  {
+    "issuer": "handelsregister-bs",
+    "name": "Handelsregister Basel-Stadt",
+    "tier": "gold",
+    "public_key": "DrlKJfqOt4QwD6+6/BbeDtSnFFmacvbCI0E7Xdc37c4="
+  },
+  {
+    "issuer": "adobe",
+    "name": "Adobe Business Registry",
+    "tier": "blue",
+    "public_key": "Z0zocAP3y3MllfxRKkW6/lRw+mgfgLDisK3zn/XJFzc="
+  },
+  {
+    "issuer": "bar-association-ch",
+    "name": "Swiss Bar Association",
+    "tier": "gold",
+    "licenses": [
+      "licensed_legal_ch"
+    ],
+    "public_key": "5bW5fh0hrXNgtSx0zYXBt+5bzZ+Ec6IqnwbmYp4qf5M="
+  }
+]
