@@ -41,6 +41,8 @@ leave the line out if no node was rejected.
 
 
 class Assistant:
+    """One conversation with the user: the LLM decides, the toolbox acts and verifies."""
+
     def __init__(self, llm: LLM, toolbox: Toolbox, bus: EventBus):
         self.llm = llm
         self.toolbox = toolbox
@@ -49,10 +51,12 @@ class Assistant:
         self.reset()
 
     def reset(self) -> None:
+        """Start a new conversation and forget all signed facts from the last one."""
         self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.toolbox.reset()
 
     async def chat(self, text: str) -> str:
+        """Answer one user message, calling tools until the LLM gives a final answer."""
         async with self.lock:
             self.messages.append({"role": "user", "content": text})
             for _ in range(MAX_ROUNDS):
@@ -76,6 +80,7 @@ class Assistant:
             return answer
 
     async def run_tool(self, name: str, raw_args: str) -> dict:
+        """Run one tool call; bad arguments or unreachable nodes become an error for the LLM."""
         try:
             args = json.loads(raw_args or "{}")
             return await self.toolbox.dispatch(name, args)

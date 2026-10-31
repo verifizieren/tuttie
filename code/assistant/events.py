@@ -9,12 +9,15 @@ import json
 
 
 class EventBus:
+    """Timeline events: kept as history and pushed to every connected browser."""
+
     def __init__(self):
         self.history: list[dict] = []
         self.subscribers: set[asyncio.Queue] = set()
 
     def emit(self, kind: str, status: str, summary: str, record: dict | None = None,
              seals: list[dict] | None = None, detail: dict | None = None) -> dict:
+        """Add a timeline step and send it to all subscribers; returns the event."""
         event = {
             "step": len(self.history) + 1,
             "kind": kind,
@@ -30,6 +33,7 @@ class EventBus:
         return event
 
     def reset(self) -> None:
+        """Clear the history and tell the browsers to clear their timeline."""
         self.history.clear()
         self._publish(("reset", {}))
 
@@ -55,4 +59,5 @@ class EventBus:
 
 
 def sse(name: str, data: dict) -> str:
+    """One Server-Sent Events frame."""
     return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"

@@ -41,6 +41,7 @@ chats: set[asyncio.Task] = set()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Create the assistant with one shared HTTP client for the service's lifetime."""
     async with httpx.AsyncClient(timeout=20) as http:
         app.state.assistant = Assistant(LLM(), Toolbox(http, REGISTRY_URL, bus, approvals), bus)
         yield
@@ -58,6 +59,7 @@ class DecisionRequest(BaseModel):
 
 
 async def run_chat(message: str) -> None:
+    """Run a chat in the background; any failure shows up as an answer on the timeline."""
     try:
         await app.state.assistant.chat(message)
     except asyncio.CancelledError:
@@ -68,6 +70,7 @@ async def run_chat(message: str) -> None:
 
 @app.post("/chat", status_code=202)
 async def chat(req: ChatRequest) -> dict:
+    """Start answering a message; the answer arrives as an "answer" event."""
     task = asyncio.create_task(run_chat(req.message))
     chats.add(task)
     task.add_done_callback(chats.discard)
@@ -76,6 +79,7 @@ async def chat(req: ChatRequest) -> dict:
 
 @app.post("/reset")
 def reset() -> dict:
+    """Start a new demo: stop running chats, decline open approvals, clear the timeline."""
     for task in list(chats):
         task.cancel()
     approvals.clear()
@@ -86,11 +90,13 @@ def reset() -> dict:
 
 @app.get("/approvals/pending")
 def pending_approvals() -> list[dict]:
+    """Approvals waiting for the user's decision (polled by the phone page)."""
     return list(approvals.pending.values())
 
 
 @app.post("/approvals/{approval_id}")
 def decide(approval_id: str, req: DecisionRequest) -> dict:
+    """Record the user's decision; it is signed with the user's key and wakes the waiting chat."""
     if req.decision not in ("approved", "declined"):
         raise HTTPException(status_code=422, detail="decision must be approved or declined")
     decision = approvals.decide(approval_id, req.decision)
@@ -112,12 +118,14 @@ def phone_qr(request: Request) -> Response:
 
 @app.get("/events")
 def events() -> StreamingResponse:
+    """The timeline as Server-Sent Events."""
     return StreamingResponse(bus.stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/")
 def home() -> RedirectResponse:
+    """The wallet is the app."""
     return RedirectResponse("/wallet/")
 
 

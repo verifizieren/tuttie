@@ -29,6 +29,7 @@ READ_TOOLS = {"get_availability", "get_policies"}
 
 
 def function(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:
+    """A tool definition in the chat-completions schema (llm.py converts it)."""
     parameters = {"type": "object", "properties": properties, "required": required or []}
     return {"type": "function", "function": {"name": name, "description": description, "parameters": parameters}}
 
@@ -82,6 +83,7 @@ SCHEMAS = [
 
 @dataclass
 class Verified:
+    """A node response that passed the trust gate: its record, verdict and signed envelope."""
     record: dict
     verdict: dict
     envelope: dict
@@ -92,10 +94,12 @@ class Verified:
 
 
 def load_authorities() -> dict:
+    """The trusted authorities from data/authorities.json, by issuer id."""
     return {a["issuer"]: a for a in json.loads(AUTHORITIES_PATH.read_text())}
 
 
 def rejected(record: dict, reason: str) -> dict:
+    """What the LLM sees instead of a node that failed verification."""
     return {"node_id": record.get("node_id"), "name": record.get("name"), "rejected": True, "reason": reason}
 
 
@@ -113,11 +117,13 @@ def node_view(record: dict, verdict: dict) -> dict:
 
 
 def broken_reason(verdict: dict) -> str:
+    """A short reason why a node's seals failed, for the LLM and the timeline."""
     failed = [f"{s['issuer']}/{s['tier']}" for s in verdict["seals"] if not s["valid"]]
     return f"seal does not verify: {', '.join(failed)}" if failed else "no seals"
 
 
 def verified_summary(record: dict, verdict: dict) -> str:
+    """Timeline text for a node whose seals verified; grey nodes are called untrusted."""
     if verdict["tier"] != "grey":
         return f"{record['name']}: {verdict['tier']} seal verified"
     signed = "no seals (unsigned)" if not verdict["seals"] else "self-signed only"
@@ -127,6 +133,7 @@ def verified_summary(record: dict, verdict: dict) -> str:
 
 
 def summarize(tool: str, payload: dict) -> str:
+    """A one-line timeline summary of a signed tool response."""
     if payload.get("rooms"):
         rooms = ", ".join(f"{r['room_type']} CHF {r['price_chf']}" for r in payload["rooms"])
         return f"{tool} {payload.get('date', '')}: {rooms}"
@@ -137,6 +144,8 @@ def summarize(tool: str, payload: dict) -> str:
 
 
 class Toolbox:
+    """The tools the LLM can call; every result passes the APS trust gate first."""
+
     def __init__(self, http: httpx.AsyncClient, registry_url: str, bus: EventBus, approvals: ApprovalBook):
         self.http = http
         self.registry_url = registry_url.rstrip("/")
@@ -147,11 +156,13 @@ class Toolbox:
 
     def reset(self) -> None:
         # Signed facts remembered for booking, so prices never come from the LLM.
+        """Forget the signed facts of the last conversation."""
         self.availability: dict[str, dict] = {}  # node_id -> last get_availability payload
         self.commitments: dict[str, list[dict]] = {}  # node_id -> signed A2A envelopes with a commitment
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
 
     async def dispatch(self, name: str, args: dict) -> dict:
+        """Run a tool by name with the LLM's arguments."""
         tools = {"search_registry": self.search_registry, "call_tool": self.call_tool,
                  "ask_agent": self.ask_agent, "book": self.book}
         if name not in tools:
@@ -159,6 +170,7 @@ class Toolbox:
         return await tools[name](**args)
 
     async def search_registry(self, tags: list[str] | None = None, capability: str = "") -> dict:
+        """Find nodes and split them into verified and rejected; each node shows once on the timeline."""
         params = {"tags": ",".join(tags or []), "capability": capability}
         records = (await self.http.get(f"{self.registry_url}/search", params=params)).json()
         verified, refused = [], []
@@ -188,6 +200,7 @@ class Toolbox:
         return self.seen[record["node_id"]]
 
     async def lookup(self, node_id: str) -> tuple[dict, dict] | None:
+        """A node's registry record and trust verdict, or None if it is unknown."""
         if not NODE_ID.match(node_id):
             return None
         response = await self.http.get(f"{self.registry_url}/nodes/{node_id}")
@@ -224,6 +237,7 @@ class Toolbox:
         return event["step"]
 
     async def call_tool(self, node_id: str, tool: str, args: dict | None = None) -> dict:
+        """Call a read-only tool on a node and return its verified payload."""
         if tool not in READ_TOOLS or not TOOL_NAME.match(tool):
             return {"error": f"tool {tool} is not available through call_tool"}
         result = await self.verified_post(node_id, f"/tools/{tool}", args or {}, "a2t", tool)
@@ -235,6 +249,7 @@ class Toolbox:
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, "data": result.payload}
 
     async def ask_agent(self, node_id: str, question: str) -> dict:
+        """Ask a node's own agent (A2A); a commitment in the reply is kept for booking."""
         result = await self.verified_post(node_id, "/agent", {"question": question, "context": {}}, "a2a", "ask_agent")
         if not isinstance(result, Verified):
             return result
@@ -248,6 +263,9 @@ class Toolbox:
 
     async def book(self, node_id: str, date: str, room_type: str, guest_name: str,
                    extras: list[str] | None = None) -> dict:
+        """Book a room: compute the total from signed facts only, wait for the user's signed
+        approval on the phone, then let the node confirm the booking.
+        """
         found = await self.lookup(node_id)
         # A booking takes payment, which untrusted (grey) nodes never get.
         if found is None or not {"can_book", "can_take_payment"} <= set(found[1]["capabilities"]):

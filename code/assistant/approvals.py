@@ -15,12 +15,15 @@ TIMEOUT_SECONDS = 300
 
 
 class ApprovalBook:
+    """Approvals waiting for the phone, and the futures the assistant waits on."""
+
     def __init__(self):
         self.user_key = load_signing_key("user")
         self.pending: dict[str, dict] = {}
         self.futures: dict[str, asyncio.Future] = {}
 
     def create(self, action: str, record: dict, amount_chf: float, summary: str, seals: list[dict]) -> dict:
+        """Register an approval request and return it (shown on the phone page)."""
         approval = {
             "id": "ap-" + secrets.token_hex(4),
             "action": action,
@@ -44,11 +47,13 @@ class ApprovalBook:
         return signed
 
     async def wait(self, approval_id: str) -> dict:
+        """Wait for the user's signed decision; no answer within the timeout counts as declined."""
         try:
             return await asyncio.wait_for(asyncio.shield(self.futures[approval_id]), TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             return self.decide(approval_id, "declined")
 
     def clear(self) -> None:
+        """Decline everything still pending (used when a new demo starts)."""
         for approval_id in list(self.pending):
             self.decide(approval_id, "declined")
