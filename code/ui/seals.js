@@ -14,13 +14,14 @@ const ISSUERS = {
   "bar-association-ch": { name: "Swiss Bar Association", logo: SCALES },
 };
 
-// Returns a <span class="seal ..."> for {issuer, tier, valid}; broken seals are struck through.
+// Returns a <span class="seal ..."> for {issuer, tier, valid}. The tier is shown only by colour;
+// broken seals are red and struck through; self-signed (grey) seals read "untrusted".
 function sealBadge(seal) {
-  const issuer = ISSUERS[seal.issuer] || { name: seal.tier === "grey" ? "self-signed" : seal.issuer, logo: "" };
+  const issuer = ISSUERS[seal.issuer] || { name: seal.tier === "grey" ? "untrusted" : seal.issuer, logo: "" };
   const badge = document.createElement("span");
   badge.className = "seal " + (seal.valid ? seal.tier : "invalid");
   badge.title = `${seal.valid ? seal.tier : "BROKEN"} seal from ${seal.issuer}`;
   badge.innerHTML = issuer.logo;  // trusted constant markup from this file only
-  badge.append(seal.valid ? issuer.name : `${issuer.name} · broken`);
+  badge.append(issuer.name);
   return badge;
 }

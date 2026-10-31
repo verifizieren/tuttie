@@ -168,7 +168,7 @@
     text.split(/(\[\d+\]|\*\*[^*]+\*\*)/).forEach(part => {
       const cite = part.match(/^\[(\d+)\]$/);
       const bold = part.match(/^\*\*([^*]+)\*\*$/);
-      if (cite && stepTier[cite[1]]) target.append(el("span", "cite " + stepTier[cite[1]], `${stepTier[cite[1]]} #${cite[1]}`));
+      if (cite && stepTier[cite[1]]) target.append(el("span", "cite " + stepTier[cite[1]], `#${cite[1]}`));
       else if (bold) target.append(el("b", null, bold[1]));
       else target.append(part);
     });
