@@ -233,6 +233,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .activity.swiping { overflow: hidden; padding-bottom: 12px; -webkit-mask-image: none; mask-image: none; }
 .activity.swiping .deck { flex: 1; min-height: 0; }
 .activity.swiping .deck-stack { flex: 1; height: auto; min-height: 280px; max-height: 440px; }
+/* A short screen (landscape, small phones): the card shrinks so its price stays in view. */
+@media (max-height: 640px) { .activity.swiping .deck-stack { min-height: 120px; } }
 .swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel2);
               border: 1px solid var(--line); touch-action: none; user-select: none; -webkit-user-select: none;
               cursor: grab; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
