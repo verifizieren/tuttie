@@ -120,3 +120,15 @@ test('long runs of spaces are fast', () => {
   cleanAnswer(' '.repeat(50000) + 'x');
   assert.ok(performance.now() - start < 200);
 });
+
+test('answer notes: the same cases as the voice (code/tests/fixtures/answer_notes.json)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const cases = JSON.parse(readFileSync(new URL('../../../../tests/fixtures/answer_notes.json', import.meta.url)));
+  for (const c of cases) assert.equal(cleanAnswer(c.in), c.screen, c.in);
+});
+
+test('runs of "[" are fast', () => {
+  const start = performance.now();
+  cleanAnswer('['.repeat(50000));
+  assert.ok(performance.now() - start < 300);
+});

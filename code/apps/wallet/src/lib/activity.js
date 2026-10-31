@@ -85,19 +85,33 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
   return { ...state, turns, phase: "thinking", closing: null };
 }
 
-// Notes the model put in square brackets (as voice/agent.py spoken() does for the voice): a
-// citation ([3]), a one-word label ([confirmed]) or an id ([receipt RC-A14786]) is dropped; any
-// other note may be a fact (a fee, a condition), so only its brackets go. Links keep their text.
-const NOTE = /[ \t]?\[([^\]\n]{0,60})\]/g;
-const EMPTY_NOTE = /^(?:\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*)$/;
-export const withoutNotes = text => String(text ?? "").replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1").replace(NOTE, (all, inner) => {
-  const note = inner.trim();
-  return !note || EMPTY_NOTE.test(note) ? "" : (/^[ \t]/.test(all) ? " " : "") + note;
-});
+// Notes the model put in square brackets, cleaned the same way as the voice (voice/agent.py
+// spoken(); shared cases in code/tests/fixtures/answer_notes.json). Only what carries nothing to
+// say goes: citations ([3], [3, 4]), a few labels ([confirmed]), booking and receipt ids, node
+// ids. Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
+// Markdown links keep their text. All patterns run in linear time.
+const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
+const NOTE = /\[([^[\]\n]{0,60})\]/g;
+const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
+const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
+const NODE_ID = /^[a-z]+(?:\.[a-z0-9-]+)+$/;
+const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
+const IGNORED_LINE = /\bignored:/i;  // a line about a business Tuttie ignored, wherever it starts
+
+function note(all, inner, offset, text) {
+  const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
+  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || /^ignored:/i.test(words)) return "";
+  return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
+}
+
+export const withoutNotes = text => String(text ?? "")
+  .replace(LINK, (all, label, inside) => (label.trim() && !CITATION.test(label.trim()) ? label.trim() : `(${inside})`))
+  .replace(NOTE, note)
+  .replace(/(?<![ \t])[ \t]+(?=[.,;:!?])/g, "").replace(/[ \t]{2,}/g, " ");
 
 /** Tuttie's answer without bracketed notes (see above) or lines about ignored businesses. */
 export const cleanAnswer = text => withoutNotes(text).split("\n")
-  .filter(line => !/^\s*Ignored:/i.test(line)).join("\n").trim();
+  .filter(line => !IGNORED_LINE.test(line)).map(line => line.trim()).join("\n").trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
