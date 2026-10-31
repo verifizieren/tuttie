@@ -31,7 +31,7 @@ TRUSTED_TIERS = ("gold", "blue")
 TIER_ORDER = {"gold": 0, "blue": 1}
 SHORTLIST_SIZE = 5
 POSTING_HOURS = 2      # how long a posting stays open
-OFFER_WAIT_S = 30      # how long Tuttie waits for the interested agents' offers
+OFFER_WAIT_S = 45      # longest wait for the interested agents' offers (it stops as soon as all have offered)
 POLL_S = 0.5
 
 
