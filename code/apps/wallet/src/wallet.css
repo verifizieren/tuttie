@@ -309,6 +309,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; padding: 18px 18px 20px; border-radius: 26px;
          background: #1c1c1f; box-shadow: 0 -12px 40px rgba(0, 0, 0, .6); animation: sheet .45s var(--ease) both; }
 @keyframes sheet { from { transform: translateY(110%); } }
+/* Only on the open card: in the stack the sheet would show (and take taps) over the bank cards. */
+.app:not(.open) .sheet { visibility: hidden; pointer-events: none; }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
 .sheet-terms { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
