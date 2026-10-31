@@ -6,7 +6,8 @@
 // pycozmo, drawn with antialiased vector shapes instead of a 128x64 bitmap.
 //
 // Usage: const face = new TuttieFace(canvas); face.set("happiness"); face.lookAt(x, y);
-//        face.sleep() closes the eyes (no saccades or blinks, slow breathing); face.wake() opens them.
+//        face.sleep() closes the eyes (no saccades or blinks, slow breathing); face.wake() opens them;
+//        face.destroy() stops the animation loop (e.g. when a React component unmounts).
 
 // ---------- Parameter layout (identical to pycozmo) ----------
 // Face: 0 center_x, 1 center_y, 2 scale_x, 3 scale_y, 4 angle. Eyes start at 5 and 24.
@@ -136,8 +137,15 @@ class TuttieFace {
     this.nextSaccade = 0; this.nextBlink = performance.now() + 2500; this.blinking = 0;
     this.asleep = false;
     this.resize();
-    new ResizeObserver(() => this.resize()).observe(canvas);
-    requestAnimationFrame(t => this.frame(t));
+    this.observer = new ResizeObserver(() => this.resize());
+    this.observer.observe(canvas);
+    this.raf = requestAnimationFrame(t => this.frame(t));
+  }
+
+  /** Stop drawing and release the canvas. */
+  destroy() {
+    cancelAnimationFrame(this.raf);
+    this.observer.disconnect();
   }
 
   /** Change expression by name (see EXPRESSIONS), animated over `ms`. */
@@ -194,7 +202,7 @@ class TuttieFace {
     }
     if (!this.asleep && now > this.nextBlink) { this.blinking = now; this.nextBlink = now + 2200 + Math.random() * 3800; }
     this.draw(now);
-    requestAnimationFrame(next => this.frame(next));
+    this.raf = requestAnimationFrame(next => this.frame(next));
   }
 
   draw(now) {
@@ -233,5 +241,7 @@ class TuttieFace {
   }
 }
 
-TuttieFace.EXPRESSIONS = Object.keys(EXPRESSIONS);
-window.TuttieFace = TuttieFace;
+/** Names of all expressions, e.g. to cycle through them. */
+export const EXPRESSION_NAMES = Object.keys(EXPRESSIONS);
+
+export default TuttieFace;
