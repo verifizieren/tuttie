@@ -1,4 +1,4 @@
-"""Tests for the node's book tool over MCP: signed call, approval, commitments, agreements, replays."""
+"""Tests for the node's book tool over MCP: the action gate (aps/gate.py), commitments, agreements, replays."""
 
 import json
 from pathlib import Path
@@ -41,13 +41,13 @@ def test_booking_confirmed_with_matching_approval_and_own_commitment():
     result = book(client, approval(195), [commitment(load_signing_key(NODE_ID))])
     assert result["status"] == "confirmed"
     assert result["total_chf"] == 195 and result["extras"] == ["late check-in with dog"]
-    assert result["checked"] == ["caller signature", "user approval", "hotel commitments"]
+    assert result["checked"] == ["caller", "signature", "delegation", "approval", "commitments"]
 
 
 def test_approval_cannot_be_replayed():
     client = node()
     assert book(client, approval(180), [])["status"] == "confirmed"
-    assert book(client, approval(180), [])["reason"] == "approval was already used"
+    assert book(client, approval(180), [])["reason"] == "the approval was already used"
 
 
 def test_refuses_wrong_amount_forged_extra_and_unsigned_approval():
@@ -99,19 +99,19 @@ def test_book_refuses_a_call_not_signed_by_the_registered_caller():
     forged = sign_call("book", booking_args(180, "ap-x"), TUTTIE, SigningKey.generate())
     assert "not signed by the caller" in call_tool(client, "book", {"call": forged})["payload"]["reason"]
     stranger = sign_call("book", booking_args(180, "ap-y"), "ch.nobody", SigningKey.generate())
-    assert "not in the registry" in call_tool(client, "book", {"call": stranger})["payload"]["reason"]
+    assert "not a known user agent" in call_tool(client, "book", {"call": stranger})["payload"]["reason"]
 
 
 def test_book_refuses_a_replayed_call_and_a_call_for_another_tool():
     client = node()
     call = sign_call("book", booking_args(180, "ap-r"), TUTTIE, load_signing_key(TUTTIE))
     assert call_tool(client, "book", {"call": call})["payload"]["status"] == "confirmed"
-    assert call_tool(client, "book", {"call": call})["payload"]["reason"] == "call was already used"
+    assert "already used" in call_tool(client, "book", {"call": call})["payload"]["reason"]
     other = sign_call("get_policies", booking_args(180, "ap-o"), TUTTIE, load_signing_key(TUTTIE))
-    assert "another tool" in call_tool(client, "book", {"call": other})["payload"]["reason"]
+    assert "not book" in call_tool(client, "book", {"call": other})["payload"]["reason"]
 
 
 def test_an_agreement_booking_names_the_signatures_it_checked():
     deal = signed_agreement(172, load_signing_key(NODE_ID), offer_id="of-rheinblick-9")
     result = book_agreement(node(), approval(172, "ap-c"), deal)
-    assert result["checked"] == ["caller signature", "user approval", "hotel agreement"]
+    assert result["checked"] == ["caller", "signature", "delegation", "agreement", "approval"]

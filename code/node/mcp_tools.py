@@ -3,36 +3,29 @@
 Any MCP client can list and call the tools. Every result is the node's signed envelope (sent
 as JSON text), so the caller verifies it like any APS reply.
 
-Reading tools (get_availability, get_policies) are open. An action (book) runs only with a
-call signed by the calling agent (aps/call.py, "Signed call" in documentation/formats.md):
-the caller's key comes from its registry record, never from the call; each call is accepted
-once (NonceBook); and the arguments it signs are exactly what the action gets, so the
-approval and the amount inside cannot be swapped. Whether the action is allowed (the user's
-approval, the hotel's agreement or commitments) is then checked by the action itself.
+Reading tools (get_availability, get_policies) are open. Actions (book) take a call signed by
+the calling agent (aps/call.py, "Signed call" in documentation/formats.md) and run only if it
+passes the action gate (aps/gate.py) on the node. Bargaining (counter_offer) brings its own
+checks (negotiation/hotel.py). This module only describes the tools; the node does the work.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 
 from mcp.server.mcpserver import MCPServer
-from pydantic import BaseModel, ValidationError
-
-from aps.call import NonceBook, verify_call
 
 INSTRUCTIONS = ("Tools of one business on the agent web. Every result is a signed envelope "
                 "(node_id, timestamp, payload, signature): verify it against the business's registry "
                 "record before using it. Actions need a signed call (aps/call.py).")
 
 
-def mcp_server(name: str, signed: Callable[[dict], dict], tools: dict[str, Callable],
-               book_request: type[BaseModel], lookup: Callable[[str], Awaitable[dict | None]]) -> MCPServer:
+def mcp_server(name: str, tools: dict[str, Callable], extra: dict[str, Callable] | None = None) -> MCPServer:
     """The MCP server for one node.
 
-    `tools` holds the node's own functions: get_availability(date, guests), get_policies() and
-    book(request, checked), each returning a signed envelope. `lookup` finds a caller's
-    registry record.
+    `tools` holds the node's own functions, each returning a signed envelope:
+    get_availability(date, guests), get_policies() and async book(call). `extra` are ready-made
+    tool functions registered as they are (their parameters and docstring describe them).
     """
     server = MCPServer(name, instructions=INSTRUCTIONS)
-    nonces = NonceBook()
 
     @server.tool(name="get_availability")
     def get_availability(date: str, guests: int = 1) -> dict:
@@ -46,25 +39,15 @@ def mcp_server(name: str, signed: Callable[[dict], dict], tools: dict[str, Calla
 
     @server.tool(name="book")
     async def book(call: dict) -> dict:
-        """Book a room. `call` is a signed call for tool "book" whose args are date, room_type,
-        guest_name, extras (this business's signed commitments), approval (the user's signed
-        decision for exactly the total) and optionally agreement (this business's signed deal)."""
-        def refuse(reason: str) -> dict:
-            return signed({"tool": "book", "status": "refused", "reason": reason})
+        """Book a room. `call` is a signed call (tool "book", signed by a sealed user agent with the
+        user's delegation for "book") whose args are date, room_type, guest_name, extras (this
+        business's signed commitments), approval (the user's signed decision for exactly the
+        total) and optionally agreement (this business's signed deal, replacing the total).
+        Returns the signed confirmation with the checks it passed, or a signed refusal."""
+        return await tools["book"](call)
 
-        record = await lookup(call.get("agent_id", "")) if isinstance(call.get("agent_id"), str) else None
-        if record is None:
-            return refuse("caller is not in the registry")
-        if not verify_call(call, record["public_key"], tool="book"):
-            return refuse("call is not signed by the caller, is outdated or is for another tool")
-        if not nonces.use(call["agent_id"], call["nonce"]):
-            return refuse("call was already used")
-        try:
-            request = book_request(**call["args"])
-        except ValidationError as error:
-            return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
-        return tools["book"](request, ["caller signature"])
-
+    for tool_name, function in (extra or {}).items():
+        server.add_tool(function, name=tool_name)
     return server
 
 

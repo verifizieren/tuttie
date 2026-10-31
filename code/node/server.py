@@ -22,13 +22,14 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
-from aps.approval import verify_decision
+from aps.call import call_body
+from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
-from negotiation.agreement import AgreementInvalid, AgreementRedeemer
-from negotiation.hotel import counter_offer_router, registry_lookup
+from negotiation.agreement import AgreementRedeemer
+from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
 from node.agent import BusinessAgent
 from node.mcp_tools import mcp_app, mcp_server
 from sessions import SessionClosed, SessionStore
@@ -61,16 +62,16 @@ class BookRequest(BaseModel):
 def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=registry_lookup) -> FastAPI:
     """Build the FastAPI app for one node config.
 
-    `http` is the client used to send offers to the marketplace, `lookup` how the bargaining tool
-    finds registry records (tests pass in-process ones for both).
+    `http` is the client used to send offers to the marketplace, `lookup` how the action gate
+    and the bargaining tool find registry records (tests pass in-process ones for both).
     """
     node_id = config["node_id"]
     facts = config.get("facts", {})
     signing_key = load_signing_key(node_id)
     own_public_key = public_key_b64(signing_key)
-    user_public_key = load_public_key("user")
-    used_approvals: set[str] = set()
     agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
+    # Checks every signed action call: caller, signature, delegation, agreement, approval.
+    gate = ActionGate(node_id, own_public_key, load_public_key("user"), load_authorities(), lookup, agreements)
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
@@ -107,55 +108,45 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "policies": facts.get("policies", {}),
         })
 
-    def book(req: BookRequest, checked: list[str]) -> dict:
-        """Confirm a booking only with the user's signed approval for exactly this total.
+    async def book(call: dict) -> dict:
+        """Book a room for a signed call that passes the action gate (aps/gate.py).
 
-        The total is either a negotiated price (this node's own signed Agreement, redeemed
-        once) or the room's price plus extras, which are this node's own signed A2A
-        commitments: either way the price is the one the node promised, whatever the caller
-        claims. `checked` lists what was verified before (the caller's signed call); the
-        confirmation names every signature it rests on.
+        The hotel computes the total itself: the room's price plus extras, which must be its own
+        signed A2A commitments; an agreement in the call (its own signed deal) replaces it with
+        the agreed price. The gate then checks the caller, its signature, the user's delegation
+        for "book" and the user's approval for exactly that amount. The confirmation lists the
+        checks it rests on.
         """
         def refuse(reason: str) -> dict:
             """A signed refusal with the reason."""
             return signed({"tool": "book", "status": "refused", "reason": reason})
 
-        approval = req.approval
-        if not verify_decision(approval, user_public_key):
-            return refuse("approval is not signed by the user")
-        if (approval["action"], approval["payee_node_id"], approval["decision"]) != ("book", node_id, "approved"):
-            return refuse("approval does not approve a booking with this hotel")
-        if approval["approval_id"] in used_approvals:
-            return refuse("approval was already used")
-        agreement = None
-        if req.agreement is not None:
-            try:
-                agreement = agreements.check(req.agreement)
-            except AgreementInvalid as error:
-                return refuse(str(error))
-            total, items = agreement.price_chf, list(agreement.includes)
-        else:
+        body = call_body(call) if isinstance(call, dict) else None
+        if body is None:
+            return refuse("the call is not a signed call")
+        try:
+            req = BookRequest(**body["args"])
+        except ValidationError as error:
+            return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
+        total, items = None, []
+        if req.agreement is None:
             room = next((r for r in facts.get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
             if room is None:
                 return refuse(f"no available room of type {req.room_type}")
-            total, items = room["price_chf"], []
+            total = room["price_chf"]
             for extra in req.extras:
                 commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
                 if not commitment or not verify_envelope(extra, own_public_key, expected_node_id=node_id):
                     return refuse("an extra is not a commitment signed by this hotel")
                 total += commitment["price_chf"]
                 items.append(commitment["item"])
-        if round(total, 2) != round(approval["amount_chf"], 2):
-            return refuse(f"approved CHF {approval['amount_chf']} does not match total CHF {total}")
 
-        checked = [*checked, "user approval"]
-        if agreement is not None:
-            checked.append("hotel agreement")
-        if req.extras:
-            checked.append("hotel commitments")
-        used_approvals.add(approval["approval_id"])
-        if agreement is not None:
-            agreements.mark_used(agreement)
+        verdict = await gate.check_action(call, Needs("book", scope="book", approval=True, amount_chf=total))
+        if not verdict.ok:
+            return refuse(verdict.reason)
+        if verdict.agreement is not None:
+            items = list(verdict.agreement.includes)
+        gate.commit(verdict)  # the approval and the agreement cannot be used again
         return signed({
             "tool": "book",
             "status": "confirmed",
@@ -165,14 +156,14 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "room_type": req.room_type,
             "guest_name": req.guest_name,
             "extras": items,
-            "total_chf": total,
-            "approval_id": approval["approval_id"],
+            "total_chf": verdict.amount_chf,
+            "approval_id": verdict.approval["approval_id"],
             "arrival": facts.get("policies", {}).get("late_arrival"),
-            "checked": checked,
+            "checked": verdict.checks + (["commitments"] if req.extras and verdict.agreement is None else []),
         })
 
-    tools = mcp_server(config["name"], signed, {"get_availability": get_availability, "get_policies": get_policies,
-                                                "book": book}, BookRequest, lookup)
+    tools = mcp_server(config["name"], {"get_availability": get_availability, "get_policies": get_policies, "book": book},
+                       extra={"counter_offer": counter_offer_mcp_tool(config, signed, lookup)})
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
