@@ -66,7 +66,13 @@ async def registry_lookup(node_id: str) -> dict | None:
 
 
 def message(payload: dict) -> dict:
-    """A reply payload without the node's "tool" label, i.e. the bare message."""
+    """A reply payload without the node's "tool" label, i.e. the bare message.
+
+    Raises TypeError for anything that is not a JSON object, so callers refuse it cleanly
+    (a signed list or string is still not a message).
+    """
+    if not isinstance(payload, dict):
+        raise TypeError("a message must be a JSON object")
     return {k: v for k, v in payload.items() if k != "tool"}
 
 
@@ -112,8 +118,8 @@ class CounterOfferTool:
                                  record["public_key"], scope="negotiate", now=now):
             raise CounterOfferRefused("the user has not delegated negotiating to this agent")
         try:
-            return Counter.model_validate(envelope["payload"])
-        except ValidationError:
+            return Counter.model_validate(message(envelope["payload"]))
+        except (ValidationError, TypeError):
             raise CounterOfferRefused("counter is not a valid Counter") from None
 
     async def answer(self, req: CounterOfferRequest, now: datetime | None = None) -> dict:

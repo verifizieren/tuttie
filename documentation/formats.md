@@ -340,9 +340,20 @@ its floor, and its price is final in the last round or once it reaches the floor
 
 **Tuttie's side** (`negotiation/tuttie.py`): one subagent per offer, all in parallel, each in
 its own session. The user's real limit is the private context item `max_price_chf`: compared
-in Tuttie's code, never shared or sent. Tuttie opens 15 % below the offer, then moves halfway
+in Tuttie's code, never shared or sent. Tuttie opens 10 % below the offer, then moves halfway
 toward the hotel's price, accepts a final or close price within the limit and walks away
 otherwise. The cheapest Agreement is what the user approves.
+
+**Strategy numbers** (tuned for the demo; preview with `scripts/bargain_preview.py`):
+`OPENING_DISCOUNT = 0.10` and `TUTTIE_STEP = 0.5` (`negotiation/tuttie.py`), `HOTEL_STEP =
+0.34` (`negotiation/rules.py`: the hotel moves a third of the way toward the guest). Pitch
+story (`documentation/context/pitch/storyline.md`), pinned by a test: Gästehaus am Rhein
+double with late arrival and dog at CHF 135, budget 160 → Tuttie 121 → Anna 131 → Tuttie 126
+→ Anna 130 → Tuttie 128 → agreed at CHF 128 (three rounds, above Anna's floor, never at it).
+Rheinblick double + dog at CHF 195, budget 200: 175 → 189 → 182 → 187 → agreed at 185.
+
+**No `negotiation.counter` wake-up:** counters go straight to the signed `counter_offer` tool,
+which answers each round at once, so the marketplace never sends this event.
 
 ## Business agent (implemented, issue #10)
 

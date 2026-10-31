@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
+Last updated: 2026-10-31 (bargaining tuned for the demo, coverage gaps closed) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
 
 ## Done
 
@@ -52,7 +52,11 @@ Build order from [goals.md](goals.md):
    redeems a hotel's signed Agreement once (`AgreementRedeemer`), and Tuttie books it with
    `use_agreement` after the user approves exactly the agreed price on the phone. Tests:
    `test_node_book.py`, `test_tuttie_market.py` (post → shortlist → negotiate → book).
-   Open: the `negotiation.counter` wake-up event (hotels subscribe to it, nothing sends it).
+   Tuned for the pitch story (Gästehaus am Rhein, CHF 135, budget 160: three visible rounds,
+   agreed at CHF 128; Rheinblick still CHF 185; preview with `scripts/bargain_preview.py`). **Decided:** no `negotiation.counter` wake-up; counters go
+   straight to the `counter_offer` tool. **Request to dev member 1:** drop
+   `negotiation.counter` from the hotels' `wakes_on` (configs) and from `DEFAULT_WAKES_ON`
+   (`node/agent.py`) so no agent card promises an event nothing sends.
 5. **MCP services** — not started.
 
 ### Who works on what
@@ -84,16 +88,17 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
    whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
    pitch needs first.
-2. **dev member 2:** all hooks are in (counter_offer mounted and available, `book` redeems
-   agreements, Tuttie negotiates the shortlist and books the agreement). Run the bargaining live
-   (`scripts/demo_headless.py approved "<a request that asks for a better price>"`) and tune the
-   strategy with the pitch team; then the `negotiation.counter` event if the demo needs it.
+2. **dev member 2:** check the tuned story with the pitch team (`scripts/bargain_preview.py`,
+   numbers in formats.md) and confirm it live with the real LLM
+   (`scripts/demo_headless.py approved "<a request that asks for a better price>"`; needs
+   `code/.env`). The stage numbers are pinned in `test_the_pitch_story_anna_s_guesthouse`; if
+   they have to change, tell the pitch team.
 3. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
 ### Test coverage
 
-136 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+163 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -101,13 +106,17 @@ company agent with a fake LLM, private facts, read tools, the three hotel config
 parallel subagents against the real node apps), `test_marketplace.py` (postings, wake-up,
 offers, shortlist, strict formats, HTTP service), `test_market_agents.py` (the real market
 waking the real company agents, which send signed offers back), `test_tuttie_market.py` (Tuttie
-posting, its own shortlist with a private budget, negotiating the shortlist), `test_negotiation_rules.py` (limits, halfway counters, never below the floor),
+posting, its own shortlist with a private budget, negotiating the shortlist), `test_negotiation_rules.py` (limits, counters toward the guest, never below the floor),
 `test_counter_offer.py` (the hotel tool on the real node app: signatures, delegation, limits
 never in replies), `test_negotiation_flow.py` (real market offers, then Tuttie's subagents
 bargain in parallel), `test_agreement.py` (redeeming signed agreements once, from the real
-counter_offer tool), `test_tools.py` (assistant trust gate and Tuttie's identity,
+counter_offer tool), `test_negotiation_edges.py` (refusals mid-negotiation, Tuttie's round
+cap, unreachable registry, signed non-object payloads), `test_registry.py` (search, records,
+live reload), `test_marketplace_edges.py` (unknown or broken requesters, unverifiable agent
+cards, odd wake-up replies), `test_tools.py` (assistant trust gate and Tuttie's identity,
 with mocked HTTP and the real demo keys).
-Not covered yet: `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
+Coverage of `aps/`, `registry/`, `marketplace/`, `negotiation/`: 98 % (`pytest --cov`, with
+`pytest-cov` installed locally). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
@@ -142,8 +151,16 @@ Why things are the way they are, so nobody has to rediscover them:
 
 - **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
   (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
-  below its floor; Tuttie opens 15 % below and moves halfway, within the private budget. An
+  below its floor; Tuttie opens 10 % below and moves halfway, within the private budget. An
   LLM could leak a limit or invent a price; code can be tested for both.
+- **Strategy tuned for a visible story, not maximum savings:** with a 15 % opening and halfway
+  hotel steps, the hotels hit their floor in round 1 and the bargaining ended after two
+  rounds, for Gästehaus am Rhein (the pitch winner) at exactly Anna's private floor of
+  CHF 125, which would effectively reveal it on stage. A 10 % opening and a hotel that moves
+  a third of the way give three rounds: Gästehaus agrees at CHF 128, Rheinblick still at 185.
+- **Signed is not the same as well-formed.** A signed envelope with a list or string payload
+  crashed `counter_offer` (HTTP 500) until `message()` refused non-objects; every parser of a
+  signed payload must handle that.
 - **`counter_offer` is stateless.** The guest agent sends the hotel's own signed offer and
   last counter with each round, so the hotel only trusts its own signatures for earlier
   prices (like `book` with commitments). No negotiation state can be lost on restart or

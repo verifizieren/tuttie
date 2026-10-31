@@ -160,3 +160,32 @@ def test_a_forged_hotel_is_refused_before_any_bargaining():
 
     outcome = asyncio.run(scenario())
     assert outcome.status == "refused" and outcome.rounds == 0
+
+
+def bargain(node_id: str, add_ons: tuple, budget: float) -> list[tuple]:
+    """One negotiation against the real hotel app; the moves as (Tuttie, hotel answer, price)."""
+    recorder = Recorder()
+
+    async def scenario():
+        async with httpx.AsyncClient(transport=recorder) as http:
+            toolbox, _ = await world(recorder, http)
+            negotiator = TuttieNegotiator(SubagentPool(toolbox), TUTTIE, load_signing_key(TUTTIE))
+            return await negotiator.negotiate(node_id, signed_offer(node_id, add_ons=add_ons), user_context(budget))
+
+    outcome = asyncio.run(scenario())
+    return [(step["own_chf"], step["hotel"]["type"], step["hotel"]["price_chf"]) for step in outcome.history]
+
+
+def test_the_pitch_story_anna_s_guesthouse():
+    """documentation/context/pitch/storyline.md: "...with my dog, under 160" → Gästehaus am Rhein
+    (CHF 135) wins and Tuttie bargains: three visible rounds, agreed at CHF 128, above Anna's
+    private floor but never at it. If this test has to change, tell the pitch team: the numbers
+    are on stage (preview: scripts/bargain_preview.py)."""
+    moves = bargain("ch.basel.gaestehaus-am-rhein", ("late-arrival-dog",), budget=160)
+    assert moves == [(121, "counter", 131), (126, "counter", 130), (128, "agreement", 128)]
+
+
+def test_the_rheinblick_story():
+    """The earlier live run (double + dog at CHF 195, budget 200), now over three rounds."""
+    moves = bargain(RHEINBLICK, ("dog",), budget=200)
+    assert moves == [(175, "counter", 189), (182, "counter", 187), (185, "agreement", 185)]

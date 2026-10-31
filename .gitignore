@@ -10,3 +10,4 @@ code/keys/local/
 CLAUDE.md
 # Local reference material (e.g. design examples); not part of the repo.
 .context/
+.coverage
