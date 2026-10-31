@@ -86,14 +86,14 @@ async def main(decision: str, request: str) -> None:
         phone = asyncio.create_task(fake_phone(approvals, decision))
         assistant = Assistant(LLM(), toolbox, bus)
         answer = await assistant.chat(request)
-        # Like the wallet: the user swipes right on the recommended cards, Tuttie negotiates and books.
+        # Like the wallet: the user swipes right on the recommended cards, Tuttie books the cheapest liked deal.
         cards = [e for e in bus.history if e["detail"].get("phase") == "cards"]
-        favourites = [c for c in (cards[-1]["detail"]["cards"] if cards else []) if c["shortlisted"]]
-        if favourites:
-            print(f"\nwallet: favourites {[c['name'] for c in favourites]}\n{answer}\n")
-            answer = await assistant.chat("I liked these, negotiate and book the best deal: "
-                                          + ", ".join(f"{c['name']} ({c['node_id']})" for c in favourites) + ".",
-                                          first_tool="negotiate")
+        liked = [c for c in (cards[-1]["detail"]["cards"] if cards else []) if c["shortlisted"]]
+        if liked:
+            best = min(liked, key=lambda c: c["agreed_chf"] if c["agreed_chf"] is not None else c["price_chf"])
+            print(f"\nwallet: liked {[c['name'] for c in liked]}\n{answer}\n")
+            answer = await assistant.chat(f"Book {best['name']} ({best['node_id']}) at the agreed price.",
+                                          first_tool="book")
         phone.cancel()
 
     for event in [e for e in bus.history[:-1] if e["kind"] != "thinking"]:
