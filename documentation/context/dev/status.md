@@ -46,10 +46,11 @@ Build order from [goals.md](goals.md):
 4. **Negotiation** — done (dev member 2, `code/negotiation/`): `counter_offer` is mounted in
    every node and available; Tuttie's `negotiate` tool hands the shortlist to
    `TuttieNegotiator.negotiate_all` with the budget as a private item and shows `best()`'s
-   signed Agreement. Tuttie negotiates only when the user asks for a better price.
-   Open (dev member 2 with dev member 1, owner of `node/server.py`): redeeming a signed
-   Agreement in `book` (today `book` only redeems commitments), and the
-   `negotiation.counter` wake-up event (hotels subscribe to it, nothing sends it yet).
+   signed Agreement. Tuttie negotiates only when the user asks for a better price. `book`
+   redeems a hotel's signed Agreement once (`AgreementRedeemer`), and Tuttie books it with
+   `use_agreement` after the user approves exactly the agreed price on the phone. Tests:
+   `test_node_book.py`, `test_tuttie_market.py` (post → shortlist → negotiate → book).
+   Open: the `negotiation.counter` wake-up event (hotels subscribe to it, nothing sends it).
 5. **MCP services** — not started.
 
 ### Who works on what
@@ -81,15 +82,16 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** the human layer in the wallet (step 3): chat and voice-mode text go to
    `POST /chat`; the wallet follows `GET /events` and shows the posting, incoming offers, the
    shortlist and the agreement under Tuttie's eyes; approvals on the phone.
-2. **dev member 2:** run the bargaining live (`scripts/demo_headless.py` with a request that
-   asks for a better price) and tune the strategy with the pitch team; then redeeming a signed
-   Agreement in `book` together with dev member 1.
+2. **dev member 2:** all hooks are in (counter_offer mounted and available, `book` redeems
+   agreements, Tuttie negotiates the shortlist and books the agreement). Run the bargaining live
+   (`scripts/demo_headless.py approved "<a request that asks for a better price>"`) and tune the
+   strategy with the pitch team; then the `negotiation.counter` event if the demo needs it.
 3. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
 ### Test coverage
 
-125 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+136 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
