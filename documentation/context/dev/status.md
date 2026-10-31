@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (MCP step 5 done on both sides and reviewed; the `pay` race is fixed).
+Last updated: 2026-10-31 (test and docs review: aps/ and negotiation/ at 100 %, READMEs for both, architecture rows current).
 
 ## Done
 
@@ -125,7 +125,7 @@ Build order from [goals.md](goals.md):
 
 ### Test coverage
 
-239 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+249 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -142,8 +142,9 @@ cap, unreachable registry, signed non-object payloads), `test_registry.py` (sear
 live reload), `test_marketplace_edges.py` (unknown or broken requesters, unverifiable agent
 cards, odd wake-up replies), `test_tools.py` (assistant trust gate and Tuttie's identity,
 with mocked HTTP and the real demo keys), `test_call.py` (signed calls: tampering, time window, nonces), `test_gate.py` (the action gate: one refusal test per missing signature, agreement and approval used once), `test_counter_offer_mcp.py` (counter_offer over a real MCP server: same replies as HTTP, the pitch rounds), `test_mandate.py` (payment mandates, auto-pay only to gold/blue and ≤ CHF 10, `pay` through the gate).
-Coverage of `aps/`, `registry/`, `marketplace/`, `negotiation/`: 98 % (`pytest --cov`, with
-`pytest-cov` installed locally). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
+Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `aps/` and
+`negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
+56 %, `assistant/events.py` 56 % (the real LLM and SSE streaming, not run in tests). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
