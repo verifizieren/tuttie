@@ -16,7 +16,7 @@ This repo follows the BaselHack template:
 
 | Folder | Contents |
 | --- | --- |
-| `code/` | all source code: `aps/` library, `registry/`, `node/`, `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `code/` | all source code: `aps/` library, `registry/`, `node/`, `assistant/`, `ui/`, `scripts/`, `tests/`, demo `data/` and `keys/` |
 | `documentation/` | `formats.md`: the APS wire formats and trust rules |
 | `assets/` | presentation material |
 
@@ -29,11 +29,15 @@ cd code
 python3 -m venv .venv            # or: uv venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env             # add your OPENAI_API_KEY
-./run.sh                         # registry on :4000, business nodes on :4001-4005
-.venv/bin/pytest -q              # tests for the APS library and demo data
+./run.sh                         # registry :4000, nodes :4001-4005, assistant + UI :4040
+.venv/bin/pytest -q              # tests for the APS library and trust gate (no network, no LLM)
 ```
 
-Try it:
+Open <http://localhost:4040>, send the prefilled request, and watch the timeline on the
+right: the scam hotel is rejected in red, and every fact the assistant uses comes from a
+signed, verified response.
+
+Or query the agent web directly:
 
 ```bash
 curl "http://localhost:4000/search?tags=hotel,basel-sbb"
