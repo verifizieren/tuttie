@@ -15,6 +15,7 @@ The signatures are real Ed25519 and are really checked; nothing in the trust cha
 - Concept and demo strategy: [`documentation/concept.md`](documentation/concept.md)
 - Architecture and work areas (mapped to the GitHub issues): [`documentation/architecture.md`](documentation/architecture.md)
 - Message formats and trust rules: [`documentation/formats.md`](documentation/formats.md)
+- For the team: [`documentation/context/`](documentation/context/) (dev: [start here](documentation/context/dev/README.md), [goals](documentation/context/dev/goals.md); research; pitch)
 
 ## Repository structure
 
