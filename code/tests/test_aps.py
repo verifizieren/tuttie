@@ -9,7 +9,9 @@ from nacl.signing import SigningKey
 
 from aps import (canonical, evaluate_record, is_valid_uid, issue_seal, public_key_b64, sign_envelope,
                  verify_envelope)
+from aps.delegation import sign_delegation, verify_delegation
 from aps.envelope import is_fresh
+from aps.keys import load_public_key
 from aps.uid import check_digit
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -153,6 +155,7 @@ def test_demo_registry_verdicts():
         "ch.basel.cheap-hotels": "broken",
         "ch.legal.consumer-law": "gold",
         "ch.legal.advisor": "grey",
+        "ch.tuttie.alex-muster": "blue",
     }
     assert "licensed_legal_ch" in evaluate_record(records["ch.legal.consumer-law"], auths)["capabilities"]
     assert "licensed_legal_ch" not in evaluate_record(records["ch.legal.advisor"], auths)["capabilities"]
@@ -258,3 +261,56 @@ def test_demo_registry_uids():
     uids = {r["node_id"]: evaluate_record(r, auths)["uid"] for r in records}
     assert {node_id for node_id, uid in uids.items() if uid} == {"ch.basel.hotel-rheinblick", "ch.basel.hotel-gundeli"}
     assert all(is_valid_uid(r["uid"]) for r in records if r["uid"])
+
+
+# --- delegations (Tuttie acts for the user) --------------------------------------------
+
+
+def make_delegation(user_key, agent_key, scopes=("ask_agents", "negotiate"), expires_at="2027-01-01T00:00:00Z"):
+    return sign_delegation("ch.tuttie.test", public_key_b64(agent_key), list(scopes), expires_at, user_key,
+                           issued_at=stamp(NOW))
+
+
+def test_delegation_verifies_for_its_agent_and_scope():
+    user_key, agent_key = SigningKey.generate(), SigningKey.generate()
+    delegation = make_delegation(user_key, agent_key)
+    args = (public_key_b64(user_key), "ch.tuttie.test", public_key_b64(agent_key))
+    assert verify_delegation(delegation, *args, now=NOW)
+    assert verify_delegation(delegation, *args, scope="negotiate", now=NOW)
+    assert not verify_delegation(delegation, *args, scope="post_requests", now=NOW)
+
+
+def test_delegation_rejects_other_agent_key_user_or_tampering():
+    user_key, agent_key = SigningKey.generate(), SigningKey.generate()
+    delegation = make_delegation(user_key, agent_key)
+    user, agent = public_key_b64(user_key), public_key_b64(agent_key)
+    assert not verify_delegation(delegation, user, "ch.other.agent", agent, now=NOW)
+    assert not verify_delegation(delegation, user, "ch.tuttie.test", public_key_b64(SigningKey.generate()), now=NOW)
+    assert not verify_delegation(delegation, public_key_b64(SigningKey.generate()), "ch.tuttie.test", agent, now=NOW)
+    widened = {**delegation, "scopes": ["ask_agents", "negotiate", "post_requests"]}
+    assert not verify_delegation(widened, user, "ch.tuttie.test", agent, now=NOW)
+    assert not verify_delegation({"agent_id": "ch.tuttie.test"}, user, "ch.tuttie.test", agent, now=NOW)
+
+
+def test_delegation_expires():
+    user_key, agent_key = SigningKey.generate(), SigningKey.generate()
+    delegation = make_delegation(user_key, agent_key, expires_at=stamp(NOW - timedelta(seconds=1)))
+    assert not verify_delegation(delegation, public_key_b64(user_key), "ch.tuttie.test",
+                                 public_key_b64(agent_key), now=NOW)
+
+
+def test_delegation_refuses_unknown_scopes_and_bad_expiry():
+    """Paying is never delegated: it always needs the user's own approval."""
+    user_key, agent_key = SigningKey.generate(), SigningKey.generate()
+    with pytest.raises(ValueError):
+        make_delegation(user_key, agent_key, scopes=("pay",))
+    with pytest.raises(ValueError):
+        make_delegation(user_key, agent_key, expires_at="next year")
+
+
+def test_demo_tuttie_acts_for_the_demo_user():
+    records = {r["node_id"]: r for r in json.loads((DATA / "registry.json").read_text())}
+    tuttie = records["ch.tuttie.alex-muster"]
+    assert tuttie["kind"] == "user-agent"
+    assert verify_delegation(tuttie["delegation"], load_public_key("user"), tuttie["node_id"],
+                             tuttie["public_key"], scope="post_requests")

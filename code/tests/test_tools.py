@@ -159,3 +159,18 @@ def test_book_refuses_untrusted_unsigned_node():
     result = asyncio.run(toolbox.book("ch.basel.budget-rooms", "2026-11-14", "double", "A"))
     assert result["rejected"] is True and not toolbox.approvals.pending
     assert not any(url.endswith("/tools/book") for url in contacted)
+
+
+def test_identity_shows_tuttie_sealed_and_acting_for_the_user():
+    toolbox, bus, _ = make_toolbox()
+    me = asyncio.run(toolbox.identity("ch.tuttie.alex-muster"))
+    assert me["trust_tier"] == "blue" and me["acts_for_user"] is True
+    assert set(me["scopes"]) == {"ask_agents", "negotiate", "post_requests"}
+    assert bus.history == []  # identity checks are for the wallet, not the timeline
+
+
+def test_identity_without_delegation_does_not_act_for_the_user():
+    toolbox, _, _ = make_toolbox()
+    me = asyncio.run(toolbox.identity(RHEINBLICK))  # a sealed node, but nobody delegated to it
+    assert me["acts_for_user"] is False and me["scopes"] == []
+    assert asyncio.run(toolbox.identity("ch.nobody.here"))["rejected"] is True

@@ -29,6 +29,7 @@ from llm import LLM  # noqa: E402
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
 WALLET_DIST = APPS_DIR / "wallet" / "dist"
+TUTTIE_ID = os.environ.get("TUTTIE_ID", "ch.tuttie.alex-muster")  # this user's agent, data/agents/
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")
 
 bus = EventBus()
@@ -83,6 +84,12 @@ def reset() -> dict:
     app.state.assistant.reset()
     bus.reset()
     return {"ok": True}
+
+
+@app.get("/identity")
+async def identity() -> dict:
+    """Tuttie's own verified identity: its seals and the user's signed delegation."""
+    return await app.state.assistant.toolbox.identity(TUTTIE_ID)
 
 
 @app.get("/approvals/pending")

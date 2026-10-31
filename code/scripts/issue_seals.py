@@ -1,22 +1,30 @@
-"""Build data/registry.json: one signed registry record per node config.
+"""Build data/registry.json: one signed registry record per node config and user agent.
 
 Each seal in a node config names its issuer and tier. The issuer's key signs it,
 except where the config says "signed_by": "self" (the scam hotel forging a
 government seal with its own key). "issuer": "self" means a self-signed grey seal.
 The node's Swiss business number ("uid", optional) goes into the record and every seal.
+
+User agents (data/agents/, e.g. Tuttie) also get a "delegation": the user's key signs
+which scopes the agent may use for them (see aps/delegation.py).
 """
 
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from aps.delegation import sign_delegation  # noqa: E402
+from aps.envelope import TIMESTAMP_FORMAT  # noqa: E402
 from aps.keys import load_signing_key, public_key_b64  # noqa: E402
 from aps.seals import issue_seal  # noqa: E402
 
 NODES_DIR = ROOT / "data" / "nodes"
+AGENTS_DIR = ROOT / "data" / "agents"
+USER_KEY_ID = "user"
 REGISTRY_PATH = ROOT / "data" / "registry.json"
 
 
@@ -38,11 +46,18 @@ def build_record(config: dict) -> dict:
         issuer = node_id if claim["issuer"] == "self" else claim["issuer"]
         signer = node_id if claim.get("signed_by") == "self" else issuer
         seals.append(issue_seal(record, issuer, claim["tier"], load_signing_key(signer)))
-    return {**record, "seals": seals}
+    record["seals"] = seals
+    if "delegation" in config:
+        valid_until = datetime.now(timezone.utc) + timedelta(days=config["delegation"]["valid_days"])
+        record["delegation"] = sign_delegation(node_id, record["public_key"], config["delegation"]["scopes"],
+                                               valid_until.strftime(TIMESTAMP_FORMAT),
+                                               load_signing_key(USER_KEY_ID))
+    return record
 
 
 def main() -> None:
-    records = [build_record(json.loads(p.read_text())) for p in sorted(NODES_DIR.glob("*.json"))]
+    configs = sorted(NODES_DIR.glob("*.json")) + sorted(AGENTS_DIR.glob("*.json"))
+    records = [build_record(json.loads(p.read_text())) for p in configs]
     REGISTRY_PATH.write_text(json.dumps(records, indent=2) + "\n")
     for record in records:
         print(f"{record['node_id']}: {[s['issuer'] + '/' + s['tier'] for s in record['seals']]}")

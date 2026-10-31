@@ -108,7 +108,8 @@ In `seals`, `"issuer": "self"` means a self-signed grey seal, and
 ## Key files (`keys/<key_id>.json`)
 
 `{"key_id", "public_key", "private_key"}`, base64; private key is the 32-byte seed.
-Key ids: authority issuer ids, node ids, and `user` (signs approvals).
+Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-muster`) and
+`user` (the person: signs approvals and delegations).
 
 ## UI event (assistant → UI over SSE)
 
@@ -147,6 +148,31 @@ sends a named `reset` event when a new demo starts; the UI then clears itself.
 Wrapped in a signed envelope. The assistant treats other agents' text as data, never
 as instructions.
 
+## User agent and delegation (`data/agents/*.json`, `aps/delegation.py`)
+
+A user agent (Tuttie) is in the registry like a node, with `"kind": "user-agent"`, its own
+key and seals (the platform seals it, e.g. `adobe`/blue), and the endpoint of the assistant.
+Its config has no `facts` and no node server; instead it carries a delegation request
+`{"scopes": [...], "valid_days": 365}`, and its registry record gets a **delegation**
+signed by the `user` key:
+
+```json
+{
+  "agent_id": "ch.tuttie.alex-muster",
+  "agent_public_key": "<b64, must equal the record's public_key>",
+  "scopes": ["ask_agents", "negotiate", "post_requests"],
+  "issued_at": "2026-10-31T12:00:00Z",
+  "expires_at": "2027-10-31T12:00:00Z",
+  "signature": "<user key over canonical {agent_id, agent_public_key, scopes, issued_at, expires_at}>"
+}
+```
+
+A delegation is valid only for the agent id and key in its own registry record, until
+`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`). Paying
+is not a scope: every payment still needs the user's signed approval (below). The
+assistant serves its own checked identity at `GET /identity`
+(`{node_id, name, trust_tier, verified_by, capabilities, acts_for_user, scopes, ...}`).
+
 ## Approval
 
 Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the phone
@@ -157,7 +183,8 @@ with the user's key and attached to the action (e.g. passed to `book`).
 
 Proposal so the marketplace, node and wallet work can start in parallel. **Not implemented
 yet; agree on it as a team before building.** Every message below is the `payload` of a
-signed envelope (see above), signed by its sender: the user's agent with the `user` key,
+signed envelope (see above), signed by its sender: the user's agent with its own key (its
+delegation proves it acts for the user),
 business agents with their node key.
 
 ### Request (user's agent → marketplace)

@@ -171,5 +171,40 @@
         "signature": "p7ult18Dhq6rkS4nzjL5kE1qWlevV1Dk4djg/NXWpho5nVkzpYdV0+mxrOXfGfgS51WwnXGEXznHL/C6tEtMAw=="
       }
     ]
+  },
+  {
+    "node_id": "ch.tuttie.alex-muster",
+    "name": "Tuttie",
+    "uid": null,
+    "public_key": "00T3JRuLqKIfZuw8jYEaJWTgJiL9+2nwTrS5xt05M7M=",
+    "endpoint": "http://localhost:4040",
+    "kind": "user-agent",
+    "capabilities": [
+      "can_post_requests",
+      "can_negotiate"
+    ],
+    "tags": [
+      "tuttie",
+      "user-agent"
+    ],
+    "seals": [
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "6iZS9GSa08sftbWra2neBOOfqo7lZrVwFYrUccBzCo2LT6aXCgqWj6L+WxN0g0lMSWHtmIBhSZTig/D/QsQWBA=="
+      }
+    ],
+    "delegation": {
+      "agent_id": "ch.tuttie.alex-muster",
+      "agent_public_key": "00T3JRuLqKIfZuw8jYEaJWTgJiL9+2nwTrS5xt05M7M=",
+      "scopes": [
+        "ask_agents",
+        "negotiate",
+        "post_requests"
+      ],
+      "issued_at": "2026-10-31T11:32:02Z",
+      "expires_at": "2027-10-31T11:32:02Z",
+      "signature": "wqxcmj3x71VtqE+Jb57smnTLIht728cIFzc6QNmOy/OjDkmH9daBFMwE0wHa7UpHwwtfOxNwCJyJ3bZII/wHAA=="
+    }
   }
 ]

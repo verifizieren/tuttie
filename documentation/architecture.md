@@ -29,7 +29,7 @@ can work in parallel without stepping on each other. Contracts live in
 | Registry | `code/registry/` | #9 | done | `GET /search`, `GET /nodes/{id}` |
 | Business nodes | `code/node/`, `code/data/nodes/` | #10 | done for direct booking; offers and negotiation to add | signed envelopes; formats: offer, counter-offer |
 | Marketplace (requests, offers, shortlist, negotiation) | `code/marketplace/` | #8, #9, #10 | to build | formats: request, offer, counter-offer, agreement |
-| User's agent | `code/assistant/` | #10 | done for direct booking; marketplace flow to add | UI events over SSE, approvals API |
+| User's agent | `code/assistant/`, `code/data/agents/` | #10 | done for direct booking; own identity (key, seal, user delegation); marketplace flow to add | UI events over SSE, approvals API, `GET /identity` |
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
 | Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |
 | Owner view | `code/apps/owner/` | #5 | to build | owner API (to define) that edits `data/nodes/*.json` facts |

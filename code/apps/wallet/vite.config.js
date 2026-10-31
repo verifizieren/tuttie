@@ -17,6 +17,7 @@ export default defineConfig({
       "/approvals": ASSISTANT,
       "/events": ASSISTANT,
       "/chat": ASSISTANT,
+      "/identity": ASSISTANT,
     },
   },
   build: { outDir: "dist", emptyOutDir: true },
