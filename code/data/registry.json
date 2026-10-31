@@ -41,6 +41,62 @@
     ]
   },
   {
+    "node_id": "ch.basel.gaestehaus-am-rhein",
+    "name": "G\u00e4stehaus am Rhein",
+    "public_key": "D0iYmNpeD0zk8V+erSxT65VFY2w2nGUd++N8VyQeqds=",
+    "endpoint": "http://localhost:4009",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "kleinbasel",
+      "rhine",
+      "independent",
+      "dog-friendly",
+      "quiet"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "bjKcdMw04qlcnNEcobrT451/WkHYECiosn0zyjahH0ubG5Ht95hH2meoL7LmcJHMXGLIpEkt9KxGXq85huCGDg=="
+      }
+    ]
+  },
+  {
+    "node_id": "ch.basel.alpina-grand",
+    "name": "Alpina Grand Basel",
+    "public_key": "iRtpCuLB7Z7aPGcuOWPyjnL2mkhR105Iulu279/j/9w=",
+    "endpoint": "http://localhost:4008",
+    "kind": "business",
+    "capabilities": [
+      "can_book",
+      "can_take_payment"
+    ],
+    "tags": [
+      "hotel",
+      "basel-sbb",
+      "business",
+      "chain",
+      "dog-friendly"
+    ],
+    "seals": [
+      {
+        "issuer": "handelsregister-bs",
+        "tier": "gold",
+        "signature": "+4PJIPr4OpxGrz37NNCEklOta9b4/xjEJ6tuvAmDDW52Q/cpNNWW4ebRsWoNlm3NP6LEol0oPKE46zDotjHwBw=="
+      },
+      {
+        "issuer": "adobe",
+        "tier": "blue",
+        "signature": "KMKrL88LHt+dMN+A3JVhH1K3/z9t1vSf9x0zJ+Yp6qvPQNyfZuhHHk5ycZI/RzMeVdsqU7S10XZg+fGvMpONBQ=="
+      }
+    ]
+  },
+  {
     "node_id": "ch.basel.hotel-gundeli",
     "name": "Hotel Gundeli",
     "public_key": "9F9e5fBWTPM44AS0MjqtAqZcHlyYBoJdG/DpaM2Re+I=",
