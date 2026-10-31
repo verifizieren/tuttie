@@ -8,6 +8,8 @@ answers. All logic, tools and signatures stay in the assistant.
   conversation. The voice agent is dispatched into every new room automatically.
 - /rtc               (wallet): LiveKit's signaling WebSocket, proxied to the local LiveKit
   server, so it shares the wallet's https origin (the team server exposes no other port for it).
+- POST /voice/diag     (wallet): what a phone saw when its voice connection failed or worked
+  (kinds of addresses, ICE errors, relay servers), written to the log to debug real phones.
 - POST /voice/say, GET /voice/events  (voice agent only, with the LiveKit secret as bearer
   token): send what the user said into the room's conversation, and follow its timeline.
 """
@@ -107,6 +109,17 @@ def voice_events(room: str, request: Request) -> StreamingResponse:
     """New events of the room's conversation as Server-Sent Events, for the voice agent to speak from."""
     return StreamingResponse(live_only(room_conversation(request, room).bus), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+DIAG_MAX_BYTES = 2000
+
+
+@router.post("/voice/diag", status_code=204)
+async def voice_diag(request: Request) -> Response:
+    """Log a wallet's voice connection report (lib/iceReport.js), cut to DIAG_MAX_BYTES."""
+    body = (await request.body())[:DIAG_MAX_BYTES].decode(errors="replace")
+    print(f"voice diag: {body}", flush=True)
+    return Response(status_code=204)
 
 
 @router.get("/rtc/validate")

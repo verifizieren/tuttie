@@ -5,10 +5,12 @@
 // Tuttie's voice, and passes both voice levels to Tuttie's presence (onLevels), which moves the
 // eyes (lib/faceDirector.js): they pulse while Tuttie speaks and open up while the user talks.
 // Speech becomes a message to the same Tuttie as typing (code/voice/agent.py); without voice
-// configured on the server the wallet simply stays text-only. What Tuttie says also arrives as text, word by word in step with its voice
-// (LiveKit's "lk.transcription" streams), so the wallet can show an answer as it is spoken.
+// configured on the server the wallet simply stays text-only. What Tuttie says also arrives as
+// text, word by word in step with its voice (LiveKit's "lk.transcription" streams), so the wallet
+// can show an answer as it is spoken.
 // When the wallet is hidden (another app, locked phone) the room is left; it rejoins on return.
 import { useEffect, useRef, useState } from "react";
+import { watchIce } from "../lib/iceReport.js";
 
 const LEVEL_MS = 50;       // how often the voice levels go to the presence (and so to the eyes)
 const RETRY_MS = 2000;     // rejoin after a dropped connection
@@ -59,6 +61,7 @@ export default function useVoice(active, onSpeech, onLevels) {
       if (!response.ok) throw new Error("voice is not configured");
       const [{ url, token }, { Room, RoomEvent, Track }] = await Promise.all([response.json(), import("livekit-client")]);
       if (closed) return;
+      watchIce();  // a failed connection on a phone is reported to the server's log
       lk = new Room({ adaptiveStream: true, dynacast: true });
       lk.on(RoomEvent.TrackSubscribed, track => {
         if (track.kind !== Track.Kind.Audio) return;

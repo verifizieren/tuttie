@@ -105,3 +105,10 @@ def test_fillers_match_the_request():
     assert filler_kind("I want to book something") == "task"
     assert filler_kind("What's the weather like tomorrow?") == "question"
     assert filler_kind("Tell me a joke") == "other"
+
+
+def test_a_wallets_voice_report_is_logged_and_cut(capsys):
+    with TestClient(app) as client:
+        assert client.post("/voice/diag", content=b'{"state": "failed"}' + b"x" * 5000).status_code == 204
+    line = capsys.readouterr().out.strip().splitlines()[-1]
+    assert line.startswith('voice diag: {"state": "failed"}') and len(line) < voice.DIAG_MAX_BYTES + 20
