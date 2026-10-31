@@ -65,6 +65,7 @@
   #qr.open { display: grid; }
   #qr div { background: #fff; padding: 24px; border-radius: 16px; text-align: center; }
   #qr img { width: min(70vh, 80vw); display: block; }
+  #qr a { font-size: 20px; font-weight: 600; color: var(--blue); word-break: break-all; }
   @keyframes in { from { opacity: 0; transform: translateY(6px); } }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } section { height: 70vh; } }
 </style>
@@ -92,7 +93,7 @@
     <div class="scroll" id="timeline"><p class="empty">Signed steps will appear here.</p></div>
   </section>
 </main>
-<div id="qr" title="Click to close"><div><img src="/phone-qr.svg" alt="QR code of the phone page"><p>Scan to approve on your phone</p></div></div>
+<div id="qr" title="Click to close"><div><img src="/phone-qr.svg" alt="QR code of the phone page"><p>Scan to approve on your phone</p><a id="phone-link" href="/phone.html" target="_blank"></a></div></div>
 <script>
   // Demo prompts shown as buttons above the text field; a click sends the prompt.
   const PROMPTS = [
@@ -249,6 +250,9 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send.click(); }
   });
   const qr = document.getElementById("qr");
+  const phoneLink = document.getElementById("phone-link");
+  phoneLink.textContent = location.origin + "/phone.html";
+  phoneLink.addEventListener("click", e => e.stopPropagation());  // open the link, keep the QR open
   document.getElementById("phone").addEventListener("click", () => qr.classList.add("open"));
   qr.addEventListener("click", () => qr.classList.remove("open"));
   document.getElementById("reset").addEventListener("click", () => fetch("/reset", { method: "POST" }));
