@@ -58,7 +58,32 @@ Build order from [goals.md](goals.md):
    lists `negotiation.counter` any more (`DEFAULT_WAKES_ON` never did). Anna offers the double
    with `late-arrival-dog` (CHF 135) for a dog guest: her config notes the single is too small
    for a dog. Verified headless: 135 → 121/131 → 126/130 → agreed 128 → approved → booked.
-5. **MCP services** — not started.
+5. **MCP services** — planned, split (goal 4). Hotels offer their tools over MCP at `/mcp`;
+   an action runs only with the right signatures. Start with the contract (C1), then both
+   sides work in parallel. `pay` only if the pitch story uses it (open decision).
+   - **dev member 2 (APS, `code/aps/`, `code/negotiation/`):**
+     - C1 *signed call* contract in `formats.md`: Tuttie signs `{tool, args, agent_id,
+       nonce, timestamp}` with its key and attaches the user's delegation; `aps/call.py`
+       `sign_call` / `verify_call` (nonce + time window against replays).
+     - C2 one gate for actions, e.g. `aps/gate.py` `check_action(call, needs)`: caller key
+       matches the registry record and its seals verify, delegation signed by the user for
+       this agent with the tool's scope (`book`, `pay`), approval for exactly this amount and
+       payee, agreement if given. Returns a refusal reason naming the missing signature.
+       Refusal tests for each case (no/forged caller, wrong scope, expired, wrong amount,
+       used twice, replayed nonce).
+     - C3 (if `pay`) payment mandate: `aps/mandate.py`, user-signed payee, max CHF, purpose,
+       expiry; auto-pay ≤ CHF 10 to gold/blue, above needs approval.
+     - C4 `counter_offer` also offered as an MCP tool (his router), same checks.
+   - **dev member 1 (nodes, Tuttie, wallet):**
+     - M1 MCP server on every node (`/mcp`, Python `mcp` SDK, streamable HTTP) with
+       `get_availability`, `get_policies`, `book` (and `pay`), reusing the `/tools/*`
+       functions; results stay signed envelopes.
+     - M2 Tuttie as MCP client (`assistant/mcp_client.py`): seal check before connecting,
+       envelope check on every result, signs action calls with C1; `call_tool` / `book` use it.
+     - M3 `book` (and `pay`) on the node call C2's gate before running.
+     - M4 timeline and wallet show which signatures an action passed ("approval ✓
+       delegation ✓ agreement ✓"), the "signatures are real" beat.
+     - M5 tests (MCP round trip in-process) and the headless story still ends booked at CHF 128.
 
 ### Who works on what
 
