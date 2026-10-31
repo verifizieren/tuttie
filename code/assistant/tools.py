@@ -21,7 +21,7 @@ from pathlib import Path
 
 import httpx
 
-from aps import evaluate_record, load_signing_key, verify_envelope
+from aps import agent_key, evaluate_record, load_signing_key, verify_envelope
 from aps.approval import booking_terms
 from aps.call import sign_call
 from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
@@ -487,7 +487,7 @@ class Toolbox:
         Returns Verified, or a rejection dict for the LLM (already shown on the timeline).
         """
         async def send(record: dict) -> dict:
-            return (await self.http.post(f"{record['endpoint']}{path}", json=body)).json()
+            return (await self.http.post(f"{record['endpoint']}{path}", json=body, headers=agent_key.headers())).json()
         return await self.verified(node_id, send, kind, label)
 
     async def verified_mcp(self, node_id: str, tool: str, args: dict, kind: str, label: str) -> Verified | dict:

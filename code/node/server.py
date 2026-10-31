@@ -28,10 +28,11 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, ValidationError
 
 from apidocs import api_docs
+from aps import agent_key
 from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import booking_terms
 from aps.call import call_body
@@ -124,6 +125,12 @@ async def requester_problem(posting, lookup, authorities: dict, now=None) -> str
     if not isinstance(payload, dict) or payload.get("request_id") != posting.request_id:
         return "the signed request is for another posting"
     return None
+
+
+def agent_caller(request: Request) -> None:
+    """Only the deployment's own services may make the agent think (aps/agent_key.py): 401 otherwise."""
+    if not agent_key.allowed(request.headers.get(agent_key.HEADER)):
+        raise HTTPException(status_code=401, detail="this agent answers only its marketplace and known agents")
 
 
 class AgentRequest(BaseModel):
@@ -357,7 +364,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     # The owner view (apps/owner): read the live business, deploy new settings (node/owner.py).
     app.mount("/owner", owner_app(config, store, lambda: business_agent.apply(config)))
 
-    @app.post("/agent")
+    @app.post("/agent", dependencies=[Depends(agent_caller)])
     async def agent(req: AgentRequest) -> dict:
         """The company's agent answers another agent (A2A), signed."""
         return signed(await business_agent.answer(req.question, req.context))
@@ -373,14 +380,14 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         except KeyError:
             raise HTTPException(status_code=404, detail="no such session") from None
 
-    @app.post("/agent/sessions")
+    @app.post("/agent/sessions", dependencies=[Depends(agent_caller)])
     def open_session(req: SessionOpenRequest) -> dict:
         """Open an isolated conversation with its own memory (one per negotiation)."""
         session = sessions.open(req.peer, req.purpose, req.context)
         session.add("system", "opened", {"peer": req.peer, "purpose": req.purpose})
         return signed({"session_id": session.id, "agent": business_agent.persona["name"], "purpose": req.purpose})
 
-    @app.post("/agent/sessions/{session_id}/messages")
+    @app.post("/agent/sessions/{session_id}/messages", dependencies=[Depends(agent_caller)])
     async def session_message(session_id: str, req: SessionMessageRequest) -> dict:
         """Answer a message inside a session; the agent sees the session's history."""
         session = find_session(session_id)
@@ -393,18 +400,18 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             session.add("self", "reply", reply)
         return signed({"session_id": session.id, "turn": len(session.turns), **reply})
 
-    @app.get("/agent/sessions/{session_id}")
+    @app.get("/agent/sessions/{session_id}", dependencies=[Depends(agent_caller)])
     def read_session(session_id: str) -> dict:
         """The session's whole memory, signed (for audits and the timeline)."""
         return signed(find_session(session_id).to_dict())
 
-    @app.post("/agent/sessions/{session_id}/close")
+    @app.post("/agent/sessions/{session_id}/close", dependencies=[Depends(agent_caller)])
     def close_session(session_id: str) -> dict:
         """End a session; its memory stays readable."""
         find_session(session_id)
         return signed({"session_id": session_id, "status": sessions.close(session_id).status})
 
-    @app.post("/agent/invoke")
+    @app.post("/agent/invoke", dependencies=[Depends(agent_caller)])
     async def agent_invoke(event: dict = Body(...)) -> dict:
         """The marketplace wakes the agent on a change; it answers whether and how it would respond.
 
