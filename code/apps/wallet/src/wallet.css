@@ -347,5 +347,6 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 @keyframes spin { to { transform: rotate(360deg); } }
 .sheet-error { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--red); }
 .sheet-close { grid-template-columns: 1fr; }
+.sheet-note { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--accent); }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }

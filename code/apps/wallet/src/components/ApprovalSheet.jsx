@@ -43,7 +43,9 @@ function Progress({ stage, decision }) {
   );
 }
 
-export default function ApprovalSheet({ approval, onGone }) {
+// `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
+// booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
+export default function ApprovalSheet({ approval, onGone, note = "" }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
   const [decision, setDecision] = useState(null); // the chosen decision, then the recorded one
   const [error, setError] = useState("");
@@ -104,6 +106,7 @@ export default function ApprovalSheet({ approval, onGone }) {
         </label>
       )}
       {error && <p className="sheet-error" role="alert">{error}</p>}
+      {!error && note && <p className="sheet-note" role="status">{note}</p>}
       {stage === "ask" && (
         <div className="sheet-buttons">
           <button type="button" className="decline" onClick={() => choose("declined")}>Decline</button>

@@ -45,6 +45,7 @@ const OPEN_GUARD_MS = 700;
 const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
 const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
 const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once more after this
+const DECIDE_FIRST = "Decide on the booking first";
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
 export default function App() {
@@ -127,7 +128,7 @@ export default function App() {
   // A new conversation from the dock: the current one goes into the history.
   async function newChat() {
     setShowHistory(false);
-    if (approval) return;  // the user must decide the waiting approval first
+    if (approval) return setNotice(DECIDE_FIRST);  // the user must decide the waiting approval first
     try {
       await actions.newConversation(agent);
       setError("");
@@ -152,6 +153,7 @@ export default function App() {
 
   // The dock's History button always shows the list, also from inside a past chat.
   function openHistory() {
+    if (approval) return setNotice(DECIDE_FIRST);  // the sheet covers the card: never open the history under it
     setHistoryChat({ id: null, error: "", resuming: false });
     setShowHistory(true);
   }
@@ -261,7 +263,7 @@ export default function App() {
             onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
-        <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} />
+        <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} note={notice} />
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
