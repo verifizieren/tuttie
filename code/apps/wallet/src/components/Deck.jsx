@@ -61,6 +61,7 @@ function HotelCard({ card, hotel, position, count, style, handlers, verdict, cla
         <div className="swipe-price">
           {card.agreed_chf != null && <s>CHF {card.price_chf}</s>}
           <b>CHF {price}</b>
+          {card.over_budget_chf != null && <small className="over-budget">over your budget</small>}
         </div>
       </div>
     </article>

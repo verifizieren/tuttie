@@ -269,6 +269,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .swipe-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
 .swipe-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
 .swipe-price s { font-size: 13px; color: var(--dim); }
+/* Only on the user's own device: the budget never leaves it towards a hotel. */
+.swipe-price .over-budget { font-size: 11px; color: var(--muted); letter-spacing: .01em; }
 .stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px;
          font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; pointer-events: none; }
 .stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
