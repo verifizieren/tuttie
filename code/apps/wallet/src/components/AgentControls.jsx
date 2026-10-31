@@ -1,5 +1,4 @@
-// The controls at the bottom of the open Tuttie card: what was said, a status line, and the
-// text fallback. Voice is the main interface; typing is a deliberate choice behind a small,
+// The controls at the bottom of the open Tuttie card: a status line and the text fallback. Voice is the main interface; typing is a deliberate choice behind a small,
 // dim keyboard icon, and the text field only exists while typing.
 import { useEffect, useRef, useState } from "react";
 
@@ -14,12 +13,11 @@ function KeyboardIcon() {
 
 /**
  * @param mode       "closed" | "voice" | "typing"
- * @param said       the last thing the user said or typed
  * @param status     the status line under it
  * @param onKeyboard switch to typing
  * @param onSend     (text) => void
  */
-export default function AgentControls({ mode, said, status, onKeyboard, onSend }) {
+export default function AgentControls({ mode, status, onKeyboard, onSend }) {
   const input = useRef(null);
   const [text, setText] = useState("");
 
@@ -38,7 +36,6 @@ export default function AgentControls({ mode, said, status, onKeyboard, onSend }
 
   return (
     <div className="controls">
-      <div className="said">{said}</div>
       <div className="status">{status}</div>
       {mode === "typing" ? (
         <form className="composer" onSubmit={submit} autoComplete="off">

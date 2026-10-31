@@ -1,8 +1,10 @@
-// The human view of the marketplace, under Tuttie's eyes: what Tuttie asked for, which hotels
-// answered with which offer, the shortlist, the negotiation and Tuttie's answer. Tapping a
-// hotel shows who vouches for it (its seals) and what its offer includes.
+// One conversation under Tuttie's eyes, turn by turn: what the user said, what Tuttie did on
+// the agent web (the posting, the hotels and their offers, the cards to pick favourites from,
+// the negotiation, the booking) and Tuttie's answer. Tapping a hotel shows who vouches for it.
+// The same view shows an archived conversation from the history (readOnly).
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
+import Picker from "./Picker.jsx";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 function RequestCard({ request }) {
@@ -70,13 +72,30 @@ function SkippedRow({ business }) {
   );
 }
 
-/** Tuttie's answer without the timeline citations ([3]) and with **bold** kept as bold. */
+/** **bold** inside a line. */
+function Inline({ text }) {
+  return text.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
+    part.startsWith("**") ? <b key={i}>{part.slice(2, -2)}</b> : <span key={i}>{part}</span>);
+}
+
+/** Tuttie's answer as a highlighted bubble: paragraphs, "- " lines as a list, **bold** kept. */
 function Answer({ text }) {
-  const clean = text.replace(/\s*\[\d+\]/g, "");
+  const blocks = [];
+  for (const line of text.split("\n").map(l => l.trim())) {
+    if (!line) continue;
+    const item = line.match(/^[-•*]\s+(.*)/);
+    if (item) {
+      if (blocks.at(-1)?.list) blocks.at(-1).list.push(item[1]);
+      else blocks.push({ list: [item[1]] });
+    } else {
+      blocks.push({ text: line });
+    }
+  }
   return (
-    <div className="answer">
-      {clean.split(/(\*\*[^*]+\*\*)/).map((part, i) =>
-        part.startsWith("**") ? <b key={i}>{part.slice(2, -2)}</b> : <span key={i}>{part}</span>)}
+    <div className="bubble tuttie">
+      {blocks.map((b, i) => (b.list
+        ? <ul key={i}>{b.list.map((t, j) => <li key={j}><Inline text={t} /></li>)}</ul>
+        : <p key={i}><Inline text={b.text} /></p>))}
     </div>
   );
 }
@@ -88,25 +107,55 @@ function order(hotels) {
     rank(a) - rank(b) || (a.agreed ?? a.offer?.price_chf ?? 1e9) - (b.agreed ?? b.offer?.price_chf ?? 1e9));
 }
 
-export default function Activity({ state }) {
-  const box = useRef(null);
+/** What happened on the market in this conversation: the request, then the cards or the hotels. */
+function Market({ state, readOnly, onPick }) {
   const [openId, setOpenId] = useState(null);
-  // The booking and Tuttie's answer come last; bring them into view when they arrive.
-  useEffect(() => {
-    if (state.answer || state.booking) box.current?.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" });
-  }, [state.answer, state.booking]);
-
-  if (!state.request && !state.answer) return null;
+  const picking = state.cards && !state.picked;
+  // Once the user picked, the hotels they chose show the negotiation; before the cards, all offers come in.
+  const shown = order(state.hotels).filter(([nodeId]) => !state.picked || state.picked.includes(nodeId));
   return (
-    <div className="activity" ref={box}>
-      {state.request && <RequestCard request={state.request} />}
-      {order(state.hotels).map(([nodeId, hotel]) => (
-        <HotelRow key={nodeId} hotel={hotel} overBudget={state.shortlistDone && hotel.offer && !hotel.shortlisted}
-                  open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
-      ))}
+    <>
+      <RequestCard request={state.request} />
+      {state.cards && (picking || readOnly)
+        ? <Picker cards={state.cards} hotels={state.hotels} picked={readOnly ? state.picked || [] : state.picked}
+                  onPick={onPick} />
+        : shown.map(([nodeId, hotel]) => (
+            <HotelRow key={nodeId} hotel={hotel} overBudget={state.shortlistDone && hotel.offer && !hotel.shortlisted}
+                      open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
+          ))}
       {state.skipped.map((business, i) => <SkippedRow key={i} business={business} />)}
-      {state.booking && <BookingCard booking={state.booking} />}
-      {state.answer && <Answer text={state.answer} />}
+    </>
+  );
+}
+
+/**
+ * @param state     the conversation (lib/activity.js)
+ * @param readOnly  an archived conversation from the history: nothing can be picked
+ * @param onPick    (favourite cards) => void
+ */
+export default function Activity({ state, readOnly = false, onPick }) {
+  const box = useRef(null);
+  const last = state.turns.at(-1);
+  // New content comes last; bring it into view when it arrives (not for archived conversations).
+  // The cards to pick from are shown from their top, so the photos and prices are in view.
+  useEffect(() => {
+    if (readOnly || !box.current) return;
+    const picker = state.cards && !state.picked && box.current.querySelector(".picker");
+    const top = picker ? picker.offsetTop - 8 : box.current.scrollHeight;
+    box.current.scrollTo({ top, behavior: "smooth" });
+  }, [readOnly, state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
+
+  if (!state.turns.length && !state.request) return null;
+  return (
+    <div className={`activity${readOnly ? " archived" : ""}`} ref={box} data-scroll>
+      {state.turns.map((turn, i) => (
+        <div className="turn" key={i}>
+          {turn.said && <div className="bubble user">{turn.said}</div>}
+          {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} />}
+          {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
+          {turn.answer && <Answer text={turn.answer} />}
+        </div>
+      ))}
     </div>
   );
 }
