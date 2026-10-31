@@ -11,6 +11,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb",
       "quiet"
@@ -29,6 +30,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb",
       "dog-friendly",
@@ -54,6 +56,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "kleinbasel",
       "rhine",
@@ -81,6 +84,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb",
       "business",
@@ -112,6 +116,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb",
       "family"
@@ -136,6 +141,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb",
       "dog-friendly",
@@ -166,6 +172,7 @@
       "can_take_payment"
     ],
     "tags": [
+      "basel",
       "hotel",
       "basel-sbb"
     ],
@@ -260,9 +267,9 @@
         "negotiate",
         "post_requests"
       ],
-      "issued_at": "2026-10-31T11:47:38Z",
-      "expires_at": "2027-10-31T11:47:38Z",
-      "signature": "LKaVsUgwXkYaz4gWJVdbte3CrDcwJbsd9sueyz8t/ObbBfOK5tSSaAHCe4qn4Y4xU8THqAKB5Uu8wSErFrzqDg=="
+      "issued_at": "2026-10-31T12:27:17Z",
+      "expires_at": "2027-10-31T12:27:17Z",
+      "signature": "95RuVllslvTtKqwRaSy0Rj5dMJQqqzxni1s/pu+sPE6+e3FMhW3OSlV0F4UHD+0jBkkeLln5pRd64U7B/uxdCg=="
     }
   }
 ]

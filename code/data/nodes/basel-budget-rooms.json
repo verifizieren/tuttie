@@ -5,7 +5,7 @@
   "port": 4007,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
-  "tags": ["hotel", "basel-sbb", "quiet"],
+  "tags": ["basel", "hotel", "basel-sbb", "quiet"],
   "seals": [],
   "facts": {
     "address": "Near Basel SBB",

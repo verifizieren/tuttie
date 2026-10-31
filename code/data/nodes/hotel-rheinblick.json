@@ -5,7 +5,7 @@
   "port": 4001,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
-  "tags": ["hotel", "basel-sbb", "dog-friendly", "quiet"],
+  "tags": ["basel", "hotel", "basel-sbb", "dog-friendly", "quiet"],
   "seals": [
     { "issuer": "handelsregister-bs", "tier": "gold" },
     { "issuer": "adobe", "tier": "blue" }

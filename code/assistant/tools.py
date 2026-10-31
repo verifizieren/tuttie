@@ -52,8 +52,9 @@ SCHEMAS = [
             "guests": {"type": "integer"},
             "requirements": {"type": "array", "items": {"type": "string"},
                              "description": "public needs, e.g. [\"quiet\", \"dog\", \"arrival around 01:00\"]"},
-            "tags": {"type": "array", "items": {"type": "string", "enum": ["basel-sbb", "kleinbasel"]},
-                     "description": "only the place; everything else (quiet, dog, ...) goes into requirements"},
+            "tags": {"type": "array", "items": {"type": "string", "enum": ["basel", "basel-sbb", "kleinbasel"]},
+                     "description": "only the place: \"basel\" for the whole city, \"basel-sbb\" or \"kleinbasel\" "
+                                    "only if the user named that area; everything else (quiet, dog, ...) goes into requirements"},
             "budget_chf": {"type": "number",
                            "description": "the user's price limit. PRIVATE: it is never posted, only used for the shortlist"},
         },

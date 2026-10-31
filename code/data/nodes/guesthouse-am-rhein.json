@@ -5,7 +5,7 @@
   "port": 4009,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
-  "tags": ["hotel", "kleinbasel", "rhine", "independent", "dog-friendly", "quiet"],
+  "tags": ["basel", "hotel", "kleinbasel", "rhine", "independent", "dog-friendly", "quiet"],
   "seals": [
     { "issuer": "handelsregister-bs", "tier": "gold" }
   ],
