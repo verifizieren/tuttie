@@ -93,9 +93,9 @@ class Said(BaseModel):
 
 @router.post("/voice/say", status_code=202, dependencies=[Depends(agent_only)])
 async def voice_say(said: Said, request: Request) -> dict:
-    """What the user said, as a message in the room's conversation (like typing it)."""
-    room_conversation(request, said.room).start(said.text)
-    return {"accepted": True}
+    """What the user said, as a new turn in the room's conversation (like typing it)."""
+    turn_id = room_conversation(request, said.room).start(said.text, source="voice")
+    return {"accepted": True, "turn_id": turn_id}
 
 
 async def live_only(bus):

@@ -14,7 +14,7 @@ import httpx
 
 from assistant.agent import Assistant
 from assistant.approvals import ApprovalBook
-from assistant.events import EventBus
+from assistant.events import EventBus, current_turn
 from assistant.tools import Toolbox
 from llm import LLM
 
@@ -30,14 +30,28 @@ class Conversation:
         self.approvals = ApprovalBook()
         self.assistant = Assistant(llm, Toolbox(http, registry_url, self.bus, self.approvals), self.bus)
         self.chats: set[asyncio.Task] = set()
+        self.turns = 0  # user turns so far; their ids stay unique for the conversation's lifetime
 
-    def start(self, message: str, first_tool: str | None = None) -> None:
-        """Answer a message in the background; the answer arrives as an "answer" event."""
-        task = asyncio.create_task(self._run(message, first_tool))
+    def start(self, message: str, first_tool: str | None = None, said: str | None = None,
+              source: str = "text") -> str:
+        """Answer a message in the background as a new turn; returns the turn's id.
+
+        A "turn" event opens the turn at once (`detail`: turn_id, said, source text | voice),
+        so the wallet shows it even while an earlier request is still running. Every event of
+        this request's run carries the id, the answer included. `said` is what the user sees as
+        their message (default: the message itself).
+        """
+        self.turns += 1
+        turn_id = f"t{self.turns}"
+        self.bus.emit("turn", "pending", said or message, turn=turn_id,
+                      detail={"turn_id": turn_id, "said": said or message, "source": source})
+        task = asyncio.create_task(self._run(message, first_tool, turn_id))
         self.chats.add(task)
         task.add_done_callback(self.chats.discard)
+        return turn_id
 
-    async def _run(self, message: str, first_tool: str | None) -> None:
+    async def _run(self, message: str, first_tool: str | None, turn_id: str) -> None:
+        current_turn.set(turn_id)  # this task's own context: every event it emits belongs to the turn
         try:
             await self.assistant.chat(message, first_tool)
         except asyncio.CancelledError:

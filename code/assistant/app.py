@@ -74,6 +74,7 @@ class ChatRequest(BaseModel):
     message: str
     first_tool: str | None = None  # one of FIRST_TOOLS
     conversation_id: str | None = None
+    said: str | None = None  # what the user sees as their message, if not the message itself
 
 
 class DecisionRequest(BaseModel):
@@ -83,13 +84,13 @@ class DecisionRequest(BaseModel):
 
 @app.post("/chat", status_code=202)
 async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
-    """Start answering a message; the answer arrives as an "answer" event."""
+    """Start answering a message as a new turn; its events and answer carry the returned turn id."""
     if req.conversation_id is not None and req.conversation_id != conv.id:
         raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
     if req.first_tool is not None and req.first_tool not in FIRST_TOOLS:
         raise HTTPException(status_code=422, detail=f"first_tool must be one of {sorted(FIRST_TOOLS)}")
-    conv.start(req.message, req.first_tool)
-    return {"accepted": True}
+    turn_id = conv.start(req.message, req.first_tool, said=req.said)
+    return {"accepted": True, "turn_id": turn_id}
 
 
 @app.post("/reset")
