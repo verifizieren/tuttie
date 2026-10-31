@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (test and docs review: aps/ and negotiation/ at 100 %, READMEs for both, architecture rows current).
+Last updated: 2026-10-31 (pitch story confirmed live with the real LLM; `scripts/check.sh`, named service logs, missing-key warning, Ctrl+C stops within 3 s).
 
 ## Done
 
@@ -23,6 +23,7 @@ Last updated: 2026-10-31 (test and docs review: aps/ and negotiation/ at 100 %, 
 | Marketplace (agent layer) | Built against the draft formats: Tuttie's signed postings in (seals, freshness, user delegation `post_requests`), matching businesses woken in parallel at `POST /agent/invoke` (broken ones never contacted), only verified businesses whose agent card subscribes to new postings, signed offers in (only from invited businesses, fresh, for this request, still valid); it decides nothing. Formats as strict Pydantic models in one place. | `code/marketplace/` (:4010) |
 | Bargaining (step 4) | Hotel side: the `counter_offer` tool, stateless like `book` (the counter carries the hotel's own signed offer and last counter), checks Tuttie's seals, signature, freshness and the user's `negotiate` delegation; the hotel meets halfway and never goes below its private floor or past its rounds, compared in code (`negotiation/rules.py`), never in a prompt or reply. Tuttie's side: one subagent per offer, all in parallel in their own sessions, counters signed with Tuttie's key, the private `max_price_chf` only compared in code; ends in a signed Agreement, a rejection or walking away; `best()` picks the cheapest agreement. Booking can redeem an Agreement (`AgreementRedeemer`: own signature, not expired, only once). Formats: `Counter` (+ `final`), `Agreement`, `Rejection`. Mounted in every node (`node/server.py`); Tuttie reaches it through its `negotiate` tool. | `code/negotiation/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
+| Dev tooling | `./run.sh` shows every service's log lines with its name, warns without an OpenAI key and stops everything within 3 s on Ctrl+C; `scripts/check.sh` runs the checks before a push (tests, wallet build, real flow; `--no-llm` without the LLM). | `code/run.sh`, `code/scripts/run_all.py`, `code/scripts/check.sh` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Connected:** requests go to Tuttie; posting, offers, shortlist, bargaining and answer shown under its eyes; approvals in the wallet with a Face ID-style confirmation. | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
 | Repo structure | BaselHack template, work-area folders with scope READMEs, team context folders, concept and architecture docs, draft marketplace formats. | `documentation/`, `code/*/README.md` |
@@ -115,7 +116,10 @@ Build order from [goals.md](goals.md):
    pitch needs first.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
-3. **dev member 2:** check with the pitch team where `pay` happens in the story (e.g. city tax
+3. **dev member 2:** **Confirmed live** (real LLM, `demo_headless.py`, 2026-10-31): the pitch
+   request "quiet hotel in Basel, arriving after midnight, with my dog, under 160" gives
+   Gästehaus 135 → 121/131 → 126/130 → agreed CHF 128 → approved → booked (caller, signature,
+   delegation, agreement, approval) → city tax CHF 4 paid with the mandate. Next: check with the pitch team where `pay` happens in the story (e.g. city tax
    with a mandate, under CHF 10, no phone; above that the phone asks); then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
    numbers in formats.md) and confirm it live with the real LLM
    (`scripts/demo_headless.py approved "<a request that asks for a better price>"`; needs
@@ -126,7 +130,7 @@ Build order from [goals.md](goals.md):
 
 ### Test coverage
 
-249 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+259 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),

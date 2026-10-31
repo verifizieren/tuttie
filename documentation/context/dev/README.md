@@ -24,10 +24,12 @@ cp .env.example .env               # add OPENAI_API_KEY (ask the team)
 ## Before every push
 
 ```bash
-.venv/bin/pytest -q                                  # all tests green
-.venv/bin/python scripts/demo_headless.py approved   # the real flow still works end to end
-(cd apps/wallet && npm run build)                    # the wallet still builds
+scripts/check.sh            # tests, wallet build, then the real flow (demo_headless.py approved); ~1 min
+scripts/check.sh --no-llm   # without the LLM step (no key, or just a quick check)
 ```
+
+It stops at the first failure and names the step. `./run.sh` prefixes every service's log
+line with its name and warns at startup if there is no `OPENAI_API_KEY`.
 
 ## Working rules
 

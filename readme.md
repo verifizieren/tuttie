@@ -87,9 +87,8 @@ To keep everything running on a server, use the systemd user service in `deploy/
 3. **Before every push:**
    ```bash
    cd code
-   .venv/bin/pytest -q                                  # all tests green
-   .venv/bin/python scripts/demo_headless.py approved   # the real flow still works
-   (cd apps/wallet && npm run build)                    # the wallet still builds
+   scripts/check.sh            # all tests, the wallet build and the real flow (demo_headless.py approved)
+   scripts/check.sh --no-llm   # the same without the LLM step
    ```
 4. **Rules:**
    - Pull before you start; small commits with clear messages, one concern each.
