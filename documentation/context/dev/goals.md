@@ -18,6 +18,25 @@ work areas and interfaces: `documentation/architecture.md`; message formats:
   through the real app, never a separate demo build.
 - **Small, clear commits.** The jury reviews the code and the commit history.
 
+## Build order
+
+The goals below describe where we want to get to. We build them step by step; each step
+ends with a working end-to-end run, tests, and a check-in with the pitch and design team.
+
+1. **Agents first** (goal 2): Tuttie and the three hotel agents exist, have signed and
+   sealed identities (goal 5) and answer with signed messages.
+2. **Agent layer of the marketplace** (goal 1): Tuttie puts up a posting, the hotel agents
+   apply with signed offers, Tuttie picks one. No bargaining yet.
+3. **Human layer** (goal 1): the wallet shows the posting, the offers and the choice, and the
+   user approves on the phone.
+4. **Negotiation** (goal 3): first Tuttie bargains directly; then it hands each negotiation
+   to a subagent with limited context.
+5. **MCP services** (goal 4): the actions become MCP tools that check signatures before they
+   run.
+
+APS signing (goal 5) is the base of every step, not a separate step: it already exists in
+`code/aps/` and grows with the steps.
+
 ## Goal 1: the first marketplace, in two layers (issues #8, #9, #10)
 
 A **reverse marketplace**: the user posts what they need, and businesses' agents apply to
