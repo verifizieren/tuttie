@@ -67,8 +67,17 @@ async def session_cookie(request: Request, call_next):
     response = await call_next(request)
     if fresh:
         response.set_cookie(SESSION_COOKIE, request.state.session_id, max_age=SESSION_DAYS * 86400,
-                            httponly=True, samesite="lax")
+                            httponly=True, samesite="lax", secure=over_https(request))
     return response
+
+
+def over_https(request: Request) -> bool:
+    """Whether the browser reached us over https: directly, or through nginx (X-Forwarded-Proto).
+
+    Only then is the session cookie marked Secure; plain-http local development keeps working.
+    """
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return request.url.scheme == "https" or forwarded == "https"
 
 
 async def conversation(request: Request) -> Conversation:

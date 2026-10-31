@@ -104,3 +104,21 @@ def test_api_docs_are_off_unless_asked_for(monkeypatch):
     monkeypatch.setenv("API_DOCS", "1")  # local development
     assert api_docs() == {}
     assert TestClient(service_app(weather)).get("/openapi.json").status_code == 200
+
+
+def test_the_session_cookie_is_secure_over_https_only():
+    from fastapi.testclient import TestClient
+
+    from assistant.app import SESSION_COOKIE, app
+
+    def cookie(client: TestClient, **headers) -> str:
+        header = client.get("/history", headers=headers).headers["set-cookie"]
+        assert header.startswith(f"{SESSION_COOKIE}=") and "HttpOnly" in header and "SameSite=lax" in header
+        return header
+
+    with TestClient(app) as client:  # plain http (local development)
+        assert "Secure" not in cookie(client)
+    with TestClient(app) as client:  # behind nginx on https://web4.mendes.dev
+        assert "Secure" in cookie(client, **{"X-Forwarded-Proto": "https"})
+    with TestClient(app, base_url="https://testserver") as client:  # https directly
+        assert "Secure" in cookie(client)
