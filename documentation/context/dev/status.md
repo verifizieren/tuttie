@@ -353,6 +353,13 @@ Why things are the way they are, so nobody has to rediscover them:
   reading paced at 0.15 s per source. Voice uses ElevenLabs Flash. The wallet joins the voice room
   ahead (mic off), so opening the card only turns the mic on. Spoken request to answer: ~8 s.
   `AGENT_LLM_MODEL` is read when needed: `node/agent.py` is imported before `.env` is loaded.
+- **Hotel offers in one call:** for a new posting the hotel agent decides and chooses its offer
+  (room, add-ons) in one LLM call (`WAKE_OFFER_PROMPT`, `offer_choice` kept out of the signed
+  reply); offers reach the guest ~1.3 s sooner (answer ~5 s after the context in a headless run).
+- **Voice on phones:** ICE from phones failed (no UDP into the team server; iPhones don't use
+  plain TCP). A coturn relay on TCP 4044 (`code/voice/turnserver.conf`, started by run_all when
+  `TURN_SECRET` is set) carries their audio; LiveKit hands it to clients. Relays only to the
+  server's own IP; no certificate needed. Verified with a relay-only client.
 - **Posting tags:** only the city (`basel`); an area went into tags and hid the guesthouse in
   Kleinbasel (the train arrives at Basel SBB). Offers wait up to 45 s (stops when all offered).
 - **Tasks in words, the rest in the eyes:** the line under the eyes shows only what Tuttie is
