@@ -140,10 +140,9 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .hotel-more { padding: 0 14px 14px; animation: rise .3s var(--ease) both; }
 .includes { font-size: 13px; color: var(--muted); margin: -2px 0 10px 48px; }
 
-/* Issuer marks in a row: small app-icon tiles, overlapping like a stack of passes. */
-.marks { display: inline-flex; flex: none; width: 38px; }
-.marks i { position: relative; width: 22px; height: 22px; border-radius: 6px; box-shadow: 0 0 0 2px var(--panel2); }
-.marks i + i { margin-left: -6px; }
+/* Issuer tiles side by side, each with its own shield, so every seal can be seen whole. */
+.marks { display: inline-flex; flex: none; gap: 8px; min-width: 38px; }
+.marks i { position: relative; width: 22px; height: 22px; border-radius: 6px; }
 .marks svg, .seal-mark svg { display: block; width: 100%; height: 100%; }
 /* A small shield on each tile: an authority signed for this business. */
 .marks .mini-shield { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px;
@@ -207,8 +206,10 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .steps li span { min-width: 0; animation: rise .3s var(--ease) both; overflow-wrap: anywhere; }
 .steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
 .steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
-/* Done lines rest: a still, grey dot; only the line Tuttie is working on breathes. */
+/* Done lines rest: a still grey dot, the one that finished last is green; only the line Tuttie
+   is working on breathes. */
 .steps li.done .dot { background: #4a4a52; }
+.steps li.done.latest .dot { background: var(--green); }
 .steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px;
                          background: var(--line2); }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
@@ -272,7 +273,6 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
 .sheet-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
 .sheet .seal-list { margin-bottom: 16px; background: #2a2a2e; }
-.sheet .marks i { box-shadow: 0 0 0 2px #1c1c1f; }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sheet-buttons button { padding: 15px; border-radius: 16px; font-size: 16px; }
 .sheet-buttons .approve { background: #fff; color: #08080b; }
