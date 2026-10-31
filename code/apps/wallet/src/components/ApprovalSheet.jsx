@@ -83,7 +83,7 @@ export default function ApprovalSheet({ approval, onGone }) {
   }
 
   return (
-    <div className="sheet" role="dialog" aria-label="Approve payment">
+    <div className="sheet" role="dialog" aria-label="Approve payment" data-scroll>
       <div className="sheet-hotel">
         <SealMarks seals={approval.seals} />
         {approval.hotel}

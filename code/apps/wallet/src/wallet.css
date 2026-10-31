@@ -10,6 +10,7 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .app {
   position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-h, 100dvh);
   max-width: 430px; margin: 0 auto; overflow: hidden;
+  overflow: clip;  /* never scrolled by the browser (e.g. focus on a short screen): the stack stays in place */
   --top: max(16px, env(safe-area-inset-top)); --bottom: max(16px, env(safe-area-inset-bottom));
   --head: 56px; --peek: clamp(50px, 15vw, 64px);
   --card-w: calc(min(100vw, 430px) - 32px); --card-h: calc(var(--card-w) / 1.586);
@@ -311,6 +312,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 @keyframes sheet { from { transform: translateY(110%); } }
 /* Only on the open card: in the stack the sheet would show (and take taps) over the bank cards. */
 .app:not(.open) .sheet { visibility: hidden; pointer-events: none; }
+/* A short screen (landscape phone): the sheet scrolls instead of losing its top. */
+.sheet { max-height: calc(100% - 20px); overflow-y: auto; overscroll-behavior: contain; }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
 .sheet-terms { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
