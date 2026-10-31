@@ -1,0 +1,52 @@
+{
+  "node_id": "ch.basel.alpina-grand",
+  "name": "Alpina Grand Basel",
+  "port": 4008,
+  "kind": "business",
+  "capabilities": ["can_book", "can_take_payment"],
+  "tags": ["hotel", "basel-sbb", "business", "chain", "dog-friendly"],
+  "seals": [
+    { "issuer": "handelsregister-bs", "tier": "gold" },
+    { "issuer": "adobe", "tier": "blue" }
+  ],
+  "agent": {
+    "persona": {
+      "name": "Lena",
+      "role": "reservations agent",
+      "business_size": "large",
+      "about": "Alpina Grand Basel is a 220-room business hotel at Basel SBB and part of the Alpina Hotels chain, with a restaurant, a gym and conference rooms.",
+      "tone": "polished and efficient, like a good front desk in a big hotel",
+      "priorities": ["keep the hotel full, especially on weekdays", "suggest the executive room or breakfast when it fits the guest", "Alpina members get a better rate"],
+      "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
+    },
+    "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
+    "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+  },
+  "facts": {
+    "address": "Centralbahnplatz 1, 4051 Basel",
+    "rooms_total": 220,
+    "chain": "Alpina Hotels (12 hotels in Switzerland)",
+    "distance_to_basel_sbb_m": 80,
+    "quiet": false,
+    "quiet_note": "Soundproof windows, but the station square is busy; courtyard rooms on request.",
+    "rooms": [
+      { "room_type": "double", "price_chf": 240, "rate": "flexible, free cancellation until 18:00 on the day of arrival", "available": true },
+      { "room_type": "executive", "price_chf": 290, "rate": "flexible, lounge access included", "available": true }
+    ],
+    "policies": {
+      "dogs_allowed": true,
+      "dog_fee_chf_per_night": 30,
+      "check_in": "24h reception",
+      "late_arrival": "Reception is open 24 hours.",
+      "cancellation": "Free cancellation until 18:00 on the day of arrival."
+    },
+    "facilities": ["restaurant", "gym", "conference rooms", "parking garage"],
+    "negotiation": { "floor_chf": 205, "max_rounds": 2 },
+    "add_ons": [
+      { "id": "breakfast", "item": "breakfast buffet", "price_chf": 32, "conditions": ["per person and night"] },
+      { "id": "dog", "item": "dog in the room", "price_chf": 30, "conditions": ["dog fee CHF 30 per night"] },
+      { "id": "late-checkout", "item": "late check-out until 14:00", "price_chf": 40, "conditions": ["subject to availability on the day"] },
+      { "id": "parking", "item": "parking in the hotel garage", "price_chf": 35, "conditions": ["per night"] }
+    ]
+  }
+}
