@@ -39,15 +39,28 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
    iOS and looks blurry after it expands. */
 .bank { will-change: transform; }
 .bank:active { transform: scale(.985); }
-.bank-blue { background: linear-gradient(135deg, #3a63e8, #1b2f8f 60%, #111c55); }
+.bank-blue { background: linear-gradient(135deg, #1487d4, #07529b 58%, #04356e); }
 .bank-black { background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
 .chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px; overflow: hidden;
         background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
 .chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90, 68, 28, .55); stroke-width: 1; }
+.bank-brand { position: absolute; top: 18px; right: 20px; height: 34px; display: flex; align-items: center;
+              color: #fff; line-height: 1; user-select: none; }
+.ubs-brand { gap: 8px; }
+.ubs-brand b { font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 700; letter-spacing: -.06em; }
+.ubs-keys { width: 39px; height: 28px; overflow: visible; }
+.zkb-brand { gap: 9px; text-align: left; }
+.zkb-brand b { display: block; font-size: 21px; font-weight: 800; letter-spacing: .02em; }
+.zkb-brand small { display: block; margin-top: 3px; font-size: 8px; font-weight: 650; letter-spacing: .015em; opacity: .9; }
+.swiss-mark { position: relative; display: block; width: 27px; height: 27px; border: 1.5px solid rgba(255, 255, 255, .9);
+               border-radius: 7px; }
+.swiss-mark i { position: absolute; left: 50%; top: 50%; display: block; background: #fff; transform: translate(-50%, -50%); }
+.swiss-mark i:first-child { width: 13px; height: 4px; }
+.swiss-mark i:last-child { width: 4px; height: 13px; }
 
 /* ---------- The Tuttie card: nothing but the agent's face ---------- */
-.agent { cursor: pointer; touch-action: none; background: #0c0c10;
-         box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), 0 -8px 24px rgba(0, 0, 0, .55); }
+.agent { cursor: pointer; touch-action: none; background: #fff;
+         box-shadow: 0 0 0 1px rgba(0, 0, 0, .08), 0 -8px 24px rgba(0, 0, 0, .32); }
 .agent.dragging { transition: none; }
 /* The face keeps its 2:1 shape (like pycozmo's 128x64 screen) and is only moved and scaled
    with transforms, so opening the card never re-renders it at a new size mid-animation. */
@@ -61,7 +74,7 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 /* The only text on the card: a quiet name label, in the stack and in the open view. */
 /* Grab bar: the open card closes by swiping down, like an iOS sheet. */
 .grabber { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px;
-           background: rgba(255, 255, 255, .28); opacity: 0; transition: opacity .3s; z-index: 2; pointer-events: none; }
+           background: rgba(0, 0, 0, .22); opacity: 0; transition: opacity .3s; z-index: 2; pointer-events: none; }
 
 /* ---------- Open: the bank cards drop away and the face takes the screen ---------- */
 .app.open .bank { transform: translateY(110vh); opacity: 0; }

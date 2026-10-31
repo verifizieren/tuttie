@@ -1,4 +1,4 @@
-// The Tuttie card: the agent's face on a dark card and (when open) a grab bar, what Tuttie is
+// The Tuttie card: the agent's black eyes on a white card and (when open) a grab bar, what Tuttie is
 // doing (children: activity, approval sheet, history) and the controls. Gestures
 // (tap, swipe up, swipe down) come from useCardGestures.
 import { useRef } from "react";

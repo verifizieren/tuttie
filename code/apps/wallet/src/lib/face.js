@@ -18,16 +18,27 @@ const EYE_FIELDS = {
 };
 const LID_FIELDS = { y: 0, angle: 1, bend: 2 };  // upper lid at eye + 13, lower lid at eye + 16
 const EYE_OFFSETS = [5, 24];
+// Small, calm gaze shifts used while the face is awake. Negative y looks upward.
+const IDLE_LOOKS = [
+  [-.34, -.05],
+  [.34, -.05],
+  [-.22, -.18],
+  [.22, -.18],
+  [0, -.24],
+  [0, 0],
+];
 
 // Design space of pycozmo (the robot's screen); everything is scaled from it.
 const W = 128, H = 64;
-const EYE_W = 28, EYE_H = 40;
+// Slightly oversized, soft rectangles: friendly at rest while the existing lid geometry still
+// has enough room to shape every emotion.
+const EYE_W = 32, EYE_H = 44;
 const X_FACTOR = 0.55, Y_FACTOR = 0.25;
 const CORNER = W / 20 + H / 10;
 const LID_HALF_W = 1.2 * EYE_W, LID_BEND_HALF_W = 1.2 * EYE_W / 2;
 
 function defaultParams() {
-  const eye = [0, 0, 1, 1, 0, .5, .5, .5, .5, .5, .5, .5, .5, 0, 0, 0, 0, 0, 0];
+  const eye = [0, 0, 1, 1, 0, .72, .72, .72, .72, .72, .72, .72, .72, 0, 0, 0, 0, 0, 0];
   return [0, 0, 1, 1, 0, ...eye, ...eye];
 }
 
@@ -35,7 +46,7 @@ function defaultParams() {
 // Each eye entry sets eye fields; "upper"/"lower" set lid fields. [left eye, right eye].
 const both = (left, right) => ({ eyes: [left, right] });
 const EXPRESSIONS = {
-  neutral: both({ scale_x: .8, scale_y: .8 }, { scale_x: .8, scale_y: .8 }),
+  neutral: both({ scale_x: .86, scale_y: .86 }, { scale_x: .86, scale_y: .86 }),
   anger: both({ upper: { y: .6, angle: -30 } }, { upper: { y: .6, angle: 30 } }),
   sadness: both({ upper: { y: .6, angle: 20 } }, { upper: { y: .6, angle: -20 } }),
   happiness: both(
@@ -111,6 +122,18 @@ function eyePath(ctx, p, e) {
   ctx.closePath();
 }
 
+// A crisp square catchlight makes the black eyes feel glossy. It is painted into the eye layer
+// before the lids are removed, so it scales, rotates, blinks and gets occluded with every emotion.
+function drawCatchlight(ctx) {
+  const x = -EYE_W * .15, y = -EYE_H * .17;
+  const size = EYE_W * .334;
+  const corner = size * .22;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.roundRect(x - size / 2, y - size / 2, size, size, corner);
+  ctx.fill();
+}
+
 // A lid is a block plus a half-ellipse bend, rotated, that is cut out of the eye.
 function cutLid(ctx, p, lidBase, yOffset, angleOffset) {
   const y = p[lidBase], angle = p[lidBase + 1], bend = p[lidBase + 2];
@@ -128,7 +151,7 @@ function cutLid(ctx, p, lidBase, yOffset, angleOffset) {
 }
 
 class TuttieFace {
-  constructor(canvas, { color = "#f6d3c2", glow = "rgba(217, 119, 87, .35)" } = {}) {
+  constructor(canvas, { color = "#000", glow = "transparent" } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.layer = document.createElement("canvas");  // one eye at a time, so lids never cut the other eye
@@ -211,10 +234,11 @@ class TuttieFace {
     this.current = lerp(this.from, this.to, easeInOut(t));
     this.speaking += (this.voiceTarget[0] - this.speaking) * .35;  // follow the voice, without jitter
     this.hearing += (this.voiceTarget[1] - this.hearing) * .15;
-    // Idle life, as in pycozmo's ProceduralFaceGenerator: small saccades and random blinks.
+    // Idle life: occasional gentle looks left, right and upward, plus natural random blinks.
     if (!this.asleep && t >= 1 && now > this.nextSaccade) {
-      this.nextSaccade = now + 900 + Math.random() * 2600;
-      this.lookAt((Math.random() - .5) * .8, (Math.random() - .5) * .5);
+      this.nextSaccade = now + 1800 + Math.random() * 3200;
+      const [x, y] = IDLE_LOOKS[Math.floor(Math.random() * IDLE_LOOKS.length)];
+      this.lookAt(x, y, 500);
     }
     if (!this.asleep && now > this.nextBlink) { this.blinking = now; this.nextBlink = now + 2200 + Math.random() * 3800; }
     this.draw(now);
@@ -246,6 +270,8 @@ class TuttieFace {
       lctx.fillStyle = this.color;
       eyePath(lctx, p, e);
       lctx.fill();
+      lctx.globalCompositeOperation = "source-atop";
+      drawCatchlight(lctx);
       lctx.globalCompositeOperation = "destination-out";
       cutLid(lctx, p, e + 13, -EYE_H / 2, 0);
       cutLid(lctx, p, e + 16, EYE_H / 2 + 1, 180);

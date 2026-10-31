@@ -7,12 +7,12 @@ Live at <https://web4.mendes.dev/wallet/>.
 
 ## What it does today
 
-- A minimal Apple Wallet-like stack: two generic bank cards (only colour and chip) and the
+- A minimal Apple Wallet-like stack: UBS and ZKB bank cards (without personal details) and the
   **Tuttie card**, which is nothing but the agent's face (procedural eyes ported from
   pycozmo) with a quiet "Tuttie" label.
-- **Asleep** in the stack (eyes closed). **Tap or swipe up** wakes Tuttie into **voice
-  mode**, the main interface; it stays on until the card is **swiped down**. Taps never send
-  Tuttie away.
+- **Quietly awake** in the stack (open eyes, gentle glances and blinks). **Tap or swipe up**
+  opens Tuttie in **voice mode**, the main interface; it stays on until the card is **swiped
+  down**. Taps never send Tuttie away.
 - **Text is a fallback** behind a small keyboard icon; the eyes close while typing, and the
   keyboard never opens by accident.
 - **Connected:** spoken or typed requests go to Tuttie (`POST /chat`, or the voice agent).
