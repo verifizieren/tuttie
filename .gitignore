@@ -14,3 +14,6 @@ CLAUDE.md
 
 # Settings the owner deployed through the owner view (runtime state, per machine).
 code/data/deployments/
+
+# Let's Encrypt challenge files (runtime, scripts/get_cert.sh).
+code/data/acme/

@@ -26,6 +26,9 @@ from assistant.conversations import Conversation, Conversations  # noqa: E402
 from assistant.voice import router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
+# Let's Encrypt HTTP challenges for this site's own certificate (voice relay, scripts/get_cert.sh);
+# runtime files, not in git.
+ACME_DIR = Path(__file__).resolve().parent.parent / "data" / "acme" / ".well-known" / "acme-challenge"
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
 WALLET_DIST = APPS_DIR / "wallet" / "dist"
 OWNER_DIST = APPS_DIR / "owner" / "dist"  # the owner view, also a React app (apps/owner)
@@ -143,6 +146,7 @@ def home() -> RedirectResponse:
 
 if not WALLET_DIST.exists():
     print(f"warning: {WALLET_DIST} is missing; build the wallet with `npm run build` in apps/wallet")
+app.mount("/.well-known/acme-challenge", StaticFiles(directory=ACME_DIR, check_dir=False), name="acme")
 app.mount("/wallet", StaticFiles(directory=WALLET_DIST, html=True, check_dir=False), name="wallet")
 app.mount("/owner", StaticFiles(directory=OWNER_DIST, html=True, check_dir=False), name="owner")
 app.mount("/", StaticFiles(directory=APPS_DIR, html=True), name="apps")
