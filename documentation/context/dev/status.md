@@ -10,6 +10,16 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 
 ## Done
 
+- **Turns with ids** (fix "messages disappear or get overwritten"): every typed or spoken
+  request is a server turn (`assistant/conversations.py` `start` returns its id and emits a
+  `turn` event; `assistant/events.py` stamps every event with the running turn via a
+  ContextVar). The wallet attaches events by `event.turn` (`lib/activity.js`), binds its own
+  typed message to the server turn, adds spoken ones, keeps every booking in its turn (a new
+  search no longer drops the last BookingCard) and shows the newest answer until the next one
+  arrives; a late answer never replaces a newer one. History restore rebuilds turns from the
+  server timeline. The voice agent says no filler for a `turn` event. Format in
+  `documentation/formats.md` (UI event). Not verified in a browser or with live voice.
+
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
   agreement facts are available to price follow-ups and final counters say quoted.

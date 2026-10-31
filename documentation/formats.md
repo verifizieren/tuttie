@@ -134,7 +134,8 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 ```json
 {
   "step": 3,
-  "kind": "registry | a2t | a2a | marketplace | payment | approval | answer | thinking",
+  "turn": "t2",
+  "kind": "turn | registry | a2t | a2a | marketplace | payment | approval | answer | thinking",
   "node_id": "ch.basel.hotel-rheinblick",
   "node_name": "Hotel Rheinblick",
   "seals": [{ "issuer": "handelsregister-bs", "tier": "gold", "valid": true }],
@@ -144,6 +145,16 @@ Key ids: authority issuer ids, node ids, user agent ids (e.g. `ch.tuttie.alex-mu
 }
 ```
 
+Every request is a **turn**: a typed message (`POST /chat`) or a spoken one (`POST
+/voice/say`) opens it with a `turn` event (`status: "pending"`, `summary` = the user's words,
+`detail: {turn_id, said, source: "text" | "voice"}`), emitted at once, also while an earlier
+request still runs. Every event of that request's run, its `answer` included, carries the id
+in `turn` (`null` for events outside any request). Turn ids (`t1`, `t2`, ...) are unique within
+a conversation. `POST /chat` and `POST /voice/say` return `{accepted, turn_id}`; `/chat` also
+takes `said`, what the user sees as their message when it differs from `message` (after
+swiping the cards: `"Book Hotel X"`). The wallet attaches events to their turn by this id, live
+and when it restores `GET /history`, so a new request never overwrites an earlier answer or
+booking.
 `untrusted` marks a node whose seals are valid but only grey (self-signed or unsigned).
 `thinking` events carry a reasoning summary of the assistant's LLM in `summary`
 (usually `"**Title**\n\nbody"`), with `status: "info"` and no node. The SSE stream also
