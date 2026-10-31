@@ -1,9 +1,12 @@
-"""The only module that talks to the LLM provider (OpenAI chat completions).
+"""The only module that talks to the LLM provider (OpenAI Responses API).
 
 Shared by the assistant (tool loop) and the business nodes (their own A2A agents).
+Callers use plain chat-style dicts ({"role", "content", "tool_calls"}, "tool"
+messages); this module converts them, so swapping providers only touches this file.
 
-Swap providers by reimplementing LLM.complete and LLM.complete_json; callers only
-see plain dicts.
+The Responses API is used because reasoning models (e.g. gpt-5.6-luna) only allow
+function tools together with reasoning there. Reasoning items are kept in the
+assistant message under "provider_items" and sent back on the next turn.
 """
 
 import json
@@ -12,28 +15,52 @@ import os
 from openai import AsyncOpenAI
 
 
+def to_input(messages: list[dict]) -> list[dict]:
+    """Chat-style messages -> Responses API input items."""
+    items = []
+    for message in messages:
+        if message["role"] == "assistant" and "provider_items" in message:
+            items.extend(message["provider_items"])
+        elif message["role"] == "tool":
+            items.append({"type": "function_call_output", "call_id": message["tool_call_id"],
+                          "output": message["content"]})
+        else:
+            items.append({"role": message["role"], "content": message["content"] or ""})
+    return items
+
+
+def to_tool(schema: dict) -> dict:
+    """Chat-completions tool schema -> Responses API tool."""
+    return {"type": "function", **schema["function"]}
+
+
 class LLM:
     def __init__(self, model: str | None = None):
         self.client = AsyncOpenAI()  # reads OPENAI_API_KEY
-        self.model = model or os.environ.get("LLM_MODEL", "gpt-4.1")
+        self.model = model or os.environ.get("LLM_MODEL", "gpt-5.6-luna")
+        effort = os.environ.get("LLM_REASONING_EFFORT")  # e.g. "low"; unset = model default
+        self.options = {"reasoning": {"effort": effort}} if effort else {}
 
     async def complete(self, messages: list[dict], tools: list[dict]) -> dict:
-        """Return the assistant message: {"role", "content", "tool_calls"?}."""
-        response = await self.client.chat.completions.create(model=self.model, messages=messages, tools=tools)
-        message = response.choices[0].message
-        result = {"role": "assistant", "content": message.content}
-        if message.tool_calls:
+        """Return the assistant message: {"role", "content", "tool_calls"?, "provider_items"}."""
+        response = await self.client.responses.create(
+            model=self.model, input=to_input(messages), tools=[to_tool(t) for t in tools], **self.options)
+        items = [item.model_dump(exclude_none=True) for item in response.output]
+        result = {"role": "assistant", "content": response.output_text or None, "provider_items": items}
+        calls = [item for item in items if item["type"] == "function_call"]
+        if calls:
             result["tool_calls"] = [
-                {"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
-                for c in message.tool_calls
+                {"id": c["call_id"], "type": "function", "function": {"name": c["name"], "arguments": c["arguments"]}}
+                for c in calls
             ]
         return result
 
     async def complete_json(self, system: str, user: str) -> dict:
         """One-shot completion that must return a JSON object."""
-        response = await self.client.chat.completions.create(
+        response = await self.client.responses.create(
             model=self.model,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            response_format={"type": "json_object"},
+            input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            text={"format": {"type": "json_object"}},
+            **self.options,
         )
-        return json.loads(response.choices[0].message.content or "{}")
+        return json.loads(response.output_text or "{}")
