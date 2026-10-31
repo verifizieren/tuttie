@@ -841,3 +841,8 @@ Why things are the way they are, so nobody has to rediscover them:
   `/events`, `/reset` and `/approvals` only touch the caller's conversation; hotels, marketplace
   and registry stay shared. Each person's run uses the real LLM (cost). For automated tests
   prefer `scripts/demo_headless.py`.
+
+
+## Presentation
+
+- `assets/pitch-deck/` contains the offline eight-scene illustrated pitch, timed to 1:54, with speaker notes, research and photo credits. The optional live wallet handoff requires rehearsal; the phone animation uses demo data.
