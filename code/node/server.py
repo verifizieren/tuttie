@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import verify_decision
 from aps.keys import load_public_key
+from negotiation.hotel import counter_offer_router, registry_lookup
 from node.agent import BusinessAgent
 from sessions import SessionClosed, SessionStore
 
@@ -57,10 +58,11 @@ class BookRequest(BaseModel):
     approval: dict  # the user's signed decision, see aps/approval.py
 
 
-def create_app(config: dict, http: httpx.AsyncClient | None = None) -> FastAPI:
+def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=registry_lookup) -> FastAPI:
     """Build the FastAPI app for one node config.
 
-    `http` is the client used to send offers to the marketplace (tests pass an in-process one).
+    `http` is the client used to send offers to the marketplace, `lookup` how the bargaining tool
+    finds registry records (tests pass in-process ones for both).
     """
     node_id = config["node_id"]
     facts = config.get("facts", {})
@@ -230,6 +232,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None) -> FastAPI:
             if http is None:
                 await client.aclose()
 
+    # Bargaining (negotiation/hotel.py, owned by its own work area): POST /tools/counter_offer.
+    app.include_router(counter_offer_router(config, signed, lookup))
     return app
 
 

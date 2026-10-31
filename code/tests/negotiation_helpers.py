@@ -1,7 +1,6 @@
 """Shared setup for the negotiation tests: real node apps with the counter_offer tool mounted.
 
-node/server.py does not mount the tool yet (the hook is requested from its owner); until
-then `node_app` mounts it exactly as the hook will: app.include_router(counter_offer_router(...)).
+`node_app` builds the real node app; node/server.py (create_app) mounts the tool.
 """
 
 import json
@@ -11,7 +10,6 @@ from pathlib import Path
 import httpx
 
 from aps import load_signing_key, sign_envelope
-from negotiation.hotel import counter_offer_router
 from node.server import create_app
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -31,15 +29,11 @@ async def registry_lookup(node_id: str) -> dict | None:
 
 
 def node_app(node_id: str, lookup=registry_lookup, http: httpx.AsyncClient | None = None):
-    """The real node app plus the counter_offer tool, mounted as the server hook will do it.
+    """The real node app, including the counter_offer tool that node/server.py mounts.
 
     `http` is the client the node sends its offers to the marketplace with (in process).
     """
-    config = CONFIGS[node_id]
-    app = create_app(config, http=http)
-    key = load_signing_key(node_id)
-    app.include_router(counter_offer_router(config, lambda payload: sign_envelope(node_id, payload, key), lookup))
-    return app
+    return create_app(CONFIGS[node_id], http=http, lookup=lookup)  # node/server.py mounts counter_offer
 
 
 def signed_offer(node_id: str = RHEINBLICK, room: str = "double", add_ons: tuple = (), offer_id: str | None = None,
