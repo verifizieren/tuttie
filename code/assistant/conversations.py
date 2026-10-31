@@ -118,10 +118,20 @@ class Conversations:
         """This session's conversation (new if unknown), marked as the most recently used."""
         if session_id not in self.by_session:
             self.by_session[session_id] = Conversation(self.http, self.registry_url, self.llm)
-            while len(self.by_session) > MAX_CONVERSATIONS:
-                owner, oldest = self.by_session.popitem(last=False)
-                oldest.reset()
+            while len(self.by_session) > MAX_CONVERSATIONS and (owner := self._evictable(session_id)):
+                self.by_session.pop(owner).reset()
                 for key in [k for k in self.saved if k[0] == owner]:
                     self.saved.pop(key).reset()
         self.by_session.move_to_end(session_id)
         return self.by_session[session_id]
+
+    def _evictable(self, keep: str) -> str | None:
+        """The session to drop: the least recently used empty one, else the least recently used idle one.
+
+        Every request without a cookie (a crawler, a link preview, curl) makes a new, empty
+        conversation; dropping those first keeps people's chats, and a running chat or a pending
+        approval is never dropped (the store may then exceed MAX_CONVERSATIONS for a while).
+        """
+        idle = [sid for sid, conv in self.by_session.items()
+                if sid != keep and not conv.chats and not conv.approvals.pending]
+        return next((sid for sid in idle if not self.by_session[sid].bus.history), idle[0] if idle else None)

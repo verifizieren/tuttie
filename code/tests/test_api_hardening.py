@@ -47,3 +47,24 @@ def test_spoken_text_is_checked_like_typed_text():
     with pytest.raises(ValidationError):
         voice.Said(room="r", text="")
     assert voice.Said(room="r", text="  Find a hotel ").text == "Find a hotel"
+
+
+def test_cookieless_requests_cannot_push_out_peoples_chats(monkeypatch):
+    import httpx
+
+    from assistant import conversations as conv_module
+    from assistant.conversations import Conversations
+
+    monkeypatch.setattr(conv_module, "MAX_CONVERSATIONS", 3)
+    store = Conversations(httpx.AsyncClient(), "http://registry", llm=object())
+    chatting = store.get("chatting")
+    chatting.bus.emit("answer", "verified", "Here are three hotels")
+    waiting = store.get("waiting")
+    waiting.approvals.pending["ap-1"] = {"id": "ap-1"}
+    for n in range(10):  # e.g. link previews or curl, each without a cookie
+        store.get(f"anonymous-{n}")
+    assert store.by_session["chatting"] is chatting and store.by_session["waiting"] is waiting
+    assert len(store.by_session) == 3
+    store.by_session["anonymous-9"].bus.emit("answer", "verified", "Hi")  # now all three are used
+    store.get("someone-new")  # the least recently used idle chat goes; a pending approval stays
+    assert "chatting" not in store.by_session and store.by_session["waiting"] is waiting
