@@ -177,6 +177,8 @@ booking of an agreed deal is always for the posted night. `GET /history` returns
 events the stream replays) and its conversation id in `X-Conversation-ID`. Reading never
 creates a conversation: for a browser without one, `/history` answers `[]` with the id its
 first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a decision 404.
+`POST /voice/token` answers 429 (`Retry-After: 60`) after 10 new rooms a minute for one
+conversation or 60 for one client address; a room is never handed out twice.
 Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does
 following the promised id on `GET /events?conversation_id=<id>`; another id there is a 409. Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
@@ -604,7 +606,11 @@ Tools come from the shared catalog `code/node/catalog.py`; each has a status, `a
 `planned` (`make_offer`, `counter_offer` and `pay` are planned). Private negotiation limits
 live in `facts.negotiation` and never reach a prompt, a reply or the card.
 
-Endpoints of every node (all answers are signed envelopes):
+Endpoints of every node (all answers are signed envelopes). Every endpoint below except
+`GET /agent/card` makes the agent think (an LLM call on the business's account), so when the
+deployment sets `AGENT_WEB_KEY` (`aps/agent_key.py`; `scripts/run_all.py` makes one per run)
+it answers HTTP 401 unless the request carries the key in `X-Agent-Web-Key`. The marketplace
+and Tuttie send it; tools over MCP and `counter_offer` are not affected.
 
 | Endpoint | Payload of the answer |
 | --- | --- |

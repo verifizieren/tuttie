@@ -78,6 +78,15 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   or over a year ahead, and guests outside 1-10. Tests: `test_conversations.py`,
   `test_node_agent.py`, `test_node_book.py`. Note: tests use the night 2026-11-14 and will fail
   after it has passed.
+  The hotel nodes are public (4001-4012), so `/agent`, `/agent/invoke` and `/agent/sessions*`
+  now need the deployment's agent key (`AGENT_WEB_KEY`, header `X-Agent-Web-Key`, 401
+  otherwise; `aps/agent_key.py`). `run_all.py` makes a new key per run and passes it to every
+  service; the market and Tuttie send it. **A Tuttie started by hand next to the running
+  services (test instance on 4046) needs the same key: put `AGENT_WEB_KEY` in `code/.env` and
+  restart the service once.** Unset (tests), the doors stay open. `POST /voice/token`: at most
+  10 new rooms a minute per conversation and 60 per client address, else 429 (the wallet
+  retries on its own); rooms are not reused because the voice agent closes its session when
+  the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
 
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
