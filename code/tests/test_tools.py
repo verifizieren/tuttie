@@ -225,3 +225,23 @@ def test_saying_goodbye_asks_the_wallet_to_close_the_card():
     result = asyncio.run(toolbox.dispatch("end_conversation", {}))
     assert result["closing"] is True
     assert bus.history[-1]["kind"] == "close"
+
+
+def test_current_deals_preserves_signed_total():
+    toolbox, _, _ = make_toolbox()
+    toolbox.market.last_offers = [{"node_id": RHEINBLICK, "name": "Hotel Rheinblick", "offer": {"price_chf": 220}}]
+    toolbox.agreements[RHEINBLICK] = {"payload": {"type": "agreement", "price_chf": 209, "includes": ["dog"]}}
+    deal = asyncio.run(toolbox.current_deals())["deals"][0]
+    assert deal["offered_chf"] == 220 and deal["agreement"]["price_chf"] == 209
+    assert deal["agreement"]["includes"] == ["dog"]
+
+
+def test_voice_swipe_targets_current_deck():
+    toolbox, bus, _ = make_toolbox()
+    assert "error" in asyncio.run(toolbox.swipe_card("like"))
+    cards = bus.emit("marketplace", "verified", "2 hotels", detail={"phase": "cards", "cards": []})
+    assert asyncio.run(toolbox.swipe_card("pass"))["sent"] == "pass"
+    assert bus.history[-1]["detail"] == {"action": "swipe", "verdict": "pass", "cards_step": cards["step"]}
+    assert "error" in asyncio.run(toolbox.swipe_card("invalid"))
+    bus.emit("marketplace", "verified", "New request", detail={"phase": "posted"})
+    assert "error" in asyncio.run(toolbox.swipe_card("like"))

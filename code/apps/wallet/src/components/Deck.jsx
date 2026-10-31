@@ -24,9 +24,6 @@ function Photos({ photos, name }) {
         : <div className="photo-missing" />}
       {photos.length > 1 && (
         <>
-          <div className="photo-bars" aria-hidden="true">
-            {photos.map((_, i) => <i key={i} className={i === shown ? "on" : ""} />)}
-          </div>
           {/* Taps on the left or right third flip the photo; drags still swipe the card. */}
           <button type="button" className="photo-prev" aria-label="Previous photo" data-tap onClick={() => flip(-1)} />
           <button type="button" className="photo-next" aria-label="Next photo" data-tap onClick={() => flip(1)} />
@@ -36,11 +33,14 @@ function Photos({ photos, name }) {
   );
 }
 
-function HotelCard({ card, hotel, style, handlers, verdict, className = "" }) {
+function HotelCard({ card, hotel, position, count, style, handlers, verdict, className = "" }) {
   const price = card.agreed_chf ?? card.price_chf;
   return (
     <article className={`swipe-card ${className}`} style={style} {...handlers}>
       <Photos photos={card.photos || []} name={card.name} />
+      <div className="hotel-bars" role="img" aria-label={`Hotel ${position + 1} of ${count}`}>
+        {Array.from({ length: count }, (_, i) => <i key={i} className={i === position ? "on" : ""} />)}
+      </div>
       <div className="swipe-top">
         <SealMarks seals={hotel?.seals || []} tiers={[card.trust_tier]} />
         {card.rating && <span className="rating" aria-label={`rated ${card.rating.score} of 5`}>★ {card.rating.score}</span>}
@@ -70,17 +70,19 @@ function HotelCard({ card, hotel, style, handlers, verdict, className = "" }) {
  * @param onDone  (liked cards) => void, after the last card
  * @param onLean  (x in -1..1) => void while a card is dragged, 0 when it is let go (Tuttie's eyes follow)
  */
-export default function Deck({ cards, hotels, onDone, onLean }) {
+export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
   const [index, setIndex] = useState(0);
   const [liked, setLiked] = useState([]);
   const [drag, setDrag] = useState(null);     // { dx, dy } while the finger moves the top card sideways
   const [flying, setFlying] = useState(null); // "like" | "pass" while the top card leaves
   const [nudge, setNudge] = useState(true);   // the first card shows once that it moves sideways
+  const flight = useRef(null);
+  const consumed = useRef(null);
   const gesture = useRef(null);               // { x, y, t, axis, scroller, scrollTop }
 
   useEffect(() => {
     const done = setTimeout(() => setNudge(false), 1600);
-    return () => clearTimeout(done);
+    return () => { clearTimeout(done); clearTimeout(flight.current); };
   }, []);
 
   function lean(x) {
@@ -88,9 +90,10 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
   }
 
   function decide(verdict) {
+    if (flying || index >= cards.length) return;
     setFlying(verdict);
     lean(verdict === "like" ? 1 : -1);
-    setTimeout(() => {
+    flight.current = setTimeout(() => {
       const nextLiked = verdict === "like" ? [...liked, cards[index]] : liked;
       setLiked(nextLiked);
       setFlying(null);
@@ -100,6 +103,14 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
       if (index + 1 >= cards.length && nextLiked.length) onDone(nextLiked);
     }, FLY_MS);
   }
+
+  // Consume each live command once; leave the next command pending during a swipe.
+  useEffect(() => {
+    const command = commands.find(c => c.id > (consumed.current ?? -1));
+    if (!command || flying || index >= cards.length) return;
+    consumed.current = command.id;
+    decide(command.verdict);
+  }, [commands, flying, index]);
 
   const handlers = {
     onPointerDown: e => {
@@ -156,11 +167,11 @@ export default function Deck({ cards, hotels, onDone, onLean }) {
       <div className="deck-stack">
         {index + 1 < cards.length && (
           <HotelCard key={cards[index + 1].node_id} card={cards[index + 1]} hotel={hotels[cards[index + 1].node_id]}
-                     style={{ transform: "scale(.95) translateY(10px)", opacity: .6 }} handlers={{}} />
+                     position={index + 1} count={cards.length} style={{ transform: "scale(.95) translateY(10px)", opacity: .6 }} handlers={{}} />
         )}
         <HotelCard key={cards[index].node_id} card={cards[index]} hotel={hotels[cards[index].node_id]}
                    style={nudge && index === 0 && !drag ? undefined : top} className={nudge && index === 0 && !drag ? "nudge" : ""}
-                   handlers={handlers} verdict={verdict} />
+                   position={index} count={cards.length} handlers={handlers} verdict={verdict} />
       </div>
       <div className="deck-count">{index + 1} of {cards.length}</div>
     </section>

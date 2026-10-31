@@ -126,3 +126,14 @@ def test_old_voice_room_cannot_send_into_a_new_chat(monkeypatch):
         assert response.status_code == 409
         assert client.get('/history').json() == []
         assert client.post(f'/conversations/{old_id}/resume').status_code == 200
+
+
+def test_short_card_commands_are_not_discarded_as_noise():
+    for command in ("Like.", "Pass!", "Next", "Weiter", "Überspringen", "Gefällt mir"):
+        assert meaningful(command)
+    assert not meaningful("um") and not meaningful("(laughs)")
+
+
+def test_reject_skip_and_similar_short_choices_survive_speech_filter():
+    for command in ("Reject", "Skip", "Dislike", "Ablehnen", "Behalten", "No thanks"):
+        assert meaningful(command)

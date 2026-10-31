@@ -5,6 +5,6 @@ export function restoreConversation(events, id, snapshot) {
   const same = snapshot?.id === id;
   const turns = same ? snapshot.turns.map(t => ({ said: t.said })) : [];
   // A goodbye in a loaded chat is over: only a live one closes the card (App.jsx).
-  const state = { ...events.reduce(applyEvent, { ...EMPTY, id, turns }), closing: null };
+  const state = { ...events.reduce(applyEvent, { ...EMPTY, id, turns }), closing: null, swipes: [] };
   return same && snapshot.picked ? { ...state, picked: snapshot.picked } : state;
 }

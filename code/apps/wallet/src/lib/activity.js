@@ -15,6 +15,7 @@ export const EMPTY = {
   skipped: [],          // [{ name, reason, tier }] not woken: untrusted or broken
   shortlistDone: false,
   cards: null,          // the hotels to swipe (assistant/cards.py), once the offers are in
+  swipes: [],           // queued live commands; preserve rapid consecutive choices
   picked: null,         // node ids the user liked
   approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate } while the user decides
   booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid, payments } once confirmed
@@ -85,6 +86,12 @@ function withPayment(state, receipt) {
 /** The next state after one event. Unknown events leave the state as it is. */
 export function applyEvent(state, event) {
   const detail = event.detail || {};
+  if (event.kind === "wallet" && detail.action === "swipe" && ["like", "pass"].includes(detail.verdict)) {
+    if (!state.cards || state.picked || detail.cards_step !== state.cardsStep) return state;
+    const swipe = { id: event.step, verdict: detail.verdict };
+    if (state.swipes.some(s => s.id === swipe.id)) return state;
+    return { ...state, swipes: [...state.swipes, swipe] };
+  }
   if (event.kind === "thinking") return state.phase === "idle" ? { ...state, phase: "thinking" } : state;
   if (event.kind === "close") return { ...state, closing: "asked" };
   if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral");
@@ -123,7 +130,7 @@ export function applyEvent(state, event) {
     if (detail.phase === "cards") {
       const n = (detail.cards || []).length;
       return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true),
-               cards: detail.cards || [], phase: "picking" };
+               cards: detail.cards || [], cardsStep: event.step, swipes: [], phase: "picking" };
     }
     return state;
   }
@@ -132,14 +139,17 @@ export function applyEvent(state, event) {
   if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)) {
     const h = hotel(state, event.node_id, event.node_name);
     const step = { price: detail.payload.price_chf, final: Boolean(detail.payload.final), type: detail.payload.type };
-    const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter(p => p != null)
+    const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter((p, i, all) => p != null && (i === 0 || p !== all[i - 1]))
       .map(p => `CHF ${p}`).join(" → ");
     const line = step.type === "agreement" ? `Agreed with ${h.name} · CHF ${step.price}` : `Bargaining with ${h.name} · ${trail}`;
+    const cards = step.type === "agreement" && state.cards
+      ? state.cards.map(c => c.node_id === event.node_id ? { ...c, agreed_chf: step.price } : c)
+      : state.cards;
     return { ...withHotel(progress(state, "tool", line), event.node_id, event.node_name, {
       rounds: [...h.rounds, step],
       agreed: detail.payload.type === "agreement" ? detail.payload.price_chf : h.agreed,
       status: detail.payload.type === "agreement" ? "agreed" : "negotiating",
-    }), phase: "negotiating" };
+    }), cards, phase: "negotiating" };
   }
 
   // The hotel's signed confirmation, with the checks its action gate passed.

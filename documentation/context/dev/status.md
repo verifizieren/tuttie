@@ -10,6 +10,20 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 
 ## Done
 
+- Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
+  reaches the visible swipe deck, single-word commands survive voice filtering; verified
+  agreement facts are available to price follow-ups and final counters say quoted.
+  Validation: 341 Python tests, 33 wallet tests and production build pass. Local Chrome
+  received live like/pass SSE events, advanced both cards and requested CHF 128 approval
+  for the liked hotel without browser errors. The Chrome run used deterministic sample
+  offers, not a microphone or an LLM. Broader audit: explicit English/German card synonyms
+  dispatch without the model; every follow-up completion receives fresh signed deal data;
+  later agreements update card prices, rapid choices queue, leaving a deck cancels its
+  delayed action, new searches clear old signed-price caches, live status renders once.
+  Chrome also passed two consecutive searches with rapid choices and one progress group.
+  Not deployed; live voice/provider testing needs credentials.
+
+
 - Wallet and local development fixes (2026-10-31): zero-duration face transitions finish
   immediately, preventing invalid coordinates when the first frame shares the startup
   timestamp; regression test added. Wallet dev proxy forwards history, reset, voice and RTC

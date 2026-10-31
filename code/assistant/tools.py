@@ -51,6 +51,12 @@ def function(name: str, description: str, properties: dict, required: list[str] 
 
 
 SCHEMAS = [
+    function("current_deals", "Read the current verified offers and signed negotiated agreements. "
+             "Use before answering questions about prices or whether a negotiation succeeded.", {}),
+    function("swipe_card", "Like or pass the hotel card currently visible in the wallet. "
+             "Use for spoken like/pass commands, not a request to book a named hotel. "
+             "The wallet handles the selection; never call book in the same turn.",
+             {"verdict": {"type": "string", "enum": ["like", "pass"]}}, ["verdict"]),
     function(
         "recall_context",
         "Read what you know about the user: calendar, mail, messages and preferences, each item classed "
@@ -262,10 +268,33 @@ class Toolbox:
         """Run a tool by name with the LLM's arguments."""
         tools = {"recall_context": self.recall_context, "post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay,
-                 "end_conversation": self.end_conversation}
+                 "end_conversation": self.end_conversation, "current_deals": self.current_deals, "swipe_card": self.swipe_card}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
+
+    async def current_deals(self) -> dict:
+        """Return remembered verified facts, including agreements absent from raw availability."""
+        return {"deals": [{"node_id": item["node_id"], "name": item["name"],
+                           "offered_chf": item["offer"]["price_chf"],
+                           "agreement": self.agreements.get(item["node_id"], {}).get("payload")}
+                          for item in self.market.last_offers],
+                "note": "A signed agreement overrides the original room rate. A final counter is not an agreement."}
+
+    async def swipe_card(self, verdict: str) -> dict:
+        if verdict not in {"like", "pass"}:
+            return {"error": "verdict must be like or pass"}
+        cards = next((e for e in reversed(self.bus.history)
+                      if e["kind"] == "marketplace" and e["detail"].get("phase") in {"posted", "cards"}), None)
+        pending_approval = next((e for e in reversed(self.bus.history) if e["kind"] == "approval"), None)
+        if pending_approval and pending_approval["status"] == "pending":
+            return {"error": "A payment approval is open. Use its approve/decline controls; do not swipe it."}
+        if not cards or cards["detail"].get("phase") != "cards":
+            return {"error": "There are no hotel cards to swipe. Ask for hotels first."}
+        self.bus.emit("wallet", "verified", f"{verdict.title()} the visible hotel",
+                      detail={"action": "swipe", "verdict": verdict, "cards_step": cards["step"]})
+        return {"sent": verdict, "note": "The wallet applies this to its visible card. Do not book here; "
+                "the wallet requests booking when the user finishes choosing."}
 
     async def end_conversation(self) -> dict:
         """Ask the wallet to close Tuttie's card (after the goodbye is said): a "close" event."""
@@ -283,7 +312,12 @@ class Toolbox:
         The wallet lets the user swipe through the cards; Tuttie then books the best liked deal.
         """
         result = await self.market.find(**request)
-        if "error" in result or not self.market.last_offers:
+        if "error" in result:
+            return result
+        self.agreements.clear()
+        self.availability.clear()
+        self.commitments.clear()
+        if not self.market.last_offers:
             return result
         shown = card_order(self.market.last_offers, self.market.last_shortlist)
         # The agents bargain before the user sees anything: the cards show what was agreed.
@@ -338,7 +372,8 @@ class Toolbox:
         self.bus.emit("marketplace", "verified" if winner else "declined", summary,
                       detail={"phase": "agreement", "agreement": winner.agreement if winner else None})
         return {
-            "outcomes": [{"hotel": names[o.node_id], "status": o.status, "offered_chf": o.offer_price_chf,
+            "outcomes": [{"node_id": o.node_id, "hotel": names[o.node_id], "status": o.status,
+                          "agreement": o.agreement["payload"] if o.agreement else None, "offered_chf": o.offer_price_chf,
                           "agreed_chf": o.price_chf, "rounds": o.rounds, "reason": o.reason} for o in outcomes],
             "best": {"hotel": names[winner.node_id], "price_chf": winner.price_chf,
                      "offer_id": winner.offer_id} if winner else None,

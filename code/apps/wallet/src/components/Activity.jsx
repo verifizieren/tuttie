@@ -30,7 +30,7 @@ function Price({ hotel }) {
   }
   if (hotel.rounds.length) {
     const last = hotel.rounds[hotel.rounds.length - 1];
-    return <span className="price">CHF {hotel.offer?.price_chf} → <b>CHF {last.price}</b>{last.final ? " final" : ""}</span>;
+    return <span className="price">CHF {hotel.offer?.price_chf} → <b>CHF {last.price}</b>{last.final ? " quoted" : ""}</span>;
   }
   if (hotel.offer) return <span className="price"><b>CHF {hotel.offer.price_chf}</b></span>;
   const waiting = { interested: "preparing offer…", declined: "no offer", woken: "asked…" };
@@ -139,20 +139,26 @@ export default function Activity({ state, readOnly = false, onPick, onLean, reve
   if (swiping) {
     return (
       <div className="activity swiping">
-        <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} />
+        <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes} />
       </div>
     );
   }
+  // Live progress has one context line and one tool line, even after follow-ups/searches.
+  // Keep the per-turn account only in history.
+  const liveProgress = state.turns.reduce((lines, turn) => ({
+    context: turn.context || lines.context, tool: turn.tool || lines.tool,
+  }), {});
   const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
   // What Tuttie did stays (steps, the chosen hotel, the booking); of what it said, only its
   // current answer is shown. The history (readOnly) keeps every answer.
   const current = state.turns.length - 1;
   return (
     <div className="activity" ref={box} data-scroll>
+      {!readOnly && <Steps turn={liveProgress} latest={latest} />}
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
           {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
-          <Steps turn={turn} latest={latest} />
+          {readOnly && <Steps turn={turn} latest={latest} />}
           {i === state.marketTurn && state.request && <Market state={state} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
           {turn.answer && (readOnly || i === current) && (

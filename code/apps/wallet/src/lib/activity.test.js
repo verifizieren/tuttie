@@ -20,3 +20,36 @@ test('a new message cancels the goodbye', () => {
 test('a loaded or resumed chat never closes the card by itself', () => {
   assert.equal(restoreConversation(bye, 'chat-1', null).closing, null);
 });
+
+test('voice swipes target the current deck and never replay on resume', () => {
+  const cards = {step: 10, kind: 'marketplace', detail: {phase: 'cards', cards: [{node_id: 'hotel'}]}};
+  const swipe = {step: 11, kind: 'wallet', detail: {action: 'swipe', verdict: 'like', cards_step: 10}};
+  const state = applyEvent(startTurn(EMPTY, 'Find a room'), cards);
+  assert.deepEqual(applyEvent(state, swipe).swipes, [{id: 11, verdict: 'like'}]);
+  assert.deepEqual(applyEvent({...state, picked: ['hotel']}, swipe).swipes, []);
+  assert.deepEqual(applyEvent(state, {...swipe, detail: {...swipe.detail, cards_step: 9}}).swipes, []);
+  assert.deepEqual(restoreConversation([cards, swipe], 'chat', null).swipes, []);
+});
+
+test('counter trails skip repeated prices and never imply an agreement', () => {
+  const event = {kind: 'a2a', node_id: 'hotel', node_name: 'Hotel', detail: {payload: {type: 'counter', price_chf: 209, final: true}}};
+  let state = {...EMPTY, hotels: {hotel: {name: 'Hotel', offer: {price_chf: 220}, rounds: [], agreed: null}}};
+  state = applyEvent(applyEvent(state, event), event);
+  assert.equal(state.turns[0].tool.text, 'Bargaining with Hotel · CHF 220 → CHF 209');
+  assert.equal(state.hotels.hotel.agreed, null);
+});
+
+test('a later signed agreement updates the displayed card price', () => {
+  const state = {...EMPTY, cards: [{node_id:'hotel', price_chf:220, agreed_chf:null}]};
+  const next = applyEvent(state, {kind:'a2a', node_id:'hotel', node_name:'Hotel', detail:{payload:{type:'agreement', price_chf:209}}});
+  assert.equal(next.cards[0].agreed_chf,209);
+});
+
+test('rapid card commands queue once each and do not replay from history', () => {
+  const cards = {step:10, kind:'marketplace', detail:{phase:'cards', cards:[{node_id:'a'},{node_id:'b'}]}};
+  const choice = (step, verdict) => ({step, kind:'wallet', detail:{action:'swipe',verdict,cards_step:10}});
+  const events=[cards,choice(11,'like'),choice(12,'pass'),choice(12,'pass')];
+  const state=events.reduce(applyEvent,EMPTY);
+  assert.deepEqual(state.swipes.map(c=>c.verdict),['like','pass']);
+  assert.deepEqual(restoreConversation(events,'chat',null).swipes,[]);
+});

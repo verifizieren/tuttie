@@ -23,6 +23,8 @@ import os
 import re
 from pathlib import Path
 
+from assistant.card_commands import card_choice
+
 import httpx
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, JobProcess, StopResponse, cli
@@ -79,7 +81,7 @@ def spoken(answer: str) -> str:
 def meaningful(text: str) -> bool:
     """A real request, not a noise tag like "(laughs)" or a stray word from the room."""
     words = re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", text))
-    return len(words) >= MIN_WORDS
+    return card_choice(text) is not None or len(words) >= MIN_WORDS
 
 
 def filler_kind(text: str) -> str:
