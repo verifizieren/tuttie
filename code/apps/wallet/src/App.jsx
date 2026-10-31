@@ -37,13 +37,14 @@ import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
-import { newChatFailure, voiceNote } from "./lib/recovery.js";
+import { newChatFailure, shouldResend, voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
 const OPEN_GUARD_MS = 700;
 const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
 const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
+const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once more after this
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
 export default function App() {
@@ -185,30 +186,45 @@ export default function App() {
   }, [approval]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // `shown` is what the history keeps of the user's words; `text` is what Tuttie gets. A typed
-  // message makes Tuttie answer quietly, in text only.
-  async function send(text, firstTool = null, shown = text, typed = false) {
-    if (switching || connectionError) return setError(connectionError || "Please wait for the conversation to load");
+  // message makes Tuttie answer quietly, in text only. With `resend`, a message that did not
+  // reach Tuttie (network, server failure; never a refusal) is sent once more by itself.
+  // Returns whether Tuttie got it.
+  async function send(text, firstTool = null, shown = text, typed = false, resend = false) {
+    if (switching || connectionError) {
+      setError(connectionError || "Please wait for the conversation to load");
+      return false;
+    }
     if (typed) setQuiet(true);
     actions.say(shown);
     setShowHistory(false);
     setMode("voice");  // Tuttie is awake while it works
     setError("");
-    try {
-      const { turn_id: turnId } = await sendChat(text, firstTool, agent.id, shown);
-      actions.sent(shown, turnId);
-    } catch (e) {
-      actions.failed(shown, e);  // not sent: it must not hold the place of the next request's answer
-      setError(e.status === 409 ? "The chat changed elsewhere. Showing the current one, please say it again."
-                                : e.message || "Tuttie is unreachable right now");
+    for (let tries = 1; ; tries++) {
+      try {
+        const { turn_id: turnId } = await sendChat(text, firstTool, agent.id, shown);
+        actions.sent(shown, turnId);
+        return true;
+      } catch (e) {
+        if (!resend || tries > 1 || !shouldResend(e)) {
+          actions.failed(shown, e);  // not sent: it must not hold the place of the next request's answer
+          setError(e.status === 409 ? "The chat changed elsewhere. Showing the current one, please say it again."
+                                    : e.message || "Tuttie is unreachable right now");
+          return false;
+        }
+        await new Promise(resolve => setTimeout(resolve, RESEND_MS));
+      }
     }
   }
 
-  // The user swiped through the cards: book the best liked deal (the lowest agreed price).
-  function pick(liked) {
+  // The user swiped through the cards: book the best liked deal (the lowest agreed price). If
+  // the choice cannot reach Tuttie (even after one more try), the cards come back, so swiping
+  // again sends it again.
+  async function pick(liked) {
     const best = [...liked].sort((a, b) => (a.agreed_chf ?? a.price_chf) - (b.agreed_chf ?? b.price_chf))[0];
     actions.pick([best.node_id]);
-    send(`Book ${best.name} (${best.node_id})${best.agreed_chf != null ? " at the agreed price" : ""}.`, "book",
-         `Book ${best.name}`);
+    const sent = await send(`Book ${best.name} (${best.node_id})${best.agreed_chf != null ? " at the agreed price" : ""}.`,
+                            "book", `Book ${best.name}`, false, true);
+    if (!sent) actions.pick(null);
   }
 
   // While a hotel card is dragged, Tuttie looks the same way (the face director follows `lean`).
