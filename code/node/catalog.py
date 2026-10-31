@@ -2,8 +2,8 @@
 
 Every company agent is the same agent object (`node/agent.py`); this catalog is what all of
 them know about the actions on the agent web. Tools marked "planned" are outlined here so
-the agents can already reason about them (e.g. "I would make an offer"), but they are not
-implemented yet: building them is goals.md step 2 (offers) and later steps.
+the agents can already reason about them, but they are not implemented yet (negotiation
+and payment are later steps of goals.md).
 """
 
 AVAILABLE, PLANNED = "available", "planned"
@@ -25,9 +25,9 @@ TOOLS = {
         "description": "Confirm a booking; needs the guest's signed approval for exactly the total.",
     },
     "make_offer": {
-        "status": PLANNED,
-        "endpoint": "POST /tools/make_offer",
-        "description": "Answer a marketplace posting with a signed offer (room, price, add-ons, conditions).",
+        "status": AVAILABLE,
+        "endpoint": "sends POST {posting.offer_url}",
+        "description": "Answer a marketplace posting with a signed offer (room, price, add-ons, conditions); prices come from the hotel's config.",
     },
     "counter_offer": {
         "status": PLANNED,
