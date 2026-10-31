@@ -34,6 +34,9 @@ def test_a_full_negotiation_ends_in_a_signed_agreement_above_the_floor():
     agreement = second["payload"]
     assert agreement["type"] == "agreement" and agreement["price_chf"] == first["payload"]["price_chf"]
     assert agreement["includes"] == ["dog in the room"] and agreement["request_id"] == "rq-neg1"
+    # Only the price moved: the room, night and rate (cancellation terms) are the offer's.
+    assert (agreement["room_type"], agreement["date"], agreement["rate"]) == \
+        ("double", "2026-11-14", "best rate, non-refundable")
 
 
 def test_limits_never_appear_in_a_reply():

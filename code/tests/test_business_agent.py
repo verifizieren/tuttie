@@ -114,6 +114,8 @@ def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
     assert offer["price_chf"] == 180 + 15 and offer["request_id"] == "rq-test1"
     assert offer["includes"] == ["late check-in after 22:00 with dog"]
     assert offer["item"] == "double room 2026-11-14" and offer["valid_until"] == POSTING["expires_at"]
+    # The bookable terms travel as fields, so an agreement and the booking can be bound to them.
+    assert (offer["room_type"], offer["date"], offer["rate"]) == ("double", "2026-11-14", "best rate, non-refundable")
 
 
 @pytest.mark.parametrize("choice", [{"room_type": "penthouse"}, {"room_type": "double", "add_ons": ["free-spa"]},

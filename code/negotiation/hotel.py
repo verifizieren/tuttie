@@ -163,7 +163,8 @@ class CounterOfferTool:
         decision = decide(counter.price_chf, counter.round, previous_price, previous_final, lowest, limits)
         if decision.kind == "agreement":
             reply = Agreement(request_id=offer.request_id, offer_id=offer.offer_id, round=counter.round,
-                              item=offer.item, price_chf=decision.price_chf, includes=offer.includes,
+                              item=offer.item, room_type=offer.room_type, date=offer.date, rate=offer.rate,
+                              price_chf=decision.price_chf, includes=offer.includes,
                               conditions=offer.conditions, valid_until=offer.valid_until)
         elif decision.kind == "counter":
             reply = Counter(offer_id=offer.offer_id, round=counter.round, price_chf=decision.price_chf,
