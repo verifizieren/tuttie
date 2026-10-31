@@ -12,11 +12,11 @@ Last updated: 2026-10-31.
 
 | Area | What works | Where |
 | --- | --- | --- |
-| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals. | `code/aps/`, `code/tests/` |
+| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them; paying is never delegated). | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
 | Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config. | `code/node/`, `code/data/nodes/` |
 | Demo data | Hotels Rheinblick (gold + blue), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
-| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". | `code/assistant/` |
+| User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
@@ -27,7 +27,8 @@ Last updated: 2026-10-31.
 Build order from [goals.md](goals.md):
 
 1. **Agents** — mostly done; missing: the three hotel agents in the planned sizes (big chain
-   branch, mid-sized, small independent) and Tuttie as a named agent identity.
+   branch, mid-sized, small independent). Tuttie's identity is done; it does not sign its own
+   outgoing messages yet.
 2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
    `documentation/formats.md`).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
@@ -37,24 +38,26 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **APS for step 1 — UIDs and freshness done.** Still open in APS: Tuttie's own named key
-   and identity (today the `user` key only signs approvals), and signing marketplace
-   messages once their formats are agreed.
-2. **Finish step 1 (small, data first).** Reshape the three hotels into the planned sizes in
+1. **Finish step 1 (small, data first).** Reshape the three hotels into the planned sizes in
    `code/data/nodes/` (e.g. Rheinblick = branch of a chain, Spalenhof = mid-sized, Gundeli =
    small independent), give each `facts.add_ons` and `facts.negotiation`
    (`floor_chf`, `max_rounds`). Re-run `issue_seals.py` if capabilities or keys change.
-3. **Tests for `node/agent.py`** with a fake LLM: the commitment is built from the config,
+2. **Tests for `node/agent.py`** with a fake LLM: the commitment is built from the config,
    unknown add-on ids give no commitment, and the fallback reply on LLM errors. Offers in step 2
    reuse this logic, so it should be pinned down first.
-4. **Then step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
+3. **Then step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
    then build `code/marketplace/` (:4010) test-first in the same style as `test_tools.py`.
+   APS is ready for it: Tuttie signs requests with its own key, and businesses check its
+   delegation (`verify_delegation(..., scope="post_requests")`) before answering.
+4. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
+   the Vite dev server).
 
 ### Test coverage
 
-38 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
-seals, tiers, UIDs, approvals), `test_node_book.py` (node `book`: approval, commitments, replay),
-`test_tools.py` (assistant trust gate with mocked HTTP and the real demo keys).
+45 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay),
+`test_tools.py` (assistant trust gate and Tuttie's identity, with mocked HTTP and the real
+demo keys).
 Not covered yet: `node/agent.py`, the node's `get_availability`, `get_policies` and `/agent`
 endpoints, `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
@@ -92,6 +95,12 @@ Why things are the way they are, so nobody has to rediscover them:
   `vouches_for_uid` and its seal is invalid without a well-formed UID. A UID under any
   other seal is shown as a claim, not as verified. The demo UIDs are made up but have
   correct check digits.
+- **Tuttie has its own key, separate from the user's.** A seal says who the agent is (the
+  platform, Adobe, vouches for the software: blue); the user's signed delegation says for
+  whom it speaks and with which scopes. The `user` key stays the person's: it signs
+  approvals and delegations, never messages. User agents live in `data/agents/` (in the
+  registry, but no node server) and `issue_seals.py` re-signs the delegation for 365 days
+  on every run.
 - **Freshness is opt-in per call.** Live replies must be at most 300 s old
   (`MAX_REPLY_AGE_S` in `assistant/tools.py`); stored envelopes like commitments are
   verified without it because they have `valid_until`.
