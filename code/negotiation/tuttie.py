@@ -15,8 +15,8 @@ Every counter is signed with Tuttie's own key; the hotel checks Tuttie's seals a
 delegation ("negotiate"). Prices only come from signed messages: the hotel's offer, its
 counters and the final Agreement, which is what the user later approves on the phone.
 
-Strategy (`next_price`): open at OPENING_DISCOUNT below the offer, then move halfway toward
-the hotel's latest price; accept a hotel price within the limit once it is final or close.
+Strategy (`next_price`): open at OPENING_DISCOUNT below the offer, then move TUTTIE_STEP of the
+way toward the hotel's latest price; accept a hotel price within the limit once it is final or close.
 """
 
 import asyncio
@@ -34,7 +34,9 @@ from negotiation.rules import CLOSE_CHF
 from sessions import Context
 
 BUDGET_LIMIT = "max_price_chf"  # private context item: the most the user will pay
-OPENING_DISCOUNT = 0.15
+# Strategy numbers; tune them for the demo with scripts/bargain_preview.py.
+OPENING_DISCOUNT = 0.10  # first counter this far below the offer (tuned for the demo, see rules.HOTEL_STEP)
+TUTTIE_STEP = 0.5  # how far Tuttie moves toward the hotel's price each round (0.5 = halfway)
 MAX_ROUNDS = 6  # Tuttie's own safety limit, whatever the hotel allows
 
 
@@ -60,8 +62,9 @@ def opening_price(offer_price: float, limit: float) -> int:
 
 
 def next_price(own_last: float, hotel_price: float, limit: float) -> int:
-    """Move halfway toward the hotel's price, never above the limit or the hotel's price."""
-    return min(math.ceil((own_last + hotel_price) / 2), math.floor(limit), math.floor(hotel_price))
+    """Move TUTTIE_STEP of the way toward the hotel's price, never above the limit or the hotel's price."""
+    step = math.ceil(own_last + (hotel_price - own_last) * TUTTIE_STEP)
+    return min(step, math.floor(limit), math.floor(hotel_price))
 
 
 class TuttieNegotiator:

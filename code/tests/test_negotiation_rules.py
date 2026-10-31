@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import negotiation.rules as rules
 from negotiation.rules import CLOSE_CHF, Limits, decide, floor_total
 
 NODES = Path(__file__).resolve().parent.parent / "data" / "nodes"
@@ -39,11 +40,14 @@ def test_paying_the_hotels_price_is_an_agreement_at_that_price():
     assert (decision.kind, decision.price_chf) == ("agreement", 180)
 
 
-def test_hotel_meets_halfway_and_never_goes_below_its_floor():
+def test_hotel_moves_toward_the_guest_and_never_below_its_floor(monkeypatch):
+    monkeypatch.setattr(rules, "HOTEL_STEP", 0.5)
     counter = decide(150, 1, 180, False, 170, LIMITS)
     assert (counter.kind, counter.price_chf, counter.final) == ("counter", 170, True)  # halfway 165 → floor
     counter = decide(170, 1, 180, False, 170, LIMITS)
-    assert (counter.kind, counter.price_chf, counter.final) == ("counter", 175, False)
+    assert (counter.kind, counter.price_chf, counter.final) == ("counter", 175, False)  # halfway
+    monkeypatch.setattr(rules, "HOTEL_STEP", 0.34)
+    assert decide(170, 1, 180, False, 170, LIMITS).price_chf == 177  # a third of the way, rounded up
 
 
 def test_close_or_last_round_counters_at_or_above_the_floor_are_accepted():

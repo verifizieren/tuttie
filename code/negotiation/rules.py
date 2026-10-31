@@ -18,9 +18,10 @@ How the hotel answers a counter (`decide`):
     more rounds than the owner allows               → rejection (the last price still stands)
     the guest is at or above the floor and close to
     the hotel's price, or this is the last round    → agreement at the guest's price
-    otherwise                                       → counter halfway between both prices,
-                                                      never below the floor; final in the
-                                                      last round or once it hits the floor
+    otherwise                                       → counter HOTEL_STEP of the way toward
+                                                      the guest (0.5 = halfway), never below
+                                                      the floor; final in the last round or
+                                                      once it hits the floor
 """
 
 import math
@@ -28,6 +29,9 @@ from dataclasses import dataclass
 
 STANDARD_ROOM = "double"
 CLOSE_CHF = 2  # a gap this small is not worth another round
+# How far the hotel moves toward the guest's counter each round (0.5 = halfway). Smaller steps
+# mean more rounds before the floor; tune with scripts/bargain_preview.py.
+HOTEL_STEP = 0.34  # tuned for the demo: Rheinblick 195 → 185 over three visible rounds
 
 
 @dataclass(frozen=True)
@@ -91,6 +95,6 @@ def decide(counter_price: float, counter_round: int, previous_price: float, prev
     last_round = counter_round == limits.max_rounds
     if counter_price >= lowest and (previous_price - counter_price <= CLOSE_CHF or last_round):
         return Decision("agreement", counter_price)
-    proposal = max(lowest, math.ceil((previous_price + counter_price) / 2))
+    proposal = max(lowest, math.ceil(previous_price - (previous_price - counter_price) * HOTEL_STEP))
     proposal = min(proposal, previous_price)  # never go back up
     return Decision("counter", proposal, final=last_round or proposal <= lowest)
