@@ -26,6 +26,7 @@
       "late_arrival": "Reception is open 24 hours.",
       "cancellation": "Free cancellation until 24h before arrival."
     },
+    "photos": ["hotels/ch.basel.hotel-gundeli/1.jpg", "hotels/ch.basel.hotel-gundeli/2.jpg", "hotels/ch.basel.hotel-gundeli/3.jpg"],
     "rating": {"score": 4.6, "reviews": 98},
     "amenities": {"breakfast": true, "wifi": true, "parking": true, "kids_beds": true},
     "charges": [

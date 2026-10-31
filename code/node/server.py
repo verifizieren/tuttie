@@ -108,6 +108,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "quiet": facts.get("quiet"),
             "quiet_note": facts.get("quiet_note"),
             "policies": facts.get("policies", {}),
+            "photos": facts.get("photos", []),      # image paths, served with the wallet (apps/wallet/public)
             "rating": facts.get("rating"),          # guests' average score out of 5, with the count
             "amenities": facts.get("amenities", {}),  # breakfast, wifi, parking, kids' beds
             "charges": facts.get("charges", []),  # collected after a booking with pay

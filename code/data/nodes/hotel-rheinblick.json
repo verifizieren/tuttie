@@ -38,6 +38,7 @@
       "late_arrival": "After 22:00 guests collect their key from the key box at the entrance with a code sent on booking.",
       "cancellation": "Best rate is non-refundable. Flexible rate can be cancelled free of charge until 48h before arrival."
     },
+    "photos": ["hotels/ch.basel.hotel-rheinblick/1.jpg", "hotels/ch.basel.hotel-rheinblick/2.jpg", "hotels/ch.basel.hotel-rheinblick/3.jpg"],
     "rating": {"score": 4.5, "reviews": 412},
     "amenities": {"breakfast": true, "wifi": true, "parking": true, "kids_beds": true},
     "charges": [

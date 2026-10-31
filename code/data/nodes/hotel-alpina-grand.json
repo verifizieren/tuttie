@@ -38,6 +38,7 @@
       "late_arrival": "Reception is open 24 hours.",
       "cancellation": "Free cancellation until 18:00 on the day of arrival."
     },
+    "photos": ["hotels/ch.basel.alpina-grand/1.jpg", "hotels/ch.basel.alpina-grand/2.jpg", "hotels/ch.basel.alpina-grand/3.jpg"],
     "rating": {"score": 4.2, "reviews": 1830},
     "amenities": {"breakfast": true, "wifi": true, "parking": true, "kids_beds": true},
     "charges": [
