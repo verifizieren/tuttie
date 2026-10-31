@@ -4,6 +4,12 @@
 // (host, srflx, relay), ICE errors and which relay servers were offered. No audio, no addresses.
 let installed = false;
 
+/** Send one report to the server's log (fire and forget). */
+export function report(facts) {
+  const body = JSON.stringify({ ...facts, agent: navigator.userAgent });
+  navigator.sendBeacon?.("/voice/diag", new Blob([body], { type: "application/json" }));
+}
+
 /** Watch every WebRTC connection this page makes (once per page). */
 export function watchIce() {
   const Native = window.RTCPeerConnection;
@@ -19,14 +25,21 @@ export function watchIce() {
     pc.addEventListener("icecandidateerror", e => {
       if (errors.length < 8) errors.push(`${e.errorCode} ${e.errorText || ""} ${e.url || ""}`.trim());
     });
-    pc.addEventListener("iceconnectionstatechange", () => {
-      const state = pc.iceConnectionState;
-      if (reported || !["connected", "completed", "failed"].includes(state)) return;
+    const send = state => {
+      if (reported) return;
       reported = true;
       const servers = (pc.getConfiguration().iceServers || []).flatMap(s => [].concat(s.urls));
-      const body = JSON.stringify({ state, candidates: [...kinds], errors, servers, agent: navigator.userAgent });
-      navigator.sendBeacon?.("/voice/diag", new Blob([body], { type: "application/json" }));
+      report({ state, gathering: pc.iceGatheringState, signaling: pc.signalingState, candidates: [...kinds],
+               errors, servers });
+    };
+    pc.addEventListener("iceconnectionstatechange", () => {
+      if (["connected", "completed", "failed"].includes(pc.iceConnectionState)) send(pc.iceConnectionState);
     });
+    const close = pc.close.bind(pc);
+    pc.close = () => {  // closed before it ever connected: what state was it stuck in?
+      send(`closed while ${pc.iceConnectionState}`);
+      close();
+    };
     return pc;
   }
   Watched.prototype = Native.prototype;
