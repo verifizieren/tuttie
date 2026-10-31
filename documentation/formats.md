@@ -136,3 +136,65 @@ as instructions.
 Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the phone
 page lists pending approvals, the user taps Approve/Decline; the decision is signed
 with the user's key and attached to the action (e.g. passed to `book`).
+
+## DRAFT: marketplace messages (Tuttie, issues #8 #10)
+
+Proposal so the marketplace, node and wallet work can start in parallel. **Not implemented
+yet; agree on it as a team before building.** Every message below is the `payload` of a
+signed envelope (see above), signed by its sender: the user's agent with the `user` key,
+business agents with their node key.
+
+### Request (user's agent → marketplace)
+
+```json
+{
+  "type": "request",
+  "request_id": "rq-7f3a",
+  "category": "hotel",
+  "tags": ["basel-sbb"],
+  "constraints": {
+    "date": "2026-11-14",
+    "budget_chf": 200,
+    "requirements": ["quiet", "dog", "arrival 01:00"]
+  },
+  "expires_at": "2026-11-13T20:00:00Z"
+}
+```
+
+### Offer (business agent → user's agent)
+
+```json
+{
+  "type": "offer",
+  "request_id": "rq-7f3a",
+  "offer_id": "of-rheinblick-1",
+  "item": "double room 14 Nov",
+  "price_chf": 195,
+  "includes": ["late check-in after 22:00 with dog"],
+  "conditions": ["non-refundable"],
+  "valid_until": "2026-11-13T22:00:00Z"
+}
+```
+
+Prices come from the node config (`facts.rooms`, `facts.add_ons`), never from an LLM.
+
+### Counter-offer (either side, during negotiation)
+
+```json
+{
+  "type": "counter",
+  "offer_id": "of-rheinblick-1",
+  "round": 2,
+  "price_chf": 185,
+  "includes": ["late check-in after 22:00 with dog"],
+  "conditions": ["non-refundable"]
+}
+```
+
+A business agent may only counter within limits set by its owner, kept in the node config
+and never sent: `facts.negotiation = {"floor_chf": 175, "max_rounds": 3}`.
+
+### Agreement
+
+The last offer or counter that both sides accept, signed by the business. It is what the
+user approves on the phone (see Approval) and what `book` redeems, like a commitment today.
