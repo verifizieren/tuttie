@@ -49,22 +49,23 @@
           background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
 
   /* The Tuttie card is nothing but the agent's face. */
-  .agent { --i: 2; cursor: pointer; touch-action: none; background: #08080b;
-           box-shadow: 0 0 0 1px rgba(217, 119, 87, .35), 0 -8px 24px rgba(0, 0, 0, .55); }
+  .agent { --i: 2; cursor: pointer; touch-action: none; background: #0c0c10;
+           box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), 0 -8px 24px rgba(0, 0, 0, .55); }
   /* The face keeps its 2:1 shape (like pycozmo's 128x64 screen) and is only moved and scaled
      with transforms, so opening the card never re-renders it at a new size mid-animation. */
   .agent canvas { position: absolute; left: 0; width: 100%; aspect-ratio: 2 / 1; top: 50%; display: block;
                   transform: translateY(-50%) scale(.92); transition: top .7s var(--ease), transform .7s var(--ease); }
+  /* Listening: just a thin line that breathes gently, no glow. */
   .agent .edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease);
-                 box-shadow: inset 0 0 0 2px rgba(255, 181, 150, .55), inset 0 0 60px rgba(217, 119, 87, .35); }
-  .app.voice .agent .edge { opacity: 1; animation: listen 2.4s ease-in-out infinite; }
-  @keyframes listen { 50% { box-shadow: inset 0 0 0 2px rgba(255, 181, 150, .9), inset 0 0 90px rgba(217, 119, 87, .55); } }
+                 box-shadow: inset 0 0 0 1px rgba(255, 181, 150, .45); }
+  .app.voice .agent .edge { opacity: 1; animation: listen 3s ease-in-out infinite; }
+  @keyframes listen { 50% { opacity: .45; } }
 
   /* Open: the other cards drop away and the face fills the screen. */
   .app.open .card:not(.agent) { transform: translateY(110vh); opacity: 0; }
   .app.open .agent { top: var(--top); height: calc(var(--app-h, 100dvh) - var(--top) - var(--bottom)); border-radius: 32px; }
   .app.typing { --bottom: 8px; }
-  .app.open .agent canvas { top: 42%; transform: translateY(-50%) scale(1.15); }
+  .app.open .agent canvas { top: 42%; transform: translateY(-50%) scale(1); }
   .app.typing .agent canvas { top: 30%; transform: translateY(-50%) scale(.8); }
   @media (prefers-reduced-motion: reduce) { .card, .agent canvas, .head, .controls { transition-duration: .01s !important; } }
 
@@ -74,8 +75,11 @@
   .status { font-size: 15px; font-weight: 500; color: var(--muted); text-align: center; min-height: 20px; }
   .said { font-size: 20px; font-weight: 600; text-align: center; line-height: 1.3; min-height: 26px; color: var(--text); }
   .pill { background: #1c1c1f; color: var(--text); font-size: 14px; padding: 8px 16px; border-radius: 20px; }
-  .done { position: absolute; top: 18px; right: 18px; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .3s; }
-  .app.open .done { opacity: 1; pointer-events: auto; }
+  /* Grab bar: the open card closes by swiping down, like an iOS sheet. */
+  .grabber { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px;
+             background: rgba(255, 255, 255, .28); opacity: 0; transition: opacity .3s; z-index: 2; pointer-events: none; }
+  .app.open .grabber { opacity: 1; }
+  .agent.dragging { transition: none; }
   form { display: none; width: 100%; gap: 8px; }
   .app.typing form { display: flex; }
   .app.typing .controls { padding: 0 20px 22px; }
@@ -99,7 +103,7 @@
   <div class="card agent" id="agent" aria-label="Tuttie, tap to talk">
     <canvas id="eyes"></canvas>
     <div class="edge"></div>
-    <button class="pill done" id="done" type="button">Done</button>
+    <div class="grabber"></div>
     <div class="controls" id="controls">
       <div class="said" id="said"></div>
       <div class="status" id="status">Tap Tuttie to talk</div>
@@ -116,7 +120,7 @@
 <script src="/shared/face.js"></script>
 <script>
   // UI only for now: voice and text are not connected to the agent backend yet.
-  // States: asleep (eyes closed) → tap the face → voice mode (eyes open, stays on until Done or
+  // States: asleep (eyes closed) → tap the face → voice mode (eyes open, stays on until swiped down or
   // Type instead). Typing closes the eyes; tapping the face goes back to voice.
   const app = document.getElementById("app");
   const agent = document.getElementById("agent");
@@ -168,22 +172,38 @@
     face.sleep();
   }
 
-  // Tapping (or swiping up on) the face wakes Tuttie into voice mode. While voice is on,
-  // further taps keep it on: the agent is never sent away by accident.
-  let startY = null;
-  agent.addEventListener("pointerdown", e => { startY = e.clientY; });
-  agent.addEventListener("pointerup", e => {
-    if (startY === null || e.target.closest("button, form")) { startY = null; return; }
-    const tap = Math.abs(startY - e.clientY) < 8, swipeUp = startY - e.clientY > 30;
-    startY = null;
-    if (!(tap || swipeUp)) return;
-    if (app.classList.contains("voice")) face.set("excitement", 250), setTimeout(() => face.set("neutral", 500), 600);
-    else startVoice();
+  // Gestures on the card. Closed: tap or swipe up wakes Tuttie into voice mode. Open: the card
+  // follows a downward drag and closes when released far or fast enough, otherwise it springs
+  // back. Taps while voice is on keep it on: the agent is never sent away by accident.
+  let drag = null;  // {y, t, dy} of the current pointer gesture
+  agent.addEventListener("pointerdown", e => {
+    if (e.target.closest("button, form")) return;
+    drag = { y: e.clientY, t: performance.now(), dy: 0 };
   });
-
-  document.getElementById("done").addEventListener("click", () => {
-    if (performance.now() - openedAt > 700) close();
+  agent.addEventListener("pointermove", e => {
+    if (!drag || !app.classList.contains("open")) return;
+    drag.dy = Math.max(0, e.clientY - drag.y);
+    if (drag.dy > 6) {
+      agent.classList.add("dragging");
+      agent.style.transform = `translateY(${drag.dy}px) scale(${1 - Math.min(drag.dy, 400) / 4000})`;
+    }
   });
+  function endDrag(e) {
+    if (!drag) return;
+    const moved = e.clientY - drag.y, speed = moved / Math.max(1, performance.now() - drag.t);
+    drag = null;
+    agent.classList.remove("dragging");
+    agent.style.transform = "";
+    if (app.classList.contains("open")) {
+      if (moved > 120 || (moved > 40 && speed > .6)) close();
+      else if (Math.abs(moved) < 8 && !app.classList.contains("voice")) startVoice();
+      else if (Math.abs(moved) < 8) face.set("excitement", 250), setTimeout(() => face.set("neutral", 500), 600);
+    } else if (Math.abs(moved) < 8 || moved < -30) {
+      startVoice();
+    }
+  }
+  agent.addEventListener("pointerup", endDrag);
+  agent.addEventListener("pointercancel", endDrag);
   document.getElementById("keyboard").addEventListener("click", () => {
     if (performance.now() - openedAt > 700) startTyping();
   });
