@@ -28,16 +28,16 @@ can work in parallel without stepping on each other. Contracts live in
 | Protocol and signing | `code/aps/` | #10 | done, tested (100 %): envelopes, seals, UIDs, approvals, delegations, signed calls, the action gate for `book`/`pay`, payment mandates | Python API; formats: envelope, seals, approval, delegation, signed call, action gate, payment mandate |
 | Registry | `code/registry/` | #9 | done | `GET /search`, `GET /nodes/{id}` |
 | Public information services (weather, trains) | `code/services/`, `code/data/services/` | #10 | done: sealed services with signed MCP tools `get_forecast` (Open-Meteo) and `get_connections` (transport.opendata.ch), marked sample data offline | MCP tools, signed envelopes; formats: public information services |
-| Business nodes and company agents | `code/node/`, `code/data/nodes/` | #10 | tools served over MCP at `/mcp/` (`node/mcp_tools.py`; `book` needs a signed call); same agent object for every company (persona, tool catalog, wake-ups, sessions); three hotel agents large / medium / small with public profiles and private negotiation limits; `make_offer` and negotiation tools planned | MCP tools, signed envelopes; formats: business tools over MCP, signed call, business agent, offer, counter-offer |
-| Marketplace (requests, offers, shortlist, negotiation) | `code/marketplace/` (:4010) | #8, #9, #10 | agent layer built (postings, wake-up via `/agent/invoke`, signed offers, shortlist); negotiation to add | formats: request, offer, counter-offer, agreement |
+| Business nodes and company agents | `code/node/`, `code/data/nodes/` | #10 | tools served over MCP at `/mcp/` (`node/mcp_tools.py`; `book` needs a signed call); same agent object for every company (persona, tool catalog, wake-ups, sessions); three hotel agents large / medium / small with public profiles and private negotiation limits; `make_offer` (signed offers to the market), `counter_offer`, `book` and `pay` available; owner API (`node/owner.py`) for the owner view | MCP tools, signed envelopes; formats: business tools over MCP, signed call, business agent, offer, counter-offer |
+| Marketplace (requests, offers) | `code/marketplace/` (:4010) | #8, #9, #10 | done: signed postings, wake-up of verified, subscribed businesses via `/agent/invoke`, signed offers; it decides nothing (Tuttie builds its own shortlist, bargaining is in `code/negotiation/`) | formats: request, offer, counter-offer, agreement |
 | Bargaining (step 4) | `code/negotiation/` | #10 | done, tested (100 %): hotel `counter_offer` tool within private limits (HTTP and MCP), Tuttie's parallel negotiating subagents, agreements redeemed once at booking; mounted in every node | signed Counter / Agreement / Rejection, `POST /tools/counter_offer`, MCP `counter_offer` |
-| User's agent (Tuttie) | `code/assistant/`, `code/data/agents/` | #10 | done for direct booking; own identity (key, seal, user delegation); subagents with own memory and limited context run in parallel (`assistant/subagents.py`); marketplace flow to add | UI events over SSE, approvals API, `GET /identity` |
+| User's agent (Tuttie) | `code/assistant/`, `code/data/agents/` | #10 | done: own identity (key, seal, user delegation); reads the user's context (`recall_context`), posts a signed request (budget stays private), bargains through parallel subagents (`negotiate`), shows the hotels as cards, books the liked deal after the user's approval, pays the city tax with a mandate; tools over MCP behind its trust gate | UI events over SSE, approvals API, `GET /identity` |
 | Sessions, memory, context passing | `code/sessions/` | #8, #10 | done: isolated sessions with memory, used by company agents and Tuttie's subagents; context classed public / negotiation / private | Python API; node session endpoints |
-| Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
-| Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |
-| Owner view | `code/apps/owner/` | #5 | to build | owner API (to define) that edits `data/nodes/*.json` facts |
-| Presentation site and QR | `code/apps/presentation/` | #1, #6 | to build | links into the wallet |
-| Demo | `code/demo/` | #3, #2 | to build | drives the user's agent and the apps |
+| Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | done, connected: card stack, Tuttie's face (eyes driven by its presence), voice mode, text fallback, the run under the eyes (posting, offers, bargaining), swipe deck of hotel cards, approval sheet with Face ID-style confirmation, booking card, history of conversations | `POST /chat`, `GET /events` (SSE), approvals API, conversations API, voice token |
+| Voice agent | `code/voice/` | #2, #3 | done, live: self-hosted LiveKit (signaling proxied by the assistant at `/rtc`, media TCP 4042 / UDP 4043, TURN relay coturn on TCP 4044 for phones), ElevenLabs speech-to-text and voice, `voice/agent.py` passes what the user says to Tuttie and speaks the answers | `POST /voice/say`, `GET /voice/events`, `POST /voice/token` |
+| Owner view | `code/apps/owner/` (React + Vite) | #5 | done: one page per business (rooms, extras, private negotiation limits, agent); edits are a draft, reviewed and deployed as a new numbered version the node uses at once | `GET /owner/overview`, `GET /owner/versions`, `POST /owner/deploy` on the node (`node/owner.py`), behind `OWNER_TOKEN` |
+| Presentation site and QR | `code/apps/presentation/` | #1, #6 | not built yet (only its README) | links into the wallet |
+| Demo | `code/demo/` | #3, #2 | not built yet (only its README); `scripts/demo_headless.py` runs the full flow in one process | drives the user's agent and the apps |
 | Shared UI pieces | `code/apps/shared/` | — | brand stylesheet, seal badges | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
 
@@ -57,5 +57,6 @@ can work in parallel without stepping on each other. Contracts live in
   served by the assistant at `/wallet/` and `run.sh` builds it. The other apps are static
   pages (HTML + vanilla JS) served at `/<app>/`. Brand and seal badges are shared in
   `apps/shared/`.
-- **Ports** (team server allows 4000-4049): registry 4000, nodes 4001-4007, assistant and
-  apps 4040, marketplace 4010.
+- **Ports** (team server allows 4000-4049): registry 4000, nodes 4001-4009, marketplace 4010,
+  weather and trains services 4011-4012, assistant and apps 4040, wallet dev server 4041,
+  LiveKit media TCP 4042 / UDP 4043, TURN relay 4044 (LiveKit signaling stays local on 7880).
