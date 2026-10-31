@@ -51,7 +51,9 @@
   .broken .status { color: var(--red); }
   .summary { margin-top: 4px; }
   .broken .summary { text-decoration: line-through; color: var(--red); }
-  .seal { font-size: 14px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 2px solid; }
+  .seal { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 2px 9px 2px 3px; border-radius: 999px; border: 2px solid; }
+  .seal svg { width: 18px; height: 18px; flex: none; }
+  .seal.invalid svg { filter: grayscale(1); opacity: .6; }
   .seal.gold { color: var(--gold); background: var(--gold-bg); }
   .seal.blue { color: var(--blue); background: var(--blue-bg); }
   .seal.grey { color: var(--grey); background: var(--grey-bg); }
@@ -94,6 +96,7 @@
   </section>
 </main>
 <div id="qr" title="Click to close"><div><img src="/phone-qr.svg" alt="QR code of the phone page"><p>Scan to approve on your phone</p><a id="phone-link" href="/phone.html" target="_blank"></a></div></div>
+<script src="/seals.js"></script>
 <script>
   // Demo prompts shown as buttons above the text field; a click sends the prompt.
   const PROMPTS = [
@@ -182,11 +185,6 @@
     turn = null;
     send.disabled = false;
     scrollDown(chat);
-  }
-
-  function sealBadge(seal) {
-    const label = seal.valid ? `${seal.tier} · ${seal.issuer}` : `broken · ${seal.issuer}`;
-    return el("span", "seal " + (seal.valid ? seal.tier : "invalid"), label);
   }
 
   function addStep(event) {

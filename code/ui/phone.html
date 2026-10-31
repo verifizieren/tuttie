@@ -16,7 +16,9 @@
   .amount { font-size: 40px; font-weight: 800; margin: 6px 0; }
   .summary { color: var(--muted); margin-bottom: 10px; }
   .seals { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
-  .seal { font-size: 14px; font-weight: 700; padding: 2px 9px; border-radius: 999px; border: 2px solid; }
+  .seal { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 2px 9px 2px 3px; border-radius: 999px; border: 2px solid; }
+  .seal svg { width: 18px; height: 18px; flex: none; }
+  .seal.invalid svg { filter: grayscale(1); opacity: .6; }
   .seal.gold { color: var(--gold); background: var(--gold-bg); }
   .seal.blue { color: var(--blue); background: var(--blue-bg); }
   .seal.grey { color: var(--grey); background: var(--grey-bg); }
@@ -31,6 +33,7 @@
 <h1>Approvals</h1>
 <div id="list"><p class="empty">Nothing to approve.</p></div>
 <p class="done" id="done"></p>
+<script src="/seals.js"></script>
 <script>
   const list = document.getElementById("list");
   const done = document.getElementById("done");
@@ -56,7 +59,7 @@
     approvals.forEach(a => {
       const card = el("div", "card");
       const seals = el("div", "seals");
-      a.seals.filter(s => s.valid).forEach(s => seals.append(el("span", "seal " + s.tier, `${s.tier} · ${s.issuer}`)));
+      a.seals.filter(s => s.valid).forEach(s => seals.append(sealBadge(s)));
       const buttons = el("div", "buttons");
       const approve = el("button", "approve", "Approve");
       const decline = el("button", "decline", "Decline");
