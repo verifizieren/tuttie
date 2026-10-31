@@ -32,7 +32,8 @@
   header button { background: #2b3140; }
   .step { border: 1px solid var(--line); border-left: 6px solid var(--green); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; animation: in .25s ease-out; }
   .step.broken { border-left-color: var(--red); background: var(--red-bg); }
-  .step.pending { border-left-color: var(--gold); }
+  .step.pending { border-left-color: var(--gold); background: var(--gold-bg); }
+  .step.declined { border-left-color: var(--red); }
   .step .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .kind { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); min-width: 92px; }
   .node { font-weight: 700; }
@@ -46,6 +47,11 @@
   .seal.grey { color: var(--grey); background: var(--grey-bg); }
   .seal.invalid { color: var(--red); background: var(--red-bg); text-decoration: line-through; }
   .empty { color: var(--muted); }
+  .cite { font-size: 13px; font-weight: 700; padding: 0 6px; border-radius: 6px; border: 1px solid; vertical-align: 2px; }
+  .cite.gold { color: var(--gold); background: var(--gold-bg); }
+  .cite.blue { color: var(--blue); background: var(--blue-bg); }
+  .cite.grey { color: var(--grey); background: var(--grey-bg); }
+  header a { color: #b9c0cc; }
   @keyframes in { from { opacity: 0; transform: translateY(6px); } }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } section { height: 70vh; } }
 </style>
@@ -53,6 +59,7 @@
 <body>
 <header>
   <h1>Two Webs</h1><span>your assistant on the agent web</span>
+  <a href="/phone.html" target="_blank">phone</a>
   <button id="reset" type="button">New demo</button>
 </header>
 <main>
@@ -76,6 +83,9 @@
   const timeline = document.getElementById("timeline");
   const input = document.getElementById("input");
   const send = document.getElementById("send");
+  const TIER_RANK = { grey: 1, blue: 2, gold: 3 };
+  const stepTier = {};  // timeline step -> best valid seal tier, for citations in answers
+  let pending = null;   // the "thinking" chat bubble waiting for an answer event
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -96,8 +106,32 @@
     return el("span", "seal " + (seal.valid ? seal.tier : "invalid"), label);
   }
 
+  // Render answer text, turning "[3]" citations into a seal badge for timeline step 3.
+  function renderAnswer(target, text) {
+    target.textContent = "";
+    text.split(/(\[\d+\])/).forEach(part => {
+      const match = part.match(/^\[(\d+)\]$/);
+      if (match && stepTier[match[1]]) {
+        target.append(el("span", "cite " + stepTier[match[1]], `${stepTier[match[1]]} #${match[1]}`));
+      } else {
+        target.append(part);
+      }
+    });
+  }
+
+  function showAnswer(event) {
+    const msg = pending || addMessage("bot", "");
+    msg.className = "msg bot";
+    renderAnswer(msg, event.summary);
+    pending = null;
+    send.disabled = false;
+    chat.scrollTop = chat.scrollHeight;
+  }
+
   function addStep(event) {
-    if (event.kind === "answer") return;  // the answer is shown in the chat
+    const valid = event.seals.filter(s => s.valid).map(s => s.tier);
+    if (valid.length) stepTier[event.step] = valid.sort((a, b) => TIER_RANK[b] - TIER_RANK[a])[0];
+    if (event.kind === "answer") return showAnswer(event);
     timeline.querySelector(".empty")?.remove();
     const step = el("div", "step " + event.status);
     const top = el("div", "top");
@@ -111,6 +145,8 @@
   }
 
   function clearAll() {
+    pending = null;
+    send.disabled = false;
     chat.innerHTML = "";
     timeline.innerHTML = '<p class="empty">Signed steps will appear here.</p>';
   }
@@ -126,16 +162,13 @@
     addMessage("user", text);
     input.value = "";
     send.disabled = true;
-    const pending = addMessage("bot thinking", "Asking the agent web…");
+    pending = addMessage("bot thinking", "Asking the agent web…");
     try {
-      const response = await fetch("/chat", { method: "POST", headers: { "content-type": "application/json" },
-                                              body: JSON.stringify({ message: text }) });
-      const data = await response.json();
-      pending.className = "msg bot";
-      pending.textContent = data.answer;
+      await fetch("/chat", { method: "POST", headers: { "content-type": "application/json" },
+                             body: JSON.stringify({ message: text }) });
     } catch (error) {
       pending.textContent = "The assistant is unreachable.";
-    } finally {
+      pending = null;
       send.disabled = false;
     }
   });
