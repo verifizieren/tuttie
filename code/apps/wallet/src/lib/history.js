@@ -35,8 +35,10 @@ function outcome(state) {
 /** Archive a conversation (replacing an earlier copy of the same one); returns the new list. */
 export function archive(state) {
   if (!state.turns.length) return loadHistory();
-  const entry = { id: state.id, at: Date.now(), title: state.turns[0].said, outcome: outcome(state), state };
-  const list = [entry, ...loadHistory().filter(e => e.id !== state.id)].slice(0, MAX_ENTRIES);
+  // A conversation picked up after a reload may have no id yet: give it one, so it never replaces another.
+  const id = state.id || `c-${Date.now().toString(36)}`;
+  const entry = { id, at: Date.now(), title: state.turns[0].said, outcome: outcome(state), state };
+  const list = [entry, ...loadHistory().filter(e => e.id !== id)].slice(0, MAX_ENTRIES);
   write(KEY, list);
   return list;
 }

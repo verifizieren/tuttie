@@ -117,7 +117,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .app.typing .activity { top: 16%; bottom: 112px; }
 .turn { display: flex; flex-direction: column; gap: 10px; }
 
-/* Tuttie's answer, highlighted. */
+/* Tuttie's answer, highlighted; in the history also the user's words, on the right. */
+.bubble.user { align-self: flex-end; background: #2a2a2f; color: var(--text); border-bottom-right-radius: 6px; }
 .bubble { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45;
           animation: rise .4s var(--ease) both; overflow-wrap: anywhere; }
 .bubble.tuttie { align-self: stretch; max-width: none; padding: 14px 16px; font-size: 16px; line-height: 1.5;

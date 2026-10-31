@@ -1,6 +1,7 @@
 // One conversation under Tuttie's eyes, turn by turn: two progress lines (what Tuttie knows,
 // what it does), the hotel cards to swipe, the chosen hotel, the booking and Tuttie's answer.
-// The user's own words are not repeated. Tapping a hotel shows who vouches for it.
+// The user's own words are not repeated, except in an earlier conversation from the history.
+// Tapping a hotel shows who vouches for it.
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
@@ -137,6 +138,7 @@ export default function Activity({ state, readOnly = false, onPick, onLean }) {
     <div className="activity" ref={box} data-scroll>
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
+          {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
           <Steps turn={turn} latest={latest} />
           {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} onLean={onLean} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
