@@ -26,6 +26,8 @@ from fastapi.responses import Response, StreamingResponse
 from livekit import api
 from pydantic import BaseModel
 
+from assistant.inputs import UserText
+
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
 API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
@@ -88,7 +90,7 @@ async def voice_token(request: Request) -> dict:
 
 class Said(BaseModel):
     room: str
-    text: str
+    text: UserText
 
 
 @router.post("/voice/say", status_code=202, dependencies=[Depends(agent_only)])

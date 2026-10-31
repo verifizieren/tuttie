@@ -16,13 +16,15 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from assistant.conversations import Conversation, Conversations  # noqa: E402
+from assistant.inputs import UserText  # noqa: E402
 from assistant.voice import router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
@@ -46,6 +48,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="APS assistant", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, error: RequestValidationError) -> JSONResponse:
+    """422 without echoing the input: it may be huge or not encodable (a lone surrogate gave a 500)."""
+    return JSONResponse(status_code=422, content={"detail": [
+        {"type": e.get("type"), "loc": list(e.get("loc", ())), "msg": e.get("msg")} for e in error.errors()]})
 
 
 @app.middleware("http")
@@ -77,10 +86,10 @@ FIRST_TOOLS = {"book", "negotiate"}
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: UserText
     first_tool: str | None = None  # one of FIRST_TOOLS
     conversation_id: str | None = None
-    said: str | None = None  # what the user sees as their message, if not the message itself
+    said: UserText | None = None  # what the user sees as their message, if not the message itself
 
 
 class DecisionRequest(BaseModel):
