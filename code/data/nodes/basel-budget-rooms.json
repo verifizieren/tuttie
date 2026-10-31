@@ -1,0 +1,24 @@
+{
+  "node_id": "ch.basel.budget-rooms",
+  "name": "Basel Budget Rooms",
+  "port": 4007,
+  "kind": "business",
+  "capabilities": ["can_book", "can_take_payment"],
+  "tags": ["hotel", "basel-sbb", "quiet"],
+  "seals": [],
+  "facts": {
+    "address": "Near Basel SBB",
+    "distance_to_basel_sbb_m": 300,
+    "quiet": true,
+    "quiet_note": "Quiet rooms.",
+    "rooms": [
+      { "room_type": "double", "price_chf": 120, "rate": "pay at booking", "available": true }
+    ],
+    "policies": {
+      "dogs_allowed": false,
+      "check_in": "self check-in with code",
+      "late_arrival": "Self check-in any time.",
+      "cancellation": "No cancellation."
+    }
+  }
+}

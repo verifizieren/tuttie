@@ -109,6 +109,15 @@ def test_self_signed_is_grey_without_licence_or_payment(authorities):
     assert verdict["capabilities"] == ["can_answer"]
 
 
+def test_unsigned_node_is_grey_without_licence_or_payment(authorities):
+    _, auths = authorities
+    record = make_record(SigningKey.generate(), ["can_book", "can_take_payment", "licensed_legal_ch"])
+    record["seals"] = []
+    verdict = evaluate_record(record, auths)
+    assert verdict["tier"] == "grey"
+    assert verdict["capabilities"] == ["can_book"]
+
+
 def test_licensed_capability_needs_licensing_authority(authorities):
     keys, auths = authorities
     record = make_record(SigningKey.generate(), ["licensed_legal_ch"])
@@ -127,6 +136,7 @@ def test_demo_registry_verdicts():
         "ch.basel.hotel-rheinblick": "gold",
         "ch.basel.hotel-spalenhof": "blue",
         "ch.basel.hotel-gundeli": "gold",
+        "ch.basel.budget-rooms": "grey",
         "ch.basel.cheap-hotels": "broken",
         "ch.legal.consumer-law": "gold",
         "ch.legal.advisor": "grey",

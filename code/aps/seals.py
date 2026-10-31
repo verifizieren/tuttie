@@ -2,7 +2,8 @@
 
 A seal counts only if its issuer is a trusted authority (data/authorities.json)
 with the claimed tier and the signature verifies. A seal whose issuer is the node
-itself is a self-signed grey seal. Any claimed seal that fails makes the node broken.
+itself is a self-signed grey seal. A node without any seal is unsigned and also grey
+(untrusted, but it claims nothing false). Any claimed seal that fails makes the node broken.
 """
 
 from nacl.signing import SigningKey
@@ -51,10 +52,10 @@ def evaluate_record(record: dict, authorities: dict) -> dict:
         {"issuer": s.get("issuer"), "tier": s.get("tier"), "valid": check_seal(record, s, authorities)}
         for s in record.get("seals", [])
     ]
-    if not seals or not all(s["valid"] for s in seals):
+    if not all(s["valid"] for s in seals):
         return {"tier": "broken", "seals": seals, "capabilities": []}
 
-    tier = max((s["tier"] for s in seals), key=TIER_RANK.__getitem__)
+    tier = max((s["tier"] for s in seals), key=TIER_RANK.__getitem__, default="grey")
     licensed = {}  # capability -> issuers that are allowed to license it
     for issuer_id, authority in authorities.items():
         for capability in authority.get("licenses", []):
