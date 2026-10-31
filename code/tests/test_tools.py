@@ -7,6 +7,8 @@ from pathlib import Path
 import httpx
 
 from aps import load_signing_key, sign_envelope
+from aps.call import verify_call
+from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
 from assistant.events import EventBus
 from assistant.tools import Toolbox
@@ -14,11 +16,11 @@ from assistant.tools import Toolbox
 REGISTRY = json.loads((Path(__file__).resolve().parent.parent / "data" / "registry.json").read_text())
 RHEINBLICK = "ch.basel.hotel-rheinblick"
 SCAM = "ch.basel.cheap-hotels"
-NODE_REPLIES = {
-    "/tools/get_availability": {"date": "2026-11-14", "rooms": [{"room_type": "double", "price_chf": 180, "rate": "x"}]},
+NODE_REPLIES = {  # by MCP tool name or agent path
+    "get_availability": {"date": "2026-11-14", "rooms": [{"room_type": "double", "price_chf": 180, "rate": "x"}]},
     "/agent": {"answer": "Fine.", "commitment": {"item": "late check-in with dog", "price_chf": 15,
                                                  "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}},
-    "/tools/book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195},
+    "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195},
 }
 
 
@@ -29,6 +31,24 @@ def make_toolbox(tamper: bool = False, timestamp: str | None = None) -> tuple[To
     """
     contacted = []
 
+    def signed_reply(node: dict, payload: dict) -> dict:
+        envelope = sign_envelope(node["node_id"], json.loads(json.dumps(payload)), load_signing_key(node["node_id"]),
+                                 timestamp=timestamp)
+        if tamper:
+            envelope["payload"]["rooms"][0]["price_chf"] = 1
+        return envelope
+
+    class FakeMcp:
+        """Stands in for McpLink: answers each tool with the node's signed reply."""
+
+        def __init__(self):
+            self.sent = {}  # tool -> the arguments Tuttie sent
+
+        async def call(self, endpoint: str, tool: str, args: dict) -> dict:
+            contacted.append(f"{endpoint}/mcp/{tool}")
+            self.sent[tool] = args
+            return signed_reply(next(r for r in REGISTRY if r["endpoint"] == endpoint), NODE_REPLIES[tool])
+
     def handler(request: httpx.Request) -> httpx.Response:
         contacted.append(str(request.url))
         path = request.url.path
@@ -38,16 +58,11 @@ def make_toolbox(tamper: bool = False, timestamp: str | None = None) -> tuple[To
             record = next((r for r in REGISTRY if r["node_id"] == path.removeprefix("/nodes/")), None)
             return httpx.Response(200, json=record) if record else httpx.Response(404)
         node = next(r for r in REGISTRY if r["endpoint"].endswith(f":{request.url.port}"))
-        payload = NODE_REPLIES.get(path, NODE_REPLIES["/tools/get_availability"])
-        envelope = sign_envelope(node["node_id"], json.loads(json.dumps(payload)), load_signing_key(node["node_id"]),
-                                 timestamp=timestamp)
-        if tamper:
-            envelope["payload"]["rooms"][0]["price_chf"] = 1
-        return httpx.Response(200, json=envelope)
+        return httpx.Response(200, json=signed_reply(node, NODE_REPLIES.get(path, NODE_REPLIES["get_availability"])))
 
     bus = EventBus()
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return Toolbox(http, "http://registry", bus, ApprovalBook()), bus, contacted
+    return Toolbox(http, "http://registry", bus, ApprovalBook(), mcp=FakeMcp()), bus, contacted
 
 
 def test_search_rejects_scam_and_keeps_verified_nodes():
@@ -105,14 +120,6 @@ def test_call_tool_refuses_unknown_tools_and_node_ids():
 
 def test_book_waits_for_approval_and_sends_signed_decision_and_commitment():
     toolbox, bus, _ = make_toolbox()
-    sent = {}
-    original_post = toolbox.http.post
-
-    async def spy_post(url, json=None):
-        sent[url.rsplit("/", 1)[-1]] = json
-        return await original_post(url, json=json)
-
-    toolbox.http.post = spy_post
 
     async def flow():
         await toolbox.call_tool(RHEINBLICK, "get_availability", {"date": "2026-11-14"})
@@ -127,8 +134,11 @@ def test_book_waits_for_approval_and_sends_signed_decision_and_commitment():
 
     result = asyncio.run(flow())
     assert result["status"] == "confirmed"
-    assert sent["book"]["approval"]["decision"] == "approved"
-    assert sent["book"]["extras"][0]["payload"]["commitment"]["price_chf"] == 15
+    call = toolbox.mcp.sent["book"]["call"]  # book goes out as a call signed by Tuttie
+    assert verify_call(call, load_public_key("ch.tuttie.alex-muster"), tool="book")
+    assert call["delegation"]["agent_id"] == "ch.tuttie.alex-muster"
+    assert call["args"]["approval"]["decision"] == "approved"
+    assert call["args"]["extras"][0]["payload"]["commitment"]["price_chf"] == 15
     assert [e["status"] for e in bus.history if e["kind"] == "approval"] == ["pending", "approved"]
 
 
@@ -143,7 +153,7 @@ def test_book_declined_never_calls_the_node():
         return await booking
 
     assert asyncio.run(flow())["declined"] is True
-    assert not any(url.endswith("/tools/book") for url in contacted)
+    assert not any(url.endswith("/mcp/book") for url in contacted)
 
 
 def test_book_requires_signed_availability_and_known_extras():
@@ -158,7 +168,7 @@ def test_book_refuses_untrusted_unsigned_node():
     asyncio.run(toolbox.call_tool("ch.basel.budget-rooms", "get_availability", {"date": "2026-11-14"}))
     result = asyncio.run(toolbox.book("ch.basel.budget-rooms", "2026-11-14", "double", "A"))
     assert result["rejected"] is True and not toolbox.approvals.pending
-    assert not any(url.endswith("/tools/book") for url in contacted)
+    assert not any(url.endswith("/mcp/book") for url in contacted)
 
 
 def test_identity_shows_tuttie_sealed_and_acting_for_the_user():

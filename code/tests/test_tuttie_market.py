@@ -24,6 +24,7 @@ from assistant.tools import Toolbox
 from negotiation_helpers import registry_lookup
 from node.server import create_app
 from registry.app import app as registry_app
+from tests.mcp_helpers import in_process_link
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -67,7 +68,8 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
                               market_url="http://localhost:4010", offer_wait_s=3)
             result = await desk.find(**kwargs)
             if negotiate_budget is not None:
-                toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk)
+                link = in_process_link({f"http://localhost:{port}": app for port, app in apps.items()})
+                toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk, mcp=link)
                 result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget)
                 if book_agreement:  # the user approves on the phone while book waits
                     async def phone():

@@ -6,6 +6,10 @@ key. Anything that fails is replaced by {"rejected": true, "reason": ...} and
 shown in red on the timeline. The node is never even contacted when its seals
 are broken.
 
+A business's tools are called over MCP (assistant/mcp_client.py). Reading tools are open;
+`book` goes out as a call signed with Tuttie's key and carrying the user's delegation
+(aps/call.py), so the hotel knows who asks and that the call is not replayed.
+
 Results carry "source_step", the timeline step that proves them, so the final
 answer can cite its sources.
 """
@@ -18,11 +22,13 @@ from pathlib import Path
 import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
+from aps.call import sign_call
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
 from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
 from assistant.marketplace import MarketDesk
+from assistant.mcp_client import McpCallFailed, McpLink
 from sessions import Context
 from assistant.events import EventBus
 
@@ -183,8 +189,9 @@ class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
     def __init__(self, http: httpx.AsyncClient, registry_url: str, bus: EventBus, approvals: ApprovalBook,
-                 market: MarketDesk | None = None):
+                 market: MarketDesk | None = None, mcp: McpLink | None = None):
         self.http = http
+        self.mcp = mcp or McpLink()
         self.registry_url = registry_url.rstrip("/")
         self.bus = bus
         self.approvals = approvals
@@ -303,10 +310,22 @@ class Toolbox:
         return record, evaluate_record(record, self.authorities)
 
     async def verified_post(self, node_id: str, path: str, body: dict, kind: str, label: str) -> Verified | dict:
-        """Check the node's seals, call it, and verify the signed envelope it returns.
+        """Check the node's seals, POST to one of its agent endpoints, and verify the signed reply.
 
         Returns Verified, or a rejection dict for the LLM (already shown on the timeline).
         """
+        async def send(record: dict) -> dict:
+            return (await self.http.post(f"{record['endpoint']}{path}", json=body)).json()
+        return await self.verified(node_id, send, kind, label)
+
+    async def verified_mcp(self, node_id: str, tool: str, args: dict, kind: str, label: str) -> Verified | dict:
+        """Check the node's seals, call one of its MCP tools, and verify the signed reply."""
+        async def send(record: dict) -> dict:
+            return await self.mcp.call(record["endpoint"], tool, args)
+        return await self.verified(node_id, send, kind, label)
+
+    async def verified(self, node_id: str, send, kind: str, label: str) -> Verified | dict:
+        """The trust gate around one call: seals first, then `send(record)`, then the envelope."""
         found = await self.lookup(node_id)
         if found is None:
             return {"node_id": node_id, "rejected": True, "reason": "not in the registry"}
@@ -316,7 +335,11 @@ class Toolbox:
             self.bus.emit(kind, "broken", f"{label} refused: {reason}", record, verdict["seals"])
             return rejected(record, reason)
 
-        envelope = (await self.http.post(f"{record['endpoint']}{path}", json=body)).json()
+        try:
+            envelope = await send(record)
+        except (httpx.HTTPError, McpCallFailed, ValueError) as error:
+            self.bus.emit(kind, "broken", f"{label}: {record['name']} did not answer", record, verdict["seals"])
+            return rejected(record, f"unreachable: {error}")
         if not verify_envelope(envelope, record["public_key"], expected_node_id=node_id):
             self.bus.emit(kind, "broken", f"{label}: response signature invalid, dropped", record, verdict["seals"])
             return rejected(record, "response signature does not verify")
@@ -324,6 +347,13 @@ class Toolbox:
             self.bus.emit(kind, "broken", f"{label}: signed reply is outdated, dropped", record, verdict["seals"])
             return rejected(record, "signed reply is outdated (possible replay)")
         return Verified(record, verdict, envelope)
+
+    async def signed_call(self, tool: str, args: dict) -> dict:
+        """A call of an action tool signed with Tuttie's key, with the user's delegation attached."""
+        agent_id = self.market.agent_id
+        found = await self.lookup(agent_id)
+        delegation = found[0].get("delegation") if found else None
+        return sign_call(tool, args, agent_id, load_signing_key(agent_id), delegation)
 
     def emit_verified(self, kind: str, summary: str, result: Verified) -> int:
         """Signature checked; the step is still "untrusted" when the node itself is only grey."""
@@ -336,7 +366,7 @@ class Toolbox:
         """Call a read-only tool on a node and return its verified payload."""
         if tool not in READ_TOOLS or not TOOL_NAME.match(tool):
             return {"error": f"tool {tool} is not available through call_tool"}
-        result = await self.verified_post(node_id, f"/tools/{tool}", args or {}, "a2t", tool)
+        result = await self.verified_mcp(node_id, tool, args or {}, "a2t", tool)
         if not isinstance(result, Verified):
             return result
         if tool == "get_availability":
@@ -416,12 +446,15 @@ class Toolbox:
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
             body["agreement"] = agreement
-        result = await self.verified_post(node_id, "/tools/book", body, "a2t", "book")
+        call = await self.signed_call("book", body)
+        result = await self.verified_mcp(node_id, "book", {"call": call}, "a2t", "book")
         if not isinstance(result, Verified):
             return result
         confirmation = result.payload
         if confirmation.get("status") == "confirmed":
             text = f"book: confirmed {confirmation['booking_id']}, CHF {confirmation['total_chf']:g}"
+            if confirmation.get("checked"):
+                text += f" (checked: {', '.join(confirmation['checked'])})"
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
