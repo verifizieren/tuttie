@@ -67,9 +67,11 @@ SCHEMAS = [
             "guests": {"type": "integer"},
             "requirements": {"type": "array", "items": {"type": "string"},
                              "description": "public needs, e.g. [\"quiet\", \"dog\", \"arrival around 01:00\"]"},
-            "tags": {"type": "array", "items": {"type": "string", "enum": ["basel", "basel-sbb", "kleinbasel"]},
-                     "description": "only the place: \"basel\" for the whole city, \"basel-sbb\" or \"kleinbasel\" "
-                                    "only if the user named that area; everything else (quiet, dog, ...) goes into requirements"},
+            # Only the city: an area tag left out every hotel outside it (the train to Basel SBB once
+            # hid the guesthouse in Kleinbasel). A wish for an area goes into requirements instead.
+            "tags": {"type": "array", "items": {"type": "string", "enum": ["basel"]},
+                     "description": "the city; areas and everything else (near the station, quiet, dog, ...) "
+                                    "go into requirements"},
             "budget_chf": {"type": "number",
                            "description": "the user's price limit. PRIVATE: it is never posted, only used for the shortlist"},
         },
