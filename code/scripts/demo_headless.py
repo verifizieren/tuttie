@@ -1,7 +1,7 @@
 """Run the whole demo in one process, without ports or a browser.
 
-The real registry and node apps are served through an in-memory transport; the
-LLM, signatures and verification are real. A fake phone taps the decision.
+The real registry, marketplace and node apps are served through an in-memory transport;
+the LLM, signatures and verification are real. A fake phone taps the decision.
 
 Usage (from code/): .venv/bin/python scripts/demo_headless.py [approved|declined] ["request"]
 """
@@ -24,18 +24,25 @@ from assistant.agent import Assistant  # noqa: E402
 from assistant.approvals import ApprovalBook  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
+from aps.keys import load_public_key  # noqa: E402
 from llm import LLM  # noqa: E402
+from marketplace.app import create_app as create_market_app  # noqa: E402
+from marketplace.app import load_authorities  # noqa: E402
+from marketplace.market import Market  # noqa: E402
 from node.server import create_app  # noqa: E402
 from registry.app import app as registry_app  # noqa: E402
 
 REQUEST = "Book me a quiet, dog-friendly hotel near Basel SBB under CHF 200 for 14 Nov, I arrive around 1am."
-REGISTRY_PORT = 4000
+REGISTRY_PORT, MARKET_PORT = 4000, 4010
 
 
 class PortRouter(httpx.AsyncBaseTransport):
-    """Send each request to the in-process app registered for its port."""
+    """Send each request to the in-process app registered for its port (filled in by `serve`)."""
 
-    def __init__(self, apps: dict):
+    def __init__(self):
+        self.transports: dict[int, httpx.ASGITransport] = {}
+
+    def serve(self, apps: dict) -> None:
         self.transports = {port: httpx.ASGITransport(app=app) for port, app in apps.items()}
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -52,13 +59,19 @@ async def fake_phone(approvals: ApprovalBook, decision: str) -> None:
 
 
 async def main(decision: str, request: str) -> None:
-    apps = {REGISTRY_PORT: registry_app}
-    for path in (ROOT / "data" / "nodes").glob("*.json"):
-        config = json.loads(path.read_text())
-        apps[config["port"]] = create_app(config)
-
     bus, approvals = EventBus(), ApprovalBook()
-    async with httpx.AsyncClient(transport=PortRouter(apps), timeout=60) as http:
+    router = PortRouter()
+    async with httpx.AsyncClient(transport=router, timeout=60) as http:
+        # Nodes and market share the in-process client, so hotels can send offers to the market.
+        apps = {REGISTRY_PORT: registry_app}
+        for path in (ROOT / "data" / "nodes").glob("*.json"):
+            config = json.loads(path.read_text())
+            apps[config["port"]] = create_app(config, http=http)
+        market_app = create_market_app(http)
+        market_app.state.market = Market(http, f"http://localhost:{REGISTRY_PORT}", load_authorities(),
+                                         load_public_key("user"), f"http://localhost:{MARKET_PORT}")
+        apps[MARKET_PORT] = market_app
+        router.serve(apps)
         toolbox = Toolbox(http, f"http://localhost:{REGISTRY_PORT}", bus, approvals)
         phone = asyncio.create_task(fake_phone(approvals, decision))
         answer = await Assistant(LLM(), toolbox, bus).chat(request)
