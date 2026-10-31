@@ -227,11 +227,13 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .pick.fav { border-color: rgba(217, 119, 87, .7); }
 .pick-photo { position: relative; height: 112px; }
 .pick-photo svg, .pick-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.heart { position: absolute; top: 10px; right: 10px; width: 38px; height: 38px; border-radius: 50%; border: 0;
-         display: grid; place-items: center; color: #fff; background: rgba(8, 8, 11, .45);
-         -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); cursor: pointer; }
-.heart svg { width: 20px; height: 20px; }
-.heart[aria-pressed="true"] { color: var(--accent); background: rgba(255, 255, 255, .92); }
+/* A plain hollow heart in the corner, in line with the "Recommended" label; filled when picked. */
+.heart { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; padding: 0; border: 0;
+         display: grid; place-items: center; color: #fff; background: none; cursor: pointer;
+         filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6)); transition: transform .15s var(--ease); }
+.heart svg { width: 28px; height: 28px; }
+.heart:active { transform: scale(.88); }
+.heart[aria-pressed="true"] { color: var(--accent); }
 .heart:disabled { cursor: default; }
 .recommended { position: absolute; top: 12px; left: 12px; padding: 4px 9px; border-radius: 10px; font-size: 11px;
                font-weight: 600; color: #08080b; background: rgba(255, 255, 255, .9); }
