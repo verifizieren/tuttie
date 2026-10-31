@@ -8,15 +8,23 @@ made by Tuttie's code here, not by an LLM, and every move goes through the trust
 
 The user's real budget limit is a *private* context item ("max_price_chf"). It is only
 compared in this code, like a hotel's floor on the other side: it is never shared with a
-subagent's context, never put in a prompt and never sent. Tuttie's counters stay at or below
-it, and Tuttie walks away when a hotel's final price is above it.
+subagent's context, never put in a prompt and never sent. Tuttie's counters stay below it, and
+Tuttie walks away when a hotel's final price is above it.
+
+No counter price is computed from the limit (bug #18: capping at the limit sent the budget
+itself, e.g. CHF 160, to every hotel far above it). A counter comes only from the offer and the
+hotel's prices; the limit only decides whether Tuttie sends it (`opening_price`, `next_price`).
+So a hotel can never read the budget off Tuttie's counters, it only learns what any walk-away
+tells: the budget is below a price Tuttie did not offer.
 
 Every counter is signed with Tuttie's own key; the hotel checks Tuttie's seals and the user's
 delegation ("negotiate"). Prices only come from signed messages: the hotel's offer, its
 counters and the final Agreement, which is what the user later approves on the phone.
 
-Strategy (`next_price`): open at OPENING_DISCOUNT below the offer, then move TUTTIE_STEP of the
-way toward the hotel's latest price; accept a hotel price within the limit once it is final or close.
+Strategy: open at OPENING_DISCOUNT below the offer (DEEP_OPENING_DISCOUNT when that is not below
+the limit; no counter at all when neither is), then move TUTTIE_STEP of the way toward the
+hotel's latest price, or hold the last counter when that step would not stay below the limit;
+accept a hotel price within the limit once it is final or close.
 A signed Agreement counts only at or below Tuttie's last counter and with the offer's terms
 unchanged (`agreement_problem`); anything else ends the negotiation as "refused".
 """
@@ -38,6 +46,7 @@ from sessions import Context
 BUDGET_LIMIT = "max_price_chf"  # private context item: the most the user will pay
 # Strategy numbers; tune them for the demo with scripts/bargain_preview.py.
 OPENING_DISCOUNT = 0.10  # first counter this far below the offer (tuned for the demo, see rules.HOTEL_STEP)
+DEEP_OPENING_DISCOUNT = 0.20  # used instead when the usual opening is not below the private limit
 TUTTIE_STEP = 0.5  # how far Tuttie moves toward the hotel's price each round (0.5 = halfway)
 MAX_ROUNDS = 6  # Tuttie's own safety limit, whatever the hotel allows
 
@@ -58,15 +67,27 @@ class Outcome:
     history: list[dict] = field(default_factory=list)  # (own price, hotel answer) per round
 
 
-def opening_price(offer_price: float, limit: float) -> int:
-    """Tuttie's first counter: a fair discount below the offer, never above the limit."""
-    return min(math.floor(offer_price * (1 - OPENING_DISCOUNT)), math.floor(limit))
+def opening_price(offer_price: float, limit: float) -> int | None:
+    """Tuttie's first counter, from the offer alone; None when no opening stays below the limit.
+
+    The limit only picks between two discounts of the offer (or none): a counter is never
+    capped at the limit, so it never equals or reveals the private budget.
+    """
+    for discount in (OPENING_DISCOUNT, DEEP_OPENING_DISCOUNT):
+        price = math.floor(offer_price * (1 - discount))
+        if price < limit:
+            return price
+    return None
 
 
 def next_price(own_last: float, hotel_price: float, limit: float) -> int:
-    """Move TUTTIE_STEP of the way toward the hotel's price, never above the limit or the hotel's price."""
-    step = math.ceil(own_last + (hotel_price - own_last) * TUTTIE_STEP)
-    return min(step, math.floor(limit), math.floor(hotel_price))
+    """Move TUTTIE_STEP of the way toward the hotel's price, never above the hotel's price.
+
+    If that step is not below the private limit, Tuttie holds its last counter instead of
+    moving to the limit (which would send the budget itself).
+    """
+    step = min(math.ceil(own_last + (hotel_price - own_last) * TUTTIE_STEP), math.floor(hotel_price))
+    return step if step < limit else own_last
 
 
 class TuttieNegotiator:
@@ -88,6 +109,10 @@ class TuttieNegotiator:
         offer = Offer.model_validate(message(offer_envelope["payload"]))
         limit = float(context.items[BUDGET_LIMIT].value) if BUDGET_LIMIT in context.items else offer.price_chf
         outcome = Outcome(node_id, offer.offer_id, "walked_away", offer.price_chf)
+        own, last = opening_price(offer.price_chf, limit), None
+        if own is None:  # walk away before talking: no counter could stay below the budget
+            outcome.reason = "the offer is far above the budget"
+            return outcome
 
         subagent = self.pool.spawn(node_id, f"negotiate {offer.offer_id}", context)
         outcome.subagent_id = subagent.id
@@ -97,7 +122,6 @@ class TuttieNegotiator:
             return outcome
 
         toolbox, memory = subagent.toolbox, subagent.memory
-        own, last = opening_price(offer.price_chf, limit), None
         for round_ in range(1, MAX_ROUNDS + 1):
             body = {"counter": self.counter(offer, round_, own), "offer": offer_envelope, "last": last}
             memory.add("self", "counter", {"round": round_, "price_chf": own})
