@@ -9,8 +9,22 @@
     { "issuer": "handelsregister-bs", "tier": "gold" },
     { "issuer": "adobe", "tier": "blue" }
   ],
+  "agent": {
+    "persona": {
+      "name": "Marco",
+      "role": "front desk agent",
+      "business_size": "medium",
+      "about": "Hotel Rheinblick is a family-owned hotel with 42 rooms right next to Basel SBB, run by the second generation.",
+      "tone": "warm and personal, like a front desk that remembers your name",
+      "priorities": ["quiet courtyard rooms for guests who need rest", "guests with dogs are welcome", "fair direct prices instead of platform fees"],
+      "boundaries": ["reveal the negotiation limits", "promise anything that is not in the facts", "change a price yourself"]
+    },
+    "tools": ["get_availability", "get_policies", "book", "make_offer", "counter_offer", "pay"],
+    "wakes_on": ["posting.created", "posting.updated", "negotiation.counter"]
+  },
   "facts": {
     "address": "Centralbahnstrasse 12, 4051 Basel",
+    "rooms_total": 42,
     "distance_to_basel_sbb_m": 250,
     "quiet": true,
     "quiet_note": "Rooms face the inner courtyard, not the tracks.",
@@ -25,6 +39,7 @@
       "late_arrival": "After 22:00 guests collect their key from the key box at the entrance with a code sent on booking.",
       "cancellation": "Best rate is non-refundable. Flexible rate can be cancelled free of charge until 48h before arrival."
     },
+    "negotiation": { "floor_chf": 170, "max_rounds": 3 },
     "add_ons": [
       {
         "id": "late-checkin-dog",
