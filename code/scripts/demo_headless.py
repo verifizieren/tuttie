@@ -23,9 +23,11 @@ import httpx  # noqa: E402
 from assistant.agent import Assistant  # noqa: E402
 from assistant.approvals import ApprovalBook  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
+from assistant.mcp_client import McpLink  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
 from aps.keys import load_public_key  # noqa: E402
 from llm import LLM  # noqa: E402
+from mcp import Client  # noqa: E402
 from marketplace.app import create_app as create_market_app  # noqa: E402
 from marketplace.app import load_authorities  # noqa: E402
 from marketplace.market import Market  # noqa: E402
@@ -63,16 +65,24 @@ async def main(decision: str, request: str) -> None:
     router = PortRouter()
     async with httpx.AsyncClient(transport=router, timeout=60) as http:
         # Nodes and market share the in-process client, so hotels can send offers to the market.
+        async def lookup(node_id: str) -> dict | None:
+            """Registry records from the in-process registry (the nodes check who calls them)."""
+            response = await http.get(f"http://localhost:{REGISTRY_PORT}/nodes/{node_id}")
+            return response.json() if response.status_code == 200 else None
+
         apps = {REGISTRY_PORT: registry_app}
         for path in (ROOT / "data" / "nodes").glob("*.json"):
             config = json.loads(path.read_text())
-            apps[config["port"]] = create_app(config, http=http)
+            apps[config["port"]] = create_app(config, http=http, lookup=lookup)
         market_app = create_market_app(http)
         market_app.state.market = Market(http, f"http://localhost:{REGISTRY_PORT}", load_authorities(),
                                          load_public_key("user"), f"http://localhost:{MARKET_PORT}")
         apps[MARKET_PORT] = market_app
         router.serve(apps)
-        toolbox = Toolbox(http, f"http://localhost:{REGISTRY_PORT}", bus, approvals)
+        # Business tools over MCP, also in-process: each endpoint reaches its node's MCP server.
+        servers = {f"http://localhost:{port}": app.state.mcp for port, app in apps.items() if hasattr(app.state, "mcp")}
+        mcp = McpLink(lambda endpoint: Client(servers[endpoint]))
+        toolbox = Toolbox(http, f"http://localhost:{REGISTRY_PORT}", bus, approvals, mcp=mcp)
         phone = asyncio.create_task(fake_phone(approvals, decision))
         answer = await Assistant(LLM(), toolbox, bus).chat(request)
         phone.cancel()
