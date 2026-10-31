@@ -1,4 +1,4 @@
-"""Registry service (port 8000): lets agents discover nodes by tag or capability.
+"""Registry service (port 4000): lets agents discover nodes by tag or capability.
 
 The registry only serves signed records from data/registry.json. It does not
 decide trust; the assistant verifies every seal itself.
@@ -41,4 +41,4 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("REGISTRY_PORT", "8000")))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("REGISTRY_PORT", "4000")))
