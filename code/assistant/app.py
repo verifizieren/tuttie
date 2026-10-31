@@ -69,6 +69,7 @@ class ChatRequest(BaseModel):
 
 class DecisionRequest(BaseModel):
     decision: str  # "approved" or "declined"
+    allow_mandate: bool = False  # also sign the mandate the approval offered (e.g. for the city tax)
 
 
 @app.post("/chat", status_code=202)
@@ -102,7 +103,7 @@ def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(
     """Record the user's decision; it is signed with the user's key and wakes the waiting chat."""
     if req.decision not in ("approved", "declined"):
         raise HTTPException(status_code=422, detail="decision must be approved or declined")
-    decision = conv.approvals.decide(approval_id, req.decision)
+    decision = conv.approvals.decide(approval_id, req.decision, req.allow_mandate)
     if decision is None:
         raise HTTPException(status_code=404, detail="no such pending approval")
     return decision
