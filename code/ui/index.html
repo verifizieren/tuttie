@@ -49,6 +49,8 @@
   .node { font-weight: 700; }
   .status { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--green); }
   .broken .status { color: var(--red); }
+  .step.untrusted { border-left-color: var(--grey); }
+  .untrusted .status { color: var(--grey); }
   .summary { margin-top: 4px; }
   .broken .summary { text-decoration: line-through; color: var(--red); }
   .seal { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 2px 9px 2px 3px; border-radius: 999px; border: 2px solid; }
@@ -104,6 +106,7 @@
     ["Family room", "Book a family room near Basel SBB for 2 adults and a 3-year-old on 14 Nov. We need a bed for our child."],
     ["Cheapest hotel", "What is the cheapest hotel near Basel SBB for 14 Nov? Just compare prices, don't book."],
     ["Dog at Spalenhof?", "Can I bring my dog to Hotel Spalenhof on 14 Nov?"],
+    ["Find a lawyer", "I need a licensed Swiss consumer-law lawyer to check a hotel's non-refundable cancellation terms. Who can I trust? Don't hire anyone yet."],
   ];
   const KIND_LABELS = { registry: "Registry", a2t: "A2T", a2a: "A2A", marketplace: "Marketplace",
                         payment: "Payment", approval: "Approval", answer: "Answer" };
@@ -179,7 +182,7 @@
     msg.className = "msg bot";
     renderAnswer(msg, event.summary);
     if (turn && turn.thoughts) {
-      turn.label.textContent = `Thought process (${turn.count} steps)`;
+      turn.label.textContent = `Thought process (${turn.count} ${turn.count === 1 ? "step" : "steps"})`;
       turn.thoughts.open = false;
     }
     turn = null;
@@ -198,6 +201,7 @@
     top.append(el("span", "kind", KIND_LABELS[event.kind] || event.kind));
     if (event.node_name) top.append(el("span", "node", event.node_name));
     event.seals.forEach(seal => top.append(sealBadge(seal)));
+    if (event.node_id && !event.seals.length) top.append(sealBadge({ tier: "grey", valid: true }));  // unsigned
     top.append(el("span", "status", event.status));
     step.append(top, el("div", "summary", event.summary));
     timeline.appendChild(step);
