@@ -195,6 +195,10 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
                                                       amount_chf=charge["price_chf"], purpose=purpose))
         if not verdict.ok:
             return refuse(verdict.reason)
+        # The gate awaited the registry, so another call for the same charge may have paid
+        # meanwhile: check again, then commit, with no await in between.
+        if (booking_id, purpose) in paid:
+            return refuse(f"the {purpose} for {booking_id} is already paid")
         gate.commit(verdict)  # an approval is used up; a mandate counts what was paid with it
         paid.add((booking_id, purpose))
         return signed({

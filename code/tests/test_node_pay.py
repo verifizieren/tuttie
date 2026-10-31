@@ -1,14 +1,17 @@
 """Tests for the node's pay tool over MCP: charges from the config, mandate or approval, once per booking."""
 
+import asyncio
 import json
 from pathlib import Path
 
 from fastapi import FastAPI
+from mcp import Client
 
 from aps import load_signing_key
 from aps.approval import sign_decision
 from aps.call import sign_call
 from aps.mandate import sign_mandate
+from assistant.mcp_client import McpLink
 from node.server import create_app
 from tests.mcp_helpers import TUTTIE, call_tool, registry_record, signed_book
 
@@ -65,3 +68,25 @@ def test_pay_refuses_unknown_charges_bookings_and_other_purposes():
     assert "no such booking" in pay(app, {"purpose": "city tax", "booking_id": "BK-NOPE", "mandate": mandate()})["reason"]
     wrong = mandate(purpose="parking")
     assert pay(app, {"purpose": "city tax", "booking_id": booking_id, "mandate": wrong})["status"] == "refused"
+
+
+def test_two_simultaneous_payments_with_one_mandate_charge_only_once():
+    """The gate awaits the registry, so two calls can be inside it at once: only one may pay."""
+    async def slow_lookup(node_id: str) -> dict | None:
+        await asyncio.sleep(0.01)  # like the registry over HTTP: lets the other call run meanwhile
+        return await registry_record(node_id)
+
+    app = create_app(CONFIG, lookup=slow_lookup)
+    decision = sign_decision({"id": "ap-race", "action": "book", "payee_node_id": NODE_ID, "amount_chf": 95},
+                             "approved", load_signing_key("user"))
+    booking_id = signed_book(app, {"date": "2026-11-14", "room_type": "single", "guest_name": "Alex Muster",
+                                   "approval": decision})["booking_id"]
+    link = McpLink(lambda _: Client(app.state.mcp))
+    args = {"purpose": "city tax", "booking_id": booking_id, "mandate": mandate()}
+
+    async def both():
+        calls = [sign_call("pay", args, TUTTIE, load_signing_key(TUTTIE)) for _ in range(2)]
+        return await asyncio.gather(*(link.call("in-process", "pay", {"call": c}) for c in calls))
+
+    statuses = sorted(r["payload"]["status"] for r in asyncio.run(both()))
+    assert statuses == ["paid", "refused"]
