@@ -14,6 +14,10 @@ The agent can be invoked in three ways, all answered as structured data, never f
     invoke()  a wake-up from the marketplace (POST /agent/invoke): does the posting fit this
               business, and which tool would it use next? Offers themselves are a planned tool.
 
+Questions can come inside a session (code/sessions, POST /agent/sessions): then the agent also
+sees the session's history and the context the peer shared when opening it, so a
+conversation (later: a negotiation) carries on where it left off.
+
 No LLM ever sets a price: prices and add-ons come from the config.
 """
 
@@ -138,10 +142,16 @@ class BusinessAgent:
             "valid_until": valid_until.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
 
-    async def answer(self, question: str, context: dict) -> dict:
-        """Answer a question from another agent; falls back to a safe reply on any LLM error."""
+    async def answer(self, question: str, context: dict, history: list[dict] | None = None) -> dict:
+        """Answer a question from another agent; falls back to a safe reply on any LLM error.
+
+        `history` is the session so far (oldest first), when the question comes in a session.
+        """
         system = ANSWER_PROMPT.format(persona=self.persona_text(), facts=self.facts_json)
-        user = json.dumps({"question": question, "context": context}, ensure_ascii=False)
+        request = {"question": question, "context": context}
+        if history:
+            request["conversation_so_far"] = history
+        user = json.dumps(request, ensure_ascii=False)
         try:
             reply = AgentReply.model_validate(await self._llm().complete_json(system, user))
         except (ValidationError, json.JSONDecodeError, OpenAIError):

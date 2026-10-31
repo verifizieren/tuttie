@@ -5,7 +5,8 @@ Usage: python -m node.server --config data/nodes/hotel-rheinblick.json [--port 4
 Every response is a signed envelope from this node's key (keys/<node_id>.json).
 Tools answer only from the config's "facts"; the company's agent (node/agent.py) answers other
 agents (POST /agent), is woken by the marketplace (POST /agent/invoke) and describes itself
-(GET /agent/card).
+(GET /agent/card). Agents that want an ongoing conversation open a session
+(POST /agent/sessions): each session has its own memory, so many run in parallel.
 """
 
 import argparse
@@ -14,13 +15,14 @@ import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import verify_decision
 from aps.keys import load_public_key
 from node.agent import BusinessAgent
+from sessions import SessionClosed, SessionStore
 
 
 class AvailabilityRequest(BaseModel):
@@ -35,6 +37,16 @@ class AgentRequest(BaseModel):
 
 class InvokeRequest(BaseModel):
     event: dict  # a marketplace event, e.g. {"type": "posting.created", "posting": {...}}
+
+
+class SessionOpenRequest(BaseModel):
+    peer: str                      # who opens the session, e.g. a Tuttie subagent's id
+    purpose: str = "negotiation"
+    context: dict = {}             # what the peer chose to share (never its private context)
+
+
+class SessionMessageRequest(BaseModel):
+    message: str
 
 
 class BookRequest(BaseModel):
@@ -54,6 +66,7 @@ def create_app(config: dict) -> FastAPI:
     user_public_key = load_public_key("user")
     used_approvals: set[str] = set()
     business_agent = BusinessAgent(config)
+    sessions = SessionStore(owner=node_id)
     app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
@@ -145,6 +158,43 @@ def create_app(config: dict) -> FastAPI:
     def agent_card() -> dict:
         """The agent's signed card: persona, tools and the events it wakes on."""
         return signed(business_agent.card())
+
+    def find_session(session_id: str):
+        try:
+            return sessions.get(session_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such session") from None
+
+    @app.post("/agent/sessions")
+    def open_session(req: SessionOpenRequest) -> dict:
+        """Open an isolated conversation with its own memory (one per negotiation)."""
+        session = sessions.open(req.peer, req.purpose, req.context)
+        session.add("system", "opened", {"peer": req.peer, "purpose": req.purpose})
+        return signed({"session_id": session.id, "agent": business_agent.persona["name"], "purpose": req.purpose})
+
+    @app.post("/agent/sessions/{session_id}/messages")
+    async def session_message(session_id: str, req: SessionMessageRequest) -> dict:
+        """Answer a message inside a session; the agent sees the session's history."""
+        session = find_session(session_id)
+        async with session.lock:  # turns of one session stay in order; other sessions run in parallel
+            try:
+                session.add("peer", "message", {"text": req.message})
+            except SessionClosed:
+                raise HTTPException(status_code=409, detail="session is closed") from None
+            reply = await business_agent.answer(req.message, session.context, history=session.transcript()[:-1])
+            session.add("self", "reply", reply)
+        return signed({"session_id": session.id, "turn": len(session.turns), **reply})
+
+    @app.get("/agent/sessions/{session_id}")
+    def read_session(session_id: str) -> dict:
+        """The session's whole memory, signed (for audits and the timeline)."""
+        return signed(find_session(session_id).to_dict())
+
+    @app.post("/agent/sessions/{session_id}/close")
+    def close_session(session_id: str) -> dict:
+        """End a session; its memory stays readable."""
+        find_session(session_id)
+        return signed({"session_id": session_id, "status": sessions.close(session_id).status})
 
     @app.post("/agent/invoke")
     async def agent_invoke(req: InvokeRequest) -> dict:
