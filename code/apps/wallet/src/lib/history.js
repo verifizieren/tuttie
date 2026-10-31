@@ -58,3 +58,8 @@ export function resumeFailure(error) {
   if (error?.status === 409) return error.message || "This chat cannot be continued right now.";
   return `Could not continue this chat: ${error?.message || "Tuttie is unreachable right now"}`;
 }
+
+/** The past chat open in the history that the keyboard should continue, if any: never the chat
+ *  already on screen (`currentId`), and nothing while the list is shown (`openId` null). */
+export const viewedChat = (entries, openId, currentId) =>
+  (openId && openId !== currentId && entries.find(e => e.id === openId)) || null;

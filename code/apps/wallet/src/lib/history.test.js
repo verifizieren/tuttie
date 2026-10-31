@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resumeFailure } from './history.js';
+import { resumeFailure, viewedChat } from './history.js';
 
 test('an expired chat (404 or 410) gets a clear expiry message', () => {
   for (const status of [404, 410]) {
@@ -17,4 +17,12 @@ test('a refused resume (409) shows the server reason', () => {
 test('other failures say the chat could not be continued', () => {
   assert.match(resumeFailure(new Error('Failed to fetch')), /^Could not continue this chat: Failed to fetch/);
   assert.match(resumeFailure(undefined), /unreachable/);
+});
+
+test('the keyboard continues only the past chat open in the history', () => {
+  const entries = [{ id: 'old-1' }, { id: 'old-2' }];
+  assert.equal(viewedChat(entries, 'old-2', 'now'), entries[1]);
+  assert.equal(viewedChat(entries, null, 'now'), null);         // the list: type into the current chat
+  assert.equal(viewedChat(entries, 'old-1', 'old-1'), null);    // already the chat on screen
+  assert.equal(viewedChat(entries, 'gone', 'now'), null);       // no longer in the history
 });

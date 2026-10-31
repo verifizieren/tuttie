@@ -33,6 +33,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
+import { resumeFailure, viewedChat } from "./lib/history.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -49,6 +50,9 @@ export default function App() {
   const face = useFace(canvas);
   const [agent, actions, history, lastChange, switching, connectionError] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
+  // The past chat open in the history (null = the list), why it could not be continued, and
+  // whether it is being restored.
+  const [historyChat, setHistoryChat] = useState({ id: null, error: "", resuming: false });
   const [quiet, setQuiet] = useState(false);  // the user typed: Tuttie answers in text only
   // A new answer in voice mode: shown as Tuttie speaks it ({ answer, id, text } while revealing).
   const [reveal, setReveal] = useState(null);
@@ -118,8 +122,36 @@ export default function App() {
     presence.cue("tap");  // a tap never ends voice mode, Tuttie just reacts
   }
 
+  // The dock's History button always shows the list, also from inside a past chat.
+  function openHistory() {
+    setHistoryChat({ id: null, error: "", resuming: false });
+    setShowHistory(true);
+  }
+
+  // Continue a past chat: the server restores that conversation first; only then does the card
+  // show it (in voice or typing). If it expired, the history says so and nothing else changes.
+  async function resumeChat(entry, then) {
+    if (historyChat.resuming) return;
+    setHistoryChat({ id: entry.id, error: "", resuming: true });
+    try {
+      await actions.resume(entry);
+    } catch (e) {
+      return setHistoryChat({ id: entry.id, error: resumeFailure(e), resuming: false });
+    }
+    setHistoryChat({ id: null, error: "", resuming: false });
+    setShowHistory(false);
+    setError("");
+    if (then === "voice") setQuiet(false);
+    setMode(then);
+  }
+
+  // The keyboard types into the chat on screen: a past chat open in the history is resumed first.
   function startTyping() {
-    if (performance.now() - openedAt.current > OPEN_GUARD_MS) setMode("typing");
+    if (performance.now() - openedAt.current <= OPEN_GUARD_MS) return;
+    const viewed = showHistory && viewedChat(history, historyChat.id, agent.id);
+    if (viewed) return resumeChat(viewed, "typing");
+    setShowHistory(false);
+    setMode("typing");
   }
 
   // An approval needs the user: open the card if it is closed.
@@ -167,11 +199,13 @@ export default function App() {
       <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : currentTask(agent))}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Activity key={agent.id} state={agent} onPick={switching ? undefined : pick} onLean={lean} reveal={reveal} />
-        {showHistory && <History entries={history.filter(e => e.id !== agent.id)} onClose={() => setShowHistory(false)}
-          onResume={async entry => { await actions.resume(entry); setShowHistory(false); setError(""); setMode("voice"); }} />}
+        {showHistory && <History entries={history.filter(e => e.id !== agent.id)} open={historyChat.id}
+          error={historyChat.error} resuming={historyChat.resuming} onClose={() => setShowHistory(false)}
+          onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
+          onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />}
         <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
       </AgentCard>
-      <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping}
+      <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
     </div>
     </PresenceProvider>
