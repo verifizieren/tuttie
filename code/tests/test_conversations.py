@@ -125,3 +125,39 @@ def test_a_late_booking_message_cannot_run_in_a_different_chat():
         assert response.status_code == 409
         assert client.get(f'/events?conversation_id={old_id}').status_code == 409
         assert client.get('/history').json() == []
+
+
+def test_reading_without_a_cookie_creates_no_conversation(monkeypatch):
+    """Crawlers and QR scanners (no cookie, many requests) must not create or push out chats."""
+    monkeypatch.setattr(conv_module, "MAX_CONVERSATIONS", 3)
+    monkeypatch.setattr(conv_module.Conversation, "start", lambda self, *a, **k: "t1")  # no LLM call
+    with TestClient(app) as presenter:
+        assert presenter.post("/chat", json={"message": "hi"}).status_code == 202  # acting creates it
+        store = app.state.conversations
+        before = set(store.by_session)
+        mine = store.find(presenter.cookies[SESSION_COOKIE])
+        for _ in range(20):
+            with TestClient(app) as bot:
+                for path in ("/history", "/approvals/pending", "/events?conversation_id=nope"):
+                    bot.get(path)
+                bot.post("/reset")
+                bot.post("/approvals/ap-1", json={"decision": "approved"})
+        assert set(store.by_session) == before
+        assert store.find(presenter.cookies[SESSION_COOKIE]) is mine
+
+
+def test_history_names_the_first_conversation_before_it_exists(monkeypatch):
+    monkeypatch.setattr(conv_module.Conversation, "start", lambda self, *a, **k: "t1")  # no LLM call
+    with TestClient(app) as client:
+        promised = client.get("/history").headers["X-Conversation-ID"]
+        assert app.state.conversations.find(client.cookies[SESSION_COOKIE]) is None
+        assert client.post("/chat", json={"message": "hi", "conversation_id": promised}).status_code == 202
+        assert app.state.conversations.find(client.cookies[SESSION_COOKIE]).id == promised
+        assert client.get("/history").headers["X-Conversation-ID"] == promised
+
+
+def test_following_the_promised_id_starts_the_conversation():
+    store = Conversations(httpx.AsyncClient(), "http://registry", llm=object())
+    assert store.find("s") is None
+    promised = store.first_id("s")
+    assert store.get("s").id == promised and store.first_id("other") != promised

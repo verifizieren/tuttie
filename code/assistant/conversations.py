@@ -7,6 +7,9 @@ everyone fresh, and the least recently used one is dropped when there are too ma
 """
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import logging
 import secrets
 from collections import OrderedDict
@@ -26,8 +29,8 @@ log = logging.getLogger(__name__)
 class Conversation:
     """Everything one person's Tuttie has: the assistant, its timeline, approvals and running chats."""
 
-    def __init__(self, http: httpx.AsyncClient, registry_url: str, llm: LLM):
-        self.id = secrets.token_urlsafe(16)
+    def __init__(self, http: httpx.AsyncClient, registry_url: str, llm: LLM, conversation_id: str | None = None):
+        self.id = conversation_id or secrets.token_urlsafe(16)
         self.bus = EventBus()
         self.approvals = ApprovalBook()
         self.assistant = Assistant(llm, Toolbox(http, registry_url, self.bus, self.approvals), self.bus)
@@ -73,7 +76,11 @@ class Conversation:
 
 
 class Conversations:
-    """The conversations by session id, creating one on first use."""
+    """The conversations by session id, creating one when its browser first acts.
+
+    Reading (find, first_id) never creates anything, so requests that only look (a crawler,
+    a link preview, a scanned QR code without cookies) cannot push out anyone's chat.
+    """
 
     def __init__(self, http: httpx.AsyncClient, registry_url: str, llm: LLM | None = None):
         self.http = http
@@ -81,6 +88,30 @@ class Conversations:
         self.llm = llm or LLM()
         self.by_session: OrderedDict[str, Conversation] = OrderedDict()
         self.saved: OrderedDict[tuple[str, str], Conversation] = OrderedDict()
+        self._secret = secrets.token_bytes(32)  # for first ids; conversations end with the process anyway
+        self._identity: Toolbox | None = None
+
+    def first_id(self, session_id: str) -> str:
+        """The id this session's first conversation gets, known before the conversation exists.
+
+        The wallet reads it from GET /history and sends it back when it acts, so a read
+        does not have to create (and store) a conversation.
+        """
+        digest = hmac.new(self._secret, session_id.encode(), hashlib.sha256).digest()
+        return base64.urlsafe_b64encode(digest[:16]).decode().rstrip("=")
+
+    def find(self, session_id: str) -> Conversation | None:
+        """This session's conversation (marked as the most recently used), or None. Never creates."""
+        if session_id not in self.by_session:
+            return None
+        self.by_session.move_to_end(session_id)
+        return self.by_session[session_id]
+
+    def identity_toolbox(self) -> Toolbox:
+        """A toolbox for checks that need no conversation (Tuttie's identity); it emits nothing."""
+        if self._identity is None:
+            self._identity = Toolbox(self.http, self.registry_url, EventBus(), ApprovalBook())
+        return self._identity
 
     def _save(self, session_id: str, conv: Conversation) -> None:
         self.saved[(session_id, conv.id)] = conv
@@ -109,15 +140,16 @@ class Conversations:
 
     def active(self, session_id: str, conversation_id: str) -> Conversation:
         """A voice room must never send a late utterance into a different conversation."""
-        conv = self.get(session_id)
-        if conv.id != conversation_id:
+        conv = self.find(session_id)
+        if conv is None or conv.id != conversation_id:
             raise KeyError(conversation_id)
         return conv
 
     def get(self, session_id: str) -> Conversation:
         """This session's conversation (new if unknown), marked as the most recently used."""
         if session_id not in self.by_session:
-            self.by_session[session_id] = Conversation(self.http, self.registry_url, self.llm)
+            self.by_session[session_id] = Conversation(self.http, self.registry_url, self.llm,
+                                                       self.first_id(session_id))
             while len(self.by_session) > MAX_CONVERSATIONS and (owner := self._evictable(session_id)):
                 self.by_session.pop(owner).reset()
                 for key in [k for k in self.saved if k[0] == owner]:

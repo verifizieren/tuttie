@@ -81,6 +81,11 @@ async def conversation(request: Request) -> Conversation:
     return request.app.state.conversations.get(request.state.session_id)
 
 
+async def existing_conversation(request: Request) -> Conversation | None:
+    """The calling browser's conversation, or None: endpoints that only read never create one."""
+    return request.app.state.conversations.find(request.state.session_id)
+
+
 # Steps the wallet may fix for a message: after swiping the cards, Tuttie books the liked deal.
 FIRST_TOOLS = {"book", "negotiate"}
 
@@ -109,9 +114,10 @@ async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> 
 
 
 @app.post("/reset")
-async def reset(conv: Conversation = Depends(conversation)) -> dict:
+async def reset(conv: Conversation | None = Depends(existing_conversation)) -> dict:
     """Start this conversation over: stop its chats, decline its approvals, clear its timeline."""
-    conv.reset()
+    if conv is not None:
+        conv.reset()
     return {"ok": True}
 
 
@@ -139,38 +145,54 @@ async def resume_conversation(conversation_id: str, request: Request) -> dict:
 
 
 @app.get("/identity")
-async def identity(conv: Conversation = Depends(conversation)) -> dict:
+async def identity(request: Request) -> dict:
     """Tuttie's own verified identity: its seals and the user's signed delegation."""
-    return await conv.assistant.toolbox.identity(TUTTIE_ID)
+    return await request.app.state.conversations.identity_toolbox().identity(TUTTIE_ID)
 
 
 @app.get("/approvals/pending")
-async def pending_approvals(conv: Conversation = Depends(conversation)) -> list[dict]:
+async def pending_approvals(conv: Conversation | None = Depends(existing_conversation)) -> list[dict]:
     """Approvals waiting for this user's decision."""
-    return list(conv.approvals.pending.values())
+    return list(conv.approvals.pending.values()) if conv else []
 
 
 @app.post("/approvals/{approval_id}")
-async def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(conversation)) -> dict:
+async def decide(approval_id: str, req: DecisionRequest,
+                 conv: Conversation | None = Depends(existing_conversation)) -> dict:
     """Record the user's decision; it is signed with the user's key and wakes the waiting chat."""
     if req.decision not in ("approved", "declined"):
         raise HTTPException(status_code=422, detail="decision must be approved or declined")
-    decision = conv.approvals.decide(approval_id, req.decision, req.allow_mandate)
+    decision = conv.approvals.decide(approval_id, req.decision, req.allow_mandate) if conv else None
     if decision is None:
         raise HTTPException(status_code=404, detail="no such pending approval")
     return decision
 
 
 @app.get("/history")
-async def history(response: Response, conv: Conversation = Depends(conversation)) -> list[dict]:
-    """This conversation's timeline so far, so the wallet can decide on opening whether to start fresh."""
-    response.headers["X-Conversation-ID"] = conv.id
-    return conv.bus.history
+async def history(request: Request, response: Response) -> list[dict]:
+    """This conversation's timeline so far, so the wallet can decide on opening whether to start fresh.
+
+    A browser without a conversation gets an empty timeline and the id its first one will have.
+    """
+    store = request.app.state.conversations
+    conv = store.find(request.state.session_id)
+    response.headers["X-Conversation-ID"] = conv.id if conv else store.first_id(request.state.session_id)
+    return conv.bus.history if conv else []
 
 
 @app.get("/events")
-async def events(conversation_id: str | None = None, conv: Conversation = Depends(conversation)) -> StreamingResponse:
-    """This conversation's timeline as Server-Sent Events."""
+async def events(request: Request, conversation_id: str | None = None) -> StreamingResponse:
+    """This conversation's timeline as Server-Sent Events.
+
+    The wallet follows the id GET /history named before its first message, which starts the
+    browser's first conversation; without a conversation any other id is refused.
+    """
+    store, session_id = request.app.state.conversations, request.state.session_id
+    conv = store.find(session_id)
+    if conv is None:
+        if conversation_id != store.first_id(session_id):
+            raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
+        conv = store.get(session_id)
     if conversation_id is not None and conversation_id != conv.id:
         raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
     return StreamingResponse(conv.bus.stream(), media_type="text/event-stream",
