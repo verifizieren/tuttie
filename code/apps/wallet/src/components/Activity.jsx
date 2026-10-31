@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
+import { deckStart } from "../lib/activity.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 /** The turn's progress: a context line, then a tool line joined to it. Each updates in place.
@@ -122,9 +123,10 @@ function Market({ state }) {
  * @param readOnly  an earlier conversation from the history: nothing to swipe
  * @param onPick    (liked cards) => void
  * @param onLean    (x in -1..1) => void while a card is dragged
+ * @param onDeck    ({ index, liked }) => void after each swiped card (kept for a reload)
  * @param reveal    { answer, text } while Tuttie speaks its latest answer
  */
-export default function Activity({ state, readOnly = false, onPick, onLean, reveal = null }) {
+export default function Activity({ state, readOnly = false, onPick, onLean, onDeck, reveal = null }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
   const swiping = Boolean(state.cards && !state.picked && !readOnly && onPick);
@@ -139,7 +141,8 @@ export default function Activity({ state, readOnly = false, onPick, onLean, reve
   if (swiping) {
     return (
       <div className="activity swiping">
-        <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes} />
+        <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes}
+              start={deckStart(state)} onProgress={onDeck} />
       </div>
     );
   }

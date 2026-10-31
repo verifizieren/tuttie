@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, EMPTY, startTurn } from './activity.js';
+import { applyEvent, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -67,4 +67,17 @@ test('searching after a booking starts fresh hotel and deck state', () => {
   assert.equal(next.cardsStep,null);
   assert.deepEqual(next.swipes,[]);
   assert.equal(next.marketTurn,1);
+});
+
+test('a reload continues the deck where the user left it', () => {
+  const cards = {step: 10, kind: 'marketplace', detail: {phase: 'cards', cards: [{node_id: 'a'}, {node_id: 'b'}, {node_id: 'c'}]}};
+  const state = withDeck(applyEvent(startTurn(EMPTY, 'Find a room'), cards), {index: 1, liked: ['a']});
+  assert.deepEqual(deckStart(state), {index: 1, liked: ['a']});
+  const saved = {id: 'chat', turns: [], picked: null, deck: state.deck};
+  assert.deepEqual(deckStart(restoreConversation([cards], 'chat', saved)), {index: 1, liked: ['a']});
+  // Another chat's or an earlier posting's deck never applies.
+  assert.equal(deckStart(restoreConversation([cards], 'other', saved)), null);
+  const newer = {...cards, step: 20};
+  assert.equal(deckStart(restoreConversation([cards, newer], 'chat', saved)), null);
+  assert.equal(deckStart(withDeck(state, {index: 3, liked: ['a']})), null);  // nothing left to swipe
 });

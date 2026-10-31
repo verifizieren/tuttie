@@ -72,13 +72,16 @@ function HotelCard({ card, hotel, position, count, style, handlers, verdict, cla
  * @param hotels  the wallet's hotel state, for the verified seals
  * @param onDone  (liked cards) => void, after the last card
  * @param onLean  (x in -1..1) => void while a card is dragged, 0 when it is let go (Tuttie's eyes follow)
+ * @param start   where the user was in this deck before a reload ({ index, liked node ids }), see
+ *                lib/activity.js deckStart
+ * @param onProgress ({ index, liked node ids }) => void after each card, so a reload can continue
  */
-export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
-  const [index, setIndex] = useState(0);
-  const [liked, setLiked] = useState([]);
+export default function Deck({ cards, hotels, onDone, onLean, commands = [], start = null, onProgress }) {
+  const [index, setIndex] = useState(start?.index || 0);
+  const [liked, setLiked] = useState(() => cards.filter(c => start?.liked.includes(c.node_id)));
   const [drag, setDrag] = useState(null);     // { dx, dy } while the finger moves the top card sideways
   const [flying, setFlying] = useState(null); // "like" | "pass" while the top card leaves
-  const [nudge, setNudge] = useState(true);   // the first card shows once that it moves sideways
+  const [nudge, setNudge] = useState(!start?.index);  // the first card shows once that it moves sideways
   const flight = useRef(null);
   const consumed = useRef(null);
   const gesture = useRef(null);               // { x, y, t, axis, scroller, scrollTop }
@@ -104,6 +107,7 @@ export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
       setDrag(null);
       setIndex(index + 1);
       lean(0);
+      onProgress?.({ index: index + 1, liked: nextLiked.map(c => c.node_id) });
       if (index + 1 >= cards.length && nextLiked.length) onDone(nextLiked);
     }, FLY_MS);
   }
@@ -161,7 +165,7 @@ export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
     return liked.length ? null : (
       <div className="deck-empty">
         You passed on every hotel.
-        <button type="button" onClick={() => { setIndex(0); setLiked([]); }}>See them again</button>
+        <button type="button" onClick={() => { setIndex(0); setLiked([]); onProgress?.({ index: 0, liked: [] }); }}>See them again</button>
       </div>
     );
   }

@@ -18,6 +18,7 @@ export const EMPTY = {
   shortlistDone: false,
   cards: null,          // the hotels to swipe (assistant/cards.py), once the offers are in
   swipes: [],           // queued live commands; preserve rapid consecutive choices
+  deck: null,           // { step, index, liked: [node_id] }: how far the user swiped these cards (kept on reload)
   picked: null,         // node ids the user liked
   approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate, terms } while the user decides
   booking: null,        // the latest { id, hotel, total, date, room, rate, extras, checked, seals, uid, payments }; each stays in its turn
@@ -167,7 +168,7 @@ export function applyEvent(state, event) {
       // earlier booking stays in its own turn.
       const base = progress(state, "tool", `Asked ${Object.keys(hotels).length} hotels`, false, at);
       return { ...base, phase: "posted", request: detail.request, marketTurn: turnOf(base, at), hotels, skipped,
-               shortlistDone: false, cards: null, cardsStep: null, swipes: [], picked: null, approval: null, booking: null, bookingTurn: null };
+               shortlistDone: false, cards: null, cardsStep: null, swipes: [], deck: null, picked: null, approval: null, booking: null, bookingTurn: null };
     }
     if (detail.phase === "offer" && event.node_id) {
       const next = withHotel(state, event.node_id, event.node_name, {
@@ -186,7 +187,7 @@ export function applyEvent(state, event) {
     if (detail.phase === "cards") {
       const n = (detail.cards || []).length;
       return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true, at),
-               cards: detail.cards || [], cardsStep: event.step, swipes: [], phase: "picking" };
+               cards: detail.cards || [], cardsStep: event.step, swipes: [], deck: null, phase: "picking" };
     }
     return state;
   }
@@ -229,6 +230,17 @@ export function applyEvent(state, event) {
              phase: approved ? "booking" : "declined" };
   }
   return state;
+}
+
+/** The user swiped a card of the deck shown now: remember how far, so a reload continues there. */
+export const withDeck = (state, { index, liked }) =>
+  (state.cards ? { ...state, deck: { step: state.cardsStep, index, liked } } : state);
+
+/** Where the deck starts: the saved position if it belongs to these cards and some are left. */
+export function deckStart(state) {
+  const deck = state.deck;
+  if (!deck || !state.cards || deck.step !== state.cardsStep || deck.index >= state.cards.length) return null;
+  return { index: deck.index, liked: deck.liked };
 }
 
 /** What Tuttie is doing right now, for the line under its eyes: the step still running, or

@@ -43,8 +43,9 @@ export function archive(state) {
   return list;
 }
 
-/** Remember the open conversation's id and turns (the server only keeps the timeline). */
-export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })), picked: state.picked });
+/** Remember the open conversation's id, turns, pick and deck position (the server only keeps the timeline). */
+export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.turns.map(t => ({ said: t.said })), picked: state.picked,
+                                                    deck: state.deck });
 
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
 export const loadCurrent = () => read(CURRENT, null);
