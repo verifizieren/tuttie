@@ -1,7 +1,8 @@
-// The hotel's signed booking confirmation, and what Tuttie checked about the hotel before and
-// after it booked: who vouches for the hotel (its verified seals), the hotel's own signed deal
-// or extras, its signed confirmation, and the user's approval. "No signature, no action" made
-// visible from the user's side: the hotel signs, Tuttie checks.
+// The hotel's signed booking confirmation, kept small: the hotel, the price, the date and the
+// booking id, a one-line note for a charge paid right after (the city tax), and what Tuttie
+// checked about the hotel, folded into one line that opens on a tap. "No signature, no action"
+// from the user's side: the hotel signs, Tuttie checks.
+import { useState } from "react";
 import { SealMarks } from "./Seals.jsx";
 
 const ISSUERS = { "handelsregister-bs": "Registered in the Handelsregister", adobe: "Verified by Adobe" };
@@ -16,8 +17,8 @@ function checks(booking) {
   return lines;
 }
 
-/** "double room 2026-11-14" or "double" → "double room" (the date is shown on its own). */
-const roomName = (room, date) => `${room.replace(date, "").replace(/\s*room\s*$/, "").trim()} room`;
+const capitalize = text => text[0].toUpperCase() + text.slice(1);
+const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 function Check() {
   return (
@@ -29,31 +30,27 @@ function Check() {
 }
 
 export default function BookingCard({ booking }) {
+  const [open, setOpen] = useState(false);
+  const lines = checks(booking);
   return (
     <div className="booking">
       <div className="booking-top">
         <SealMarks seals={booking.seals} />
-        <span className="booking-hotel">{booking.hotel}<small>{booking.date} · {roomName(booking.room, booking.date)}</small></span>
+        <span className="booking-hotel">{booking.hotel}<small>{day(booking.date)} · {booking.id}</small></span>
         <span className="booking-total">CHF {booking.total}</span>
       </div>
-      <div className="booking-id">Booking <b>{booking.id}</b></div>
       {booking.payments.map((payment, i) => (
-        <div className="payment" key={i}>
-          <Check />
-          <span><b>{payment.purpose[0].toUpperCase() + payment.purpose.slice(1)} CHF {payment.amount}</b>
-            <small>{payment.paidWith === "mandate" ? "Paid with your mandate" : "Paid after your approval"}</small>
-          </span>
-        </div>
+        <div className="payment" key={i}><Check />{capitalize(payment.purpose)} CHF {payment.amount} paid</div>
       ))}
-      <div className="seal-list checks">
-        <div className="seal-head">Checked by Tuttie</div>
-        {checks(booking).map(line => (
-          <div className="seal-row" key={line}>
-            <Check />
-            <span className="seal-text"><b>{line}</b></span>
-          </div>
-        ))}
-      </div>
+      <button type="button" className="checks-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Check /> Checked by Tuttie <span className="checks-count">{lines.length}</span>
+        <span className="chevron" aria-hidden="true">{open ? "⌃" : "⌄"}</span>
+      </button>
+      {open && (
+        <ul className="checks-list">
+          {lines.map(line => <li key={line}>{line}</li>)}
+        </ul>
+      )}
     </div>
   );
 }

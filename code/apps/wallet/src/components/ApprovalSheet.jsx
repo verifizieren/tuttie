@@ -59,11 +59,10 @@ export default function ApprovalSheet({ approval }) {
         {approval.hotel}
       </div>
       <div className="sheet-amount">CHF {approval.amount}</div>
-      <div className="sheet-summary">{approval.summary.replace(/^Waiting for your phone\.\s*/, "")}</div>
       <SealList seals={approval.seals} uid={approval.uid} />
       {offer && (
         <label className="mandate">
-          <span>Also pay the {offer.purpose} (CHF {offer.price_chf}) without asking</span>
+          <span>Also pay {offer.purpose} (CHF {offer.price_chf})</span>
           <input type="checkbox" role="switch" checked={allow} disabled={stage !== "ask"}
                  onChange={e => setAllow(e.target.checked)} />
         </label>
