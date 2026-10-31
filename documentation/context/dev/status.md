@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (MCP step 5, APS side: signed calls C1, action gate C2, counter_offer as MCP tool C4) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
+Last updated: 2026-10-31 (MCP step 5, APS side complete: signed calls C1, action gate C2, payment mandate C3, counter_offer as MCP tool C4) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
 
 ## Done
 
@@ -60,7 +60,7 @@ Build order from [goals.md](goals.md):
    for a dog. Verified headless: 135 → 121/131 → 126/130 → agreed 128 → approved → booked.
 5. **MCP services** — planned, split (goal 4). Hotels offer their tools over MCP at `/mcp`;
    an action runs only with the right signatures. Start with the contract (C1), then both
-   sides work in parallel. `pay` only if the pitch story uses it (open decision).
+   sides work in parallel. `pay` is part of the demo.
    - **dev member 2 (APS, `code/aps/`, `code/negotiation/`):**
      - C1 *signed call* contract in `formats.md`: Tuttie signs `{tool, args, agent_id,
        nonce, timestamp}` with its key and attaches the user's delegation; `aps/call.py`
@@ -81,7 +81,10 @@ Build order from [goals.md](goals.md):
        `mcp_server.add_tool(..., name="counter_offer")`, the same `CounterOfferTool.reply` as
        the HTTP route; tested through a real in-memory MCP server and client (mcp 2.3.0:
        `MCPServer`, `Client`; FastMCP is gone in 2.x), skipped until `mcp` is in
-       requirements.txt (M1). C3 waits for the `pay` decision.
+       requirements.txt (M1). **`pay` stays in the demo (decided):** C3 done,
+       `aps/mandate.py` (`sign_mandate`, `mandate_refusal`, `may_auto_pay`), formats.md
+       "Payment mandate"; the gate takes `Needs("pay", scope=None, approval=True,
+       mandate=True, amount_chf=, purpose=)`.
    - **dev member 1 (nodes, Tuttie, wallet):**
      - M1 MCP server on every node (`/mcp`, Python `mcp` SDK, streamable HTTP) with
        `get_availability`, `get_policies`, `book` (and `pay`), reusing the `/tools/*`
@@ -126,9 +129,11 @@ Build order from [goals.md](goals.md):
    `from mcp.server.mcpserver import MCPServer`), register `counter_offer_mcp_tool`, sign
    action calls with `sign_call` in Tuttie, and put `ActionGate.check_action` + `commit` in
    front of `book` (hook in the `aps/gate.py` docstring; pass the node's existing
-   `AgreementRedeemer`). `test_conversations.py` needs `OPENAI_API_KEY` set (any value) or it
+   `AgreementRedeemer`); `pay` on the node with the gate, the wallet signs mandates with the
+   user key (`sign_mandate`) and Tuttie checks `may_auto_pay` before paying without asking. `test_conversations.py` needs `OPENAI_API_KEY` set (any value) or it
    fails without `.env`.
-3. **dev member 2:** decide C3 (`pay`) with the pitch team; then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
+3. **dev member 2:** check with the pitch team where `pay` happens in the story (e.g. city tax
+   with a mandate, under CHF 10, no phone; above that the phone asks); then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
    numbers in formats.md) and confirm it live with the real LLM
    (`scripts/demo_headless.py approved "<a request that asks for a better price>"`; needs
    `code/.env`). The stage numbers are pinned in `test_the_pitch_story_anna_s_guesthouse`; if
@@ -138,7 +143,7 @@ Build order from [goals.md](goals.md):
 
 ### Test coverage
 
-207 tests, all green (`pytest -q`; set `OPENAI_API_KEY` to any value without `.env`), no network and no LLM: `test_aps.py` (signing, freshness,
+228 tests, all green (`pytest -q`; set `OPENAI_API_KEY` to any value without `.env`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -154,7 +159,7 @@ counter_offer tool), `test_negotiation_edges.py` (refusals mid-negotiation, Tutt
 cap, unreachable registry, signed non-object payloads), `test_registry.py` (search, records,
 live reload), `test_marketplace_edges.py` (unknown or broken requesters, unverifiable agent
 cards, odd wake-up replies), `test_tools.py` (assistant trust gate and Tuttie's identity,
-with mocked HTTP and the real demo keys), `test_call.py` (signed calls: tampering, time window, nonces), `test_gate.py` (the action gate: one refusal test per missing signature, agreement and approval used once), `test_counter_offer_mcp.py` (counter_offer over a real MCP server: same replies as HTTP, the pitch rounds).
+with mocked HTTP and the real demo keys), `test_call.py` (signed calls: tampering, time window, nonces), `test_gate.py` (the action gate: one refusal test per missing signature, agreement and approval used once), `test_counter_offer_mcp.py` (counter_offer over a real MCP server: same replies as HTTP, the pitch rounds), `test_mandate.py` (payment mandates, auto-pay only to gold/blue and ≤ CHF 10, `pay` through the gate).
 Coverage of `aps/`, `registry/`, `marketplace/`, `negotiation/`: 98 % (`pytest --cov`, with
 `pytest-cov` installed locally). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
@@ -199,6 +204,10 @@ Why things are the way they are, so nobody has to rediscover them:
   negotiation code: the node passes its `AgreementRedeemer` in.
 - **`book` is a delegation scope, paying is not.** The scope says Tuttie may book for the
   user at all; each booking still needs the user's signed approval for its amount.
+- **Small payments by mandate, not by scope.** A mandate is the user's own signature for one
+  agent, one payee, one purpose, a total and an expiry; one payment with it is at most CHF 10
+  and only to gold/blue businesses. So a stolen or confused agent can lose at most what the
+  user signed for that one business, never pay an untrusted one without the phone.
 
 - **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
   (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
