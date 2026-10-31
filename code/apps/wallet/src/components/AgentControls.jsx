@@ -1,10 +1,11 @@
-// The controls at the bottom of the open Tuttie card: a status line and, while typing, the
-// text field. Voice is the main interface; typing is chosen with the keyboard in the dock.
+// The controls at the bottom of the open Tuttie card: while typing, the text field, and a line
+// only when something is wrong. Voice is the main interface (Tuttie's eyes show that it
+// listens); typing is chosen with the keyboard in the dock.
 import { useEffect, useRef, useState } from "react";
 
 /**
  * @param mode    "closed" | "voice" | "typing"
- * @param status  the status line
+ * @param status  a problem to show (e.g. Tuttie cannot be reached), or ""
  * @param onSend  (text) => void
  */
 export default function AgentControls({ mode, status, onSend }) {
@@ -26,7 +27,7 @@ export default function AgentControls({ mode, status, onSend }) {
 
   return (
     <div className="controls">
-      <div className="status">{status}</div>
+      {status && <div className="status">{status}</div>}
       {mode === "typing" && (
         <form className="composer" onSubmit={submit} autoComplete="off">
           <input ref={input} value={text} onChange={e => setText(e.target.value)}

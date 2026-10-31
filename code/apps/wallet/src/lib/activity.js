@@ -21,7 +21,6 @@ export const EMPTY = {
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
   mood: "neutral",      // how it feels (assistant/agent.py MOODS)
-  thought: "",          // the latest reasoning summary title
 };
 
 const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
@@ -85,10 +84,7 @@ function withPayment(state, receipt) {
 /** The next state after one event. Unknown events leave the state as it is. */
 export function applyEvent(state, event) {
   const detail = event.detail || {};
-  if (event.kind === "thinking") {
-    const title = event.summary.match(/^\*\*(.+?)\*\*/);
-    return { ...state, thought: title ? title[1] : state.thought, phase: state.phase === "idle" ? "thinking" : state.phase };
-  }
+  if (event.kind === "thinking") return state.phase === "idle" ? { ...state, phase: "thinking" } : state;
   if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral");
   if (event.kind === "context") return progress(state, "context", event.summary, detail.phase === "found");
   if (event.kind === "payment" && detail.payload?.status === "paid") {
@@ -167,24 +163,6 @@ export function applyEvent(state, event) {
   return state;
 }
 
-/** A short line for the status under the eyes. */
-export function statusLine(state) {
-  const offers = Object.values(state.hotels).filter(h => h.offer).length;
-  switch (state.phase) {
-    case "thinking": return state.thought || "Thinking…";
-    case "posted": return `Asked ${Object.keys(state.hotels).length} hotels…`;
-    case "offers": return `${offers} offer${offers === 1 ? "" : "s"} in`;
-    case "picking": return "";
-    case "negotiating": return "Negotiating…";
-    case "approval": return "Waiting for your approval";
-    case "booking": return "Booking…";
-    case "booked": return "Booked";
-    case "declined": return "You declined";
-    case "done": return "";
-    default: return "";
-  }
-}
-
 /** While Tuttie works it does not hold one face: it moves through these looks, each with a
  *  glance (x, y in -1..1), like someone thinking. Names from lib/face.js. */
 export const THINKING = [
@@ -201,6 +179,23 @@ export const MOOD = {
   surprised: "surprise", confused: "confusion", sad: "sadness", sorry: "guilt", worried: "fear",
   neutral: "neutral",
 };
+
+/** While Tuttie waits for the user it listens: its eyes stay open and attentive, glance a little
+ *  and nod now and then (y > 0 looks down). Names from lib/face.js. */
+export const LISTENING = [
+  { name: "listening", look: [0, 0] },
+  { name: "attentive", look: [.18, -.08] },
+  { name: "listening", look: [0, .3] },      // a small nod
+  { name: "listening", look: [-.15, -.05] },
+  { name: "attentive", look: [0, 0] },
+];
+
+/** While the user swipes the hotel cards, Tuttie looks down at them with them. */
+export const WATCHING = [
+  { name: "listening", look: [0, .55] },
+  { name: "attentive", look: [.12, .6] },
+  { name: "listening", look: [-.1, .5] },
+];
 
 /** Phases in which Tuttie is busy and the face cycles through THINKING. */
 export const BUSY = new Set(["thinking", "posted", "negotiating", "booking"]);
