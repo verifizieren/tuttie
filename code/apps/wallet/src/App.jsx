@@ -143,8 +143,8 @@ export default function App() {
   function tapWhileOpen() {
     unlockAudio();
     setQuiet(false);  // tapping Tuttie's face brings its voice back after typing
+    if (mode !== "voice") return startVoice();  // voice mode starting again also retries voice
     retryVoice();  // voice could not connect: the tap tries again
-    if (mode !== "voice") return startVoice();
     presence.cue("tap");  // a tap never ends voice mode, Tuttie just reacts
   }
 
