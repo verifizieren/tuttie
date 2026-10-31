@@ -144,8 +144,7 @@ cards, odd wake-up replies), `test_tools.py` (assistant trust gate and Tuttie's 
 with mocked HTTP and the real demo keys), `test_call.py` (signed calls: tampering, time window, nonces), `test_gate.py` (the action gate: one refusal test per missing signature, agreement and approval used once), `test_counter_offer_mcp.py` (counter_offer over a real MCP server: same replies as HTTP, the pitch rounds), `test_mandate.py` (payment mandates, auto-pay only to gold/blue and ≤ CHF 10, `pay` through the gate).
 Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `aps/` and
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
-56 %, `assistant/events.py` 56 % (the real LLM and SSE streaming, not run in tests). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
-routes (`assistant/app.py`).
+56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
 (`code/apps/owner/`), presentation site and QR code (`code/apps/presentation/`), a
