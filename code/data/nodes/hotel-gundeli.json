@@ -10,6 +10,7 @@
     { "issuer": "handelsregister-bs", "tier": "gold" }
   ],
   "facts": {
+    "profile": { "size": "small-independent", "rooms_total": 11, "about": "Small family-run guesthouse on the Gundeldingen side of Basel SBB." },
     "address": "Güterstrasse 40, 4053 Basel",
     "distance_to_basel_sbb_m": 400,
     "quiet": true,
@@ -37,7 +38,9 @@
         "item": "breakfast for one child",
         "price_chf": 12,
         "conditions": ["children under 12, CHF 12 per night"]
-      }
-    ]
+      },
+      { "id": "breakfast", "item": "breakfast for one adult", "price_chf": 16, "conditions": ["homemade, CHF 16 per night"] }
+    ],
+    "negotiation": { "floor_chf": 135, "max_rounds": 3 }
   }
 }

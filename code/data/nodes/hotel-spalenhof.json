@@ -10,6 +10,7 @@
     { "issuer": "adobe", "tier": "blue" }
   ],
   "facts": {
+    "profile": { "size": "mid-sized", "rooms_total": 48, "about": "Owner-managed city hotel in the old town, run by the same family since 1978." },
     "address": "Spalenvorstadt 3, 4051 Basel",
     "distance_to_basel_sbb_m": 900,
     "quiet": false,
@@ -22,6 +23,11 @@
       "check_in": "14:00-23:00 at reception",
       "late_arrival": "Reception closes at 23:00; no check-in after that.",
       "cancellation": "Free cancellation until 24h before arrival."
-    }
+    },
+    "add_ons": [
+      { "id": "breakfast", "item": "breakfast buffet", "price_chf": 18, "conditions": ["per person and night"] },
+      { "id": "parking", "item": "parking space in the Spalentor garage", "price_chf": 20, "conditions": ["per night, book before arrival"] }
+    ],
+    "negotiation": { "floor_chf": 150, "max_rounds": 3 }
   }
 }

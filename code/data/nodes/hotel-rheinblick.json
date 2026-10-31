@@ -11,6 +11,7 @@
     { "issuer": "adobe", "tier": "blue" }
   ],
   "facts": {
+    "profile": { "size": "chain-branch", "chain": "Rhein Hospitality Group", "rooms_total": 160, "about": "Basel branch of a Swiss hotel chain with 14 hotels; business hotel next to Basel SBB." },
     "address": "Centralbahnstrasse 12, 4051 Basel",
     "distance_to_basel_sbb_m": 250,
     "quiet": true,
@@ -45,6 +46,7 @@
         "price_chf": 15,
         "conditions": ["dog fee CHF 15 per night"]
       }
-    ]
+    ],
+    "negotiation": { "floor_chf": 175, "max_rounds": 2 }
   }
 }

@@ -102,6 +102,14 @@ replays. Envelopes kept on purpose (commitments redeemed at `book`) are checked 
 `[{ "id", "item", "price_chf", "conditions": [...] }]`. The node's LLM only picks an add-on
 id; the signed commitment (item, price, conditions, valid_until) is built from the config.
 
+`facts.profile` says who the business is, so small businesses are visibly comparable to
+big ones: `{ "size": "chain-branch | mid-sized | small-independent", "rooms_total", "about",
+"chain"? }`. It is public: `get_policies` returns it and the node's agent may talk about it.
+
+`facts.negotiation = { "floor_chf", "max_rounds" }` holds the owner's limits. It is
+**private**: listed in `PRIVATE_FACTS` (`node/agent.py`), never put in an LLM prompt and
+never returned by any tool; only the node's own code may use it.
+
 In `seals`, `"issuer": "self"` means a self-signed grey seal, and
 `"signed_by": "self"` makes the node sign a seal in someone else's name (the scam).
 

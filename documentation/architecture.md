@@ -27,7 +27,7 @@ can work in parallel without stepping on each other. Contracts live in
 | --- | --- | --- | --- | --- |
 | Protocol and signing | `code/aps/` | #10 | done, tested | Python API; formats: envelope, seals, approval |
 | Registry | `code/registry/` | #9 | done | `GET /search`, `GET /nodes/{id}` |
-| Business nodes | `code/node/`, `code/data/nodes/` | #10 | done for direct booking; offers and negotiation to add | signed envelopes; formats: offer, counter-offer |
+| Business nodes | `code/node/`, `code/data/nodes/` | #10 | done for direct booking; three hotels in the planned sizes with public profiles and private negotiation limits; offers and negotiation to add | signed envelopes; formats: offer, counter-offer |
 | Marketplace (requests, offers, shortlist, negotiation) | `code/marketplace/` | #8, #9, #10 | to build | formats: request, offer, counter-offer, agreement |
 | User's agent | `code/assistant/`, `code/data/agents/` | #10 | done for direct booking; own identity (key, seal, user delegation); marketplace flow to add | UI events over SSE, approvals API, `GET /identity` |
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
