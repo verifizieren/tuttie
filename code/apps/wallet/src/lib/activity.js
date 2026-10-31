@@ -6,6 +6,7 @@
 // Pure functions, so the view only ever renders `state`.
 
 export const EMPTY = {
+  id: null,             // this conversation, for the history on this device
   turns: [],            // [{ said, answer, mood, context, tool }]; context/tool: { text, done } progress lines
   phase: "idle",        // idle | thinking | posted | offers | picking | negotiating | approval | booking | booked | done | declined
   request: null,        // the public part of Tuttie's posting
@@ -24,6 +25,7 @@ export const EMPTY = {
 };
 
 const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
+const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
 export function activeTurn(state) {
@@ -34,9 +36,9 @@ export function activeTurn(state) {
 /** A conversation that has ended: answered, nothing waiting for the user or still running. */
 export const finished = state => Boolean(state.answer) && !state.approval && state.turns.every(t => t.answer);
 
-/** The user said something: a new turn. */
+/** The user said something: a new turn (and a new conversation if there is none). */
 export function startTurn(state, said) {
-  return { ...state, turns: [...state.turns, { said }], phase: "thinking" };
+  return { ...state, id: state.id || newId(), turns: [...state.turns, { said }], phase: "thinking" };
 }
 
 /** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
