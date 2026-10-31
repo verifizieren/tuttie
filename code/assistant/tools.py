@@ -29,6 +29,7 @@ from aps.envelope import is_fresh
 from aps.keys import load_public_key
 from assistant.approvals import ApprovalBook
 from assistant.cards import card_order, hotel_card
+from assistant.context import UserContext
 from assistant.marketplace import MarketDesk
 from assistant.mcp_client import McpCallFailed, McpLink
 from sessions import Context
@@ -50,6 +51,12 @@ def function(name: str, description: str, properties: dict, required: list[str] 
 
 
 SCHEMAS = [
+    function(
+        "recall_context",
+        "Read what you know about the user: calendar, mail, messages and preferences, each item classed "
+        "public, negotiation or private. Call it first whenever the user wants to find or book something.",
+        {},
+    ),
     function(
         "post_request",
         "Post the user's request on the marketplace: matching verified businesses are woken and "
@@ -204,8 +211,9 @@ class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
     def __init__(self, http: httpx.AsyncClient, registry_url: str, bus: EventBus, approvals: ApprovalBook,
-                 market: MarketDesk | None = None, mcp: McpLink | None = None):
+                 market: MarketDesk | None = None, mcp: McpLink | None = None, user: UserContext | None = None):
         self.http = http
+        self.user = user or UserContext()
         self.mcp = mcp or McpLink()
         self.registry_url = registry_url.rstrip("/")
         self.bus = bus
@@ -226,11 +234,15 @@ class Toolbox:
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
-        tools = {"post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
+        tools = {"recall_context": self.recall_context, "post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
+
+    async def recall_context(self) -> dict:
+        """The user's calendar, mail, messages and preferences (assistant/context.py)."""
+        return await self.user.recall(self.bus)
 
     async def post_request(self, **request) -> dict:
         """Post the request on the market (MarketDesk.find), then show the offers as cards.
@@ -249,8 +261,10 @@ class Toolbox:
                                     self.market.last_budget, item["offer"]["offer_id"] in shortlisted))
         self.bus.emit("marketplace", "verified", f"{len(cards)} hotels to choose from",
                       detail={"phase": "cards", "cards": cards})
-        result["cards"] = [{k: c[k] for k in ("node_id", "name", "price_chf", "pros", "cons", "shortlisted")}
-                           for c in cards]
+        result["cards"] = [{"node_id": c["node_id"], "name": c["name"], "price_chf": c["price_chf"],
+                            "rating": c["rating"], "shortlisted": c["shortlisted"],
+                            "yes": [f["label"] for f in c["features"] if f["ok"]],
+                            "no": [f["label"] for f in c["features"] if not f["ok"]]} for c in cards]
         return result
 
     async def negotiate(self, budget_chf: float | None = None, node_ids: list[str] | None = None) -> dict:
