@@ -42,7 +42,8 @@ def stub_llm(monkeypatch):
     monkeypatch.setattr(node.agent, "LLM", StubLLM)
 
 
-def run_find(negotiate_budget: float | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
+def run_find(negotiate_budget: float | None = None, book_agreement: bool = False,
+             **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -68,6 +69,17 @@ def run_find(negotiate_budget: float | None = None, **kwargs) -> tuple[dict, Eve
             if negotiate_budget is not None:
                 toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk)
                 result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget)
+                if book_agreement:  # the user approves on the phone while book waits
+                    async def phone():
+                        while not toolbox.approvals.pending:
+                            await asyncio.sleep(0.01)
+                        approval = next(iter(toolbox.approvals.pending.values()))
+                        result["approved_chf"] = approval["amount_chf"]
+                        toolbox.approvals.decide(approval["id"], "approved")
+                    tap = asyncio.create_task(phone())
+                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", "2026-11-14", "double",
+                                                           "Alex Muster", use_agreement=True)
+                    await tap
             return result, bus, market
 
     return asyncio.run(scenario())
@@ -128,3 +140,11 @@ def test_tuttie_negotiates_its_shortlist_and_gets_a_signed_agreement():
     assert agreement["detail"]["agreement"]["payload"]["type"] == "agreement"
     # The private budget was never sent: no event or message on the way mentions it as a limit.
     assert all("max_price" not in json.dumps(e) for e in bus.history)
+
+
+def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
+    result, _, _ = run_find(negotiate_budget=200, book_agreement=True, date="2026-11-14", tags=["basel-sbb"],
+                            budget_chf=200)
+    agreed = result["negotiation"]["best"]["price_chf"]
+    assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
+    assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed

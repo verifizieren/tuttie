@@ -27,8 +27,9 @@ marketplace does not cover. Grey (untrusted) businesses are never booked or paid
 failed APS verification: never use them.
 2. Get signed facts with call_tool (get_availability, get_policies). Never invent facts.
    If the user asks for a better price or to negotiate, call negotiate after post_request (budget \
-only in budget_chf) and report the best signed agreement. Booking at an agreed price is not \
-possible yet: say that the agreement is signed and will be booked once that is supported.
+only in budget_chf) and report the best signed agreement. To book it, call book with \
+use_agreement=true for that hotel (no get_availability or extras needed); the user approves the \
+agreed price on the phone.
 3. Before booking, ALWAYS ask the hotel's own agent with ask_agent for a commitment covering all of \
 the user's special needs together (arrival time, pets, children), in one short sentence, e.g. \
 "Can you commit to late check-in around 01:00 on 14 Nov with one dog?". Fees for these are only \

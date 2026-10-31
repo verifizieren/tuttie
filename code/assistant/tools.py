@@ -106,6 +106,9 @@ SCHEMAS = [
             "guest_name": {"type": "string"},
             "extras": {"type": "array", "items": {"type": "string"},
                        "description": "'item' names of commitments from ask_agent to include"},
+            "use_agreement": {"type": "boolean",
+                              "description": "book the price agreed in the last negotiate with this hotel "
+                                             "(no get_availability or extras needed)"},
         },
         ["node_id", "date", "room_type", "guest_name"],
     ),
@@ -194,6 +197,7 @@ class Toolbox:
         """Forget the signed facts of the last conversation."""
         self.availability: dict[str, dict] = {}  # node_id -> last get_availability payload
         self.commitments: dict[str, list[dict]] = {}  # node_id -> signed A2A envelopes with a commitment
+        self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
 
     async def dispatch(self, name: str, args: dict) -> dict:
@@ -223,6 +227,7 @@ class Toolbox:
         negotiator = TuttieNegotiator(SubagentPool(self), self.market.agent_id, load_signing_key(self.market.agent_id))
         outcomes = await negotiator.negotiate_all(self.market.last_shortlist, context)
         winner = best(outcomes)
+        self.agreements.update({o.node_id: o.agreement for o in outcomes if o.status == "agreed"})
         names = {o["node_id"]: o["name"] for o in self.market.last_shortlist}
         summary = (f"Best agreement: {names[winner.node_id]} at CHF {winner.price_chf:g} "
                    f"(offered CHF {winner.offer_price_chf:g})") if winner else "No hotel agreed within the budget"
@@ -352,9 +357,12 @@ class Toolbox:
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, **reply}
 
     async def book(self, node_id: str, date: str, room_type: str, guest_name: str,
-                   extras: list[str] | None = None) -> dict:
+                   extras: list[str] | None = None, use_agreement: bool = False) -> dict:
         """Book a room: compute the total from signed facts only, wait for the user's signed
         approval on the phone, then let the node confirm the booking.
+
+        With `use_agreement`, the total is the price in the hotel's signed Agreement from the
+        last negotiation, which the node redeems once (negotiation/agreement.py).
         """
         found = await self.lookup(node_id)
         # A booking takes payment, which untrusted (grey) nodes never get.
@@ -362,6 +370,15 @@ class Toolbox:
             return {"node_id": node_id, "rejected": True,
                     "reason": "node is not trusted for bookings and payments (needs a gold or blue seal)"}
         record, verdict = found
+
+        if use_agreement:
+            agreement = self.agreements.get(node_id)
+            if agreement is None:
+                return {"error": f"no signed agreement with {node_id}: call negotiate first"}
+            amount = agreement["payload"]["price_chf"]
+            summary = f"Book {record['name']}, {date}: negotiated {agreement['payload']['item']} = CHF {amount:g}"
+            return await self._approve_and_book(record, verdict, date, room_type, guest_name, [], amount,
+                                                summary, agreement)
 
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
@@ -380,7 +397,12 @@ class Toolbox:
         parts += [f"{env['payload']['commitment']['item']} CHF {env['payload']['commitment']['price_chf']:g}"
                   for env in chosen]
         summary = f"Book {record['name']}, {date}: {' + '.join(parts)} = CHF {amount:g}"
+        return await self._approve_and_book(record, verdict, date, room_type, guest_name, chosen, amount, summary)
 
+    async def _approve_and_book(self, record: dict, verdict: dict, date: str, room_type: str, guest_name: str,
+                                chosen: list[dict], amount: float, summary: str, agreement: dict | None = None) -> dict:
+        """Wait for the user's signed approval of exactly `amount`, then let the node book."""
+        node_id = record["node_id"]
         approval = self.approvals.create("book", record, amount, summary, verdict["seals"])
         self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                       {"approval_id": approval["id"], "amount_chf": amount})
@@ -391,6 +413,8 @@ class Toolbox:
             return {"declined": True, "source_step": step}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
+        if agreement is not None:
+            body["agreement"] = agreement
         result = await self.verified_post(node_id, "/tools/book", body, "a2t", "book")
         if not isinstance(result, Verified):
             return result
