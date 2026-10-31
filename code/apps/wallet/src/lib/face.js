@@ -205,7 +205,9 @@ class TuttieFace {
   }
 
   frame(now) {
-    const t = Math.min(1, (now - this.start) / this.duration);
+    // sleep(0) starts the face without a transition. A frame can share its timestamp
+    // (especially with reduced timer precision); 0 / 0 would poison all later poses.
+    const t = this.duration <= 0 ? 1 : Math.max(0, Math.min(1, (now - this.start) / this.duration));
     this.current = lerp(this.from, this.to, easeInOut(t));
     this.speaking += (this.voiceTarget[0] - this.speaking) * .35;  // follow the voice, without jitter
     this.hearing += (this.voiceTarget[1] - this.hearing) * .15;
