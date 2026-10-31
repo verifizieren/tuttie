@@ -155,17 +155,22 @@ export default function Activity({ state, readOnly = false, onPick, onLean, reve
   return (
     <div className="activity" ref={box} data-scroll>
       {!readOnly && <Steps turn={liveProgress} latest={latest} />}
-      {state.turns.map((turn, i) => (
-        <div className="turn" key={i}>
+      {state.turns.map((turn, i) => {
+        const showMarket = i === state.marketTurn && state.request && !state.booking && state.picked?.length;
+        const showBooking = i === state.bookingTurn && state.booking;
+        const showAnswer = turn.answer && (readOnly || i === current);
+        // Empty historical turns still take a flex gap; omit them from the live layout.
+        if (!readOnly && !showMarket && !showBooking && !showAnswer) return null;
+        return <div className="turn" key={i}>
           {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
           {readOnly && <Steps turn={turn} latest={latest} />}
-          {i === state.marketTurn && state.request && <Market state={state} />}
-          {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
-          {turn.answer && (readOnly || i === current) && (
+          {showMarket && <Market state={state} />}
+          {showBooking && <BookingCard booking={state.booking} />}
+          {showAnswer && (
             <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />
           )}
-        </div>
-      ))}
+        </div>;
+      })}
     </div>
   );
 }

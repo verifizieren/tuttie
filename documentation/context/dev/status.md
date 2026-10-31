@@ -13,7 +13,7 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
   agreement facts are available to price follow-ups and final counters say quoted.
-  Validation: 341 Python tests, 33 wallet tests and production build pass. Local Chrome
+  Validation: 341 Python tests, 34 wallet tests and production build pass. Local Chrome
   received live like/pass SSE events, advanced both cards and requested CHF 128 approval
   for the liked hotel without browser errors. The Chrome run used deterministic sample
   offers, not a microphone or an LLM. Broader audit: explicit English/German card synonyms
@@ -21,6 +21,11 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   later agreements update card prices, rapid choices queue, leaving a deck cancels its
   delayed action, new searches clear old signed-price caches, live status renders once.
   Chrome also passed two consecutive searches with rapid choices and one progress group.
+  Repeat-booking follow-up: a new posting initializes fresh hotel offers/rounds/agreed
+  prices and clears deck commands; empty historical turns no longer create flex gaps in
+  the live view. Chrome passed two consecutive typed search → choice → approved booking
+  flows at CHF 128 with no empty turns, duplicate bookings or browser errors. Verified
+  web4 still serves the old photo-bar assets; PR #16 remains unmerged.
   Not deployed; live voice/provider testing needs credentials.
 
 

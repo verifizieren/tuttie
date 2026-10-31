@@ -53,3 +53,18 @@ test('rapid card commands queue once each and do not replay from history', () =>
   assert.deepEqual(state.swipes.map(c=>c.verdict),['like','pass']);
   assert.deepEqual(restoreConversation(events,'chat',null).swipes,[]);
 });
+
+test('searching after a booking starts fresh hotel and deck state', () => {
+  const previous = {...EMPTY, turns:[{answer:'Booked'}], cards:[{node_id:'hotel'}], cardsStep:10,
+    swipes:[{id:11,verdict:'like'}], picked:['hotel'], booking:{id:'old'}, bookingTurn:0,
+    hotels:{hotel:{name:'Hotel',offer:{price_chf:220},rounds:[{price:209}],agreed:209}}};
+  const next=applyEvent(startTurn(previous,'Find another hotel'), {kind:'marketplace', detail:{phase:'posted',
+    request:{request_id:'new'},invited:{hotel:{name:'Hotel',trust_tier:'gold'}}}});
+  assert.equal(next.hotels.hotel.offer,null);
+  assert.deepEqual(next.hotels.hotel.rounds,[]);
+  assert.equal(next.hotels.hotel.agreed,null);
+  assert.equal(next.booking,null);
+  assert.equal(next.cardsStep,null);
+  assert.deepEqual(next.swipes,[]);
+  assert.equal(next.marketTurn,1);
+});

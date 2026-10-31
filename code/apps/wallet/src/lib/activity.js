@@ -104,14 +104,14 @@ export function applyEvent(state, event) {
     if (detail.phase === "posted") {
       const hotels = {};
       for (const [nodeId, info] of Object.entries(detail.invited || {})) {
-        hotels[nodeId] = { ...hotel(state, nodeId, info.name), size: info.profile?.size || null, agent: info.agent,
+        hotels[nodeId] = { ...hotel({ hotels: {} }, nodeId, info.name), size: info.profile?.size || null, agent: info.agent,
                            tiers: [info.trust_tier], status: info.status || "woken" };
       }
       const skipped = Object.values(detail.skipped || {}).map(s => ({ name: s.name, reason: s.reason, tier: s.trust_tier }));
       // A new posting replaces the last one's market, offers, picks and booking in this conversation.
       const base = progress(state, "tool", `Asked ${Object.keys(hotels).length} hotels`);
       return { ...base, phase: "posted", request: detail.request, marketTurn: activeTurn(base), hotels, skipped,
-               shortlistDone: false, cards: null, picked: null, approval: null, booking: null, bookingTurn: null };
+               shortlistDone: false, cards: null, cardsStep: null, swipes: [], picked: null, approval: null, booking: null, bookingTurn: null };
     }
     if (detail.phase === "offer" && event.node_id) {
       const next = withHotel(state, event.node_id, event.node_name, {
