@@ -232,3 +232,21 @@ Endpoints of every node (all answers are signed envelopes):
 (postings: see "DRAFT: marketplace messages"). The marketplace will wake the agents
 subscribed to an event; an interested agent then uses `next_tool`, e.g. `make_offer` once it
 exists.
+
+## Sessions and context passing (implemented)
+
+Agents that talk over several turns (a Tuttie subagent and a hotel, later a negotiation) open a
+**session**. Each side keeps its own memory of it (`code/sessions/memory.py`), so many
+sessions run in parallel without mixing. Endpoints of every node (answers are signed):
+
+| Endpoint | Payload of the answer |
+| --- | --- |
+| `POST /agent/sessions` `{peer, purpose, context}` | `{session_id, agent, purpose}` |
+| `POST /agent/sessions/{id}/messages` `{message}` | `{session_id, turn, answer, commitment}`; the agent sees the session's history |
+| `GET /agent/sessions/{id}` | the whole session: `{session_id, owner, peer, purpose, status, context, state, turns: [{author, kind, content, at}]}` |
+| `POST /agent/sessions/{id}/close` | `{session_id, status: "closed"}`; later messages get HTTP 409 |
+
+`context` is what the opening agent chose to share. Every item an agent holds has a
+visibility (`code/sessions/context.py`): `public` (may go into a posting), `negotiation` (may
+go to the one business it talks to) or `private` (never leaves the agent; the default).
+Agents only ever send `Context.share(up_to=...)`, which can never include private items.

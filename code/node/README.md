@@ -6,11 +6,13 @@ the **same agent object** (`agent.py`) with its own persona.
 
 | File | What it does |
 | --- | --- |
-| `server.py` | endpoints: signed tools (`/tools/*`), the agent (`/agent`, `/agent/card`, `/agent/invoke`) |
+| `server.py` | endpoints: signed tools (`/tools/*`), the agent (`/agent`, `/agent/card`, `/agent/invoke`) and its sessions (`/agent/sessions/...`) |
 | `agent.py` | `BusinessAgent`: persona, tools, A2A answers with priced add-ons, wake-ups from the marketplace |
 | `catalog.py` | the shared tool catalog with status `available` or `planned` |
 
-Formats: `documentation/formats.md`, "Business agent". Signing and seals come from
+Formats: `documentation/formats.md`, "Business agent" and "Sessions and context passing".
+Every session is an isolated conversation with its own memory (`code/sessions/`), so a hotel
+can talk to many guests' agents in parallel. Signing and seals come from
 `code/aps/` (APS is owned by its own work area; nodes only use it).
 
 ## The three hotel agents

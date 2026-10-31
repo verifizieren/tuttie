@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (company agents).
+Last updated: 2026-10-31 (sessions, memory, subagents).
 
 ## Done
 
@@ -17,6 +17,8 @@ Last updated: 2026-10-31 (company agents).
 | Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays). | `code/node/`, `code/data/nodes/` |
 | Company agents | The same agent object for every company: persona, a shared tool catalog with `available` / `planned` tools, a signed agent card (`GET /agent/card`), A2A answers in persona with priced add-ons from the config (`POST /agent`), and wake-ups from the marketplace (`POST /agent/invoke`: interested?, which tool next). Three hotel agents: Alpina Grand Basel (large chain branch, Lena), Hotel Rheinblick (medium, Marco), Gästehaus am Rhein (small independent, Anna). Private negotiation limits never leave the node. | `code/node/agent.py`, `code/node/catalog.py`, `code/node/README.md` |
 | Demo data | Hotels Alpina Grand (gold + blue), Rheinblick (gold + blue), Gästehaus am Rhein (gold), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
+| Sessions and memory | Shared module for all agents: isolated sessions with their own memory (many in parallel), and context passing where every item is public, negotiation or private (private never leaves). Hotels keep one memory per session and answer with the history. | `code/sessions/`, node `/agent/sessions/...` |
+| Tuttie's subagents | Tuttie spawns one subagent per business with its own memory and only the shareable context; a pool runs them in parallel; every call goes through the trust gate. Live-tested: three hotels in parallel over two rounds, each remembering its own offer, the private budget never shared. Bargaining logic is step 4. | `code/assistant/subagents.py` |
 | User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". | `code/assistant/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
@@ -27,15 +29,17 @@ Last updated: 2026-10-31 (company agents).
 
 Build order from [goals.md](goals.md):
 
-1. **Agents** — company agents done (three hotels, same agent object). Next: **Tuttie**, our
-   main agent, as its own agent identity.
+1. **Agents** — company agents done (three hotels, same agent object); sessions with memory
+   and Tuttie's parallel subagents done. Next: **Tuttie**, our main agent, as its own agent
+   identity that spawns the subagents from a posting.
 2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
    `documentation/formats.md`). The agents are ready to be woken: the marketplace calls
    `POST /agent/invoke` on every agent subscribed to an event (`wakes_on`). Tools still to
    build: `make_offer`, `counter_offer`, `pay` (outlined in `code/node/catalog.py`).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
    connect the wallet to `POST /chat`, `GET /events` and the approvals API.
-4. **Negotiation and subagents** — not started.
+4. **Negotiation and subagents** — the base exists (subagents, sessions, memory, context
+   levels); missing: the bargaining logic and the `make_offer` / `counter_offer` tools.
 5. **MCP services** — not started.
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
@@ -84,6 +88,9 @@ Why things are the way they are, so nobody has to rediscover them:
   the installed app; full-bleed under the Dynamic Island was tried and rejected. The agent
   card must not be a GPU layer (`will-change`), or it renders blurry after expanding. The
   layout follows `visualViewport`, so the keyboard shrinks the app instead of pushing it away.
+- **Sessions and memory** live in each agent's process for now, so a restart forgets them.
+  Each session has its own lock: turns within one session stay in order, different sessions
+  run in parallel.
 - **Gestures:** release decisions use the speed of the last 100 ms; the card keeps its
   shape while dragged. Headless browsers send pointer events too slowly to test flicks;
   dispatch `PointerEvent`s in the page instead.
