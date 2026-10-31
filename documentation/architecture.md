@@ -18,7 +18,7 @@ can work in parallel without stepping on each other. Contracts live in
                          v
               console (apps/console): every signed step, live over SSE
                                    all signing: code/aps
-             scripted demo (code/demo) drives the same real components
+             demo (code/demo) drives the same real components
 ```
 
 ## Work areas
@@ -34,7 +34,7 @@ can work in parallel without stepping on each other. Contracts live in
 | Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |
 | Owner view | `code/apps/owner/` | #5 | to build | owner API (to define) that edits `data/nodes/*.json` facts |
 | Presentation site and QR | `code/apps/presentation/` | #1, #6 | to build | links into the wallet and console |
-| Scripted demo (director) | `code/demo/` | #3, #2 | to build | drives the user's agent and the apps |
+| Demo | `code/demo/` | #3, #2 | to build | drives the user's agent and the apps |
 | Console | `code/apps/console/` | — | done | UI events over SSE |
 | Shared UI pieces | `code/apps/shared/` | — | seal badges | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
@@ -42,14 +42,14 @@ can work in parallel without stepping on each other. Contracts live in
 ## Rules that keep the areas independent
 
 - **The demo runs the real app.** `code/demo/` never has its own UI. It drives the real
-  wallet (and console) by feeding scripted input into the same backend the user would use
+  wallet (and console) by feeding the storyline's input into the same backend the user would use
   (e.g. the user's lines instead of live speech) and lets the real flow run. Any feature
   the demo shows must exist in the app for real use; demo-only switches are limited to
   input and timing (e.g. `?demo=<script>` on the wallet), never to separate screens.
 
 - **Signing stays in `code/aps/`.** No other folder creates or checks signatures by hand.
 - **Prices never come from an LLM.** They come from node configs and signed messages.
-- **The scripted demo calls the real components**; it never fakes verification
+- **The demo calls the real components**; it never fakes verification
   (`documentation/concept.md`).
 - **Apps are static pages** (HTML + vanilla JS, no build step) served by the assistant at
   `/<app>/`; shared code goes in `apps/shared/`.

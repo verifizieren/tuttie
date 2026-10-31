@@ -43,7 +43,7 @@ approve with one tap. Every message is signed, so fakes simply do not show up.
 
 Brand: dark, Inter, terracotta accent (`code/apps/shared/tuttie.css`), shared by all apps.
 
-## Demo strategy: scripted, but real
+## Demo strategy: predictable, but real
 
 The demo must never fail on stage, but the code behind it must really work.
 
@@ -52,14 +52,14 @@ use. The demo is a *simulated run through that same app*: same pages, same compo
 same backend. There is no separate demo page with its own look; whatever the audience sees
 is what a real user would see.
 
-- **Directed:** the demo follows a script (`code/demo/`, storyline issue #3): fixed user
+- **Predictable:** the demo follows the storyline (`code/demo/`, issue #3): fixed user
   lines, fixed timing, and a voice agent whose lines we already know, so we play them
   directly instead of depending on live speech recognition.
-- **Real:** every step of the script calls the real functions: real registry lookups, real
+- **Real:** every step of the demo calls the real functions: real registry lookups, real
   Ed25519 signatures and verification, real offers and negotiation, real signed approvals.
-  The same code runs unscripted in live mode, so the code review sees the real system.
-- **Rule:** the script may fix *what is said or chosen*. It may never fake *verification*:
-  a forged seal fails in scripted mode exactly as in live mode.
+  The same code serves real use, so the code review sees the real system.
+- **Rule:** the demo may fix *what is said or chosen*. It may never fake *verification*:
+  a forged seal fails in the demo exactly as in real use.
 
 ## What exists today
 
@@ -67,4 +67,4 @@ Working and tested (see `readme.md`): the APS signing core, the registry, busine
 with signed tools and their own A2A agent, the assistant's LLM tool loop with the trust
 gate, signed phone approvals, bookings and the console. The current flow is "assistant goes
 to the businesses"; the reverse marketplace, the wallet UI, voice, owner view, presentation
-site and scripted demo are the next work areas (`documentation/architecture.md`).
+site and demo are the next work areas (`documentation/architecture.md`).
