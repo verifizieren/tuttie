@@ -163,6 +163,17 @@ export function applyEvent(state, event) {
   return state;
 }
 
+/** What Tuttie is doing right now, for the line under its eyes: the step still running, or
+ *  "" when it only listens or thinks (the eyes show that). */
+export function currentTask(state) {
+  if (state.approval) return "Waiting for your approval";
+  if (state.phase === "booking") return "Booking…";
+  const turn = state.turns[activeTurn(state)];
+  if (!turn || turn.answer) return "";
+  const running = [turn.tool, turn.context].find(line => line && !line.done);
+  return running ? running.text : "";
+}
+
 /** While Tuttie works it does not hold one face: it moves through these looks, each with a
  *  glance (x, y in -1..1), like someone thinking. Names from lib/face.js. */
 export const THINKING = [

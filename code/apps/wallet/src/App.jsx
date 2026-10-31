@@ -24,7 +24,7 @@ import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import { sendChat } from "./lib/api.js";
-import { BUSY, EXPRESSION, LISTENING, MOOD, THINKING, WATCHING } from "./lib/activity.js";
+import { BUSY, EXPRESSION, LISTENING, MOOD, THINKING, WATCHING, currentTask } from "./lib/activity.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -152,7 +152,7 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error}
+      <AgentCard canvasRef={canvas} mode={mode} status={error || currentTask(agent)}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={send}>
         <Activity state={agent} onPick={pick} onLean={lean} />
         {showHistory && <History entries={history} onClose={() => setShowHistory(false)} />}
