@@ -68,3 +68,20 @@ def test_every_followup_receives_current_signed_deal_facts():
     toolbox.agreements["hotel"] = {"payload": {"type": "agreement", "price_chf": 209}}
     asyncio.run(assistant.chat("Didn't you agree on 209?"))
     assert len([m for m in assistant.messages if m["role"] == "system"]) == 1
+
+
+def test_a_question_about_the_booked_hotel_sees_its_signed_check_in_time():
+    seen = []
+
+    class FactsLLM(RecordingLLM):
+        async def complete(self, messages, tools, tool_choice=None):
+            import json
+            seen.append(json.loads(messages[2]["content"].split("\n", 1)[1]))
+            return await super().complete(messages, tools, tool_choice)
+    bus = EventBus()
+    toolbox = Toolbox(httpx.AsyncClient(), "http://registry", bus, ApprovalBook())
+    assistant = Assistant(FactsLLM(), toolbox, bus)  # starts a conversation: forgets earlier facts
+    toolbox.market.last_offers = [{"node_id": "hotel", "name": "Hotel", "offer": {"price_chf": 135}}]
+    toolbox.policies["hotel"] = {"tool": "get_policies", "policies": {"check_in": "16:00-20:00"}, "photos": ["1.jpg"]}
+    asyncio.run(assistant.chat("What time is check-in?"))
+    assert seen[0]["deals"][0]["policies"] == {"policies": {"check_in": "16:00-20:00"}}
