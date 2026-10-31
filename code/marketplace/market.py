@@ -116,14 +116,15 @@ class Market:
         entry = {"posting": posting.model_dump(), "request": request.model_dump(mode="json"),
                  "requester_tier": verdict["tier"], "invited": {}, "skipped": {}, "offers": []}
         self.postings[request.request_id] = entry
-        entry["invited"], entry["skipped"] = await self.wake(posting, [request.category, *request.tags])
+        await self.wake(posting, [request.category, *request.tags], entry)
         return self.view(request.request_id)
 
-    async def wake(self, posting: Posting, tags: list[str]) -> tuple[dict[str, dict], dict[str, dict]]:
+    async def wake(self, posting: Posting, tags: list[str], entry: dict) -> None:
         """Wake every matching, verified business that subscribed to new postings, in parallel.
 
-        Returns (invited, skipped): invited businesses were woken and may send offers;
-        skipped ones (untrusted, broken, not subscribed, card unreadable) were not.
+        Fills entry["invited"] (woken; may send offers) and entry["skipped"] (untrusted, broken,
+        not subscribed, card unreadable). Businesses are recorded as invited *before* they are
+        woken, because an agent may send its offer before every wake-up has been answered.
         """
         response = await self.http.get(f"{self.registry_url}/search", params={"tags": ",".join(tags)})
         skipped, candidates = {}, []
@@ -145,13 +146,16 @@ class Market:
                 skipped[record["node_id"]] = {"name": record["name"], "trust_tier": verdict["tier"], "reason": reason}
             else:
                 subscribed.append((record, verdict, card))
-        replies = await asyncio.gather(*(self.invoke(record, event) for record, _, _ in subscribed))
-        invited = {
+        entry["skipped"] = skipped
+        entry["invited"] = {
             record["node_id"]: {"name": record["name"], "trust_tier": verdict["tier"],
-                                "agent": card.get("persona", {}).get("name"), "profile": card.get("profile"), **reply}
-            for (record, verdict, card), reply in zip(subscribed, replies)
+                                "agent": card.get("persona", {}).get("name"), "profile": card.get("profile"),
+                                "status": "invited"}
+            for record, verdict, card in subscribed
         }
-        return invited, skipped
+        replies = await asyncio.gather(*(self.invoke(record, event) for record, _, _ in subscribed))
+        for (record, _, _), reply in zip(subscribed, replies):
+            entry["invited"][record["node_id"]].update(reply)
 
     async def agent_card(self, record: dict) -> dict | None:
         """The business agent's card, if it is signed by the business; None otherwise."""
