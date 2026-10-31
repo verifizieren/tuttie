@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (merged: company agents, sessions and subagents with APS UIDs and Tuttie's identity).
+Last updated: 2026-10-31 (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
 
 ## Done
 
@@ -21,6 +21,7 @@ Last updated: 2026-10-31 (merged: company agents, sessions and subagents with AP
 | Tuttie's subagents | Tuttie spawns one subagent per business with its own memory and only the shareable context; a pool runs them in parallel; every call goes through the trust gate. Live-tested: three hotels in parallel over two rounds, each remembering its own offer, the private budget never shared. Bargaining logic is step 4. | `code/assistant/subagents.py` |
 | User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
 | Marketplace (agent layer) | Built against the draft formats: Tuttie's signed postings in (seals, freshness, user delegation `post_requests`), matching businesses woken in parallel at `POST /agent/invoke` (broken ones never contacted), signed offers in (only from invited businesses, fresh, for this request, still valid), shortlist (by price, grey last). Formats as strict Pydantic models in one place. | `code/marketplace/` (:4010) |
+| Bargaining (step 4) | Hotel side: the `counter_offer` tool, stateless like `book` (the counter carries the hotel's own signed offer and last counter), checks Tuttie's seals, signature, freshness and the user's `negotiate` delegation; the hotel meets halfway and never goes below its private floor or past its rounds, compared in code (`negotiation/rules.py`), never in a prompt or reply. Tuttie's side: one subagent per offer, all in parallel in their own sessions, counters signed with Tuttie's key, the private `max_price_chf` only compared in code; ends in a signed Agreement, a rejection or walking away; `best()` picks the cheapest agreement. Formats: `Counter` (+ `final`), `Agreement`, `Rejection`. **Not yet mounted in `node/server.py`** (hook requested, see Pending). | `code/negotiation/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
@@ -31,8 +32,8 @@ Last updated: 2026-10-31 (merged: company agents, sessions and subagents with AP
 Build order from [goals.md](goals.md):
 
 1. **Agents** — done: the three hotel agents (same agent object, personas, profiles, private
-   limits), sessions with memory, Tuttie's identity and its parallel subagents. Tuttie does
-   not sign its own outgoing messages yet; that comes with the marketplace flow.
+   limits), sessions with memory, Tuttie's identity and its parallel subagents. Tuttie signs
+   its postings and counters with its own key.
 2. **Agent layer of the marketplace** — done for postings and offers: Tuttie's signed posting
    in; the market wakes only verified businesses whose agent card subscribes to new postings
    (`/agent/invoke`); interested agents send a signed offer with `make_offer` (the LLM picks
@@ -41,8 +42,19 @@ Build order from [goals.md](goals.md):
    posting a request and building the shortlist (in progress, dev member 1).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
    connect the wallet to `POST /chat`, `GET /events` and the approvals API.
-4. **Negotiation and subagents** — the base exists (subagents, sessions, memory, context
-   levels); missing: the bargaining logic and the `counter_offer` tool.
+4. **Negotiation and subagents** — built in `code/negotiation/` (dev member 2) and tested
+   against the real hotel apps, marketplace and subagents (`test_negotiation_flow.py`).
+   **Needs from dev member 1 (owner of the files):**
+   - a hook in `node/server.py` `create_app`, after the other routes:
+     `app.include_router(counter_offer_router(config, signed))`
+     (`from negotiation.hotel import counter_offer_router`); the tests mount it the same way
+     today (`tests/negotiation_helpers.py: node_app`);
+   - then `counter_offer` can be set to `available` in `node/catalog.py`;
+   - when Tuttie's shortlist is in: call `TuttieNegotiator.negotiate_all(shortlist, context)`
+     and show `best()`'s signed Agreement for the user's approval.
+   Open questions for later: the `negotiation.counter` wake-up event (hotels subscribe to it
+   but nothing sends it: the counter tool is called directly), and redeeming an Agreement in
+   `book` (today `book` only redeems commitments).
 5. **MCP services** — not started.
 
 ### Who works on what
@@ -74,24 +86,29 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** Tuttie posts a request (`marketplace/client.py`), collects the signed
    offers and builds the shortlist itself (verified, within the private budget, cheapest
    first); then the wallet shows request, offers and shortlist under Tuttie's eyes.
-2. **dev member 2:** bargaining (step 4), see "Who works on what". Building blocks that
-   exist: sessions with memory (`code/sessions/`, node `/agent/sessions/...`), parallel
-   subagents with limited context (`assistant/subagents.py`), private limits per hotel
-   (`facts.negotiation`, never in a prompt), the `Counter` format (`marketplace/messages.py`)
-   and `counter_offer` listed as planned in `node/catalog.py`.
-3. **Check-in with the pitch and design team** after these steps; agree the marketplace
+2. **dev member 1:** mount the `counter_offer` hook in `node/server.py` and mark the tool
+   `available` in `node/catalog.py` (see Pending, step 4); then connect the shortlist to
+   `TuttieNegotiator.negotiate_all`.
+3. **dev member 2:** after the hook is in, run the bargaining end to end on the real
+   services and adjust the strategy numbers with the pitch team if the demo needs a
+   different story; then redeeming a signed Agreement in `book` (needs dev member 1, owner
+   of `node/server.py`).
+4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
 ### Test coverage
 
-97 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+120 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
 `test_sessions.py` and `test_agent_sessions.py` (session memory, isolation, context levels,
 parallel subagents against the real node apps), `test_marketplace.py` (postings, wake-up,
 offers, shortlist, strict formats, HTTP service), `test_market_agents.py` (the real market
-waking the real company agents, which send signed offers back), `test_tools.py` (assistant trust gate and Tuttie's identity,
+waking the real company agents, which send signed offers back), `test_negotiation_rules.py` (limits, halfway counters, never below the floor),
+`test_counter_offer.py` (the hotel tool on the real node app: signatures, delegation, limits
+never in replies), `test_negotiation_flow.py` (real market offers, then Tuttie's subagents
+bargain in parallel), `test_tools.py` (assistant trust gate and Tuttie's identity,
 with mocked HTTP and the real demo keys).
 Not covered yet: `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
@@ -125,6 +142,19 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
+  (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
+  below its floor; Tuttie opens 15 % below and moves halfway, within the private budget. An
+  LLM could leak a limit or invent a price; code can be tested for both.
+- **`counter_offer` is stateless.** The guest agent sends the hotel's own signed offer and
+  last counter with each round, so the hotel only trusts its own signatures for earlier
+  prices (like `book` with commitments). No negotiation state can be lost on restart or
+  forged; replaying an older round gains nothing.
+- **`floor_chf` is for the standard double room**; other rooms drop by the same share and
+  add-ons are never discounted, so one number per hotel is enough for every offer.
+- **Tuttie's budget limit is the private context item `max_price_chf`**, the same key the
+  subagent tests use; it is compared in Tuttie's code and never put in a subagent's context.
 
 - **UIDs are vouched for by the commercial register only.** Every seal signs the node's
   `uid` (or `null`), so it cannot be swapped later; `handelsregister-bs` has
