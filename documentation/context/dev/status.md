@@ -14,8 +14,8 @@ Last updated: 2026-10-31.
 | --- | --- | --- |
 | APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them; paying is never delegated). | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
-| Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config. | `code/node/`, `code/data/nodes/` |
-| Demo data | Hotels Rheinblick (gold + blue), Spalenhof (blue), Gundeli (gold only, family rooms), Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
+| Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config and never sees private facts (negotiation limits). `get_policies` includes the business profile (size). | `code/node/`, `code/data/nodes/` |
+| Demo data | The three hotel agents in the planned sizes, each with add-ons and private negotiation limits: Rheinblick (branch of a chain, 160 rooms, gold + blue), Spalenhof (mid-sized, family-owned, 48 rooms, blue), Gundeli (small independent guesthouse, 11 rooms, gold only, family rooms). Also Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
 | User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
@@ -26,9 +26,8 @@ Last updated: 2026-10-31.
 
 Build order from [goals.md](goals.md):
 
-1. **Agents** — mostly done; missing: the three hotel agents in the planned sizes (big chain
-   branch, mid-sized, small independent). Tuttie's identity is done; it does not sign its own
-   outgoing messages yet.
+1. **Agents** — done: Tuttie's identity, the three hotel agents in the planned sizes. Tuttie
+   does not sign its own outgoing messages yet; that comes with the marketplace.
 2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
    `documentation/formats.md`).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
@@ -38,28 +37,23 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **Finish step 1 (small, data first).** Reshape the three hotels into the planned sizes in
-   `code/data/nodes/` (e.g. Rheinblick = branch of a chain, Spalenhof = mid-sized, Gundeli =
-   small independent), give each `facts.add_ons` and `facts.negotiation`
-   (`floor_chf`, `max_rounds`). Re-run `issue_seals.py` if capabilities or keys change.
-2. **Tests for `node/agent.py`** with a fake LLM: the commitment is built from the config,
-   unknown add-on ids give no commitment, and the fallback reply on LLM errors. Offers in step 2
-   reuse this logic, so it should be pinned down first.
-3. **Then step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
+1. **Step 1 check-in with the pitch and design team** (goals.md: every step ends with one):
+   the hotel sizes, profiles and prices, and Tuttie's identity.
+2. **Step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
    then build `code/marketplace/` (:4010) test-first in the same style as `test_tools.py`.
    APS is ready for it: Tuttie signs requests with its own key, and businesses check its
    delegation (`verify_delegation(..., scope="post_requests")`) before answering.
-4. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
+3. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
    the Vite dev server).
 
 ### Test coverage
 
-45 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
-seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay),
+58 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
+node's A2A agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_tools.py` (assistant trust gate and Tuttie's identity, with mocked HTTP and the real
 demo keys).
-Not covered yet: `node/agent.py`, the node's `get_availability`, `get_policies` and `/agent`
-endpoints, `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
+Not covered yet: `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
 
 Other open items: voice agent (`code/voice/`), the demo runner (`code/demo/`), owner view
@@ -101,6 +95,12 @@ Why things are the way they are, so nobody has to rediscover them:
   approvals and delegations, never messages. User agents live in `data/agents/` (in the
   registry, but no node server) and `issue_seals.py` re-signs the delegation for 365 days
   on every run.
+- **Private facts never reach an LLM.** The node's agent used to get all `facts` in its
+  prompt; with negotiation floors in the config that would leak them to any agent that asks
+  cleverly. `PRIVATE_FACTS` in `node/agent.py` keeps them out of the prompt and out of every
+  tool reply. Add any new owner-only fact there.
+- **Hotel sizes are in `facts.profile`, not in tags or seals:** owners can edit them without
+  new seals. The demo prices and the dog storyline (Rheinblick, CHF 180 + 15) are unchanged.
 - **Freshness is opt-in per call.** Live replies must be at most 300 s old
   (`MAX_REPLY_AGE_S` in `assistant/tools.py`); stored envelopes like commitments are
   verified without it because they have `valid_until`.
