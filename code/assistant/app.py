@@ -18,8 +18,8 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from assistant.agent import Assistant  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from assistant.llm import LLM  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
+from llm import LLM  # noqa: E402
 
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")

@@ -6,8 +6,8 @@ import json
 import httpx
 
 from assistant.events import EventBus
-from assistant.llm import LLM
 from assistant.tools import SCHEMAS, Toolbox
+from llm import LLM
 
 MAX_ROUNDS = 12
 

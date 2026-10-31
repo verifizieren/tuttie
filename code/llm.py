@@ -1,4 +1,6 @@
-"""The only module that talks to the LLM provider (OpenAI chat completions with tools).
+"""The only module that talks to the LLM provider (OpenAI chat completions).
+
+Shared by the assistant (tool loop) and the business nodes (their own A2A agents).
 
 Swap providers by reimplementing LLM.complete; the rest of the assistant only sees
 plain chat messages as dicts.
