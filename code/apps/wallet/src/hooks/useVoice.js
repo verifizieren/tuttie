@@ -3,9 +3,9 @@
 // voice agent is already there and listening costs nothing to start: opening the card in voice
 // mode only switches the microphone on and Tuttie's voice up. It sends the microphone, plays
 // Tuttie's voice, and passes both voice levels to Tuttie's presence (onLevels), which moves the
-// eyes (lib/faceDirector.js): they pulse while Tuttie speaks and open up while the user talks. Speech becomes a message to the same Tuttie as
-// typing (code/voice/agent.py); without voice configured on the server the wallet simply stays
-// text-only. What Tuttie says also arrives as text, word by word in step with its voice
+// eyes (lib/faceDirector.js): they pulse while Tuttie speaks and open up while the user talks.
+// Speech becomes a message to the same Tuttie as typing (code/voice/agent.py); without voice
+// configured on the server the wallet simply stays text-only. What Tuttie says also arrives as text, word by word in step with its voice
 // (LiveKit's "lk.transcription" streams), so the wallet can show an answer as it is spoken.
 // When the wallet is hidden (another app, locked phone) the room is left; it rejoins on return.
 import { useEffect, useRef, useState } from "react";
@@ -104,7 +104,7 @@ export default function useVoice(active, onSpeech, onLevels) {
     };
   }, [shown, attempt]);
 
-  // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the face.
+  // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the presence.
   useEffect(() => {
     if (!joined) return undefined;
     joined.localParticipant.setMicrophoneEnabled(active && !muted, MIC).catch(() => {});
