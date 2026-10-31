@@ -29,6 +29,18 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   answer finished meanwhile appears after recovery; first `/history` 502 twice recovers and
   sends; tab two follows tab one's new chat and lists the old chat in History; deck with fake
   cards stays at 2 of 3 after a reload. Not tested on a real phone.
+- **Wallet recovery** (`lib/recovery.js`, `hooks/useVoice.js`, `App.jsx`): a failed voice join
+  (token or connection) is now "unavailable": in voice mode the line under the eyes says
+  "Voice unavailable · tap to retry", it is tried again after 2, 4, 8, ... up to 30 s, and at
+  once on a tap or when voice mode starts again (back from typing). A server without voice
+  (503 on `/voice/token`) is "disabled": text only, no note, no retries. A booking choice from
+  the swipe cards that does not reach Tuttie (network or 5xx, never a 4xx) is sent once more;
+  if that fails too the cards come back with "Tuttie could not be reached — swipe again to
+  book". New chat while Tuttie works (409) shows "Tuttie is still working — new chat after
+  this answer" for 4 s instead of the server's text. Verified with Playwright against the
+  built wallet and a mocked backend (no LLM, no LiveKit); not verified with live voice. Open:
+  on short screens with a long timeline the approval sheet (an overlay at the bottom) can
+  cover the chosen hotel row; not a spacing fix, left as is.
 
 - **Turns with ids** (fix "messages disappear or get overwritten"): every typed or spoken
   request is a server turn (`assistant/conversations.py` `start` returns its id and emits a
