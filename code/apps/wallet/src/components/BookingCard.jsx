@@ -1,17 +1,20 @@
-// The hotel's signed booking confirmation, and the signatures its action gate checked before
-// it booked (aps/gate.py): "No signature, no action" made visible. Each check is listed the way
-// the user knows it; the hotel names them in `checked`.
+// The hotel's signed booking confirmation, and what Tuttie checked about the hotel before and
+// after it booked: who vouches for the hotel (its verified seals), the hotel's own signed deal
+// or extras, its signed confirmation, and the user's approval. "No signature, no action" made
+// visible from the user's side: the hotel signs, Tuttie checks.
 import { SealMarks } from "./Seals.jsx";
 
-const CHECKS = {
-  caller: "Tuttie is a sealed agent",
-  signature: "Signed by Tuttie",
-  delegation: "You let Tuttie book",
-  agreement: "The hotel's signed deal",
-  approval: "Approved by you",
-  mandate: "Your payment mandate",
-  commitments: "The hotel's signed extras",
-};
+const ISSUERS = { "handelsregister-bs": "Registered in the Handelsregister", adobe: "Verified by Adobe" };
+
+/** What Tuttie checked, as short lines the user understands. */
+function checks(booking) {
+  const lines = (booking.seals || []).filter(s => s.valid).map(s => ISSUERS[s.issuer] || `Sealed by ${s.issuer}`);
+  if (booking.checked.includes("agreement")) lines.push("The hotel signed the agreed price");
+  if (booking.checked.includes("commitments")) lines.push("The hotel signed the extras");
+  lines.push("The hotel signed the booking");
+  if (booking.checked.includes("approval")) lines.push("Approved by you");
+  return lines;
+}
 
 /** "double room 2026-11-14" or "double" → "double room" (the date is shown on its own). */
 const roomName = (room, date) => `${room.replace(date, "").replace(/\s*room\s*$/, "").trim()} room`;
@@ -42,17 +45,15 @@ export default function BookingCard({ booking }) {
           </span>
         </div>
       ))}
-      {booking.checked.length > 0 && (
-        <div className="seal-list checks">
-          <div className="seal-head">Checked by the hotel before booking</div>
-          {booking.checked.map(check => (
-            <div className="seal-row" key={check}>
-              <Check />
-              <span className="seal-text"><b>{CHECKS[check] || check}</b></span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="seal-list checks">
+        <div className="seal-head">Checked by Tuttie</div>
+        {checks(booking).map(line => (
+          <div className="seal-row" key={line}>
+            <Check />
+            <span className="seal-text"><b>{line}</b></span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
