@@ -303,7 +303,10 @@ the guest can only accept it (a counter at that price) or walk away.
 ```
 
 The price both sides accept. It is what the user approves on the phone (see Approval) and
-what booking redeems, like a commitment today.
+what booking redeems instead of the list price (`negotiation/agreement.py`,
+`AgreementRedeemer`): only with this hotel's own signature, before `valid_until`, and only
+once per `offer_id`; the user's approval must be for exactly `price_chf`. `book` takes it as
+an optional `agreement` field once the hook in `node/server.py` is in.
 
 ### Rejection (business → guest agent)
 
