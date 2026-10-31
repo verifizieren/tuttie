@@ -25,7 +25,7 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from livekit.agents import Agent, AgentServer, AgentSession, JobContext, StopResponse, cli
+from livekit.agents import Agent, AgentServer, AgentSession, JobContext, JobProcess, StopResponse, cli
 from livekit.plugins import elevenlabs, silero
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -148,27 +148,32 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
                 session.say(prompt)
 
 
-server = AgentServer()
+def prewarm(proc: JobProcess) -> None:
+    """Load the voice activity model once per worker process, before any wallet connects."""
+    proc.userdata["vad"] = silero.VAD.load(activation_threshold=VAD_THRESHOLD, min_speech_duration=MIN_SPEECH_S)
+
+
+# Idle processes wait with the model loaded, so opening the card only joins one.
+server = AgentServer(setup_fnc=prewarm, num_idle_processes=2)
 
 
 @server.rtc_session()
 async def entry(ctx: JobContext) -> None:
     """One voice session per wallet room (rooms are created by /voice/token)."""
-    await ctx.connect()
     key = os.environ["ELEVENLABS_KEY"]
     http = httpx.AsyncClient(base_url=ASSISTANT_URL, timeout=20,
                              headers={"Authorization": f"Bearer {os.environ['LIVEKIT_API_SECRET']}"})
     session = AgentSession(
         # Only clear, near speech counts: a higher threshold and a minimum length keep voices and
         # noise in the background from starting a turn.
-        vad=silero.VAD.load(activation_threshold=VAD_THRESHOLD, min_speech_duration=MIN_SPEECH_S),
+        vad=ctx.proc.userdata["vad"],
         stt=elevenlabs.STT(api_key=key, model=STT_MODEL, keyterms=KEYTERMS, language_code=LANGUAGE,
                            tag_audio_events=False),
         tts=elevenlabs.TTS(api_key=key, voice_id=VOICE_ID, model=TTS_MODEL, language=LANGUAGE),
         turn_handling={"interruption": INTERRUPTION, "endpointing": ENDPOINTING},
     )
     agent = Tuttie(ctx.room.name, http)
-    await session.start(agent, room=ctx.room)
+    await session.start(agent, room=ctx.room)  # connects to the room itself
     follower = asyncio.create_task(follow(session, agent, http, ctx.room.name))
 
     async def cleanup() -> None:
