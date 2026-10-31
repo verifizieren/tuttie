@@ -22,6 +22,7 @@ from pathlib import Path
 import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
+from aps.approval import booking_terms
 from aps.call import sign_call
 from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
 from aps.delegation import verify_delegation
@@ -133,16 +134,18 @@ SCHEMAS = [
         "Waits until the user approves or declines on their phone.",
         {
             "node_id": {"type": "string"},
-            "date": {"type": "string", "description": "YYYY-MM-DD"},
-            "room_type": {"type": "string"},
+            "date": {"type": "string", "description": "YYYY-MM-DD; omit with use_agreement"},
+            "room_type": {"type": "string", "description": "omit with use_agreement"},
             "guest_name": {"type": "string"},
             "extras": {"type": "array", "items": {"type": "string"},
-                       "description": "'item' names of commitments from ask_agent to include"},
+                       "description": "'item' names of commitments from ask_agent to include; "
+                                      "never with use_agreement"},
             "use_agreement": {"type": "boolean",
-                              "description": "book the price agreed in the last negotiate with this hotel "
-                                             "(no get_availability or extras needed)"},
+                              "description": "book exactly the deal agreed with this hotel: its room, night, "
+                                             "rate, extras and price (no get_availability, room_type, date or "
+                                             "extras needed)"},
         },
-        ["node_id", "date", "room_type", "guest_name"],
+        ["node_id", "guest_name"],
     ),
     function(
         "pay",
@@ -163,6 +166,44 @@ SCHEMAS = [
         {},
     ),
 ]
+
+
+def same_room(a: str, b: str) -> bool:
+    """True if two room type names mean the same room ("Double room" is "double")."""
+    def norm(name: str) -> str:
+        return re.sub(r"\s+room$", "", name.strip().lower())
+    return norm(a) == norm(b)
+
+
+def describe_deal(deal: dict, date: str) -> str:
+    """An agreement's terms in one line for the phone and the LLM: room, night, rate, extras."""
+    text = f"{deal.get('room_type') or deal['item']} room, night of {date}"
+    if deal.get("rate"):
+        text += f", {deal['rate']}"
+    if deal.get("includes"):
+        text += f", with {', '.join(deal['includes'])}"
+    return text
+
+
+def agreement_conflicts(deal: dict, booked_date: str, room_type: str, date: str, extras: list[str] | None) -> list[str]:
+    """What in the LLM's book arguments would change a signed agreement (empty: nothing)."""
+    conflicts = []
+    if room_type and deal.get("room_type") and not same_room(room_type, deal["room_type"]):
+        conflicts.append(f"room_type {room_type!r}")
+    if date and date != booked_date:
+        conflicts.append(f"date {date}")
+    if extras:
+        conflicts.append(f"extras {extras}")
+    return conflicts
+
+
+def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) -> list[str]:
+    """Where a signed confirmation differs from what the user approved (empty: it matches)."""
+    differ = [] if round(confirmation.get("total_chf", -1), 2) == round(amount, 2) else ["total_chf"]
+    if terms is not None:
+        differ += [key for key in ("room_type", "date", "rate", "offer_id")
+                   if key in terms and confirmation.get(key) != terms[key]]
+    return differ
 
 
 @dataclass
@@ -518,13 +559,15 @@ class Toolbox:
         step = self.emit_verified("a2a", summary, result)
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, **reply}
 
-    async def book(self, node_id: str, date: str, room_type: str, guest_name: str,
+    async def book(self, node_id: str, date: str = "", room_type: str = "", guest_name: str = "",
                    extras: list[str] | None = None, use_agreement: bool = False) -> dict:
         """Book a room: compute the total from signed facts only, wait for the user's signed
         approval on the phone, then let the node confirm the booking.
 
-        With `use_agreement`, the total is the price in the hotel's signed Agreement from the
-        last negotiation, which the node redeems once (negotiation/agreement.py).
+        With `use_agreement`, the booking is the hotel's signed Agreement from the last
+        negotiation, exactly: its room type, night, rate, inclusions and price, which the node
+        redeems once (negotiation/agreement.py). Arguments that would change any of them are
+        refused with an error instead of being booked.
         """
         found = await self.lookup(node_id)
         # A booking takes payment, which untrusted (grey) nodes never get.
@@ -537,13 +580,27 @@ class Toolbox:
             agreement = self.agreements.get(node_id)
             if agreement is None:
                 return {"error": f"no signed agreement with {node_id}: call negotiate first"}
-            amount = agreement["payload"]["price_chf"]
-            # The agreed deal is for the posted night, whatever date the LLM passes.
-            date = self.market.last_request["constraints"]["date"] if self.market.last_request else date
-            summary = f"Book {record['name']}, {date}: negotiated {agreement['payload']['item']} = CHF {amount:g}"
-            return await self._approve_and_book(record, verdict, date, room_type, guest_name, [], amount,
-                                                summary, agreement)
+            deal = agreement["payload"]
+            posted = self.market.last_request["constraints"]["date"] if self.market.last_request else None
+            booked_room, booked_date = deal.get("room_type") or room_type, deal.get("date") or posted or date
+            conflicts = agreement_conflicts(deal, booked_date, room_type, date, extras)
+            if conflicts:
+                return {"error": f"the signed agreement with {record['name']} is for {describe_deal(deal, booked_date)}; "
+                                 f"{', '.join(conflicts)} would change it. Call book again with use_agreement=true "
+                                 "and without room_type, date or extras, or ask the user before booking anything else.",
+                        "agreement": deal}
+            if not booked_room:
+                return {"error": "the agreement names no room type: pass the room_type of the offer"}
+            terms = None
+            if deal.get("rate") is not None:
+                terms = booking_terms(booked_room, booked_date, deal["rate"], deal["includes"], deal["offer_id"])
+            amount = deal["price_chf"]
+            summary = f"Book {record['name']}: {describe_deal(deal, booked_date)} = CHF {amount:g} (negotiated)"
+            return await self._approve_and_book(record, verdict, booked_date, booked_room, guest_name, [], amount,
+                                                summary, agreement, terms)
 
+        if not date or not room_type:
+            return {"error": "pass date and room_type (or use_agreement=true to book a negotiated deal)"}
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
             return {"error": f"call get_availability on {node_id} for {date} first"}
@@ -557,20 +614,24 @@ class Toolbox:
 
         chosen = [offered[item] for item in extras or []]
         amount = room["price_chf"] + sum(env["payload"]["commitment"]["price_chf"] for env in chosen)
-        parts = [f"{room_type} CHF {room['price_chf']:g}"]
+        parts = [f"{room_type} CHF {room['price_chf']:g} ({room['rate']})"]
         parts += [f"{env['payload']['commitment']['item']} CHF {env['payload']['commitment']['price_chf']:g}"
                   for env in chosen]
         summary = f"Book {record['name']}, {date}: {' + '.join(parts)} = CHF {amount:g}"
-        return await self._approve_and_book(record, verdict, date, room_type, guest_name, chosen, amount, summary)
+        terms = booking_terms(room_type, date, room["rate"], [env["payload"]["commitment"]["item"] for env in chosen])
+        return await self._approve_and_book(record, verdict, date, room_type, guest_name, chosen, amount, summary,
+                                            terms=terms)
 
     async def _approve_and_book(self, record: dict, verdict: dict, date: str, room_type: str, guest_name: str,
-                                chosen: list[dict], amount: float, summary: str, agreement: dict | None = None) -> dict:
-        """Wait for the user's signed approval of exactly `amount`, then let the node book."""
+                                chosen: list[dict], amount: float, summary: str, agreement: dict | None = None,
+                                terms: dict | None = None) -> dict:
+        """Wait for the user's signed approval of exactly `amount` and `terms` (room, night,
+        rate, inclusions), then let the node book and check its confirmation against them."""
         node_id = record["node_id"]
         offer = await self.mandate_offer(node_id)
-        approval = self.approvals.create("book", record, amount, summary, verdict["seals"], offer)
+        approval = self.approvals.create("book", record, amount, summary, verdict["seals"], offer, terms)
         self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
-                      {"approval_id": approval["id"], "amount_chf": amount, "offer_mandate": offer})
+                      {"approval_id": approval["id"], "amount_chf": amount, "offer_mandate": offer, "terms": terms})
         decision = await self.approvals.wait(approval["id"])
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
@@ -585,8 +646,15 @@ class Toolbox:
         if not isinstance(result, Verified):
             return result
         confirmation = result.payload
+        if confirmation.get("status") == "confirmed" and booked_other_terms(confirmation, amount, terms):
+            # The hotel signed a booking that is not what the user approved: say so, never hide it.
+            confirmation = {**confirmation, "mismatch": booked_other_terms(confirmation, amount, terms)}
         if confirmation.get("status") == "confirmed":
             text = f"book: confirmed {confirmation['booking_id']}, CHF {confirmation['total_chf']:g}"
+            if confirmation.get("rate"):
+                text += f", {confirmation.get('room_type')} ({confirmation['rate']})"
+            if confirmation.get("mismatch"):
+                text += f"; differs from what you approved: {', '.join(confirmation['mismatch'])}"
             if confirmation.get("checked"):
                 text += f" (checked: {', '.join(confirmation['checked'])})"
         else:

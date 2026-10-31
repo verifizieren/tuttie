@@ -20,7 +20,8 @@ NODE_REPLIES = {  # by MCP tool name or agent path
     "get_availability": {"date": "2026-11-14", "rooms": [{"room_type": "double", "price_chf": 180, "rate": "x"}]},
     "/agent": {"answer": "Fine.", "commitment": {"item": "late check-in with dog", "price_chf": 15,
                                                  "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}},
-    "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195},
+    "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195, "room_type": "double",
+             "date": "2026-11-14", "rate": "x", "offer_id": None},
     "get_policies": {"tool": "get_policies", "charges": [{"purpose": "city tax", "price_chf": 4}]},
     "pay": {"tool": "pay", "status": "paid", "amount_chf": 4, "checked": ["caller", "signature", "delegation", "mandate"]},
 }
@@ -142,6 +143,21 @@ def test_book_waits_for_approval_and_sends_signed_decision_and_commitment():
     assert call["args"]["approval"]["decision"] == "approved"
     assert call["args"]["extras"][0]["payload"]["commitment"]["price_chf"] == 15
     assert [e["status"] for e in bus.history if e["kind"] == "approval"] == ["pending", "approved"]
+    # The user signed the room, night, rate and extras along with the amount.
+    assert call["args"]["approval"]["terms"] == {"room_type": "double", "date": "2026-11-14", "rate": "x",
+                                                 "includes": ["late check-in with dog"]}
+    assert "mismatch" not in result
+
+
+def test_a_confirmation_for_other_terms_than_approved_is_flagged():
+    from assistant.tools import booked_other_terms
+    terms = {"room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable", "includes": [],
+             "offer_id": "of-1"}
+    same = {"total_chf": 172, "room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable",
+            "offer_id": "of-1"}
+    assert booked_other_terms(same, 172, terms) == []
+    flexible = {**same, "room_type": "double-flex", "rate": "flexible", "total_chf": 205}
+    assert booked_other_terms(flexible, 172, terms) == ["total_chf", "room_type", "rate"]
 
 
 def test_book_declined_never_calls_the_node():

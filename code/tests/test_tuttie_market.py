@@ -45,7 +45,7 @@ def stub_llm(monkeypatch):
 
 def run_find(negotiate_budget: float | None = None, book_agreement: bool = False,
              favourites: list[str] | None = None, resume_before_booking: bool = False,
-             **kwargs) -> tuple[dict, EventBus, Market]:
+             book_args: dict | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -85,12 +85,17 @@ def run_find(negotiate_budget: float | None = None, book_agreement: bool = False
                         while not toolbox.approvals.pending:
                             await asyncio.sleep(0.01)
                         approval = next(iter(toolbox.approvals.pending.values()))
-                        result["approved_chf"] = approval["amount_chf"]
+                        result["approved_chf"], result["approval"] = approval["amount_chf"], approval
                         toolbox.approvals.decide(approval["id"], "approved")
                     tap = asyncio.create_task(phone())
-                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", "2026-11-15", "double",
-                                                           "Alex Muster", use_agreement=True)
-                    await tap
+                    args = book_args if book_args is not None else {"room_type": "double"}
+                    result["booking"] = await toolbox.book("ch.basel.hotel-rheinblick", guest_name="Alex Muster",
+                                                           use_agreement=True, **args)
+                    if "error" in result["booking"]:
+                        tap.cancel()  # refused before asking the phone
+                        result["pending"] = list(toolbox.approvals.pending.values())
+                    else:
+                        await tap
             return result, bus, market
 
     return asyncio.run(scenario())
@@ -160,7 +165,36 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     agreed = result["negotiation"]["best"]["price_chf"]
     assert result["approved_chf"] == agreed  # the user approved exactly the negotiated price
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
-    assert result["booking"]["date"] == "2026-11-14"  # the posted night, even if the LLM passes another date
+    assert result["booking"]["date"] == "2026-11-14"  # the agreed night
+
+
+def test_booking_an_agreement_books_and_approves_exactly_the_offer_terms():
+    result, bus, _ = run_find(negotiate_budget=200, book_agreement=True, book_args={}, date="2026-11-14",
+                              tags=["basel-sbb"], budget_chf=200)
+    deal = next(o["agreement"] for o in result["negotiation"]["outcomes"] if o["node_id"] == "ch.basel.hotel-rheinblick")
+    assert (deal["room_type"], deal["date"], deal["rate"]) == ("double", "2026-11-14", "best rate, non-refundable")
+    # The phone shows, and the user's key signs, the same room, night, rate and price.
+    terms = result["approval"]["terms"]
+    assert terms == {"room_type": "double", "date": "2026-11-14", "rate": "best rate, non-refundable",
+                     "includes": deal["includes"], "offer_id": deal["offer_id"]}
+    assert "non-refundable" in result["approval"]["summary"]
+    pending = next(e for e in bus.history if e["kind"] == "approval" and e["status"] == "pending")
+    assert pending["detail"]["terms"] == terms and pending["detail"]["amount_chf"] == deal["price_chf"]
+    booking = result["booking"]
+    assert booking["status"] == "confirmed" and "mismatch" not in booking
+    assert (booking["room_type"], booking["rate"], booking["offer_id"], booking["total_chf"]) == \
+        ("double", "best rate, non-refundable", deal["offer_id"], deal["price_chf"])
+
+
+@pytest.mark.parametrize("args, wrong", [({"room_type": "double-flex"}, "room_type 'double-flex'"),
+                                         ({"room_type": "double", "date": "2026-11-15"}, "date 2026-11-15"),
+                                         ({"extras": ["late check-in"]}, "extras")])
+def test_book_refuses_llm_arguments_that_would_change_the_agreement(args, wrong):
+    result, _, _ = run_find(negotiate_budget=200, book_agreement=True, book_args=args, date="2026-11-14",
+                            tags=["basel-sbb"], budget_chf=200)
+    error = result["booking"]["error"]
+    assert wrong in error and "best rate, non-refundable" in error
+    assert result["pending"] == [] and "approval" not in result  # the phone was never asked
 
 
 def test_resumed_chat_can_book_its_signed_agreement_after_starting_a_new_chat():

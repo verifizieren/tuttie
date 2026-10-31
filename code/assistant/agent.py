@@ -58,7 +58,8 @@ returns the cards with the agreed prices, which the wallet shows as cards the us
 (right = like, left = pass). Then say in one short sentence which hotel you recommend and why. \
 Do not book in this turn: the user chooses first.
 3. When the user asks to book a hotel (its node id is in brackets), book it right away. If \
-post_request got an agreement with it, call book with use_agreement=true (no other steps). \
+post_request got an agreement with it, call book with use_agreement=true and without room_type, \
+date or extras: the agreement fixes them (no other steps). \
 Otherwise get its availability with call_tool, ask its agent with ask_agent for one commitment \
 covering the user's special needs together (arrival time, pets, children) in one short \
 sentence, then call book with the commitment's item as an extra. Never ask for confirmation in \
