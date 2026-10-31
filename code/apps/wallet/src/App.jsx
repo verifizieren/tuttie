@@ -38,6 +38,7 @@ import { currentTask } from "./lib/activity.js";
 // never land on the keyboard icon.
 const OPEN_GUARD_MS = 700;
 const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
+const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
 
 export default function App() {
   const [mode, setMode] = useState("closed");
@@ -72,6 +73,13 @@ export default function App() {
     const fallback = setTimeout(() => setReveal(r => (r && !r.id ? null : r)), REVEAL_WAIT_MS);
     return () => clearTimeout(fallback);
   }, [agent.answer]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // The user said goodbye (Tuttie's end_conversation): once the goodbye is shown and spoken, the
+  // card closes itself, as if swiped down.
+  useEffect(() => {
+    if (agent.closing !== "ready" || reveal || mode === "closed") return undefined;
+    const timer = setTimeout(close, CLOSE_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [agent.closing, reveal, mode]);  // eslint-disable-line react-hooks/exhaustive-deps
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 

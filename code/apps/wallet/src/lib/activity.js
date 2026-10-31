@@ -21,6 +21,7 @@ export const EMPTY = {
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
   mood: "neutral",      // how it feels (assistant/agent.py MOODS)
+  closing: null,        // the user said goodbye: "asked" (end_conversation), "ready" once Tuttie answered
 };
 
 const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
@@ -37,7 +38,7 @@ export const finished = state => Boolean(state.answer) && !state.approval && sta
 
 /** The user said something: a new turn (and a new conversation if there is none). */
 export function startTurn(state, said) {
-  return { ...state, id: state.id || newId(), turns: [...state.turns, { said }], phase: "thinking" };
+  return { ...state, id: state.id || newId(), turns: [...state.turns, { said }], phase: "thinking", closing: null };
 }
 
 /** Tuttie's answer without the timeline citations ([3]) or lines about ignored businesses. */
@@ -70,7 +71,7 @@ function withAnswer(state, text, mood) {
   const settle = line => (line ? { ...line, done: true } : line);
   const turns = base.turns.map((t, n) => (n === i ? { ...t, answer: text, mood, context: settle(t.context),
                                                        tool: settle(t.tool) } : t));
-  return { ...base, turns, answer: text, mood, phase: "done" };
+  return { ...base, turns, answer: text, mood, phase: "done", closing: state.closing === "asked" ? "ready" : state.closing };
 }
 
 /** A charge paid after the booking (e.g. the city tax), from the hotel's signed receipt. */
@@ -85,6 +86,7 @@ function withPayment(state, receipt) {
 export function applyEvent(state, event) {
   const detail = event.detail || {};
   if (event.kind === "thinking") return state.phase === "idle" ? { ...state, phase: "thinking" } : state;
+  if (event.kind === "close") return { ...state, closing: "asked" };
   if (event.kind === "answer") return withAnswer(state, cleanAnswer(event.summary), detail.mood || "neutral");
   if (event.kind === "context") return progress(state, "context", event.summary, detail.phase === "found");
   if (event.kind === "payment" && detail.payload?.status === "paid") {
