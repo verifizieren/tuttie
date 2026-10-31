@@ -16,6 +16,7 @@ which the wallet shows as the human view of the marketplace.
 
 import asyncio
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -34,6 +35,18 @@ SHORTLIST_SIZE = 5
 POSTING_HOURS = 2      # how long a posting stays open
 OFFER_WAIT_S = 45      # longest wait for the interested agents' offers (it stops as soon as all have offered)
 POLL_S = 0.5
+
+
+# A price in a requirement ("max CHF 160", "160 francs", "budget 160", "under 160.-"): the LLM
+# must never post one, so code drops it (bug #18), whatever the prompt said.
+MONEY = re.compile(r"chf|fr\.|francs?|€|\$|eur\b|usd|budget|price|cost|per night|\d\s*\.-", re.IGNORECASE)
+
+
+def public_requirements(requirements: list[str], budget_chf: float | None) -> list[str]:
+    """The requirements that may be posted: none naming a price or the private budget's number."""
+    secret = re.compile(rf"(?<![\d.]){int(budget_chf)}(?![\d])") if budget_chf else None
+    return [r for r in requirements
+            if not MONEY.search(r) and not (secret and secret.search(r))]
 
 
 def shortlist(offers: list[dict], budget_chf: float | None, now: datetime, size: int = SHORTLIST_SIZE) -> list[dict]:
@@ -71,7 +84,9 @@ class MarketDesk:
         now = datetime.now(timezone.utc)
         request = Request.model_validate({
             "request_id": new_request_id(), "category": category, "tags": tags or [],
-            "constraints": {"date": date, "guests": guests, "requirements": requirements or []},  # no budget
+            # No budget, and no requirement that names a price (the LLM wrote "max CHF 160" once).
+            "constraints": {"date": date, "guests": guests,
+                            "requirements": public_requirements(requirements or [], budget_chf)},
             "expires_at": (now + timedelta(hours=POSTING_HOURS)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         })
         envelope = sign_request(request, self.agent_id, load_signing_key(self.agent_id))
