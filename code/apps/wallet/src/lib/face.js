@@ -140,6 +140,8 @@ class TuttieFace {
     this.gaze = [0, 0];
     this.nextSaccade = 0; this.nextBlink = performance.now() + 2500; this.blinking = 0;
     this.asleep = false;
+    this.speaking = 0; this.hearing = 0;          // smoothed voice levels (0..1), see setVoice
+    this.voiceTarget = [0, 0];
     this.resize();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
@@ -172,6 +174,12 @@ class TuttieFace {
     this.set(name, ms);
   }
 
+  /** Voice levels (0..1): Tuttie's own speech makes the eyes pulse with it, the user's voice
+   *  makes them open up a little, like leaning in to listen. */
+  setVoice(speaking, hearing) {
+    this.voiceTarget = [Math.min(1, speaking), Math.min(1, hearing)];
+  }
+
   /** Look in a direction: x, y in -1..1. */
   lookAt(x, y, ms = 220) {
     this.gaze = [x, y];
@@ -199,6 +207,8 @@ class TuttieFace {
   frame(now) {
     const t = Math.min(1, (now - this.start) / this.duration);
     this.current = lerp(this.from, this.to, easeInOut(t));
+    this.speaking += (this.voiceTarget[0] - this.speaking) * .35;  // follow the voice, without jitter
+    this.hearing += (this.voiceTarget[1] - this.hearing) * .15;
     // Idle life, as in pycozmo's ProceduralFaceGenerator: small saccades and random blinks.
     if (!this.asleep && t >= 1 && now > this.nextSaccade) {
       this.nextSaccade = now + 900 + Math.random() * 2600;
@@ -212,6 +222,8 @@ class TuttieFace {
   draw(now) {
     const p = this.current.slice();
     if (this.asleep) p[1] += Math.sin(now / 900) * 3;  // slow breathing while the eyes are closed
+    p[3] *= 1 + .22 * this.speaking;                    // speaking: the eyes pulse with the voice
+    p[2] *= 1 + .07 * this.hearing; p[3] *= 1 + .07 * this.hearing;  // hearing: they open up
     const blink = this.blinking ? Math.min(1, (now - this.blinking) / 180) : 1;
     const closed = 1 - Math.abs(Math.sin(Math.PI * blink));  // 1 open → 0 closed → 1 open
     const { ctx, canvas, layer } = this;
