@@ -374,7 +374,9 @@ Why things are the way they are, so nobody has to rediscover them:
   it again archives it and starts fresh (`POST /conversations`), unless a request or approval
   waits. Reload keeps the selected conversation (`GET /history`, `X-Conversation-ID`).
   History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
-  old or expired entries stay read-only. Saved conversations are in memory, capped at 200
+  the keyboard in an open past chat resumes that chat before typing, and the dock's History
+  button always returns to the list. Old or expired entries stay read-only: a 404/410 shows
+  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 200
   globally in addition to the 200 active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
