@@ -123,7 +123,7 @@ function cutLid(ctx, p, lidBase, yOffset, angleOffset) {
 }
 
 class TuttieFace {
-  constructor(canvas, { color = "#ffd1bb", glow = "rgba(217, 119, 87, .85)" } = {}) {
+  constructor(canvas, { color = "#f6d3c2", glow = "rgba(217, 119, 87, .35)" } = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.layer = document.createElement("canvas");  // one eye at a time, so lids never cut the other eye
@@ -226,7 +226,7 @@ class TuttieFace {
       lctx.globalCompositeOperation = "source-over";
       ctx.save();
       ctx.shadowColor = this.glow;
-      ctx.shadowBlur = 8 * unit;
+      ctx.shadowBlur = 3 * unit;  // a soft halo, not a glow
       ctx.drawImage(layer, 0, 0);
       ctx.restore();
     });
