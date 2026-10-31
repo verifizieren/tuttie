@@ -23,9 +23,25 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        for p in processes:
+        stop(processes)
+
+
+def stop(processes: list[subprocess.Popen], grace_s: float = 3) -> None:
+    """Stop every service: politely first, then for good after `grace_s`.
+
+    Why the deadline: on Ctrl+C uvicorn shuts down gracefully and waits until all open
+    connections close, and the wallet's live event stream (`GET /events` on the assistant)
+    never closes by itself. Without a deadline the launcher hung until a second Ctrl+C.
+    """
+    for p in processes:
+        if p.poll() is None:
             p.terminate()
-        for p in processes:
+    deadline = time.monotonic() + grace_s
+    for p in processes:
+        try:
+            p.wait(timeout=max(0.0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            p.kill()  # still waiting for an open connection (e.g. the event stream)
             p.wait()
 
 
