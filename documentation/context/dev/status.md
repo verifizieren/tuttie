@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (MCP step 5, APS side complete: signed calls C1, action gate C2, payment mandate C3, counter_offer as MCP tool C4) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
+Last updated: 2026-10-31 (MCP step 5 reviewed where node and gate meet: one double-charge race in `pay` found, fix requested; gate concurrency rule documented and tested).
 
 ## Done
 
@@ -112,7 +112,12 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
    whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
    pitch needs first.
-2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above).
+2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above). **Bug to fix in `pay`
+   (`node/server.py`):** "already paid" is only checked *before* `await gate.check_action`,
+   so two `pay` calls sent at once with one mandate both pass (reproduced: the CHF 4 city tax
+   paid twice for one booking; 4 + 4 is still within the mandate's CHF 10). Fix: check
+   `(booking_id, purpose) in paid` again right after the gate, before `gate.commit`, with no
+   `await` in between (the rule is now in the `aps/gate.py` docstring). `book` is fine.
 3. **dev member 2:** check with the pitch team where `pay` happens in the story (e.g. city tax
    with a mandate, under CHF 10, no phone; above that the phone asks); then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
    numbers in formats.md) and confirm it live with the real LLM
@@ -124,7 +129,7 @@ Build order from [goals.md](goals.md):
 
 ### Test coverage
 
-228 tests, all green (`pytest -q`; set `OPENAI_API_KEY` to any value without `.env`), no network and no LLM: `test_aps.py` (signing, freshness,
+238 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
