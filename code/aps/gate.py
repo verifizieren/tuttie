@@ -10,18 +10,22 @@ signature that is missing:
     3. fresh          stamped within CALL_MAX_AGE_S (an old call is a recording)
     4. signature      signed with the key in the caller's registry record
     5. nonce          not seen before from this agent (a recent call played again)
-    6. delegation     the user's key lets this agent use the tool's scope (e.g. "book"), not expired
+    6. delegation     the user's key lets this agent act for them, with the tool's scope (e.g.
+                      "book"; `pay` has no scope: paying is never delegated), not expired
     7. agreement      if the call carries one: this business's own signed Agreement, valid, unused
     8. approval       if the action needs one: the user's signed "approved" decision for this
                       action and this business, not used before, for exactly the amount: the
                       agreement's price, or else the total the business computed itself (the
                       caller's own figures are never trusted)
+       or mandate     for a payment (Needs.mandate) without an approval: the user's signed
+                      mandate (aps/mandate.py) for this agent, payee and purpose, at most
+                      CHF 10 per payment and within its total (the gate counts what was paid)
 
 The answer is a Verdict: ok, or the refusal reason (safe to send back; it names what is
 missing, never a private limit), plus the list of checks passed for the wallet ("approval ✓
 delegation ✓ agreement ✓"). Nothing is used up until the action succeeded: then the service
-calls `commit(verdict)`, which marks the approval and the agreement as used. The nonce is
-used as soon as the signature verified, so a refused call cannot be retried as it is either.
+calls `commit(verdict)`, which marks the approval and the agreement as used and counts a
+mandate payment. The nonce is used as soon as the signature verified, so a refused call cannot be retried as it is either.
 
 Hook for an action tool (owner of node/server.py), e.g. `book`:
 
@@ -33,6 +37,10 @@ Hook for an action tool (owner of node/server.py), e.g. `book`:
         return refuse(verdict.reason)
     ... confirm the booking ...
     gate.commit(verdict)
+
+For `pay` (the business computes what it charges):
+
+    Needs("pay", scope=None, approval=True, mandate=True, amount_chf=charge, purpose="city tax")
 """
 
 from collections.abc import Awaitable, Callable
@@ -43,6 +51,7 @@ from aps.approval import verify_decision
 from aps.call import CALL_MAX_AGE_S, NonceBook, call_body, verify_call
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
+from aps.mandate import mandate_refusal
 from aps.seals import evaluate_record
 
 Lookup = Callable[[str], Awaitable[dict | None]]  # node_id -> registry record, or None
@@ -53,15 +62,19 @@ TRUSTED_TIERS = {"gold", "blue"}
 class Needs:
     """What an action tool requires of a call.
 
-    `scope` is the delegation scope the tool needs. With `approval`, the user's signed
-    approval must be for this tool and this business, for exactly `amount_chf` (the total
-    the business computed; an agreement in the call replaces it with the agreed price).
+    `scope` is the delegation scope the tool needs (None: any valid delegation, e.g. `pay`,
+    which is never a scope). With `approval`, the user's signed approval must be for this
+    tool and this business, for exactly `amount_chf` (the total the business computed; an
+    agreement in the call replaces it with the agreed price). With `mandate` as well, a
+    user-signed mandate for `purpose` may stand in for the approval of a small payment.
     """
 
     tool: str
-    scope: str
+    scope: str | None
     approval: bool = False
     amount_chf: float | None = None
+    mandate: bool = False
+    purpose: str | None = None
 
 
 @dataclass
@@ -74,6 +87,7 @@ class Verdict:
     caller: dict | None = None      # the caller's registry record
     approval: dict | None = None    # the user's signed decision, if the action needed one
     agreement: object | None = None  # the parsed Agreement, if the call carried one
+    mandate: dict | None = None     # the user's signed mandate, if it stood in for an approval
     amount_chf: float | None = None  # the approved amount the action runs with
 
 
@@ -98,6 +112,7 @@ class ActionGate:
         self.agreements = agreements
         self.nonces = NonceBook(CALL_MAX_AGE_S)
         self.used_approvals: set[str] = set()
+        self.paid_with_mandate: dict[str, float] = {}  # mandate id -> CHF paid with it
 
     async def check_action(self, call: dict, needs: Needs, now: datetime | None = None) -> Verdict:
         """Run every check for this call; never raises for bad input, refuses instead."""
@@ -139,16 +154,31 @@ class ActionGate:
         delegation = call.get("delegation") or caller.get("delegation") or {}
         if not verify_delegation(delegation, self.user_public_key, body["agent_id"], caller["public_key"],
                                  scope=needs.scope, now=now):
-            raise Refused(f"the user has not delegated {needs.scope} to this agent (missing, expired or not signed by the user)")
+            what = needs.scope or "anything"
+            raise Refused(f"the user has not delegated {what} to this agent (missing, expired or not signed by the user)")
         verdict.checks.append("delegation")
 
         args = body["args"]
         if args.get("agreement") is not None:
             verdict.agreement = self._agreement(args["agreement"], now)
             verdict.checks.append("agreement")
-        if needs.approval:
+        if needs.approval and needs.mandate and args.get("approval") is None and args.get("mandate") is not None:
+            verdict.mandate, verdict.amount_chf = self._mandate(args["mandate"], body["agent_id"], needs, now)
+            verdict.checks.append("mandate")
+        elif needs.approval:
             verdict.approval, verdict.amount_chf = self._approval(args.get("approval"), needs, verdict.agreement)
             verdict.checks.append("approval")
+
+    def _mandate(self, mandate, agent_id: str, needs: Needs, now: datetime) -> tuple[dict, float]:
+        """The user's signed mandate covers this payment: agent, payee, purpose, limits, time."""
+        if needs.amount_chf is None:
+            raise Refused("there is no amount to pay")
+        paid = self.paid_with_mandate.get(mandate.get("mandate_id"), 0) if isinstance(mandate, dict) else 0
+        reason = mandate_refusal(mandate, self.user_public_key, agent_id, self.node_id, needs.purpose,
+                                 needs.amount_chf, paid, now)
+        if reason is not None:
+            raise Refused(reason)
+        return mandate, needs.amount_chf
 
     def _agreement(self, envelope, now: datetime):
         """This business's own signed agreement, not expired and not booked before."""
@@ -182,3 +212,6 @@ class ActionGate:
             self.used_approvals.add(verdict.approval["approval_id"])
         if verdict.agreement is not None and self.agreements is not None:
             self.agreements.mark_used(verdict.agreement)
+        if verdict.mandate is not None:
+            mandate_id = verdict.mandate["mandate_id"]
+            self.paid_with_mandate[mandate_id] = self.paid_with_mandate.get(mandate_id, 0) + verdict.amount_chf

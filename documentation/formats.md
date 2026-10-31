@@ -227,6 +227,34 @@ calling agent (Tuttie); the MCP tool gets it as its arguments, unchanged:
   side. Whether the action is *allowed* (seals, scope, approval, agreement) is decided by the
   action gate (below).
 
+## Payment mandate (`aps/mandate.py`)
+
+For small expected payments (city tax, a late-arrival fee) the user signs a mandate in
+advance instead of approving each payment on the phone:
+
+```json
+{
+  "mandate_id": "md-3f9a2c1b",
+  "agent_id": "ch.tuttie.alex-muster",
+  "payee_node_id": "ch.basel.gaestehaus-am-rhein",
+  "max_chf": 20,
+  "purpose": "city tax",
+  "issued_at": "2026-11-14T00:00:00Z",
+  "expires_at": "2026-11-16T00:00:00Z",
+  "signature": "<user key over canonical {mandate_id, agent_id, payee_node_id, max_chf, purpose, issued_at, expires_at}>"
+}
+```
+
+- Valid only for this agent, this payee and this purpose, until `expires_at`. `max_chf` is
+  the total over all payments with it; the business counts what was paid.
+- One mandate payment is at most **CHF 10** (`AUTO_PAY_LIMIT_CHF`); above that the user
+  approves the payment on the phone, mandate or not.
+- Tuttie pays with a mandate only to gold or blue businesses (`may_auto_pay(mandate,
+  user_key, agent_id, payee_record, authorities, amount, purpose)` → `None` or the reason
+  to ask the user instead). The business side checks the mandate in the action gate.
+- The `pay` call carries it in `args.mandate` (with `amount_chf` and `purpose`); the user's
+  key signs mandates (`sign_mandate`), like approvals, in the wallet.
+
 ## Action gate (`aps/gate.py`)
 
 Every action tool asks one gate before it runs: `await gate.check_action(call, needs)` with
@@ -244,11 +272,14 @@ approval, agreement, amount_chf}`:
 | 6 | `delegation` with the scope, signed by the user, not expired | `the user has not delegated <scope> to this agent (...)` |
 | 7 | `agreement` (only if `args.agreement`): own signature, valid, unused | `the agreement is not signed by this hotel` / `... has expired` / `... was already booked` / `this business does not negotiate, ...` |
 | 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` |
+| 8b | or `mandate` (only `pay`, `Needs(mandate=True)`, call has `mandate` and no `approval`) | `the mandate is not signed by the user` / `... is for another agent` / `... for another payee` / `... is for <x>, not <purpose>` / `... has expired` / `CHF a is above the CHF 10 a mandate covers; the user must approve it` / `the mandate's amount is used up` |
 
+`pay` uses `Needs("pay", scope=None, approval=True, mandate=True, amount_chf=<charge>,
+purpose=<what for>)`: no delegation scope (paying is never delegated), any valid delegation.
 The amount is the agreement's price if the call carries one, else the business's own total;
 the caller's figures are never used. Reasons name what is missing and never a private limit.
 Nothing is used up by a check: after the action succeeded, the service calls
-`gate.commit(verdict)` (approval and agreement become used). The nonce is used as soon as the
+`gate.commit(verdict)` (approval and agreement become used, a mandate payment is counted). The nonce is used as soon as the
 signature verified, so a refused call is not retried unchanged. `checks` is what the wallet
 shows ("approval ✓ delegation ✓ agreement ✓").
 
