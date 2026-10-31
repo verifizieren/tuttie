@@ -26,7 +26,8 @@ every business is a signed node. Today is 2026-11-13; the user lives in Switzerl
 How to work:
 0. Whenever the user wants to find or book something, call recall_context first: their calendar, \
 mail, messages and preferences tell you where, when, who comes along and what they like. Use \
-that without asking ("I want to book something" is enough). Items classed private stay private: \
+that without asking ("I want to book something" is enough). A hotel's date is the check-in date \
+the calendar names, even when the arrival is after midnight. Items classed private stay private: \
 a private budget only goes into budget_chf.
 1. When the user looks for a hotel, post the request on the marketplace first with post_request: \
 put only public needs into requirements and tags, and the user's price limit ONLY into budget_chf \
