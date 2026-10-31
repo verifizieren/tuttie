@@ -9,6 +9,7 @@ export const EMPTY = {
   skipped: [],          // [{ name, reason, tier }] not woken: untrusted or broken
   shortlistDone: false,
   approval: null,       // { id, amount, hotel, summary, seals, uid } while the user decides
+  booking: null,        // { id, hotel, total, date, room, extras, checked, seals, uid } once the hotel confirmed
   answer: "",
   mood: "neutral",      // how Tuttie's answer feels (assistant/agent.py MOODS)
   thought: "",          // the latest reasoning summary title
@@ -71,6 +72,13 @@ export function applyEvent(state, event) {
     }), phase: "negotiating" };
   }
 
+  // The hotel's signed confirmation, with the checks its action gate passed.
+  if (event.kind === "a2t" && detail.payload?.tool === "book" && detail.payload.status === "confirmed") {
+    const b = detail.payload;
+    return { ...state, phase: "booked", booking: { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date,
+      room: b.room_type, extras: b.extras || [], checked: b.checked || [], seals: event.seals, uid: event.uid } };
+  }
+
   if (event.kind === "approval") {
     if (event.status === "pending") {
       return { ...state, phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
@@ -91,6 +99,7 @@ export function statusLine(state) {
     case "negotiating": return "Negotiating…";
     case "approval": return "Waiting for your approval";
     case "booking": return "Booking…";
+    case "booked": return "Booked";
     case "declined": return "You declined";
     default: return "";
   }
@@ -119,5 +128,5 @@ export const BUSY = new Set(["thinking", "posted", "negotiating", "booking"]);
 /** The face's expression for a phase (names from lib/face.js). */
 export const EXPRESSION = {
   thinking: "skepticism", posted: "amazement", offers: "happiness", negotiating: "suspicion",
-  approval: "pleading", booking: "neutral", declined: "sadness", done: "happiness",
+  approval: "pleading", booking: "neutral", booked: "happiness", declined: "sadness", done: "happiness",
 };
