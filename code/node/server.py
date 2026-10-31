@@ -26,6 +26,7 @@ from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel, ValidationError
 
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
+from aps.approval import booking_terms
 from aps.call import call_body
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
@@ -137,8 +138,10 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         The hotel computes the total itself: the room's price plus extras, which must be its own
         signed A2A commitments; an agreement in the call (its own signed deal) replaces it with
         the agreed price. The gate then checks the caller, its signature, the user's delegation
-        for "book" and the user's approval for exactly that amount. The confirmation lists the
-        checks it rests on.
+        for "book" and the user's approval for exactly that amount. An agreement binds the
+        booking to its offer: another room type, night or rate, or extras on top, are refused,
+        and so is an approval signed for other terms (aps/approval.py, booking_terms). The
+        confirmation names the rate booked and lists the checks it rests on.
         """
         def refuse(reason: str) -> dict:
             """A signed refusal with the reason."""
@@ -152,10 +155,12 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         except ValidationError as error:
             return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
         total, items = None, []
+        if req.agreement is not None and req.extras:
+            return refuse("an agreement fixes what is included: book it without extras")
+        room = next((r for r in facts().get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
+        if room is None:
+            return refuse(f"no available room of type {req.room_type}")
         if req.agreement is None:
-            room = next((r for r in facts().get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
-            if room is None:
-                return refuse(f"no available room of type {req.room_type}")
             total = room["price_chf"]
             for extra in req.extras:
                 commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
@@ -167,8 +172,20 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         verdict = await gate.check_action(call, Needs("book", scope="book", approval=True, amount_chf=total))
         if not verdict.ok:
             return refuse(verdict.reason)
-        if verdict.agreement is not None:
-            items = list(verdict.agreement.includes)
+        deal = verdict.agreement
+        if deal is not None:
+            # The agreement is the selected offer: book exactly its room, night and rate.
+            if deal.room_type is not None and req.room_type != deal.room_type:
+                return refuse(f"the agreement is for a {deal.room_type} room, not {req.room_type}")
+            if deal.date is not None and req.date != deal.date:
+                return refuse(f"the agreement is for the night of {deal.date}, not {req.date}")
+            if deal.rate is not None and room["rate"] != deal.rate:
+                return refuse(f"the agreement is for the rate {deal.rate!r}, not {room['rate']!r}")
+            items = list(deal.includes)
+        terms = booking_terms(req.room_type, req.date, room["rate"], items, deal.offer_id if deal else None)
+        approved = verdict.approval.get("terms") if verdict.approval else None
+        if approved is not None and approved != terms:
+            return refuse("the approval is for other terms than this booking (room, night, rate or extras)")
         gate.commit(verdict)  # the approval and the agreement cannot be used again
         booking_id = "BK-" + secrets.token_hex(3).upper()
         bookings.add(booking_id)
@@ -179,6 +196,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "hotel": config["name"],
             "date": req.date,
             "room_type": req.room_type,
+            "rate": room["rate"],  # the cancellation terms booked
+            "offer_id": deal.offer_id if deal else None,
             "guest_name": req.guest_name,
             "extras": items,
             "total_chf": verdict.amount_chf,

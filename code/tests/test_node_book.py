@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from nacl.signing import SigningKey
 
 from aps import load_signing_key, sign_envelope
-from aps.approval import sign_decision
+from aps.approval import booking_terms, sign_decision
 from aps.call import sign_call
 from node.server import create_app
 from tests.mcp_helpers import TUTTIE, call_tool, registry_record, signed_book
@@ -17,8 +17,8 @@ NODE_ID = CONFIG["node_id"]
 DOG = {"item": "late check-in with dog", "price_chf": 15, "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}
 
 
-def approval(amount: float, approval_id: str = "ap-1", key: SigningKey | None = None) -> dict:
-    request = {"id": approval_id, "action": "book", "payee_node_id": NODE_ID, "amount_chf": amount}
+def approval(amount: float, approval_id: str = "ap-1", key: SigningKey | None = None, terms: dict | None = None) -> dict:
+    request = {"id": approval_id, "action": "book", "payee_node_id": NODE_ID, "amount_chf": amount, "terms": terms}
     return sign_decision(request, "approved", key or load_signing_key("user"))
 
 
@@ -115,3 +115,64 @@ def test_an_agreement_booking_names_the_signatures_it_checked():
     deal = signed_agreement(172, load_signing_key(NODE_ID), offer_id="of-rheinblick-9")
     result = book_agreement(node(), approval(172, "ap-c"), deal)
     assert result["checked"] == ["caller", "signature", "delegation", "agreement", "approval"]
+
+
+# --- the booking is bound to the selected offer ------------------------------------------
+
+BEST, FLEX = "best rate, non-refundable", "flexible, free cancellation until 48h before arrival"
+
+
+def bound_agreement(price: float, offer_id: str, room: str = "double", rate: str = BEST) -> dict:
+    """An agreement as the hotel now signs it: the offer's room, night and rate as fields."""
+    payload = {"type": "agreement", "request_id": "rq-test1", "offer_id": offer_id, "round": 2,
+               "item": f"{room} room 2026-11-14", "room_type": room, "date": "2026-11-14", "rate": rate,
+               "price_chf": price, "includes": [], "conditions": [rate], "valid_until": "2099-01-01T00:00:00Z"}
+    return sign_envelope(NODE_ID, payload, load_signing_key(NODE_ID))
+
+
+def book_terms(client: FastAPI, decision: dict, agreement: dict, room: str = "double",
+               date: str = "2026-11-14", extras: list | None = None) -> dict:
+    body = {"date": date, "room_type": room, "guest_name": "Alex Muster", "extras": extras or [],
+            "approval": decision, "agreement": agreement}
+    return signed_book(client, body)
+
+
+def test_an_agreement_books_exactly_its_room_night_and_rate():
+    client = node()
+    deal = bound_agreement(172, "of-rheinblick-b1")
+    terms = booking_terms("double", "2026-11-14", BEST, [], "of-rheinblick-b1")
+    result = book_terms(client, approval(172, "ap-b1", terms=terms), deal)
+    assert result["status"] == "confirmed" and result["total_chf"] == 172
+    assert (result["room_type"], result["rate"], result["offer_id"]) == ("double", BEST, "of-rheinblick-b1")
+
+
+def test_an_agreement_cannot_be_switched_to_the_flexible_rate_or_another_night():
+    client = node()
+    deal = bound_agreement(172, "of-rheinblick-b2")  # the non-refundable double
+    flex = book_terms(client, approval(172, "ap-b2"), deal, room="double-flex")
+    assert flex["status"] == "refused" and "agreement is for a double room" in flex["reason"]
+    other_night = book_terms(client, approval(172, "ap-b3"), deal, date="2026-11-15")
+    assert "night of 2026-11-14" in other_night["reason"]
+    extra = book_terms(client, approval(172, "ap-b4"), deal, extras=[commitment(load_signing_key(NODE_ID))])
+    assert "without extras" in extra["reason"]
+    # Nothing was used up: the agreement still books its own terms.
+    assert book_terms(client, approval(172, "ap-b5"), deal)["status"] == "confirmed"
+
+
+def test_an_approval_signed_for_other_terms_does_not_book():
+    client = node()
+    deal = bound_agreement(172, "of-rheinblick-b6")
+    seen = booking_terms("double-flex", "2026-11-14", FLEX, [], "of-rheinblick-b6")  # what the phone showed
+    result = book_terms(client, approval(172, "ap-b6", terms=seen), deal)
+    assert result["status"] == "refused" and "other terms" in result["reason"]
+
+
+def test_a_list_price_booking_names_its_rate_and_checks_the_approved_terms():
+    client = node()
+    terms = booking_terms("double-flex", "2026-11-14", FLEX, [])
+    body = {"date": "2026-11-14", "room_type": "double-flex", "guest_name": "Alex Muster",
+            "approval": approval(205, "ap-b7", terms=terms)}
+    result = signed_book(client, body)
+    assert result["status"] == "confirmed" and result["rate"] == FLEX and result["offer_id"] is None
+    swapped = {**body, "room_type": "double", "approval": approval(180, "ap-b8", terms=terms)}
+    assert "other terms" in signed_book(client, swapped)["reason"]
