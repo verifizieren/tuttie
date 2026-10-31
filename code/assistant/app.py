@@ -1,4 +1,4 @@
-"""User's assistant service (port 4040): chat API, SSE timeline, phone approvals and the static UI.
+"""User's assistant service (port 4040): chat API, SSE timeline, phone approvals and the static apps.
 
 A chat runs in the background (it may wait minutes for the phone); its answer arrives as an
 "answer" event on the timeline stream.
@@ -17,7 +17,7 @@ import qrcode
 import qrcode.image.svg
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ from assistant.events import EventBus  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
 from llm import LLM  # noqa: E402
 
-UI_DIR = Path(__file__).resolve().parent.parent / "ui"
+APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # console/, wallet/, shared/, ...
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")
 
 bus = EventBus()
@@ -102,7 +102,7 @@ def phone_qr(request: Request) -> Response:
     """QR code of the phone page URL, as seen by the browser (works behind the reverse proxy)."""
     scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
     host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
-    url = os.environ.get("PHONE_URL", f"{scheme}://{host}/phone.html")
+    url = os.environ.get("PHONE_URL", f"{scheme}://{host}/wallet/")
     buffer = io.BytesIO()
     qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=2).save(buffer)
     return Response(buffer.getvalue(), media_type="image/svg+xml", headers={"X-Phone-Url": url})
@@ -114,7 +114,18 @@ def events() -> StreamingResponse:
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
+@app.get("/")
+def home() -> RedirectResponse:
+    return RedirectResponse("/console/")
+
+
+@app.get("/phone.html")
+def old_phone_link() -> RedirectResponse:
+    """Links and QR codes from before the apps/ split."""
+    return RedirectResponse("/wallet/")
+
+
+app.mount("/", StaticFiles(directory=APPS_DIR, html=True), name="apps")
 
 
 if __name__ == "__main__":

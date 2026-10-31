@@ -1,4 +1,4 @@
-// Seal badges shared by index.html and phone.html: issuer logo + name, coloured by tier.
+// Seal badges shared by the console and wallet apps: issuer logo + name, coloured by tier.
 // Logos are small inline SVGs so the pages need no external assets.
 
 const SWISS_FLAG = `<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="4" fill="#da291c"/>
