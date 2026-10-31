@@ -1,0 +1,24 @@
+{
+  "user": "Alex Muster",
+  "about": "Demo data: what Tuttie may read about its user (calendar, mail, messages, preferences). Each item is classed public, negotiation or private; private items never leave Tuttie.",
+  "calendar": [
+    { "when": "2026-11-14 18:00", "what": "Dinner with Lukas in Milan", "visibility": "private" },
+    { "when": "2026-11-14 21:10", "what": "Train Milano Centrale → Basel SBB, arrives 00:52 (night to 15 Nov)", "visibility": "negotiation" },
+    { "when": "2026-11-15 11:00", "what": "Brunch with Sara at the Rhine, Kleinbasel", "visibility": "private" }
+  ],
+  "mail": [
+    { "from": "SBB", "subject": "Your ticket Milano → Basel, 14 Nov", "snippet": "EC 52, arrival Basel SBB 00:52, seat 64", "visibility": "private" },
+    { "from": "Hotel newsletter", "subject": "Autumn deals in Zurich", "snippet": "Not relevant to Basel", "visibility": "private" }
+  ],
+  "messages": [
+    { "from": "Sara", "text": "Can't wait for Sunday! Bring Luna, the Rhine walk is dog heaven 🐶", "visibility": "private" },
+    { "from": "Alex", "text": "Luna comes along. I'll find a quiet place near you for the night.", "visibility": "private" }
+  ],
+  "preferences": [
+    { "what": "Sleeps badly in noisy places: prefers quiet rooms", "visibility": "public" },
+    { "what": "Travels with Luna, a medium-sized dog", "visibility": "public" },
+    { "what": "Likes small, independent places", "visibility": "public" },
+    { "what": "Budget for one night: CHF 160 at most", "visibility": "private" }
+  ],
+  "found": ["Basel", "14 Nov", "arriving ~01:00", "with Luna", "quiet", "budget stays private"]
+}
