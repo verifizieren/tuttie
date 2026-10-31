@@ -125,6 +125,10 @@ class Assistant:
         (the user swiped the cards: negotiate with the liked hotels). After it, the LLM decides.
         """
         async with self.lock:
+            if not text.strip():  # the LLM APIs refuse empty messages; nothing to answer either
+                answer = "I didn't catch that. What can I do for you?"
+                self.bus.emit("answer", "verified", answer, detail={"mood": "confused"})
+                return answer
             start = len(self.messages)
             try:
                 return await self._turn(text, first_tool)
