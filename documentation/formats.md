@@ -532,7 +532,14 @@ its floor, and its price is final in the last round or once it reaches the floor
 its own session. The user's real limit is the private context item `max_price_chf`: compared
 in Tuttie's code, never shared or sent. Tuttie opens 10 % below the offer, then moves halfway
 toward the hotel's price, accepts a final or close price within the limit and walks away
-otherwise. The cheapest Agreement is what the user approves.
+otherwise. A signed Agreement counts only at or below Tuttie's last counter (so never above
+the limit) and with the offer's `request_id`, `offer_id`, `item`, `room_type`, `date`, `rate`,
+`includes` and `conditions` unchanged; anything else ends that negotiation as `refused`. The
+cheapest Agreement is what the user approves.
+
+**Tuttie collecting offers** (`assistant/marketplace.py`): Tuttie re-checks every relayed offer
+(seals, signature, `request_id` equal to its own posting, `valid_until` not passed) and keeps
+one offer per hotel, its latest; it waits until every interested hotel has one (or 45 s).
 
 **Strategy numbers** (tuned for the demo; preview with `scripts/bargain_preview.py`):
 `OPENING_DISCOUNT = 0.10` and `TUTTIE_STEP = 0.5` (`negotiation/tuttie.py`), `HOTEL_STEP =

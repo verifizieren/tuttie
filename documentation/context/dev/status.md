@@ -136,6 +136,10 @@ Build order from [goals.md](goals.md):
    subscribed businesses; interested agents send signed offers (`make_offer`, prices from the
    config); Tuttie re-checks every offer and builds the shortlist itself (verified, within the
    private budget, cheapest first, at most five). Live-tested end to end with the real LLM.
+   Offer checks (2026-11-01): the wait counts hotels, not offers (one hotel's two offers
+   ended it early: likely the "only Rheinblick offered" sighting), one offer per hotel (its
+   latest); offers for another request or past `valid_until` are refused; Tuttie accepts an
+   Agreement only at or below its own last counter and on the offer's unchanged terms.
    Tests: `test_market_agents.py`, `test_tuttie_market.py`.
 3. **Human layer in the wallet** — done: typed requests go to Tuttie; the wallet follows the
    timeline and shows the posting (budget private), the hotels asked and skipped, offers with
