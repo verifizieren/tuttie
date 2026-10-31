@@ -1,7 +1,7 @@
-// Tuttie's voice in the wallet. While the wallet is on screen it stays connected to this
-// conversation's LiveKit room (token from POST /voice/token) with the microphone OFF, so the
-// voice agent is already there and listening costs nothing to start: opening the card in voice
-// mode only switches the microphone on and Tuttie's voice up. It sends the microphone, plays
+// Tuttie's voice in the wallet. The first tap on Tuttie joins this conversation's LiveKit room
+// (token from POST /voice/token); after that the wallet stays in the room with the microphone
+// off while the card is closed, so the voice agent is already there: opening the card again
+// only switches the microphone on and Tuttie's voice up. It sends the microphone, plays
 // Tuttie's voice, and passes both voice levels to Tuttie's presence (onLevels), which moves the
 // eyes (lib/faceDirector.js): they pulse while Tuttie speaks and open up while the user talks.
 // Speech becomes a message to the same Tuttie as typing (code/voice/agent.py); without voice
@@ -10,7 +10,7 @@
 // can show an answer as it is spoken.
 // When the wallet is hidden (another app, locked phone) the room is left; it rejoins on return.
 import { useEffect, useRef, useState } from "react";
-import { watchIce } from "../lib/iceReport.js";
+import { report, watchIce } from "../lib/iceReport.js";
 
 const LEVEL_MS = 50;       // how often the voice levels go to the presence (and so to the eyes)
 const RETRY_MS = 2000;     // rejoin after a dropped connection
@@ -43,6 +43,8 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
   const [joined, setJoined] = useState(null);  // the connected Room, or null
   const [state, setState] = useState("off");
   const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   const [attempt, setAttempt] = useState(0);
   const [shown, setShown] = useState(visible());
 
@@ -52,23 +54,34 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
-  // Join the room ahead, microphone off, while the wallet is on screen.
+  // The first tap joins the room (an iPhone sets up the connection only while the microphone
+  // is in use, so it must be captured first); after that the room stays joined while the card
+  // is closed, microphone off, so opening it again is instant. If the room is left while the
+  // card is closed (new chat, wallet hidden), it is joined again on the next tap.
+  const [wanted, setWanted] = useState(false);
+  useEffect(() => { if (active) setWanted(true); }, [active]);
+
   useEffect(() => {
     // Only once the conversation is loaded: its request also sets this browser's session cookie,
     // and a token fetched before that would tie the room to another session (voice would go
     // into a conversation the screen does not show).
-    if (!shown || !conversationId) return undefined;
+    if (!shown || !conversationId || !wanted) return undefined;
     let closed = false, lk = null, retry = null;
     setState("connecting");
     (async () => {
       const response = await fetch("/voice/token", { method: "POST" });
       if (!response.ok) throw new Error("voice is not configured");
-      const [{ url, token }, { Room, RoomEvent, Track }] = await Promise.all([response.json(), import("livekit-client")]);
+      const [{ url, token }, { Room, RoomEvent, Track, createLocalAudioTrack }] =
+        await Promise.all([response.json(), import("livekit-client")]);
       if (closed) return;
+      // The microphone first, then the connection (see above). Muted: connect without it.
+      const mic = activeRef.current && !mutedRef.current ? await createLocalAudioTrack(MIC).catch(() => null) : null;
+      if (closed) { mic?.stop(); return; }
       watchIce();  // a failed connection on a phone is reported to the server's log
       // The classic two connections (publish, subscribe), not the newer single one: phones'
       // Safari joined but never connected with it.
-      lk = new Room({ adaptiveStream: true, dynacast: true, singlePeerConnection: false });
+      // The microphone is released while the card is closed (stopMicTrackOnMute).
+      lk = new Room({ adaptiveStream: true, dynacast: true, singlePeerConnection: false, stopMicTrackOnMute: true });
       lk.on(RoomEvent.TrackSubscribed, track => {
         if (track.kind !== Track.Kind.Audio) return;
         const audio = track.attach();  // Tuttie's voice, silent until voice mode is on
@@ -78,9 +91,11 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
         document.body.appendChild(audio);
       });
       lk.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
-      lk.on(RoomEvent.Disconnected, () => {
+      lk.on(RoomEvent.Disconnected, reason => {
+        report({ state: "room disconnected", reason });
         if (closed) return;
         setJoined(null);
+        if (!activeRef.current) return setWanted(false);  // joined again on the next tap
         retry = setTimeout(() => setAttempt(n => n + 1), RETRY_MS);
       });
       // Tuttie's words, in step with its voice. The user's own words come on the same topic,
@@ -99,10 +114,14 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
         speech.current?.({ id, text, done: true });
       });
       await lk.connect(url, token);
-      if (closed) return;
+      if (closed) { mic?.stop(); return; }
+      if (mic) await lk.localParticipant.publishTrack(mic, { source: Track.Source.Microphone });
       setJoined(lk);
       setState("ready");
-    })().catch(() => !closed && setState("unavailable"));
+    })().catch(error => {
+      report({ state: "connect failed", error: String(error?.message || error).slice(0, 300) });
+      if (!closed) setState("unavailable");
+    });
 
     return () => {
       closed = true;
@@ -110,8 +129,9 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
       lk?.disconnect();
       setJoined(null);
       setState("off");
+      if (!activeRef.current) setWanted(false);  // left while closed: join again on the next tap
     };
-  }, [shown, attempt, conversationId]);
+  }, [shown, attempt, conversationId, wanted]);
 
   // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the presence.
   useEffect(() => {
