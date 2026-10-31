@@ -42,13 +42,13 @@ DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
 DEFAULT_WAKES_ON = ["posting.created", "posting.updated"]
 COMMITMENT_DAYS = 30  # validity of a commitment when the arrival date is unknown
 # The company agents' decisions are small (interested?, which room and add-ons, a short answer),
-# so they use a fast model without reasoning; Tuttie keeps the stronger one (LLM_MODEL).
-AGENT_MODEL = os.environ.get("AGENT_LLM_MODEL", "gpt-4.1-mini")
+# so they use a fast model without reasoning (AGENT_LLM_MODEL, e.g. claude-haiku-5-5).
+DEFAULT_AGENT_MODEL = "gpt-4.1-mini"
 
 
 def LLM() -> ChatLLM:  # noqa: N802 (named like a class: tests replace it with a stub)
-    """The model the company agents use."""
-    return ChatLLM(AGENT_MODEL, reasoning=False)
+    """The model the company agents use, read when needed (code/.env is loaded after import)."""
+    return ChatLLM(os.environ.get("AGENT_LLM_MODEL", DEFAULT_AGENT_MODEL), reasoning=False)
 
 
 # Needs an add-on can cover, and the words that name them in a request or an add-on's item.
