@@ -15,6 +15,7 @@ from anthropic import APIConnectionError
 from openai import OpenAIError
 
 import node.agent
+import node.server
 from aps import verify_envelope
 from aps.keys import load_public_key
 from node.agent import FALLBACK, PRIVATE_FACTS, BusinessAgent, public_facts
@@ -206,3 +207,36 @@ def test_offer_url_must_be_the_markets_offer_door():
     assert not offer_url_allowed("http://localhost:4010/postings/rq-1/offers?x=1", "rq-1", market)
     assert not offer_url_allowed("http://[bad/postings/rq-1/offers", "rq-1", market)
     assert not offer_url_allowed("http://localhost:99999/postings/rq-1/offers", "rq-1", market)
+
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from aps import load_signing_key, sign_envelope  # noqa: E402
+from marketplace.messages import PostingCreated  # noqa: E402
+from negotiation.hotel import load_authorities  # noqa: E402
+from negotiation_helpers import TUTTIE, registry_lookup  # noqa: E402
+
+
+def signed_posting(signer=TUTTIE, request_id="rq-x1", requester=TUTTIE):
+    request = sign_envelope(signer, {"type": "request", "request_id": request_id}, load_signing_key(signer))
+    return PostingCreated.model_validate(posting_event(request=request, requester_id=requester)).posting
+
+
+def problem(posting, now=None):
+    return asyncio.run(node.server.requester_problem(posting, registry_lookup, load_authorities(), now))
+
+
+def test_a_posting_counts_only_with_a_fresh_request_signed_by_a_verified_user_agent():
+    assert problem(signed_posting()) is None
+    hotel = "ch.basel.hotel-rheinblick"
+    assert "not a user agent" in problem(signed_posting(signer=hotel, requester=hotel))
+    assert "not signed" in problem(signed_posting(signer=hotel))  # claims to be Tuttie
+    assert "another posting" in problem(signed_posting(request_id="rq-other"))
+    later = datetime.now(timezone.utc) + timedelta(minutes=10)
+    assert "outdated" in problem(signed_posting(), now=later)
+
+
+def test_invoke_refuses_an_unsigned_posting_before_the_llm_runs(no_llm):
+    app = create_app(RHEINBLICK, lookup=registry_lookup)
+    response = TestClient(app).post("/agent/invoke", json=posting_event())
+    assert response.status_code == 403

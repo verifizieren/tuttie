@@ -27,9 +27,10 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel, ValidationError
 
-from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
+from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import booking_terms
 from aps.call import call_body
+from aps.envelope import is_fresh
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
 from marketplace.messages import PostingCreated
@@ -45,6 +46,7 @@ from sessions import SessionClosed, SessionStore
 
 
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+MAX_REQUEST_AGE_S = 300  # as fresh as the market wants a posted request (marketplace/market.py)
 
 
 def market_url() -> str:
@@ -69,6 +71,27 @@ def offer_url_allowed(offer_url: str, request_id: str, market: str) -> bool:
     expected_path = f"{allowed.path.rstrip('/')}/postings/{request_id}/offers"
     return (url.scheme == allowed.scheme and same_host and same_port and url.path == expected_path
             and not url.query and not url.fragment and not url.username)
+
+
+async def requester_problem(posting, lookup, authorities: dict, now=None) -> str | None:
+    """Why a posting's request is not a fresh one signed by a verified user agent, or None.
+
+    Only then is a posting worth an LLM call: a made-up posting costs the business nothing.
+    """
+    envelope, requester = posting.request, posting.requester_id
+    record = await lookup(requester)
+    if not record or record.get("kind") != "user-agent":
+        return "the requester is not a user agent in the registry"
+    if evaluate_record(record, authorities)["tier"] not in ("gold", "blue"):
+        return "the requester's seals do not verify"
+    if not verify_envelope(envelope, record["public_key"], expected_node_id=requester):
+        return "the request is not signed by the requester"
+    if not is_fresh(envelope["timestamp"], MAX_REQUEST_AGE_S, now):
+        return "the request is outdated"
+    payload = envelope.get("payload")
+    if not isinstance(payload, dict) or payload.get("request_id") != posting.request_id:
+        return "the signed request is for another posting"
+    return None
 
 
 class AgentRequest(BaseModel):
@@ -118,7 +141,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     own_public_key = public_key_b64(signing_key)
     agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
     # Checks every signed action call: caller, signature, delegation, agreement, approval.
-    gate = ActionGate(node_id, own_public_key, load_public_key("user"), load_authorities(), lookup, agreements)
+    authorities = load_authorities()
+    gate = ActionGate(node_id, own_public_key, load_public_key("user"), authorities, lookup, agreements)
     bookings: set[str] = set()  # booking ids confirmed here, so charges can follow them
     paid: set[tuple[str, str]] = set()  # (booking id, purpose) already charged
     business_agent = BusinessAgent(config)
@@ -351,7 +375,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
         (marketplace/messages.py, PostingCreated). A new posting must be a valid PostingCreated
         whose offer_url is the configured market's offer door for it (offer_url_allowed); else
-        422, before any LLM runs.
+        422. Its request must be fresh and signed by a verified user agent (requester_problem);
+        else 403. Both are checked before any LLM runs.
         """
         if event.get("type") == "posting.created":
             try:
@@ -361,6 +386,9 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
                                                             f"{error.errors()[0]['msg']}") from None
             if not offer_url_allowed(posting.offer_url, posting.request_id, market_url()):
                 raise HTTPException(status_code=422, detail="offer_url is not this marketplace's offer address")
+            problem = await requester_problem(posting, lookup, authorities)
+            if problem:
+                raise HTTPException(status_code=403, detail=problem)
         decision = await business_agent.invoke(event)
         choice = decision.pop("offer_choice", None)  # chosen while deciding; not part of the reply
         if (event.get("type") == "posting.created" and decision.get("interested")
