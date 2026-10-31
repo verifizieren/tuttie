@@ -259,13 +259,21 @@ Why things are the way they are, so nobody has to rediscover them:
   hotel for its seals as an iOS-style grouped list with a checkmark-seal badge; the approval
   sheet shows them too. Businesses never asked are listed: forged seal in red, no valid seal
   grey and struck through.
-- **Picking favourites** (wallet + `assistant/cards.py`): after `post_request` Tuttie shows up
-  to 5 hotels as cards (shortlist first, marked "Recommended" and preselected), with pros and
-  cons built in code from the signed offer and the hotel's signed policies. Tuttie waits; the
-  user swipes through, hearts favourites and taps "Negotiate with …"; the wallet sends the
-  favourites with their node ids, Tuttie calls `negotiate(node_ids=…)` and books the best
-  agreement. Hotel photos: drop `code/apps/wallet/public/hotels/<node_id>.jpg`; until then a
-  drawn scene is shown. `scripts/demo_headless.py` picks the recommended cards like the wallet.
+- **User context** (`assistant/context.py`, `data/users/alex-muster.json`): Tuttie's first tool
+  `recall_context` reads the user's calendar, mail, messages and preferences (demo data, each
+  item public / negotiation / private), so "I want to book something" is enough: Basel, night
+  of 14 Nov, arriving ~01:00, with the dog Luna, quiet, budget CHF 160 (private, only in
+  `budget_chf`). The wallet shows it as the context progress line.
+- **Swipe cards** (wallet `Deck.jsx` + `assistant/cards.py`): after `post_request` Tuttie shows
+  up to 5 hotels as cards (shortlist first): photo, seals, ★ rating, up to 5 feature icons
+  (green yes / red no, needs first) and the price. Swipe right = like, left = pass. After the
+  last card the wallet sends the liked hotels with `first_tool: "negotiate"`; Tuttie negotiates
+  with exactly those and books the best agreement (approval as usual). Hotel photos: drop
+  `code/apps/wallet/public/hotels/<node_id>.jpg`; until then a drawn scene is shown.
+  `scripts/demo_headless.py` likes the recommended cards like the wallet.
+- **Progress lines:** each turn shows two joined lines that update in place: context (reading
+  calendar, mails, messages, preferences → what Tuttie found) and tools (asked N hotels → offers
+  in, checking seals → comparing → N hotels for you; later bargaining, agreed, booking, booked).
 - **Conversations in the wallet:** a conversation is a list of turns (user bubble, what
   happened on the market, Tuttie's highlighted answer). Swipe left on the open card (outside
   the scrolling list) starts a new one; swipe right shows the history. History lives only on
