@@ -39,14 +39,15 @@ cp .env.example .env             # add your OPENAI_API_KEY
 .venv/bin/pytest -q              # tests for APS, the trust gate and booking (no network, no LLM)
 ```
 
-Open <http://localhost:4040> (the console) and press **Dog + 1am arrival**. The timeline on
-the right shows what happens:
+<http://localhost:4040> opens the new Tuttie wallet (phone-first; the agent is not connected
+yet). The first working prototype is at <http://localhost:4040/old/console/>: press
+**Dog + 1am arrival** and the timeline on the right shows what happens:
 
 1. The scam hotel is rejected in red; Hotel Rheinblick verifies as gold.
 2. Signed availability and policies are fetched (A2T).
 3. The assistant asks the hotel's own agent about the 1am arrival with a dog (A2A) and gets
    a signed, priced commitment.
-4. An approval appears. Press **Phone** and scan the QR code, or open `/wallet/`, then
+4. An approval appears. Press **Phone** and scan the QR code, or open `/old/wallet/`, then
    tap Approve. The decision is signed with the user's key.
 5. The hotel checks the signature, recomputes the total from its own signed commitment and
    confirms the booking. Each claim in the answer carries a seal badge citing its source.

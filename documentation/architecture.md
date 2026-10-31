@@ -16,7 +16,7 @@ can work in parallel without stepping on each other. Contracts live in
          user's agent (code/assistant) <--> marketplace (code/marketplace) <--> registry
                          |                                        (code/registry)
                          v
-              console (apps/console): every signed step, live over SSE
+              console (apps/old/console): every signed step, live over SSE
                                    all signing: code/aps
              demo (code/demo) drives the same real components
 ```
@@ -30,13 +30,13 @@ can work in parallel without stepping on each other. Contracts live in
 | Business nodes | `code/node/`, `code/data/nodes/` | #10 | done for direct booking; offers and negotiation to add | signed envelopes; formats: offer, counter-offer |
 | Marketplace (requests, offers, shortlist, negotiation) | `code/marketplace/` | #8, #9, #10 | to build | formats: request, offer, counter-offer, agreement |
 | User's agent | `code/assistant/` | #10 | done for direct booking; marketplace flow to add | UI events over SSE, approvals API |
-| Wallet app (phone) | `code/apps/wallet/` | #2 | approvals page only; wallet UI to build | approvals API, UI events |
+| Wallet app (phone) | `code/apps/wallet/` | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
 | Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |
 | Owner view | `code/apps/owner/` | #5 | to build | owner API (to define) that edits `data/nodes/*.json` facts |
 | Presentation site and QR | `code/apps/presentation/` | #1, #6 | to build | links into the wallet and console |
 | Demo | `code/demo/` | #3, #2 | to build | drives the user's agent and the apps |
-| Console | `code/apps/console/` | — | done | UI events over SSE |
-| Shared UI pieces | `code/apps/shared/` | — | seal badges | — |
+| First prototype (console, approvals page) | `code/apps/old/` | — | done, kept for reference | UI events over SSE, approvals API |
+| Shared UI pieces | `code/apps/shared/` | — | brand, seal badges, procedural eyes | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
 
 ## Rules that keep the areas independent
