@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.hotel-rheinblick",
   "name": "Hotel Rheinblick",
+  "uid": "CHE-526.018.151",
   "port": 4001,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],

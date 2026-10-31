@@ -3,6 +3,7 @@
 Each seal in a node config names its issuer and tier. The issuer's key signs it,
 except where the config says "signed_by": "self" (the scam hotel forging a
 government seal with its own key). "issuer": "self" means a self-signed grey seal.
+The node's Swiss business number ("uid", optional) goes into the record and every seal.
 """
 
 import json
@@ -25,6 +26,7 @@ def build_record(config: dict) -> dict:
     record = {
         "node_id": node_id,
         "name": config["name"],
+        "uid": config.get("uid"),
         "public_key": public_key_b64(load_signing_key(node_id)),
         "endpoint": f"http://localhost:{config['port']}",
         "kind": config["kind"],

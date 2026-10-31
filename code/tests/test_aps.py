@@ -1,33 +1,46 @@
-"""Tests for the aps library: envelopes, seals and the committed demo registry."""
+"""Tests for the aps library: envelopes, freshness, seals, Swiss UIDs and the committed demo registry."""
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from nacl.signing import SigningKey
 
-from aps import canonical, evaluate_record, issue_seal, public_key_b64, sign_envelope, verify_envelope
+from aps import (canonical, evaluate_record, is_valid_uid, issue_seal, public_key_b64, sign_envelope,
+                 verify_envelope)
+from aps.envelope import is_fresh
+from aps.uid import check_digit
 
 DATA = Path(__file__).resolve().parent.parent / "data"
+TEST_UID = "CHE-786.579.750"  # made up, but with a correct check digit
+NOW = datetime(2026, 11, 14, 0, 12, tzinfo=timezone.utc)
 
 
-def make_authority(issuer, tier, licenses=()):
+def make_authority(issuer, tier, licenses=(), vouches_for_uid=False):
     key = SigningKey.generate()
-    entry = {"issuer": issuer, "tier": tier, "public_key": public_key_b64(key), "licenses": list(licenses)}
+    entry = {"issuer": issuer, "tier": tier, "public_key": public_key_b64(key), "licenses": list(licenses),
+             "vouches_for_uid": vouches_for_uid}
     return key, entry
 
 
-def make_record(node_key, capabilities=("can_book", "can_take_payment")):
+def make_record(node_key, capabilities=("can_book", "can_take_payment"), uid=TEST_UID):
     return {
         "node_id": "ch.test.node",
+        "uid": uid,
         "public_key": public_key_b64(node_key),
         "capabilities": list(capabilities),
     }
 
 
+def stamp(moment: datetime) -> str:
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 @pytest.fixture
 def authorities():
-    gov_key, gov = make_authority("handelsregister-bs", "gold")
+    """Fresh authorities shaped like data/authorities.json (the register vouches for UIDs)."""
+    gov_key, gov = make_authority("handelsregister-bs", "gold", vouches_for_uid=True)
     adobe_key, adobe = make_authority("adobe", "blue")
     bar_key, bar = make_authority("bar-association-ch", "gold", ["licensed_legal_ch"])
     keys = {"handelsregister-bs": gov_key, "adobe": adobe_key, "bar-association-ch": bar_key}
@@ -156,3 +169,92 @@ def test_approval_decision_verifies_and_detects_tampering():
     assert not verify_decision(decision, public_key_b64(SigningKey.generate()))
     with pytest.raises(ValueError):
         sign_decision(approval, "maybe", user_key)
+
+
+# --- envelope freshness -------------------------------------------------------------
+
+
+def test_fresh_envelope_verifies_with_max_age():
+    key = SigningKey.generate()
+    env = sign_envelope("ch.test.node", {"ok": True}, key, timestamp=stamp(NOW - timedelta(seconds=30)))
+    assert verify_envelope(env, public_key_b64(key), "ch.test.node", max_age_s=300, now=NOW)
+
+
+def test_old_envelope_is_rejected_only_when_freshness_is_asked_for():
+    key = SigningKey.generate()
+    env = sign_envelope("ch.test.node", {"price_chf": 99}, key, timestamp=stamp(NOW - timedelta(hours=1)))
+    assert not verify_envelope(env, public_key_b64(key), max_age_s=300, now=NOW)
+    assert verify_envelope(env, public_key_b64(key))  # kept envelopes (commitments) still verify
+
+
+def test_freshness_rejects_future_and_malformed_timestamps():
+    assert is_fresh(stamp(NOW + timedelta(seconds=30)), 300, NOW)  # small clock skew is fine
+    assert not is_fresh(stamp(NOW + timedelta(minutes=5)), 300, NOW)
+    assert not is_fresh("2026-11-14 00:12:00", 300, NOW)
+    assert not is_fresh(None, 300, NOW)
+
+
+def test_backdated_timestamp_breaks_the_signature():
+    """The timestamp is signed, so making an old envelope look fresh breaks it."""
+    key = SigningKey.generate()
+    env = sign_envelope("ch.test.node", {"ok": True}, key, timestamp=stamp(NOW - timedelta(hours=1)))
+    env["timestamp"] = stamp(NOW)
+    assert not verify_envelope(env, public_key_b64(key), max_age_s=300, now=NOW)
+
+
+# --- Swiss UIDs ---------------------------------------------------------------------
+
+
+def test_uid_check_digit():
+    assert is_valid_uid("CHE-116.281.710")  # a published UID; its check digit is 0 (11 -> 0)
+    assert is_valid_uid(TEST_UID)
+    assert not is_valid_uid("CHE-116.281.711")  # wrong check digit
+    assert check_digit("00000003") is None  # remainder 1 would need digit 10: no valid UID
+
+
+def test_uid_format():
+    for bad in ("CHE116281710", "che-116.281.710", "CHE-116.281.710 ", "CHE-116.281.71", "", None, 116281710):
+        assert not is_valid_uid(bad)
+
+
+def test_register_seal_verifies_the_uid(authorities):
+    keys, auths = authorities
+    record = make_record(SigningKey.generate())
+    record["seals"] = [issue_seal(record, "handelsregister-bs", "gold", keys["handelsregister-bs"])]
+    verdict = evaluate_record(record, auths)
+    assert verdict["tier"] == "gold" and verdict["uid"] == TEST_UID
+
+
+def test_register_seal_needs_a_valid_uid(authorities):
+    keys, auths = authorities
+    for uid in (None, "CHE-116.281.711"):
+        record = make_record(SigningKey.generate(), uid=uid)
+        record["seals"] = [issue_seal(record, "handelsregister-bs", "gold", keys["handelsregister-bs"])]
+        assert evaluate_record(record, auths)["tier"] == "broken"
+
+
+def test_changing_the_uid_breaks_every_seal(authorities):
+    keys, auths = authorities
+    record = make_record(SigningKey.generate())
+    record["seals"] = [issue_seal(record, "adobe", "blue", keys["adobe"])]
+    record["uid"] = "CHE-116.281.710"
+    assert evaluate_record(record, auths)["tier"] == "broken"
+
+
+def test_uid_without_register_seal_is_only_a_claim(authorities):
+    keys, auths = authorities
+    record = make_record(SigningKey.generate())
+    record["seals"] = [issue_seal(record, "adobe", "blue", keys["adobe"])]
+    verdict = evaluate_record(record, auths)
+    assert verdict["tier"] == "blue" and verdict["uid"] is None
+    record["seals"] = []
+    assert evaluate_record(record, auths)["uid"] is None
+
+
+def test_demo_registry_uids():
+    """Only nodes sealed by the commercial register show a verified UID in the demo."""
+    auths = {a["issuer"]: a for a in json.loads((DATA / "authorities.json").read_text())}
+    records = json.loads((DATA / "registry.json").read_text())
+    uids = {r["node_id"]: evaluate_record(r, auths)["uid"] for r in records}
+    assert {node_id for node_id, uid in uids.items() if uid} == {"ch.basel.hotel-rheinblick", "ch.basel.hotel-gundeli"}
+    assert all(is_valid_uid(r["uid"]) for r in records if r["uid"])

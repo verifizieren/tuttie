@@ -17,6 +17,7 @@ Implementation: `aps/canonical.py`.
 {
   "node_id": "ch.basel.hotel-rheinblick",
   "name": "Hotel Rheinblick",
+  "uid": "CHE-526.018.151",
   "public_key": "<base64 ed25519 verify key>",
   "endpoint": "http://localhost:4001",
   "kind": "business",
@@ -30,7 +31,11 @@ Implementation: `aps/canonical.py`.
 ```
 
 Each seal signature = issuer's key over canonical
-`{"node_id", "public_key", "capabilities", "issuer", "tier"}`.
+`{"node_id", "uid", "public_key", "capabilities", "issuer", "tier"}`.
+
+`uid` is the Swiss business identification number, `CHE-ddd.ddd.ddd` with a mod-11 check
+digit (eCH-0097, `aps/uid.py`), or `null` for nodes without one. It is always signed, so it
+cannot be added, changed or removed after sealing.
 
 ## Signed envelope (every tool and agent response)
 
@@ -42,6 +47,12 @@ Each seal signature = issuer's key over canonical
   "signature": "<node key over canonical {node_id, timestamp, payload}>"
 }
 ```
+
+`timestamp` is UTC, `YYYY-MM-DDTHH:MM:SSZ`. A receiver that needs a live answer also checks
+freshness (`verify_envelope(..., max_age_s=...)`): at most `max_age_s` old and at most 60 s
+in the future (clock skew). The assistant drops node replies older than 300 s as possible
+replays. Envelopes kept on purpose (commitments redeemed at `book`) are checked without
+`max_age_s`; they carry their own `valid_until`.
 
 ## Trust tiers and seal rules (`aps/seals.py`)
 
@@ -61,12 +72,17 @@ Each seal signature = issuer's key over canonical
 - Licensed capabilities (listed under an authority's `licenses`, e.g.
   `licensed_legal_ch` for `bar-association-ch`) are granted only with a valid seal
   from that authority. `can_take_payment` needs tier blue or higher.
+- A seal from an authority with `"vouches_for_uid": true` (the commercial register) is
+  valid only if the record has a valid `uid`. The verdict's `uid` is set only through such
+  a seal; any other `uid` in a record is just a claim.
 
 ## Authorities (`data/authorities.json`)
 
 ```json
 [{ "issuer": "bar-association-ch", "name": "...", "tier": "gold",
-   "licenses": ["licensed_legal_ch"], "public_key": "<b64>" }]
+   "licenses": ["licensed_legal_ch"], "public_key": "<b64>" },
+ { "issuer": "handelsregister-bs", "name": "...", "tier": "gold",
+   "vouches_for_uid": true, "public_key": "<b64>" }]
 ```
 
 `public_key` is filled in by `scripts/gen_keys.py`.
@@ -75,7 +91,7 @@ Each seal signature = issuer's key over canonical
 
 ```json
 {
-  "node_id": "...", "name": "...", "port": 4001, "kind": "business",
+  "node_id": "...", "name": "...", "uid": "CHE-ddd.ddd.ddd (optional)", "port": 4001, "kind": "business",
   "capabilities": [...], "tags": [...],
   "seals": [{ "issuer": "adobe", "tier": "blue" }],
   "facts": { "...": "everything the node's tools and agent may answer from" }

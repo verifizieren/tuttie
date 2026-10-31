@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.hotel-gundeli",
   "name": "Hotel Gundeli",
+  "uid": "CHE-131.860.915",
   "port": 4006,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],

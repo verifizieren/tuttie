@@ -1,6 +1,7 @@
 {
   "node_id": "ch.legal.consumer-law",
   "name": "Swiss consumer-law agent",
+  "uid": "CHE-518.190.931",
   "port": 4004,
   "kind": "agent",
   "capabilities": ["licensed_legal_ch", "can_take_payment"],

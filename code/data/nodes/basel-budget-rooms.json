@@ -1,6 +1,7 @@
 {
   "node_id": "ch.basel.budget-rooms",
   "name": "Basel Budget Rooms",
+  "uid": "CHE-390.996.037",
   "port": 4007,
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],

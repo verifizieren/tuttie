@@ -18,6 +18,7 @@ from pathlib import Path
 import httpx
 
 from aps import evaluate_record, verify_envelope
+from aps.envelope import is_fresh
 from assistant.approvals import ApprovalBook
 from assistant.events import EventBus
 
@@ -26,6 +27,8 @@ TOOL_NAME = re.compile(r"^[a-z_]{1,40}$")
 NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 # Tools the assistant may call freely; book needs the user's approval first.
 READ_TOOLS = {"get_availability", "get_policies"}
+# Node replies must be this fresh, so an old signed reply (e.g. an outdated price) cannot be replayed.
+MAX_REPLY_AGE_S = 300
 
 
 def function(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:
@@ -110,6 +113,7 @@ def node_view(record: dict, verdict: dict) -> dict:
         "name": record["name"],
         "kind": record["kind"],
         "trust_tier": verdict["tier"],
+        "uid": verdict["uid"],  # only set when the commercial register vouched for it
         "verified_by": [s["issuer"] for s in verdict["seals"]],
         "capabilities": verdict["capabilities"],
         "tags": record["tags"],
@@ -227,6 +231,9 @@ class Toolbox:
         if not verify_envelope(envelope, record["public_key"], expected_node_id=node_id):
             self.bus.emit(kind, "broken", f"{label}: response signature invalid, dropped", record, verdict["seals"])
             return rejected(record, "response signature does not verify")
+        if not is_fresh(envelope["timestamp"], MAX_REPLY_AGE_S):
+            self.bus.emit(kind, "broken", f"{label}: signed reply is outdated, dropped", record, verdict["seals"])
+            return rejected(record, "signed reply is outdated (possible replay)")
         return Verified(record, verdict, envelope)
 
     def emit_verified(self, kind: str, summary: str, result: Verified) -> int:
