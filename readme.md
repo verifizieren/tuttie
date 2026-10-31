@@ -63,8 +63,11 @@ Or query the agent web directly:
 
 ```bash
 curl "http://localhost:4000/search?tags=hotel,basel-sbb"
-curl -X POST localhost:4001/tools/get_availability -H 'content-type: application/json' \
-     -d '{"date": "2026-11-14", "guests": 1}'
+# every hotel serves its tools over MCP; any MCP client works, or plain JSON-RPC:
+curl -X POST localhost:4001/mcp/ -H 'content-type: application/json' \
+     -H 'accept: application/json, text/event-stream' \
+     -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": {"name": "get_availability", "arguments": {"date": "2026-11-14"}}}'
 ```
 
 Hotel Rheinblick verifies as gold and Hotel Spalenhof as blue. `basel-cheap-hotels` claims

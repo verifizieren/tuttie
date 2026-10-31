@@ -194,6 +194,17 @@ Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the
 page lists pending approvals, the user taps Approve/Decline; the decision is signed
 with the user's key and attached to the action (e.g. passed to `book`).
 
+## Business tools over MCP (`node/mcp_tools.py`)
+
+Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
+stateless, JSON answers) at `<endpoint>/mcp/`: `get_availability {date, guests}`,
+`get_policies {}` and `book {call}`. Each result is the node's signed envelope as JSON text;
+the caller verifies it against the node's registry record like any APS reply. Reading tools
+are open; `book` takes a signed call (below) whose `args` are the `BookRequest` fields. Its
+confirmation lists the signatures it rests on in `checked`, e.g. `["caller signature",
+"user approval", "hotel agreement"]` (or `"hotel commitments"` for extras). Agent
+conversations (`/agent`, sessions, `counter_offer`) stay on their HTTP endpoints.
+
 ## Signed call (MCP actions, `aps/call.py`)
 
 Reading tools (`get_availability`, `get_policies`) need no caller signature: their answers

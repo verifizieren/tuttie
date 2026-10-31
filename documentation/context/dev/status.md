@@ -58,7 +58,17 @@ Build order from [goals.md](goals.md):
    lists `negotiation.counter` any more (`DEFAULT_WAKES_ON` never did). Anna offers the double
    with `late-arrival-dog` (CHF 135) for a dog guest: her config notes the single is too small
    for a dog. Verified headless: 135 → 121/131 → 126/130 → agreed 128 → approved → booked.
-5. **MCP services** — planned, split (goal 4). Hotels offer their tools over MCP at `/mcp`;
+5. **MCP services** — in progress (goal 4). Done (dev member 1): every node serves
+   `get_availability`, `get_policies` and `book` over MCP at `/mcp/` (`node/mcp_tools.py`,
+   SDK `mcp==2.3.0`, stateless, JSON); the HTTP `/tools/*` routes for them are gone. Tuttie
+   calls them through `assistant/mcp_client.py` behind the same trust gate and sends `book` as
+   a call signed with its key plus the user's delegation (C1). The node refuses unsigned,
+   forged, unknown-caller, replayed and wrong-tool calls; the confirmation lists `checked`
+   signatures. Tests: `test_node_book.py`, `test_tools.py`, in-process helpers in
+   `tests/mcp_helpers.py`; the headless story books at CHF 128 over MCP. Open: C2 gate (seals
+   of the caller, delegation scope; note `aps/delegation.py` SCOPES has no `book` yet), the
+   wallet showing `checked`, `counter_offer` over MCP (C4).
+   Original plan: Hotels offer their tools over MCP at `/mcp`;
    an action runs only with the right signatures. Start with the contract (C1), then both
    sides work in parallel. `pay` is part of the demo.
    - **dev member 2 (APS, `code/aps/`, `code/negotiation/`):**
