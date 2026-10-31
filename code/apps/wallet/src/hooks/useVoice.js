@@ -6,6 +6,9 @@
 import { useEffect, useRef, useState } from "react";
 
 const LEVEL_MS = 50;  // how often the voice levels go to the face
+// The phone's own clean-up of the microphone: background noise and Tuttie's own voice are
+// filtered before anything is sent; voice isolation (e.g. on iPhones) is the stronger form.
+const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, voiceIsolation: true };
 
 /**
  * @param active  voice mode is on (the card is open and the user is not typing)
@@ -39,7 +42,7 @@ export default function useVoice(active, face) {
       const { url, token } = await response.json();
       await lk.connect(url, token);
       if (closed) return;
-      await lk.localParticipant.setMicrophoneEnabled(true);
+      await lk.localParticipant.setMicrophoneEnabled(true, MIC);
       setState("live");
       levels = setInterval(() => {
         const tuttie = [...lk.remoteParticipants.values()][0];
