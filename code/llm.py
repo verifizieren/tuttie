@@ -38,9 +38,13 @@ def to_tool(schema: dict) -> dict:
 class LLM:
     """Thin client for the OpenAI Responses API with optional reasoning settings."""
 
-    def __init__(self, model: str | None = None):
+    def __init__(self, model: str | None = None, reasoning: bool = True):
+        """`reasoning=False` for a non-reasoning model (no reasoning options are sent)."""
         self.client = AsyncOpenAI()  # reads OPENAI_API_KEY
         self.model = model or os.environ.get("LLM_MODEL", "gpt-6-luna")
+        self.options = {}
+        if not reasoning:
+            return
         reasoning = {}
         if effort := os.environ.get("LLM_REASONING_EFFORT"):  # e.g. "low"; unset = model default
             reasoning["effort"] = effort
