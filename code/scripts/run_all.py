@@ -37,13 +37,31 @@ def services(voice: dict | None = None) -> list[tuple[str, list[str]]]:
     found.append(("tuttie", [sys.executable, "-m", "assistant.app"]))
     voice = voice or {}
     if voice.get("LIVEKIT_API_KEY") and voice.get("LIVEKIT_API_SECRET") and LIVEKIT_SERVER.exists():
-        command = [str(LIVEKIT_SERVER), "--config", "voice/livekit.yaml"]
+        command = [str(LIVEKIT_SERVER), *livekit_config(voice)]
         if voice.get("LIVEKIT_NODE_IP"):
             command += ["--node-ip", voice["LIVEKIT_NODE_IP"]]
         found.append(("livekit", command))
         if voice.get("ELEVENLABS_KEY"):
             found.append(("voice", [sys.executable, "-m", "voice.agent", "start"]))
     return found
+
+
+TURN_TLS_PORT = 4044  # in the team server's open range; TCP, so it gets through where UDP does not
+
+
+def livekit_config(voice: dict) -> list[str]:
+    """LiveKit's config arguments: voice/livekit.yaml, plus the TURN relay when a certificate is set.
+
+    Phones often can't reach the media ports directly (the team server lets no UDP through, and
+    iPhones don't fall back to plain TCP); TURN over TLS on TURN_TLS_PORT relays their audio.
+    It needs a certificate for LIVEKIT_TURN_DOMAIN (scripts/get_cert.sh).
+    """
+    config = (ROOT / "voice" / "livekit.yaml").read_text()
+    if not all(voice.get(k) for k in ("LIVEKIT_TURN_DOMAIN", "LIVEKIT_TURN_CERT", "LIVEKIT_TURN_KEY")):
+        return ["--config", "voice/livekit.yaml"]
+    turn = (f"turn:\n  enabled: true\n  domain: {voice['LIVEKIT_TURN_DOMAIN']}\n  tls_port: {TURN_TLS_PORT}\n"
+            f"  cert_file: {voice['LIVEKIT_TURN_CERT']}\n  key_file: {voice['LIVEKIT_TURN_KEY']}\n")
+    return ["--config-body", config + turn]
 
 
 def key_warning(env_file: Path = ROOT / ".env", environ=os.environ) -> str | None:

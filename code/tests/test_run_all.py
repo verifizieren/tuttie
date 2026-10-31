@@ -62,3 +62,11 @@ def test_output_lines_are_prefixed_with_the_service_name(monkeypatch):
     monkeypatch.setattr(run_all.sys, "stdout", coloured)
     run_all.prefix_output("tuttie", io.StringIO("x\n"), 32, width=6)
     assert coloured.getvalue() == "\033[32m[tuttie]\033[0m x\n"
+
+
+def test_the_turn_relay_is_added_only_with_a_certificate():
+    assert run_all.livekit_config({}) == ["--config", "voice/livekit.yaml"]
+    flag, body = run_all.livekit_config({"LIVEKIT_TURN_DOMAIN": "web4.example", "LIVEKIT_TURN_CERT": "/c.pem",
+                                         "LIVEKIT_TURN_KEY": "/k.pem"})
+    assert flag == "--config-body" and "tcp_port: 4042" in body
+    assert "turn:\n  enabled: true\n  domain: web4.example\n  tls_port: 4044" in body and "key_file: /k.pem" in body
