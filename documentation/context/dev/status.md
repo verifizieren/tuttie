@@ -260,27 +260,26 @@ Why things are the way they are, so nobody has to rediscover them:
   sheet shows them too. Businesses never asked are listed: forged seal in red, no valid seal
   grey and struck through.
 - **User context** (`assistant/context.py`, `data/users/alex-muster.json`): Tuttie's first tool
-  `recall_context` reads the user's calendar, mail, messages and preferences (demo data, each
-  item public / negotiation / private), so "I want to book something" is enough: Basel, night
-  of 14 Nov, arriving ~01:00, with the dog Luna, quiet, budget CHF 160 (private, only in
-  `budget_chf`). The wallet shows it as the context progress line.
-- **Swipe cards** (wallet `Deck.jsx` + `assistant/cards.py`): after `post_request` Tuttie shows
-  up to 5 hotels as cards (shortlist first): photo, seals, ★ rating, up to 5 feature icons
-  (green yes / red no, needs first) and the price. Swipe right = like, left = pass. After the
-  last card the wallet sends the liked hotels with `first_tool: "negotiate"`; Tuttie negotiates
-  with exactly those and books the best agreement (approval as usual). Hotel photos: drop
-  `code/apps/wallet/public/hotels/<node_id>.jpg`; until then a drawn scene is shown.
-  `scripts/demo_headless.py` likes the recommended cards like the wallet.
-- **Progress lines:** each turn shows two joined lines that update in place: context (reading
-  calendar, mails, messages, preferences → what Tuttie found) and tools (asked N hotels → offers
-  in, checking seals → comparing → N hotels for you; later bargaining, agreed, booking, booked).
-- **Conversations in the wallet:** a conversation is a list of turns (user bubble, what
-  happened on the market, Tuttie's highlighted answer). Swipe left on the open card (outside
-  the scrolling list) starts a new one; swipe right shows the history. History lives only on
-  the device (`localStorage`, `lib/history.js`); the server forgets an archived conversation
-  (`/reset`). Opening the wallet (or coming back after 5 min) with a finished conversation
-  starts fresh; a running one (approval waiting) resumes from `GET /history`. Touches inside
-  the conversation scroll it natively and never move or close the card.
+  `recall_context` reads the user's location, messages, mail, calendar and preferences (demo
+  data, each item public / negotiation / private), so "I want to book something" is enough:
+  Basel, night of 14 Nov, arriving ~01:00, with the dog Luna, quiet, budget CHF 160 (private,
+  only in `budget_chf`). The wallet's context line shows "Checking location → messages → mails →
+  calendar", then "Checked your location, messages, mails and calendar".
+- **Swipe cards** (wallet `Deck.jsx` + `assistant/cards.py`): `post_request` posts, collects the
+  offers, bargains with the hotels to show (budget private), then shows up to 5 cards: photos
+  (tap left/right to flip, Unsplash, `apps/wallet/public/hotels/`), seals, ★ rating, a row of
+  5 feature icons (green yes / red no, needs first) and the agreed price with the offer crossed
+  out. Swipe right = like, left = pass; the first card nudges once to show it can be swiped,
+  and Tuttie's eyes follow the drag. Up/down drags scroll the conversation. After the last card
+  the wallet sends the cheapest liked deal with `first_tool: "book"`; the user approves as
+  usual. `scripts/demo_headless.py` likes the recommended cards like the wallet.
+- **Progress lines:** each turn shows two joined lines that update in place and wrap downwards:
+  context, then tools (asked N hotels → offers in, checking seals → comparing → bargaining →
+  N hotels for you; later booking, booked).
+- **One conversation at a time:** no history and no sideways gestures on Tuttie's card. Swiping
+  Tuttie down and opening it again starts a fresh conversation (`/reset`), unless an approval
+  waits; opening the wallet resumes only a running conversation (`GET /history`). The user's own
+  words are not shown; businesses with forged or missing seals are never shown either.
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.

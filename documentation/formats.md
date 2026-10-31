@@ -107,9 +107,10 @@ big ones: `{ "size": "large | medium | small", "rooms_total", "about",
 "chain"? }`. It is public: `get_policies` and the agent card return it, and the node's agent may
 talk about it. The persona (`agent.persona`) only says who the *agent* is, not the business.
 
-`facts.rating = {score, reviews}` (guests' average out of 5) and `facts.amenities =
-{breakfast, wifi, parking, kids_beds}` are public and returned by `get_policies`; the cards'
-icons come from them.
+`facts.rating = {score, reviews}` (guests' average out of 5), `facts.amenities = {breakfast,
+wifi, parking, kids_beds}` and `facts.photos` (image paths served with the wallet,
+`apps/wallet/public/hotels/<node_id>/`, Unsplash, see CREDITS.md there) are public and returned
+by `get_policies`; the cards come from them.
 
 `facts.charges` lists what the business may collect after a booking with `pay`:
 `[{ "purpose": "city tax", "price_chf": 4, "note" }]`. Public (in `get_policies`); the node
@@ -151,15 +152,17 @@ Events about a node also carry `uid`, the business's UID from its registry recor
 into every seal, so it is only shown inside a seal that verifies).
 Marketplace events have `detail.phase`: `posted`, `offer`, `shortlist`, then `cards`
 (`detail.cards`: up to 5 hotels for the user to swipe, shortlist first, each `{node_id, name,
-trust_tier, size, about, agent, rating, offer_id, item, price_chf, over_budget_chf, includes,
-features, shortlisted}`; `features` are up to 5 `{key, ok, label}` (key = icon: dog, kids,
+trust_tier, size, about, agent, rating, photos, offer_id, item, price_chf, agreed_chf,
+over_budget_chf, includes, features, shortlisted}`; `post_request` bargains with these hotels
+before the cards are shown, so `agreed_chf` is the hotel's signed agreed price or null; `features` are up to 5 `{key, ok, label}` (key = icon: dog, kids,
 quiet, late, station, cancel, breakfast, wifi, parking, small), built in code from the signed
 offer and the hotel's signed policies, `assistant/cards.py`), and `agreement`. Tuttie's
-`negotiate` tool takes the liked hotels as `node_ids`. `context` events show Tuttie reading the
-user's context (`detail.phase`: `reading` with `detail.source` calendar | mail | messages |
-preferences, then `found` with a short summary; private items such as the budget are never in
-it). `POST /chat {message, first_tool?}`: `first_tool: "negotiate"` makes that the first step
-(sent by the wallet after the user swiped the cards). `GET /history` returns this browser's timeline so far (the same
+`negotiate` tool takes `node_ids` to limit the bargaining to some hotels. `context` events show
+Tuttie reading the user's context (`detail.phase`: `reading` with `detail.source` location |
+messages | mail | calendar | preferences, then `found`; private items such as the budget are
+never in them). `POST /chat {message, first_tool?}`: `first_tool` (`book` or `negotiate`)
+makes that tool the first step; the wallet sends `book` after the user swiped the cards. A
+booking of an agreed deal is always for the posted night. `GET /history` returns this browser's timeline so far (the same
 events the stream replays). Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
 `assistant/agent.py`, e.g. `excited`, `sorry`); the wallet shows it on Tuttie's face.
