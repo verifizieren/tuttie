@@ -19,8 +19,11 @@ cp .env.example .env               # add OPENAI_API_KEY (ask the team)
 
 - Wallet (the app): <http://localhost:4040/> (redirects to `/wallet/`); working on the UI:
   `cd apps/wallet && npm run dev` for hot reload on <http://localhost:4041/wallet/>
-- Owner view (edit and deploy, needs `OWNER_TOKEN` in `.env`): <http://localhost:4040/owner/?node=http://localhost:4009>;
-  hot reload: `cd apps/owner && npm run dev` on <http://localhost:4042/owner/>
+- Owner view (edit and deploy): on its own with `./run_owner.sh` (no OpenAI key; token `demo`) on
+  <http://localhost:4042/owner/>; with the stack it needs `OWNER_TOKEN` in `.env` and is served at
+  <http://localhost:4040/owner/?node=http://localhost:4009>. Details: `code/apps/owner/README.md`
+- `./run.sh` needs `OPENAI_API_KEY` in `code/.env`: without it the assistant stops at start-up and
+  `run.sh` stops all services with it
 - Live team instance: <https://web4.mendes.dev> (shared server, ports 4000-4049)
 
 ## Before every push

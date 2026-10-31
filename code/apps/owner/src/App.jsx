@@ -11,6 +11,9 @@ import { forgetToken, saveToken, savedToken } from "./lib/api.js";
 import { ago } from "./lib/format.js";
 import { diff } from "./lib/settings.js";
 
+// Visual only for now: section labels for the owner view.
+const TABS = ["Overview", "Agent", "Negotiation", "Versions"];
+
 /** The page for a signed-in owner, once the business has been read from its node. */
 function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }) {
   const live = data.settings;
@@ -49,6 +52,15 @@ function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }
 
   return (
     <EditorContext.Provider value={editor}>
+      <div className="corner">
+        <button className="link" onClick={refresh}>Refresh</button>
+        <button className="link" onClick={() => { draft.discard(); onSignOut(); }}>Sign out</button>
+      </div>
+
+      <ul className="tabs" aria-hidden="true">
+        {TABS.map((tab, index) => <li key={tab} className={index === 0 ? "active" : ""}>{tab}</li>)}
+      </ul>
+
       <main className="page">
         <header>
           <h1>{data.name}</h1>
@@ -58,8 +70,6 @@ function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }
           </p>
           <p className="meta">
             <span className={`live ${error ? "down" : ""}`}><i /> {error ? "Offline" : "Live"} · version {data.version} · {ago(updatedAt, now)}</span>
-            <button className="link" onClick={refresh}>Refresh</button>
-            <button className="link" onClick={() => { draft.discard(); onSignOut(); }}>Sign out</button>
           </p>
         </header>
 

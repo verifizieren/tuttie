@@ -13,6 +13,16 @@ button.secondary { background: var(--panel2); border: 1px solid var(--line2); co
 button.link { background: none; color: var(--dim); font-weight: 500; padding: 0; font-size: 13px; }
 button.link:hover { color: var(--text); }
 
+/* ---- corner links (top right) and the tabs on the left ---- */
+.corner { position: fixed; top: 20px; right: 24px; z-index: 4; display: flex; gap: 16px; }
+.tabs {
+  position: fixed; top: 64px; left: 40px; width: 168px; margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 2px; font-size: 14px; user-select: none;
+}
+.tabs li { padding: 8px 12px; border-radius: 8px; color: var(--dim); cursor: default; }
+.tabs li.active { color: var(--accent-text); background: var(--accent-soft); }
+@media (max-width: 1100px) { .tabs { display: none; } }
+
 /* ---- header ---- */
 header h1 { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
 .meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--dim); }
