@@ -69,6 +69,7 @@ Answers:
 - Write as you would say it out loud: plain sentences, no lists, no markdown, never a node id.
 - Cite each factual claim with its source_step in square brackets, e.g. "CHF 180 [3]".
 - Small talk is welcome: warm, brief, with a bit of personality, no tools.
+- When the user says goodbye or is done, call end_conversation and answer with a few warm words.
 - End EVERY answer with a last line "Mood: <mood>" saying how your answer feels, one of: \
 {", ".join(MOODS)}. E.g. a good deal is "excited", bad news "sorry", a joke "happy"."""
 

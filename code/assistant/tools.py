@@ -149,6 +149,13 @@ SCHEMAS = [
         },
         ["node_id", "purpose", "booking_id"],
     ),
+    function(
+        "end_conversation",
+        "Close Tuttie's card in the wallet, like the user swiping it down. Use it when the user says "
+        "goodbye or is done (bye, see you, that's all, thanks that's it, tschüss, ciao); answer with a "
+        "very short goodbye.",
+        {},
+    ),
 ]
 
 
@@ -254,10 +261,16 @@ class Toolbox:
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
         tools = {"recall_context": self.recall_context, "post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
-                 "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay}
+                 "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay,
+                 "end_conversation": self.end_conversation}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
+
+    async def end_conversation(self) -> dict:
+        """Ask the wallet to close Tuttie's card (after the goodbye is said): a "close" event."""
+        self.bus.emit("close", "verified", "Closing the card")
+        return {"closing": True, "note": "the card closes after your goodbye; keep it to a few words"}
 
     async def recall_context(self) -> dict:
         """The user's calendar, mail, messages and preferences (assistant/context.py)."""

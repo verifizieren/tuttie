@@ -218,3 +218,10 @@ def test_without_a_mandate_the_city_tax_stays_open_for_the_phone():
     result, toolbox, _ = book_and_decide(allow_mandate=False)
     assert result["open_charges"] == [{"purpose": "city tax", "price_chf": 4}] and "pay" not in toolbox.mcp.sent
     assert toolbox.approvals.mandates == {}
+
+
+def test_saying_goodbye_asks_the_wallet_to_close_the_card():
+    toolbox, bus, _ = make_toolbox()
+    result = asyncio.run(toolbox.dispatch("end_conversation", {}))
+    assert result["closing"] is True
+    assert bus.history[-1]["kind"] == "close"
