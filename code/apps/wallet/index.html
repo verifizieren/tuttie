@@ -36,9 +36,12 @@
 
   /* Card stack: earlier cards show only their top strip, the Tuttie card is in front. */
   .card { position: absolute; left: 16px; right: 16px; top: calc(var(--stack) + var(--i) * var(--peek)); height: var(--card-h);
-          border-radius: calc(var(--card-w) * .045); overflow: hidden; will-change: transform;
+          border-radius: calc(var(--card-w) * .045); overflow: hidden;
           box-shadow: 0 -1px 0 rgba(255, 255, 255, .12) inset, 0 -8px 24px rgba(0, 0, 0, .55);
           transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
+  /* Only the bank cards get a GPU layer: a promoted agent card is rasterised at stack size on
+     iOS and looks blurry after it expands. */
+  .card:not(.agent) { will-change: transform; }
   .card[data-i="0"] { --i: 0; }
   .card[data-i="1"] { --i: 1; }
   .card:active:not(.agent) { transform: scale(.985); }
@@ -198,7 +201,7 @@
     const moved = e.clientY - drag.y, speed = moved / Math.max(1, performance.now() - drag.t);
     drag = null;
     agent.classList.remove("dragging");
-    agent.style.transform = "";
+    agent.style.removeProperty("transform");
     if (app.classList.contains("open")) {
       if (moved > 120 || (moved > 40 && speed > .6)) close();
       else if (Math.abs(moved) < 8 && !app.classList.contains("voice")) startVoice();
