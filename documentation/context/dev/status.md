@@ -294,10 +294,11 @@ Why things are the way they are, so nobody has to rediscover them:
   (`MAX_REPLY_AGE_S` in `assistant/tools.py`); stored envelopes like commitments are
   verified without it because they have `valid_until`.
 
-- **LLM:** `gpt-6-luna` through the OpenAI **Responses API** with reasoning on
-  (`code/llm.py`). Reasoning models only allow tools together with reasoning there;
-  `gpt-5.6-luna` did no reasoning at its default and gave no summaries; `gpt-4.1-mini`
-  dropped rules in the full flow. Only `llm.py` would change for another provider.
+- **LLM:** Claude Haiku 5.5 without thinking for Tuttie and the hotel agents (`LLM_MODEL`,
+  `AGENT_LLM_MODEL` = `claude-haiku-5-5`, key `ANTHROPIC_API_KEY`): `code/llm.py` picks the
+  Anthropic Messages API for `claude-*` names, otherwise the OpenAI **Responses API**. Measured
+  per Tuttie round: Haiku ~0.9-1.3 s, gpt-5.1 (effort none) ~1.2 s, gpt-6-luna with thinking
+  ~2-3 s; all run the story right. `gpt-4.1-mini` once dropped rules in the full flow.
 - **Structure beats prompting.** When the model misbehaved, fixing the tool contract worked
   better than longer prompts: search results split into `verified` / `rejected`, an enum for
   `capability` (the model invented values like "hotel_booking"), booking totals computed only
@@ -345,11 +346,13 @@ Why things are the way they are, so nobody has to rediscover them:
   https://web4.mendes.dev with a spoken request. See `code/voice/README.md`.
 - **Voice in the wallet:** answers appear word by word as Tuttie speaks them; a typed message
   makes Tuttie quiet (text only) until its face or the mic button is tapped; the dock has a mic
-  mute button; the user can interrupt any time (two or more words); a fitting filler only when Tuttie starts a tool. Voice "Germain" on the demo.
-- **Speed:** company agents use a fast non-reasoning model (`AGENT_LLM_MODEL`, default
-  gpt-4.1-mini, `node/agent.py`); the add-ons a request needs (dog, late arrival, children) are
+  mute button; the user can interrupt any time (two or more words); a fitting filler only when Tuttie starts a tool. Voice "Germain" on the demo. Amounts are spoken in francs.
+- **Speed:** company agents use a fast model without thinking (`AGENT_LLM_MODEL`, Haiku on the
+  demo, default gpt-4.1-mini, `node/agent.py`); the add-ons a request needs (dog, late arrival, children) are
   chosen in code (`add_ons_for`), so every fee is in the offer whatever the model picks. Context
-  reading paced at 0.15 s per source. Voice uses ElevenLabs Flash. Spoken request to answer: ~14 s.
+  reading paced at 0.15 s per source. Voice uses ElevenLabs Flash. The wallet joins the voice room
+  ahead (mic off), so opening the card only turns the mic on. Spoken request to answer: ~8 s.
+  `AGENT_LLM_MODEL` is read when needed: `node/agent.py` is imported before `.env` is loaded.
 - **Posting tags:** only the city (`basel`); an area went into tags and hid the guesthouse in
   Kleinbasel (the train arrives at Basel SBB). Offers wait up to 45 s (stops when all offered).
 - **Tasks in words, the rest in the eyes:** the line under the eyes shows only what Tuttie is
