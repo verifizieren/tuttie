@@ -39,6 +39,7 @@ src/hooks/                 useCardGestures (iOS-sheet swipes), useFace, useVisib
                            useAgentStream (follows GET /events), usePresence (Tuttie's presence, below)
 src/lib/activity.js        turns timeline events into what the wallet shows (pure reducer)
 src/lib/presence.js        what Tuttie is doing, as one signal for the eyes (pure; tests: npm test)
+src/lib/faceDirector.js    moves the eyes from that signal: looks per state, reactions to cues
 src/lib/api.js             POST /chat, POST /approvals/{id}, POST /reset
 src/lib/face.js            procedural eyes: port of pycozmo's face and 25 expressions (MIT)
 src/wallet.css             layout; brand colours and fonts come from apps/shared/tuttie.css
@@ -80,9 +81,15 @@ const { state, detail } = usePresenceState();          // re-renders only when t
 usePresenceEvents(event => { /* levels and cues */ }); // no re-render
 ```
 
-Today the old face code in `App.jsx` still drives the eyes (phase looks, `setVoice`), so nothing
-changes until the new animation uses these hooks; then the matching `face.current?.set(...)`
-calls in `App.jsx` can go.
+**Who moves the eyes:** `src/lib/faceDirector.js` (connected in App with `useFaceDirector`). It
+turns the presence into the face's own methods (`set`, `lookAt`, `setVoice`, `sleep`, `wake`):
+each state has a base expression and a loop of looks (searching scans left and right, thinking
+looks up and around, listening nods, waiting looks down at the approval sheet, watching follows
+the dragged card; asleep and typing close the eyes), the voice levels make the eyes pulse, and
+each cue plays a short reaction (`REACTIONS`) before the loop goes on. Tune the looks and
+reactions there. A new face with the same methods works as it is; a face that defines
+`onPresence(event)` animates the presence itself and the director steps aside. Nothing else in
+the wallet calls the face any more.
 
 ## Run
 

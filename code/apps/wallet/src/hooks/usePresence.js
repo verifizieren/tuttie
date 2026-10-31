@@ -10,6 +10,7 @@
 // The face gets the same signals without any React: if the TuttieFace instance has an
 // `onPresence(event)` method, it is called for every event (see lib/face.js).
 import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { createFaceDirector } from "../lib/faceDirector.js";
 import { createPresence, cuesBetween } from "../lib/presence.js";
 
 const PresenceContext = createContext(null);
@@ -52,6 +53,19 @@ export function usePresenceSource({ mode, agent, error, lean, lastChange }, face
   useEffect(() => { presence.update({ error }); }, [error, presence]);
   useEffect(() => { presence.update({ lean }); }, [lean, presence]);
   return presence;
+}
+
+/**
+ * Let the presence direct the face (lib/faceDirector.js): expressions, looks, voice pulsing and
+ * reactions. Call once, in App, with the presence from usePresenceSource and the face ref.
+ */
+export function useFaceDirector(presence, face) {
+  useEffect(() => {
+    const director = createFaceDirector(() => face.current);
+    const stop = presence.subscribe(director.onEvent);
+    director.onEvent({ type: "state", ...presence.current() });  // start from where Tuttie is now
+    return () => { stop(); director.stop(); };
+  }, [presence, face]);
 }
 
 function usePresence() {

@@ -28,23 +28,20 @@ import Dock from "./components/Dock.jsx";
 import History from "./components/History.jsx";
 import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
-import { PresenceProvider, usePresenceSource } from "./hooks/usePresence.js";
+import { PresenceProvider, useFaceDirector, usePresenceSource } from "./hooks/usePresence.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
-import { BUSY, EXPRESSION, LISTENING, MOOD, THINKING, WATCHING, currentTask } from "./lib/activity.js";
+import { currentTask } from "./lib/activity.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
 const OPEN_GUARD_MS = 700;
 const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
-const LOOK_MS = 1600;      // how long each look of a loop (thinking, listening, watching) lasts
-const SETTLE_MS = { idle: 1300, done: 3500, declined: 3500 };  // the first face holds this long before listening
 
 export default function App() {
   const [mode, setMode] = useState("closed");
   const [error, setError] = useState("");  // the only text under the eyes: Tuttie cannot be reached
-  const leaning = useRef(false);           // a hotel card is being dragged: the eyes follow it
   const canvas = useRef(null);
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
@@ -54,8 +51,10 @@ export default function App() {
   const [quiet, setQuiet] = useState(false);  // the user typed: Tuttie answers in text only
   // A new answer in voice mode: shown as Tuttie speaks it ({ answer, id, text } while revealing).
   const [reveal, setReveal] = useState(null);
+  // What Tuttie is doing, and the eyes following it (lib/presence.js, lib/faceDirector.js).
   const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
-  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, face, onSpeech,
+  useFaceDirector(presence, face);
+  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, onSpeech,
                                                                     presence.levels);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
@@ -75,15 +74,6 @@ export default function App() {
   }, [agent.answer]);  // eslint-disable-line react-hooks/exhaustive-deps
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
-
-  // The face follows the mode: awake in voice mode, asleep otherwise.
-  useEffect(() => {
-    if (mode !== "voice") {
-      face.current?.sleep();
-      return;
-    }
-    face.current?.wake("happiness");
-  }, [mode, face]);
 
   function startVoice() {
     unlockAudio();
@@ -108,47 +98,18 @@ export default function App() {
     if (agent.approval) return;  // the user must decide the waiting approval first
     actions.newConversation(agent);
     presence.cue("new_chat");
-    face.current?.set("happiness", 300);
-    setTimeout(() => face.current?.set("neutral", 600), 700);
   }
 
   function tapWhileOpen() {
     unlockAudio();
     setQuiet(false);  // tapping Tuttie's face brings its voice back after typing
     if (mode !== "voice") return startVoice();
-    presence.cue("tap");
-    face.current?.set("excitement", 250);  // a tap never ends voice mode, Tuttie just reacts
-    setTimeout(() => face.current?.set("neutral", 500), 600);
+    presence.cue("tap");  // a tap never ends voice mode, Tuttie just reacts
   }
 
   function startTyping() {
     if (performance.now() - openedAt.current > OPEN_GUARD_MS) setMode("typing");
   }
-
-  // While Tuttie works, its face follows what is happening on the agent web.
-  // It never holds one face: while busy it moves through thinking looks, while the user swipes
-  // the cards it looks down at them, and otherwise it listens (open eyes, small glances, a nod).
-  // A finished answer first shows how it feels: glad about a deal, sorry about bad news.
-  useEffect(() => {
-    if (mode !== "voice") return;
-    const phase = agent.phase;
-    const first = phase === "done" ? MOOD[agent.mood] || "happiness" : EXPRESSION[phase];
-    if (first) face.current?.set(first, 500);
-    const looks = BUSY.has(phase) ? THINKING : phase === "picking" ? WATCHING : phase === "approval" ? null : LISTENING;
-    if (!looks) return;
-    let i = 0, timer;
-    const start = setTimeout(() => {
-      const step = () => {
-        if (leaning.current) return;  // the eyes are following a dragged card
-        const { name, look } = looks[i++ % looks.length];
-        face.current?.set(name, 600);
-        face.current?.lookAt(look[0], look[1], 600);
-      };
-      step();
-      timer = setInterval(step, LOOK_MS);
-    }, BUSY.has(phase) ? LOOK_MS : SETTLE_MS[phase] ?? 0);
-    return () => { clearTimeout(start); clearInterval(timer); };
-  }, [agent.phase, agent.mood, mode, face]);
 
   // An approval needs the user: open the card if it is closed.
   useEffect(() => {
@@ -178,11 +139,9 @@ export default function App() {
          `Book ${best.name}`);
   }
 
-  // While a hotel card is dragged, Tuttie looks the same way.
+  // While a hotel card is dragged, Tuttie looks the same way (the face director follows `lean`).
   function lean(x) {
-    leaning.current = x !== 0;
     presence.update({ lean: x });
-    face.current?.lookAt(x, 0, 120);
   }
 
   const classes = ["app", mode !== "closed" && "open", mode === "voice" && "voice", mode === "typing" && "typing",
