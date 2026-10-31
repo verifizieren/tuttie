@@ -1,4 +1,4 @@
-"""Start the registry and one node server per config; Ctrl+C stops them all."""
+"""Start the registry, one node server per config and the assistant; Ctrl+C stops them all."""
 
 import subprocess
 import sys
@@ -14,6 +14,7 @@ def main() -> None:
         [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]
         for path in sorted((ROOT / "data" / "nodes").glob("*.json"))
     ]
+    commands.append([sys.executable, "-m", "assistant.app"])
     processes = [subprocess.Popen(cmd, cwd=ROOT) for cmd in commands]
     try:
         while all(p.poll() is None for p in processes):
