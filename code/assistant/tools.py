@@ -39,7 +39,7 @@ AUTHORITIES_PATH = Path(__file__).resolve().parent.parent / "data" / "authoritie
 TOOL_NAME = re.compile(r"^[a-z_]{1,40}$")
 NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 # Tools the assistant may call freely; book needs the user's approval first.
-READ_TOOLS = {"get_availability", "get_policies"}
+READ_TOOLS = {"get_availability", "get_policies", "get_forecast", "get_connections"}  # the last two: services/server.py
 # Node replies must be this fresh, so an old signed reply (e.g. an outdated price) cannot be replayed.
 MAX_REPLY_AGE_S = 300
 
@@ -92,9 +92,12 @@ SCHEMAS = [
         "Results are seal-checked: use only 'verified', never 'rejected'.",
         {
             "tags": {"type": "array", "items": {"type": "string"},
-                     "description": "Known tags: hotel, basel-sbb, dog-friendly, quiet, family, legal, consumer-law, switzerland"},
-            "capability": {"type": "string", "enum": ["can_book", "can_take_payment", "licensed_legal_ch"],
-                           "description": "Optional. Omit it for hotels; tags are enough."},
+                     "description": "Known tags: hotel, basel-sbb, dog-friendly, quiet, family, legal, consumer-law, switzerland, "
+                                    "weather, train"},
+            "capability": {"type": "string", "enum": ["can_book", "can_take_payment", "licensed_legal_ch",
+                                                      "weather_forecast", "train_timetable"],
+                           "description": "Optional. Omit it for hotels; tags are enough. weather_forecast finds "
+                                          "the weather service, train_timetable the train timetable."},
         },
     ),
     function(
@@ -104,7 +107,10 @@ SCHEMAS = [
             "node_id": {"type": "string"},
             "tool": {"type": "string", "enum": sorted(READ_TOOLS)},
             "args": {"type": "object",
-                     "description": "get_availability: {date: YYYY-MM-DD, guests: int}; get_policies: {}"},
+                     "description": "get_availability: {date: YYYY-MM-DD, guests: int}; get_policies: {}; "
+                                    "get_forecast (weather service): {place, date: YYYY-MM-DD}; get_connections "
+                                    "(train timetable): {origin, destination, date: YYYY-MM-DD, time: HH:MM, "
+                                    "arrive_by: bool (time is the latest arrival)}"},
         },
         ["node_id", "tool"],
     ),
@@ -206,6 +212,17 @@ def summarize(tool: str, payload: dict) -> str:
     if "policies" in payload:
         dogs = "dogs allowed" if payload["policies"].get("dogs_allowed") else "no dogs"
         return f"{tool}: {dogs}, {payload['policies'].get('late_arrival', '')}"
+    if payload.get("status") == "refused":
+        return f"{tool}: {payload.get('reason', 'refused')}"
+    sample = " (sample data)" if "sample" in str(payload.get("source", "")) else ""
+    if tool == "get_forecast" and "sky" in payload:  # services/weather.py
+        return (f"Weather {payload['place']} {payload['date']}: {payload['sky']}, "
+                f"{payload['temperature_min_c']:g}–{payload['temperature_max_c']:g} °C, "
+                f"rain {payload['rain_chance_pct']} %{sample}")
+    if tool == "get_connections" and payload.get("connections"):  # services/trains.py
+        first = payload["connections"][0]
+        return (f"Trains {payload['from']} → {payload['to']}: {first['departure']} → {first['arrival']} "
+                f"({', '.join(first['trains']) or 'train'}){sample}")
     return tool
 
 

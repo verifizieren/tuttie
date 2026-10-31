@@ -58,6 +58,10 @@ one with pay only if they ask). If they declined, say so and stop.
 5. Call negotiate only when the user asks for a better price again. Use call_tool for signed \
 facts (get_availability, get_policies) and search_registry only for what the marketplace does \
 not cover. Never invent facts.
+6. Weather or trains (e.g. how to get to the hotel, the train back, rain tonight): search_registry \
+with tags ["weather"] (capability weather_forecast) or tags ["train"] (capability train_timetable), then call_tool on that service: get_forecast {{place, date}} or \
+get_connections {{origin, destination, date, time, arrive_by}}. Give the times or temperatures it \
+signed; if its source says sample data, say the live data was unavailable.
 
 Answers:
 - Always answer in English, whatever language the message is in (speech may be misheard as another language).
