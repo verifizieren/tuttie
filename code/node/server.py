@@ -3,7 +3,9 @@
 Usage: python -m node.server --config data/nodes/hotel-rheinblick.json [--port 4001]
 
 Every response is a signed envelope from this node's key (keys/<node_id>.json).
-Tools and the /agent endpoint answer only from the config's "facts".
+Tools answer only from the config's "facts"; the company's agent (node/agent.py) answers other
+agents (POST /agent), is woken by the marketplace (POST /agent/invoke) and describes itself
+(GET /agent/card).
 """
 
 import argparse
@@ -18,7 +20,7 @@ from pydantic import BaseModel
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import verify_decision
 from aps.keys import load_public_key
-from node.agent import NodeAgent
+from node.agent import BusinessAgent
 
 
 class AvailabilityRequest(BaseModel):
@@ -29,6 +31,10 @@ class AvailabilityRequest(BaseModel):
 class AgentRequest(BaseModel):
     question: str
     context: dict = {}
+
+
+class InvokeRequest(BaseModel):
+    event: dict  # a marketplace event, e.g. {"type": "posting.created", "posting": {...}}
 
 
 class BookRequest(BaseModel):
@@ -47,7 +53,7 @@ def create_app(config: dict) -> FastAPI:
     own_public_key = public_key_b64(signing_key)
     user_public_key = load_public_key("user")
     used_approvals: set[str] = set()
-    node_agent = NodeAgent(config)
+    business_agent = BusinessAgent(config)
     app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
@@ -132,8 +138,18 @@ def create_app(config: dict) -> FastAPI:
 
     @app.post("/agent")
     async def agent(req: AgentRequest) -> dict:
-        """The node's own agent answers another agent (A2A), signed."""
-        return signed(await node_agent.answer(req.question, req.context))
+        """The company's agent answers another agent (A2A), signed."""
+        return signed(await business_agent.answer(req.question, req.context))
+
+    @app.get("/agent/card")
+    def agent_card() -> dict:
+        """The agent's signed card: persona, tools and the events it wakes on."""
+        return signed(business_agent.card())
+
+    @app.post("/agent/invoke")
+    async def agent_invoke(req: InvokeRequest) -> dict:
+        """The marketplace wakes the agent on a change; it answers whether and how it would respond."""
+        return signed(await business_agent.invoke(req.event))
 
     return app
 
