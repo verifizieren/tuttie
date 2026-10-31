@@ -13,11 +13,14 @@ const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: t
 /**
  * @param active  voice mode is on (the card is open and the user is not typing)
  * @param face    ref to the TuttieFace (src/lib/face.js)
- * @returns [state, unlockAudio]: state is "off" | "connecting" | "live" | "unavailable";
- *          call unlockAudio() from a tap if the browser blocked Tuttie's voice
+ * @returns { state, unlockAudio, muted, toggleMute }: state is "off" | "connecting" | "live" |
+ *          "unavailable"; call unlockAudio() from a tap if the browser blocked Tuttie's voice;
+ *          muted keeps the microphone off (e.g. in a noisy room) until toggled again
  */
 export default function useVoice(active, face) {
   const [state, setState] = useState("off");
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
   const room = useRef(null);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function useVoice(active, face) {
       const { url, token } = await response.json();
       await lk.connect(url, token);
       if (closed) return;
-      await lk.localParticipant.setMicrophoneEnabled(true, MIC);
+      await lk.localParticipant.setMicrophoneEnabled(!mutedRef.current, MIC);
       setState("live");
       levels = setInterval(() => {
         const tuttie = [...lk.remoteParticipants.values()][0];
@@ -65,5 +68,13 @@ export default function useVoice(active, face) {
     room.current?.startAudio().catch(() => {});
   }
 
-  return [state, unlockAudio];
+  /** Turn the microphone off or on again; Tuttie keeps talking and listening to taps. */
+  function toggleMute() {
+    const next = !mutedRef.current;
+    mutedRef.current = next;
+    setMuted(next);
+    room.current?.localParticipant.setMicrophoneEnabled(!next, MIC).catch(() => {});
+  }
+
+  return { state, unlockAudio, muted, toggleMute };
 }

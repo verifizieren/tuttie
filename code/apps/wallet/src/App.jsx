@@ -43,7 +43,7 @@ export default function App() {
   const face = useFace(canvas);
   const [agent, actions, history] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
-  const [, unlockAudio] = useVoice(mode === "voice", face);
+  const { unlockAudio, muted, toggleMute } = useVoice(mode === "voice", face);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -162,7 +162,8 @@ export default function App() {
         {showHistory && <History entries={history} onClose={() => setShowHistory(false)} />}
         <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
       </AgentCard>
-      <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping} />
+      <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping}
+            muted={muted} onMute={toggleMute} />
     </div>
   );
 }
