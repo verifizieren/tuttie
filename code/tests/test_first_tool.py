@@ -57,7 +57,7 @@ def test_every_followup_receives_current_signed_deal_facts():
     class FactsLLM(RecordingLLM):
         async def complete(self, messages, tools, tool_choice=None):
             import json
-            facts = json.loads(messages[1]["content"].split("\n", 1)[1])
+            facts = json.loads(messages[2]["content"].split("\n", 1)[1])
             assert facts["deals"][0]["agreement"]["price_chf"] == 209
             assert facts["deals"][0]["offered_chf"] == 220
             return await super().complete(messages, tools, tool_choice)
