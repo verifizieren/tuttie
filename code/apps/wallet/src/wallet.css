@@ -125,11 +125,6 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .bubble.tuttie li + li { margin-top: 4px; }
 .bubble.tuttie b { font-weight: 650; color: #fff; }
 
-.request { padding: 12px 14px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); }
-.request-title { font-size: 15px; font-weight: 600; }
-.request-needs { font-size: 13px; color: var(--muted); margin-top: 2px; }
-.private { font-size: 12px; color: var(--dim); margin-top: 6px; }
-.private::before { content: "● "; color: var(--accent); }
 
 .hotel { padding: 0; border-radius: 16px;
          background: var(--panel2); border: 1px solid var(--line); animation: rise .45s var(--ease) both;
@@ -206,54 +201,58 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .mandate input:checked { background: var(--green); }
 .mandate input:checked::after { transform: translateX(18px); }
 
-/* Businesses Tuttie never asked. */
-.hotel.skipped { cursor: default; }
-.hotel.skipped .hotel-line { cursor: default; }
-.hotel.skipped s { text-decoration-thickness: 1px; }
-.hotel.forged { border-color: rgba(255, 69, 58, .35); }
-.hotel.forged small { color: var(--red, #ff453a); }
-.hotel.untrusted { opacity: .55; }
-.hotel.untrusted .seal-x { background: #5a5a60; }
-.hotel.skipped .seal-x { margin-right: 16px; }
+/* ---------- Progress: a context line and a tool line, joined, each updating in place ---------- */
+.steps { list-style: none; margin: 0; padding: 2px 4px; display: grid; gap: 10px; }
+.steps li { position: relative; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted);
+            min-height: 20px; }
+.steps li span { min-width: 0; animation: rise .3s var(--ease) both; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steps .dot { flex: none; width: 9px; height: 9px; margin: 0 3px; border-radius: 50%; background: var(--accent); }
+.steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
+.steps li.done .dot { background: var(--green); }
+.steps li.done span { color: var(--text); }
+.steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px;
+                         background: var(--line2); }
+@keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
 
-/* ---------- Picking favourites: hotel cards to swipe through ---------- */
-.picker { display: flex; flex-direction: column; gap: 8px; margin: 0 -16px; }
-.picker-title { font-size: 13px; font-weight: 600; color: var(--muted); padding: 0 20px; }
-.picker-track { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 2px 16px 4px;
-                scroll-padding: 0 16px; touch-action: pan-x pan-y; overscroll-behavior-x: contain; scrollbar-width: none; }
-.picker-track::-webkit-scrollbar { display: none; }
-.pick { position: relative; flex: 0 0 84%; scroll-snap-align: start; border-radius: 20px; overflow: hidden;
-        background: var(--panel2); border: 1px solid var(--line); transition: border-color .3s; }
-.pick.fav { border-color: rgba(217, 119, 87, .7); }
-.pick-photo { position: relative; height: 112px; }
-.pick-photo svg, .pick-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-/* A plain hollow heart in the corner, in line with the "Recommended" label; filled when picked. */
-.heart { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; padding: 0; border: 0;
-         display: grid; place-items: center; color: #fff; background: none; cursor: pointer;
-         filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6)); transition: transform .15s var(--ease); }
-.heart svg { width: 28px; height: 28px; }
-.heart:active { transform: scale(.88); }
-.heart[aria-pressed="true"] { color: var(--accent); }
-.heart:disabled { cursor: default; }
-.recommended { position: absolute; top: 12px; left: 12px; padding: 4px 9px; border-radius: 10px; font-size: 11px;
-               font-weight: 600; color: #08080b; background: rgba(255, 255, 255, .9); }
-.pick-body { padding: 12px 14px 14px; }
-.pick-head { display: flex; align-items: center; gap: 10px; }
-.pick-name { flex: 1; min-width: 0; font-size: 16px; font-weight: 650; }
-.pick-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
-.pick-price { font-size: 18px; font-weight: 700; white-space: nowrap; }
-.pick-includes { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
-.pros, .cons { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 5px; font-size: 14px; }
-.cons { margin-top: 6px; color: var(--muted); }
-.pros li, .cons li { display: flex; gap: 8px; align-items: baseline; }
-.pros li::before { content: "✓"; color: var(--green); font-weight: 700; }
-.cons li::before { content: "–"; color: var(--dim); font-weight: 700; }
-.picker-dots { display: flex; justify-content: center; gap: 6px; }
-.picker-dots i { width: 6px; height: 6px; border-radius: 50%; background: #3a3a40; transition: background .2s; }
-.picker-dots i.on { background: var(--text); }
-.picker-go { margin: 2px 16px 0; padding: 14px; border-radius: 16px; border: 0; font: inherit; font-size: 16px;
-             font-weight: 600; color: #08080b; background: #fff; cursor: pointer; }
-.picker-go:disabled { color: var(--dim); background: var(--panel2); }
+/* ---------- The hotel cards: swipe right to like, left to pass ---------- */
+.deck { display: flex; flex-direction: column; gap: 10px; }
+.deck-stack { position: relative; height: 384px; }
+.swipe-card { position: absolute; inset: 0; border-radius: 22px; overflow: hidden; background: var(--panel2);
+              border: 1px solid var(--line); touch-action: pan-y; user-select: none; -webkit-user-select: none;
+              cursor: grab; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.swipe-photo { position: relative; height: 176px; }
+.swipe-photo svg, .swipe-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                                     display: block; pointer-events: none; }
+.swipe-photo::after { content: ""; position: absolute; inset: 0;
+                      background: linear-gradient(to bottom, rgba(0, 0, 0, .25), transparent 35%, transparent 55%, rgba(14, 14, 18, .95)); }
+.swipe-top { position: absolute; top: 12px; left: 14px; right: 12px; display: flex; justify-content: space-between;
+             align-items: center; z-index: 1; }
+.rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b;
+          background: rgba(255, 255, 255, .92); }
+.swipe-name { position: absolute; top: 128px; left: 16px; right: 16px; z-index: 1; font-size: 20px; font-weight: 700;
+              letter-spacing: -.01em; line-height: 1.15; }
+.swipe-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.swipe-body { position: relative; height: calc(100% - 176px); padding: 14px 16px; }
+.features { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.features li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.features i { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; }
+.features svg { width: 17px; height: 17px; }
+.features .yes i { color: var(--green); background: rgba(52, 199, 123, .14); }
+.features .no { color: var(--muted); }
+.features .no i { color: #ff6b6b; background: rgba(255, 95, 95, .14); }
+.swipe-price { position: absolute; right: 16px; bottom: 14px; text-align: right; font-size: 24px; font-weight: 750;
+               letter-spacing: -.02em; }
+.swipe-price small { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0; color: #ff8a8a; }
+.stamp { position: absolute; top: 56px; z-index: 2; padding: 4px 12px; border: 3px solid; border-radius: 10px;
+         font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
+.stamp.pass { right: 18px; color: #ff6b6b; transform: rotate(12deg); }
+.deck-hint { text-align: center; font-size: 12px; color: var(--dim); }
+.deck-empty { display: grid; gap: 10px; justify-items: center; padding: 18px; font-size: 14px; color: var(--muted); }
+.deck-empty button { font: inherit; color: var(--accent); background: none; border: 0; cursor: pointer; }
+.forged-line { display: flex; align-items: center; gap: 10px; padding: 2px 4px; font-size: 13px; color: #ff8a8a; }
+.forged-line s { color: var(--muted); }
+.forged-line .seal-x { width: 18px; height: 18px; font-size: 11px; }
 
 /* ---------- History of earlier conversations (this device only) ---------- */
 .history { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; padding-top: 40px;

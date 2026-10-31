@@ -1,21 +1,22 @@
-// One conversation under Tuttie's eyes, turn by turn: what the user said, what Tuttie did on
-// the agent web (the posting, the hotels and their offers, the cards to pick favourites from,
-// the negotiation, the booking) and Tuttie's answer. Tapping a hotel shows who vouches for it.
-// The same view shows an archived conversation from the history (readOnly).
+// One conversation under Tuttie's eyes, turn by turn: what the user said, two progress lines
+// (what Tuttie knows, what it does), the hotel cards to swipe, the negotiation with the liked
+// hotels, the booking and Tuttie's answer. Tapping a hotel shows who vouches for it. The same
+// view shows an archived conversation from the history (readOnly).
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
-import Picker from "./Picker.jsx";
+import Deck from "./Deck.jsx";
 import { SealList, SealMarks } from "./Seals.jsx";
 
-function RequestCard({ request }) {
-  const { constraints, tags } = request;
-  const needs = [...constraints.requirements, ...tags.map(t => t.replace("-", " "))];
+/** The turn's progress: a context line, then a tool line joined to it. Each updates in place. */
+function Steps({ turn }) {
+  const lines = [turn.context, turn.tool].filter(Boolean);
+  if (!lines.length) return null;
   return (
-    <div className="request">
-      <div className="request-title">Looking for a {request.category} · {constraints.date}</div>
-      {needs.length > 0 && <div className="request-needs">{needs.join(" · ")}</div>}
-      <div className="private">Your budget stays private</div>
-    </div>
+    <ol className="steps">
+      {lines.map((line, i) => (
+        <li key={i} className={line.done ? "done" : "active"}><i className="dot" /><span>{line.text}</span></li>
+      ))}
+    </ol>
   );
 }
 
@@ -56,18 +57,11 @@ function HotelRow({ hotel, overBudget, open, onToggle }) {
   );
 }
 
-/** A business Tuttie never asked: a forged seal (red) or no seal at all (grey). */
-function SkippedRow({ business }) {
-  const forged = business.tier === "broken";
+/** A business with a forged seal: Tuttie never asked it. One quiet red line. */
+function Forged({ business }) {
   return (
-    <div className={`hotel skipped ${forged ? "forged" : "untrusted"}`}>
-      <span className="hotel-line">
-        <span className="seal-x" aria-hidden="true">{forged ? "!" : "?"}</span>
-        <span className="hotel-name">
-          <s>{business.name}</s>
-          <small>{forged ? "Forged seal · never asked" : "No valid seal · never asked"}</small>
-        </span>
-      </span>
+    <div className="forged-line"><span className="seal-x" aria-hidden="true">!</span>
+      <s>{business.name}</s> forged seal, never asked
     </div>
   );
 }
@@ -107,23 +101,20 @@ function order(hotels) {
     rank(a) - rank(b) || (a.agreed ?? a.offer?.price_chf ?? 1e9) - (b.agreed ?? b.offer?.price_chf ?? 1e9));
 }
 
-/** What happened on the market in this conversation: the request, then the cards or the hotels. */
+/** What happened on the market: the forged business, then the cards to swipe or the liked hotels. */
 function Market({ state, readOnly, onPick }) {
   const [openId, setOpenId] = useState(null);
-  const picking = state.cards && !state.picked;
-  // Once the user picked, the hotels they chose show the negotiation; before the cards, all offers come in.
-  const shown = order(state.hotels).filter(([nodeId]) => !state.picked || state.picked.includes(nodeId));
+  const swiping = state.cards && !state.picked && !readOnly;
+  // Once the user liked some, those show the negotiation; the progress line covers everything before.
+  const liked = order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
   return (
     <>
-      <RequestCard request={state.request} />
-      {state.cards && (picking || readOnly)
-        ? <Picker cards={state.cards} hotels={state.hotels} picked={readOnly ? state.picked || [] : state.picked}
-                  onPick={onPick} />
-        : shown.map(([nodeId, hotel]) => (
-            <HotelRow key={nodeId} hotel={hotel} overBudget={state.shortlistDone && hotel.offer && !hotel.shortlisted}
-                      open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
-          ))}
-      {state.skipped.map((business, i) => <SkippedRow key={i} business={business} />)}
+      {state.skipped.filter(b => b.tier === "broken").map((business, i) => <Forged key={i} business={business} />)}
+      {swiping && <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} />}
+      {liked.map(([nodeId, hotel]) => (
+        <HotelRow key={nodeId} hotel={hotel} overBudget={false}
+                  open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
+      ))}
     </>
   );
 }
@@ -131,17 +122,17 @@ function Market({ state, readOnly, onPick }) {
 /**
  * @param state     the conversation (lib/activity.js)
  * @param readOnly  an archived conversation from the history: nothing can be picked
- * @param onPick    (favourite cards) => void
+ * @param onPick    (liked cards) => void
  */
 export default function Activity({ state, readOnly = false, onPick }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
   // New content comes last; bring it into view when it arrives (not for archived conversations).
-  // The cards to pick from are shown from their top, so the photos and prices are in view.
+  // The cards to swipe are shown from their top, so the whole card is in view.
   useEffect(() => {
     if (readOnly || !box.current) return;
-    const picker = state.cards && !state.picked && box.current.querySelector(".picker");
-    const top = picker ? picker.offsetTop - 8 : box.current.scrollHeight;
+    const deck = state.cards && !state.picked && box.current.querySelector(".deck");
+    const top = deck ? deck.offsetTop - 8 : box.current.scrollHeight;
     box.current.scrollTo({ top, behavior: "smooth" });
   }, [readOnly, state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
 
@@ -151,6 +142,7 @@ export default function Activity({ state, readOnly = false, onPick }) {
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
           {turn.said && <div className="bubble user">{turn.said}</div>}
+          <Steps turn={turn} />
           {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
           {turn.answer && <Answer text={turn.answer} />}

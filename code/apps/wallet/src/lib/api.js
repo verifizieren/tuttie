@@ -11,8 +11,9 @@ async function post(path, body) {
   return response.json();
 }
 
-/** Ask Tuttie something; the answer arrives later as an "answer" event on the stream. */
-export const sendChat = message => post("/chat", { message });
+/** Ask Tuttie something; the answer arrives later as an "answer" event on the stream.
+ *  `firstTool` fixes Tuttie's first step (after swiping the cards: "negotiate"). */
+export const sendChat = (message, firstTool = null) => post("/chat", { message, first_tool: firstTool });
 
 /** The user's decision on a pending approval; the assistant signs it with the user's key.
  *  `allowMandate` also signs the mandate the approval offered (e.g. for the city tax). */

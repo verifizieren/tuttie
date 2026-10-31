@@ -132,23 +132,23 @@ export default function App() {
   }, [agent.approval]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // `shown` is what the user's bubble says; `text` what Tuttie gets (e.g. with node ids).
-  async function send(text, shown = text) {
+  async function send(text, shown = text, firstTool = null) {
     actions.say(shown);
     setShowHistory(false);
     setMode("voice");  // Tuttie is awake while it works
     try {
-      await sendChat(text);
+      await sendChat(text, firstTool);
     } catch {
       setStatus("Tuttie is unreachable right now");
     }
   }
 
-  // The user chose favourites on the cards: Tuttie negotiates with those and books the best deal.
+  // The user swiped through the cards: Tuttie negotiates with the liked ones and books the best deal.
   function pick(cards) {
     actions.pick(cards.map(c => c.node_id));
     const names = cards.map(c => c.name).join(" and ");
-    send(`Negotiate with my favourites and book the best deal: ${cards.map(c => `${c.name} (${c.node_id})`).join(", ")}.`,
-         `Negotiate with ${names} and book the best deal`);
+    send(`I liked these, negotiate and book the best deal: ${cards.map(c => `${c.name} (${c.node_id})`).join(", ")}.`,
+         `I like ${names}`, "negotiate");
   }
 
   const classes = ["app", mode !== "closed" && "open", mode === "voice" && "voice", mode === "typing" && "typing",
