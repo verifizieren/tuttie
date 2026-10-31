@@ -1,9 +1,10 @@
-"""Tests for the hotel cards (assistant/cards.py): pros and cons from signed facts only."""
+"""Tests for the hotel cards (assistant/cards.py): features from signed facts only."""
 
 from assistant.cards import MAX_CARDS, card_order, hotel_card
 
 GUESTHOUSE_FACTS = {
-    "quiet": True, "distance_to_basel_sbb_m": 1900, "profile": {"size": "small", "about": "Family-run"},
+    "quiet": True, "distance_to_basel_sbb_m": 1900, "profile": {"size": "small"}, "rating": {"score": 4.8, "reviews": 64},
+    "amenities": {"breakfast": True, "wifi": True, "parking": False, "kids_beds": False},
     "policies": {"dogs_allowed": True, "dog_fee_chf_per_night": 0,
                  "late_arrival": "Arrivals until 02:00 are fine.", "cancellation": "Free cancellation until 48h before."},
 }
@@ -20,23 +21,26 @@ def item(node_id: str, price: float) -> dict:
             "offer": {"offer_id": f"of-{node_id}", "item": "double room", "price_chf": price, "includes": []}}
 
 
-def test_a_fitting_small_hotel_gets_pros_for_every_need():
+def shown(card: dict) -> list[tuple[str, bool, str]]:
+    return [(f["key"], f["ok"], f["label"]) for f in card["features"]]
+
+
+def test_the_users_needs_come_first_then_the_rest():
     card = hotel_card(item("guesthouse", 135), GUESTHOUSE_FACTS, NEEDS, 160, shortlisted=True)
-    assert card["pros"][:4] == ["Within your budget", "Dogs welcome, free", "Quiet", "Late arrival arranged"]
-    assert "Small independent business" in card["pros"] and "Free cancellation" in card["pros"]
-    assert card["cons"] == ["24 min walk to Basel SBB"]
+    assert shown(card)[:3] == [("dog", True, "Dogs free"), ("quiet", True, "Quiet"), ("late", True, "Late arrival")]
+    assert ("kids", False, "No kids' beds") in shown(card) and len(card["features"]) == 7
+    assert card["rating"] == {"score": 4.8, "reviews": 64} and card["over_budget_chf"] is None
 
 
-def test_a_hotel_that_misses_the_needs_shows_why():
+def test_a_hotel_that_misses_the_needs_shows_them_in_red():
     card = hotel_card(item("city", 180), CITY_FACTS, NEEDS, 160, shortlisted=False)
-    assert card["cons"] == ["CHF 20 over your budget", "No dogs", "Not a quiet location", "No late check-in",
-                            "Best rate is non-refundable"]
-    assert card["pros"] == ["11 min walk to Basel SBB"]
+    assert shown(card)[:3] == [("dog", False, "No dogs"), ("quiet", False, "Not quiet"), ("late", False, "No late check-in")]
+    assert ("cancel", False, "Non-refundable") in shown(card) and ("station", True, "11 min to SBB") in shown(card)
+    assert card["over_budget_chf"] == 20
 
 
-def test_without_a_budget_the_price_is_neither_pro_nor_con():
-    card = hotel_card(item("guesthouse", 135), GUESTHOUSE_FACTS, [], None, shortlisted=True)
-    assert not any("budget" in text for text in card["pros"] + card["cons"])
+def test_without_a_budget_nothing_is_over_budget():
+    assert hotel_card(item("guesthouse", 135), GUESTHOUSE_FACTS, [], None, shortlisted=True)["over_budget_chf"] is None
 
 
 def test_the_shortlist_comes_first_then_the_rest_by_price():

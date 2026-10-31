@@ -152,13 +152,15 @@ def test_tuttie_books_the_negotiated_price_after_the_phone_approval():
     assert result["booking"]["status"] == "confirmed" and result["booking"]["total_chf"] == agreed
 
 
-def test_the_cards_show_every_offer_with_signed_pros_and_cons_shortlist_first():
+def test_the_cards_show_every_offer_with_signed_features_shortlist_first():
     result, bus, _ = run_find(date="2026-11-14", tags=["basel-sbb"], requirements=["quiet", "dog"], budget_chf=200)
     cards = [e for e in bus.history if e["detail"].get("phase") == "cards"][-1]["detail"]["cards"]
     assert [(c["name"], c["shortlisted"]) for c in cards] == [("Hotel Rheinblick", True), ("Alpina Grand Basel", False)]
     rheinblick, alpina = cards
-    assert "Within your budget" in rheinblick["pros"] and "Dogs welcome, CHF 15 a night" in rheinblick["pros"]
-    assert "CHF 40 over your budget" in alpina["cons"] and "Not a quiet location" in alpina["cons"]
+    labels = {c["name"]: {f["label"]: f["ok"] for f in c["features"]} for c in cards}
+    assert labels["Hotel Rheinblick"]["Dogs CHF 15"] and labels["Hotel Rheinblick"]["Quiet"]
+    assert alpina["over_budget_chf"] == 40 and labels["Alpina Grand Basel"]["Not quiet"] is False
+    assert rheinblick["rating"]["score"] == 4.5
     assert [c["name"] for c in result["cards"]] == ["Hotel Rheinblick", "Alpina Grand Basel"]
 
 
