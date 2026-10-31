@@ -1,0 +1,17 @@
+# systemd user service that keeps the whole demo running (registry, nodes, assistant).
+# Install:  cp deploy/two-webs.service ~/.config/systemd/user/ && systemctl --user daemon-reload
+#           systemctl --user enable --now two-webs
+# Deploy new code: systemctl --user restart two-webs     Logs: journalctl --user -u two-webs -f
+[Unit]
+Description=Two Webs agent web demo
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/project-repo/code
+ExecStart=%h/project-repo/code/run.sh
+Restart=always
+RestartSec=3
+KillSignal=SIGINT
+
+[Install]
+WantedBy=default.target
