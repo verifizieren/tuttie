@@ -7,6 +7,7 @@ everyone fresh, and the least recently used one is dropped when there are too ma
 """
 
 import asyncio
+import logging
 import secrets
 from collections import OrderedDict
 
@@ -19,6 +20,7 @@ from assistant.tools import Toolbox
 from llm import LLM
 
 MAX_CONVERSATIONS = 200
+log = logging.getLogger(__name__)
 
 
 class Conversation:
@@ -56,8 +58,9 @@ class Conversation:
             await self.assistant.chat(message, first_tool)
         except asyncio.CancelledError:
             raise
-        except Exception as error:  # surface any failure on screen instead of hanging the wallet
-            self.bus.emit("answer", "broken", f"Sorry, something went wrong: {type(error).__name__}",
+        except Exception:  # surface any failure on screen instead of hanging the wallet; details only in the log
+            log.exception("chat failed")
+            self.bus.emit("answer", "broken", "I can't think right now, please try again in a moment.",
                           detail={"mood": "sorry"})
 
     def reset(self) -> None:

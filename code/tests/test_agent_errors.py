@@ -110,3 +110,21 @@ def test_a_refused_llm_call_ends_the_turn_with_a_friendly_answer():
     assert "try again" in asyncio.run(assistant.chat("I want to book something"))
     assert bus.history[-1]["kind"] == "answer" and bus.history[-1]["detail"]["mood"] == "sorry"
     assert asyncio.run(assistant.chat("hello?")) == "Back again"
+
+
+def test_a_failing_chat_shows_no_internals():
+    from assistant.conversations import Conversation
+
+    class Crashing:
+        async def chat(self, message, first_tool=None):
+            raise ValueError("secret internals")
+
+    async def run():
+        conv = Conversation(httpx.AsyncClient(), "http://registry", ScriptedLLM([]))
+        conv.assistant = Crashing()
+        conv.start("hi")
+        await asyncio.gather(*conv.chats)
+        return conv.bus.history[-1]
+    event = asyncio.run(run())
+    assert event["kind"] == "answer" and event["status"] == "broken"
+    assert "ValueError" not in event["summary"] and "secret" not in event["summary"]

@@ -132,12 +132,12 @@ class Assistant:
             start = len(self.messages)
             try:
                 return await self._turn(text, first_tool)
-            except Exception as error:  # e.g. the LLM provider is down or over its limit: answer instead
+            except Exception:  # e.g. the LLM provider is down or over its limit: answer instead
                 log.exception("turn failed")
                 self.close_open_calls(start)
                 answer = "I can't think right now, please try again in a moment."
                 self.messages.append({"role": "assistant", "content": answer})
-                self.bus.emit("answer", "broken", answer, detail={"mood": "sorry", "error": type(error).__name__})
+                self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
                 return answer
             except asyncio.CancelledError:
                 self.close_open_calls(start)
