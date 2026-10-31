@@ -1,30 +1,28 @@
 """User's assistant service (port 4040): chat API, SSE timeline, phone approvals and the static apps.
 
-A chat runs in the background (it may wait minutes for the phone); its answer arrives as an
-"answer" event on the timeline stream.
+Every browser gets its own conversation (assistant/conversations.py), recognised by a session
+cookie: its own timeline, approvals and chat, so people using the app at the same time never see
+each other's runs. A chat runs in the background (it may wait minutes for the approval); its
+answer arrives as an "answer" event on that conversation's timeline stream.
 
 Run from code/: python -m assistant.app
 """
 
-import asyncio
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from assistant.agent import Assistant  # noqa: E402
-from assistant.approvals import ApprovalBook  # noqa: E402
-from assistant.events import EventBus  # noqa: E402
-from assistant.tools import Toolbox  # noqa: E402
-from llm import LLM  # noqa: E402
+from assistant.conversations import Conversation, Conversations  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
@@ -32,20 +30,37 @@ WALLET_DIST = APPS_DIR / "wallet" / "dist"
 TUTTIE_ID = os.environ.get("TUTTIE_ID", "ch.tuttie.alex-muster")  # this user's agent, data/agents/
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")
 
-bus = EventBus()
-approvals = ApprovalBook()
-chats: set[asyncio.Task] = set()
+SESSION_COOKIE = "tuttie_session"
+SESSION_DAYS = 30
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create the assistant with one shared HTTP client for the service's lifetime."""
+    """Keep the conversations and one shared HTTP client for the service's lifetime."""
     async with httpx.AsyncClient(timeout=20) as http:
-        app.state.assistant = Assistant(LLM(), Toolbox(http, REGISTRY_URL, bus, approvals), bus)
+        app.state.conversations = Conversations(http, REGISTRY_URL)
         yield
 
 
 app = FastAPI(title="APS assistant", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def session_cookie(request: Request, call_next):
+    """Give every browser a session id on its first request (the wallet page itself)."""
+    session_id = request.cookies.get(SESSION_COOKIE)
+    fresh = not session_id
+    request.state.session_id = session_id or secrets.token_urlsafe(16)
+    response = await call_next(request)
+    if fresh:
+        response.set_cookie(SESSION_COOKIE, request.state.session_id, max_age=SESSION_DAYS * 86400,
+                            httponly=True, samesite="lax")
+    return response
+
+
+def conversation(request: Request) -> Conversation:
+    """The calling browser's conversation."""
+    return request.app.state.conversations.get(request.state.session_id)
 
 
 class ChatRequest(BaseModel):
@@ -56,63 +71,47 @@ class DecisionRequest(BaseModel):
     decision: str  # "approved" or "declined"
 
 
-async def run_chat(message: str) -> None:
-    """Run a chat in the background; any failure shows up as an answer on the timeline."""
-    try:
-        await app.state.assistant.chat(message)
-    except asyncio.CancelledError:
-        raise
-    except Exception as error:  # surface any failure on screen instead of hanging the demo
-        bus.emit("answer", "broken", f"Sorry, something went wrong: {type(error).__name__}")
-
-
 @app.post("/chat", status_code=202)
-async def chat(req: ChatRequest) -> dict:
+async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
     """Start answering a message; the answer arrives as an "answer" event."""
-    task = asyncio.create_task(run_chat(req.message))
-    chats.add(task)
-    task.add_done_callback(chats.discard)
+    conv.start(req.message)
     return {"accepted": True}
 
 
 @app.post("/reset")
-def reset() -> dict:
-    """Start a new demo: stop running chats, decline open approvals, clear the timeline."""
-    for task in list(chats):
-        task.cancel()
-    approvals.clear()
-    app.state.assistant.reset()
-    bus.reset()
+def reset(conv: Conversation = Depends(conversation)) -> dict:
+    """Start this conversation over: stop its chats, decline its approvals, clear its timeline."""
+    conv.reset()
     return {"ok": True}
 
 
 @app.get("/identity")
-async def identity() -> dict:
+async def identity(conv: Conversation = Depends(conversation)) -> dict:
     """Tuttie's own verified identity: its seals and the user's signed delegation."""
-    return await app.state.assistant.toolbox.identity(TUTTIE_ID)
+    return await conv.assistant.toolbox.identity(TUTTIE_ID)
 
 
 @app.get("/approvals/pending")
-def pending_approvals() -> list[dict]:
-    """Approvals waiting for the user's decision (polled by the phone page)."""
-    return list(approvals.pending.values())
+def pending_approvals(conv: Conversation = Depends(conversation)) -> list[dict]:
+    """Approvals waiting for this user's decision."""
+    return list(conv.approvals.pending.values())
 
 
 @app.post("/approvals/{approval_id}")
-def decide(approval_id: str, req: DecisionRequest) -> dict:
+def decide(approval_id: str, req: DecisionRequest, conv: Conversation = Depends(conversation)) -> dict:
     """Record the user's decision; it is signed with the user's key and wakes the waiting chat."""
     if req.decision not in ("approved", "declined"):
         raise HTTPException(status_code=422, detail="decision must be approved or declined")
-    decision = approvals.decide(approval_id, req.decision)
+    decision = conv.approvals.decide(approval_id, req.decision)
     if decision is None:
         raise HTTPException(status_code=404, detail="no such pending approval")
     return decision
 
 
 @app.get("/events")
-def events() -> StreamingResponse:
-    """The timeline as Server-Sent Events."""
-    return StreamingResponse(bus.stream(), media_type="text/event-stream",
+def events(conv: Conversation = Depends(conversation)) -> StreamingResponse:
+    """This conversation's timeline as Server-Sent Events."""
+    return StreamingResponse(conv.bus.stream(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
