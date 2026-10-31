@@ -84,6 +84,11 @@ def test_answers_are_spoken_without_citations_markdown_or_emoji():
     assert spoken("Booked **BK-1** for CHF 128 [16]. 🐶\nIgnored: scam (broken seal)") == "Booked BK-1 for 128 francs."
 
 
+def test_temperatures_and_percentages_are_said_in_words():
+    assert spoken("Between 6.4 and 11.6 °C, around 8°C, a 25% chance.") == \
+        "Between 6.4 and 11.6 degrees, around 8 degrees, a 25 percent chance."
+
+
 def test_amounts_are_said_in_francs():
     assert spoken("CHF 1 tax, 70 CHF over, CHF 12.50 left, in CHF.") == "1 franc tax, 70 francs over, 12.50 francs left, in francs."
 
