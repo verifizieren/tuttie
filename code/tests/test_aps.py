@@ -137,6 +137,8 @@ def test_demo_registry_verdicts():
         "ch.basel.hotel-spalenhof": "blue",
         "ch.basel.hotel-gundeli": "gold",
         "ch.basel.budget-rooms": "grey",
+        "ch.basel.alpina-grand": "gold",
+        "ch.basel.gaestehaus-am-rhein": "gold",
         "ch.basel.cheap-hotels": "broken",
         "ch.legal.consumer-law": "gold",
         "ch.legal.advisor": "grey",
