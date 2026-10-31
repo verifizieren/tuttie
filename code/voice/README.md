@@ -17,10 +17,12 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
 - Concise by design: no greeting, a short varied confirmation ("On it.") as soon as the user
   has asked, then Tuttie's answer, read to the end; the only update in between is "Please
   confirm with Face ID."
-- Robust in a noisy room: English only (speech-to-text, voice and Tuttie's answers); the
-  phone's noise suppression, echo cancellation and voice isolation clean the microphone; a
-  stricter voice detector (threshold .65, at least 0.2 s); while Tuttie works or speaks, new
-  speech is not sent on; fragments under two words or noise tags are dropped.
+- The user can speak and interrupt at any time, also while Tuttie works or speaks (a new
+  message waits for the current one). Robust in a noisy room: English only (speech-to-text,
+  voice and Tuttie's answers); the phone's noise suppression, echo cancellation and voice
+  isolation clean the microphone; a stricter voice detector (threshold .65, at least 0.2 s);
+  fragments under two words or noise tags are dropped; only two or more words (0.5 s) interrupt
+  Tuttie, and it resumes after a false interruption. The dock's mic button mutes the microphone.
 - Voice: ElevenLabs "Eric" (free, conversational) with Turbo v2.5.
 - Self-hosted LiveKit (`livekit.yaml`): the team server only exposes ports 4000-4049, so
   signaling goes through the assistant on the wallet's own https origin (`/rtc`) and media uses
