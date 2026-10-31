@@ -15,7 +15,7 @@ from openai import AsyncOpenAI
 class LLM:
     def __init__(self, model: str | None = None):
         self.client = AsyncOpenAI()  # reads OPENAI_API_KEY
-        self.model = model or os.environ.get("LLM_MODEL", "gpt-4.1-mini")
+        self.model = model or os.environ.get("LLM_MODEL", "gpt-4.1")
 
     async def complete(self, messages: list[dict], tools: list[dict]) -> dict:
         """Return the assistant message: {"role", "content", "tool_calls"?}."""
