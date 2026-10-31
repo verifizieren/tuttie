@@ -73,7 +73,7 @@ has no seal at all and stays untrusted.
 To regenerate the demo keys and seals: `.venv/bin/python scripts/gen_keys.py && .venv/bin/python scripts/issue_seals.py`.
 To keep everything running on a server, use the systemd user service in `deploy/tuttie.service`.
 
-## Working on Tuttie (team template)
+## Working on Tuttie
 
 1. **Get it running:** clone, then follow "Run it" above. Working on the wallet UI:
    `cd code/apps/wallet && npm run dev` (hot reload on <http://localhost:4041/wallet/>).
@@ -98,6 +98,22 @@ To keep everything running on a server, use the systemd user service in `deploy/
    - Check in with the pitch and design team regularly
      ([`documentation/context/pitch/`](documentation/context/pitch/)); the demo is a run
      through the real app.
+
+## Team
+
+Every team member adds a short profile below. Copy the template, fill it in and keep it up
+to date when your responsibilities change.
+
+```markdown
+### Your Name
+- **Background:** what you study or work on, and what you bring to the team
+- **Team:** dev / research / pitch
+- **Working on:** areas and GitHub issues, e.g. wallet app (#2)
+- **Responsible for:** what you own and decide, and what others can ask you about
+- **Contact:** GitHub handle, how to reach you during the hackathon
+```
+
+<!-- Team profiles go here, one "### Name" block per person. -->
 
 ## License
 
