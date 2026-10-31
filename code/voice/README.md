@@ -15,8 +15,9 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
 - The voice layer stays thin: it never decides anything. What the user says becomes a message
   to the user's Tuttie, exactly like typing; Tuttie's answers are spoken.
 - Concise by design: no greeting; a filler that fits the request ("Let me take a look." for a
-  task, "Hmm, let me think." for a question) only if Tuttie has not answered within 1.5 s; then
-  Tuttie's answer; the only update in between is "Please confirm with Face ID."
+  task, "Hmm, let me think." for a question) only when Tuttie starts a tool for it (its first
+  tool event on the timeline), never for small talk or quick answers; then Tuttie's answer;
+  the only update in between is "Please confirm with Face ID."
 - The user can speak and interrupt at any time, also while Tuttie works or speaks (a new
   message waits for the current one). Robust in a noisy room: English only (speech-to-text,
   voice and Tuttie's answers); the phone's noise suppression, echo cancellation and voice

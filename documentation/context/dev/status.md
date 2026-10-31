@@ -344,7 +344,7 @@ Why things are the way they are, so nobody has to rediscover them:
   https://web4.mendes.dev with a spoken request. See `code/voice/README.md`.
 - **Voice in the wallet:** answers appear word by word as Tuttie speaks them; a typed message
   makes Tuttie quiet (text only) until its face or the mic button is tapped; the dock has a mic
-  mute button; the user can interrupt any time (two or more words). Voice "Germain" on the demo.
+  mute button; the user can interrupt any time (two or more words); a fitting filler only when Tuttie starts a tool. Voice "Germain" on the demo.
 - **Speed:** company agents use a fast non-reasoning model (`AGENT_LLM_MODEL`, default
   gpt-4.1-mini, `node/agent.py`); the add-ons a request needs (dog, late arrival, children) are
   chosen in code (`add_ons_for`), so every fee is in the offer whatever the model picks. Context

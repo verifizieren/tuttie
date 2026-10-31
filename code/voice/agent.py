@@ -1,7 +1,8 @@
 """Tuttie's voice: a LiveKit agent that listens and speaks for the user's Tuttie.
 
 It is ears and mouth only, and it keeps quiet: no greeting, a short filler that matches the
-request only when Tuttie needs a moment (no answer after FILLER_DELAY_S), then Tuttie's answer. What the user says (ElevenLabs
+request only when Tuttie starts using a tool for it (the first tool event on the timeline), then
+Tuttie's answer. Small talk and quick answers get no filler. What the user says (ElevenLabs
 speech-to-text, Silero voice activity) goes into the same conversation the wallet types into
 (POST /voice/say on the assistant), so every tool call runs exactly as when typing: context,
 signed MCP calls, bargaining, booking. It follows that conversation's timeline (GET
@@ -43,8 +44,7 @@ INTERRUPTION = {"mode": "vad", "min_words": 2, "min_duration": .5, "resume_false
 STT_MODEL = "scribe_v2_realtime"
 KEYTERMS = ["Tuttie", "Basel", "Gästehaus am Rhein", "Rheinblick", "Alpina", "Luna", "Kleinbasel"]  # heard right
 
-# A filler that matches what the user asked, only when Tuttie needs a moment; varied so it never drones.
-FILLER_DELAY_S = 1.5
+# A filler that matches what the user asked, said when Tuttie starts a tool for it; varied so it never drones.
 FILLERS = {
     "task": ["Let me take a look.", "Sure, let me check.", "On it, one second."],
     "question": ["Hmm, let me think.", "Good question, one moment."],
@@ -100,25 +100,23 @@ class Tuttie(Agent):
         self.room = room
         self.http = http
         self.turns = 0
-        self.answers = 0      # Tuttie's answers so far (counted by follow())
-        self.fillers = set()  # pending filler tasks
+        self.asked = None  # what the user asked last, until Tuttie uses a tool for it or answers
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         text = (new_message.text_content or "").strip()
         if meaningful(text):  # noise and stray words are not requests
             self.turns += 1
-            task = asyncio.create_task(self.fill_if_slow(text, self.answers))
-            self.fillers.add(task)
-            task.add_done_callback(self.fillers.discard)
+            self.asked = text
             await self.http.post("/voice/say", json={"room": self.room, "text": text})
         raise StopResponse()  # Tuttie answers through the timeline, spoken by follow()
 
-    async def fill_if_slow(self, text: str, answers_before: int) -> None:
-        """Say a fitting filler only if Tuttie has not answered yet and is not speaking."""
-        await asyncio.sleep(FILLER_DELAY_S)
-        if self.answers == answers_before and self.session.agent_state != "speaking":
-            options = FILLERS[filler_kind(text)]
-            self.session.say(options[self.turns % len(options)])
+    def filler(self) -> str | None:
+        """A filler fitting the last request, once, when Tuttie starts a tool for it."""
+        if self.asked is None or self.session.agent_state == "speaking":
+            return None
+        options = FILLERS[filler_kind(self.asked)]
+        self.asked = None
+        return options[self.turns % len(options)]
 
 
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: str) -> None:
@@ -133,9 +131,12 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
             event = json.loads(line[5:])
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
-                agent.answers += 1
+                agent.asked = None  # answered without (or after) a tool: no filler any more
                 session.say(spoken(event["summary"]))
-            elif prompt := update_for(event, said):
+                continue
+            if event["kind"] != "thinking" and (line := agent.filler()):  # the first tool for the request
+                session.say(line)
+            if prompt := update_for(event, said):
                 session.say(prompt)
 
 
