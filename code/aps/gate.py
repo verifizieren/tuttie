@@ -27,6 +27,12 @@ delegation ✓ agreement ✓"). Nothing is used up until the action succeeded: t
 calls `commit(verdict)`, which marks the approval and the agreement as used and counts a
 mandate payment. The nonce is used as soon as the signature verified, so a refused call cannot be retried as it is either.
 
+Concurrency: the gate awaits only the registry lookup, before any of its state checks. So
+between the checks of used approvals, agreements and mandate totals and `commit` nothing may
+be awaited: the service calls `commit` right after `check_action` returns, and any state of
+its own (e.g. "this charge is already paid") is checked again after the gate, not only
+before it. Otherwise two calls sent at once both pass, and one approval books twice.
+
 Hook for an action tool (owner of node/server.py), e.g. `book`:
 
     gate = ActionGate(node_id, own_public_key, user_public_key, authorities, lookup, agreements)

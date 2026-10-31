@@ -230,3 +230,26 @@ def test_only_a_passed_verdict_can_be_committed():
     verdict = check(make_gate(), book_call(tool="pay"))
     with pytest.raises(ValueError):
         make_gate().commit(verdict)
+
+
+def test_concurrent_calls_with_one_approval_book_only_once():
+    """Two calls at once with one approval: the lookup awaits, but only one passes and commits."""
+    async def slow(node_id):
+        await asyncio.sleep(0.01)  # like the real registry over HTTP
+        return REGISTRY.get(node_id)
+
+    gate = ActionGate(HOTEL, load_public_key(HOTEL), load_public_key("user"), load_authorities(), slow,
+                      AgreementRedeemer(HOTEL, load_public_key(HOTEL)))
+
+    async def book_once():
+        verdict = await gate.check_action(book_call(), BOOK)  # same approval, new nonce each
+        if verdict.ok:
+            gate.commit(verdict)  # nothing awaited in between: the rule in the gate's docstring
+        return verdict
+
+    async def both():
+        return await asyncio.gather(book_once(), book_once())
+
+    verdicts = asyncio.run(both())
+    assert sorted(v.ok for v in verdicts) == [False, True]
+    assert [v.reason for v in verdicts if not v.ok] == ["the approval was already used"]
