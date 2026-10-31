@@ -281,6 +281,11 @@ Why things are the way they are, so nobody has to rediscover them:
   Tuttie down and opening it again starts a fresh conversation (`/reset`), unless an approval
   waits; opening the wallet resumes only a running conversation (`GET /history`). The user's own
   words are not shown; businesses with forged or missing seals are never shown either.
+- **Tuttie's priorities** (`assistant/agent.py`): what the user says now beats their saved
+  context, preferences, budget and Tuttie's own recommendation ("book it anyway" is booked,
+  with the phone approval as the final word); then safety on the agent web; then the context;
+  then Tuttie's judgement. Verified headless: an over-budget hotel the user insisted on was
+  booked after approval.
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
