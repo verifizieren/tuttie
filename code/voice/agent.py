@@ -26,6 +26,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentServer, AgentSession, JobContext, JobProcess, StopResponse, cli
+from livekit import rtc
 from livekit.plugins import elevenlabs, silero
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -127,10 +128,24 @@ class Tuttie(Agent):
         return options[self.turns % len(options)]
 
 
-async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: str) -> None:
-    """Speak every answer and the approval prompt from the conversation's timeline."""
+def voice_on(room: rtc.Room) -> bool:
+    """The wallet is in voice mode (card open, not typing): it sets the attribute voice=on.
+
+    The wallet stays in the room with the microphone off while the card is closed, so voice
+    starts at once; Tuttie only speaks while voice mode is on.
+    """
+    return any(p.attributes.get("voice") == "on" for p in room.remote_participants.values())
+
+
+async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
+    """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
     said: set[str] = set()
-    async with http.stream("GET", "/voice/events", params={"room": room}, timeout=None) as stream:
+
+    def say(text: str) -> None:
+        if voice_on(room):
+            session.say(text)
+
+    async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
         async for line in stream.aiter_lines():
             if line.startswith("event: reset"):
                 said.clear()
@@ -140,12 +155,12 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
                 agent.asked = None  # answered without (or after) a tool: no filler any more
-                session.say(spoken(event["summary"]))
+                say(spoken(event["summary"]))
                 continue
             if event["kind"] != "thinking" and (line := agent.filler()):  # the first tool for the request
-                session.say(line)
+                say(line)
             if prompt := update_for(event, said):
-                session.say(prompt)
+                say(prompt)
 
 
 def prewarm(proc: JobProcess) -> None:
@@ -174,7 +189,7 @@ async def entry(ctx: JobContext) -> None:
     )
     agent = Tuttie(ctx.room.name, http)
     await session.start(agent, room=ctx.room)  # connects to the room itself
-    follower = asyncio.create_task(follow(session, agent, http, ctx.room.name))
+    follower = asyncio.create_task(follow(session, agent, http, ctx.room))
 
     async def cleanup() -> None:
         follower.cancel()

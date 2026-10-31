@@ -2,6 +2,8 @@
 what the voice agent says (voice/agent.py). No LiveKit server or ElevenLabs call is needed."""
 
 import asyncio
+import base64
+import json
 import os
 
 from fastapi.testclient import TestClient
@@ -11,7 +13,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import SESSION_COOKIE, app  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for  # noqa: E402
+from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for, voice_on  # noqa: E402
 
 
 def configure(monkeypatch):
@@ -31,6 +33,27 @@ def test_a_token_opens_a_room_tied_to_this_browsers_conversation(monkeypatch):
         token = client.post("/voice/token", headers={"x-forwarded-proto": "https", "x-forwarded-host": "web4.example"}).json()
         assert token["url"] == "wss://web4.example" and token["token"].count(".") == 2
         assert app.state.voice_rooms[token["room"]] == client.cookies[SESSION_COOKIE]
+        grants = jwt_claims(token["token"])["video"]
+        assert grants["canUpdateOwnMetadata"]  # the wallet sets voice=on|off: Tuttie speaks only in voice mode
+
+
+def jwt_claims(token: str) -> dict:
+    body = token.split(".")[1]
+    return json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+
+
+class Participant:
+    def __init__(self, voice_attr):
+        self.attributes = {"voice": voice_attr} if voice_attr else {}
+
+
+class Room:
+    def __init__(self, *attrs):
+        self.remote_participants = {str(i): Participant(a) for i, a in enumerate(attrs)}
+
+
+def test_tuttie_speaks_only_while_the_wallet_is_in_voice_mode():
+    assert voice_on(Room("on")) and not voice_on(Room("off")) and not voice_on(Room(None)) and not voice_on(Room())
 
 
 def test_only_the_voice_agent_may_speak_into_a_room(monkeypatch):

@@ -74,7 +74,8 @@ def voice_token(request: Request) -> dict:
              .with_identity(f"user-{secrets.token_hex(4)}")
              .with_name("You")
              .with_ttl(timedelta(seconds=TOKEN_TTL_S))
-             .with_grants(api.VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True))
+             .with_grants(api.VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True,
+                                             can_update_own_metadata=True))
              .to_jwt())
     return {"url": public_url(request), "token": token, "room": room}
 
@@ -145,5 +146,5 @@ async def rtc_proxy(ws: WebSocket, rest: str = "") -> None:
     finally:
         try:
             await ws.close()
-        except RuntimeError:
-            pass  # already closed
+        except (RuntimeError, OSError, WebSocketDisconnect):
+            pass  # the wallet left first
