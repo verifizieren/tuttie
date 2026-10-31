@@ -1,6 +1,7 @@
 # Tuttie: your agent in your wallet
 
-BaselHack 2026, Adobe challenge.
+BaselHack 2026, Adobe challenge. **Live: <https://web4.mendes.dev>** (open it on your phone and
+add it to the home screen).
 
 Tuttie lives in your phone's wallet. You say what you need, businesses' agents come to you
 with signed offers, your agent picks the best few and negotiates for you, and you approve
@@ -23,40 +24,39 @@ This repo follows the BaselHack template:
 
 | Folder | Contents |
 | --- | --- |
-| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `voice/`, `demo/`, `apps/` (console, wallet, owner, presentation, shared), `scripts/`, `tests/`, demo `data/` and `keys/` |
-| `documentation/` | concept, architecture, formats |
+| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `documentation/` | concept, architecture, formats, team context |
 | `assets/` | presentation material |
 
 ## Run it
 
-Requires Python 3.11+.
+Requires Python 3.11+ and Node.js 20+ (for the wallet).
 
 ```bash
 cd code
 python3 -m venv .venv            # or: uv venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env             # add your OPENAI_API_KEY
-./run.sh                         # registry :4000, nodes :4001-4007, assistant + apps :4040
+./run.sh                         # builds the wallet, starts registry :4000, nodes :4001-4007, assistant + apps :4040
 .venv/bin/pytest -q              # tests for APS, the trust gate and booking (no network, no LLM)
 ```
 
-<http://localhost:4040> opens the new Tuttie wallet (phone-first; the agent is not connected
-yet). The first working prototype is at <http://localhost:4040/old/console/>: press
-**Dog + 1am arrival** and the timeline on the right shows what happens:
+<http://localhost:4040> opens the Tuttie wallet (phone-first; the agent is not connected to
+it yet). The agent web behind it already works end to end:
 
-1. The scam hotel is rejected in red; Hotel Rheinblick verifies as gold.
+```bash
+.venv/bin/python scripts/demo_headless.py approved   # or: declined
+```
+
+runs the whole flow in one process, with a real LLM, real signatures and a simulated phone:
+
+1. The scam hotel is rejected (forged seal); Hotel Rheinblick verifies as gold.
 2. Signed availability and policies are fetched (A2T).
 3. The assistant asks the hotel's own agent about the 1am arrival with a dog (A2A) and gets
    a signed, priced commitment.
-4. An approval appears. Press **Phone** and scan the QR code, or open `/old/wallet/`, then
-   tap Approve. The decision is signed with the user's key.
+4. The user approves on the phone; the decision is signed with the user's key.
 5. The hotel checks the signature, recomputes the total from its own signed commitment and
-   confirms the booking. Each claim in the answer carries a seal badge citing its source.
-
-Without a browser: `.venv/bin/python scripts/demo_headless.py [approved|declined]` runs the
-same flow in one process with a simulated phone.
-
-To keep it running on a server, use the systemd user service in `deploy/tuttie.service`.
+   confirms the booking. Each claim in the answer cites its signed source.
 
 Or query the agent web directly:
 
@@ -71,6 +71,33 @@ a government seal but signed it with its own key, so its seal is broken; Basel B
 has no seal at all and stays untrusted.
 
 To regenerate the demo keys and seals: `.venv/bin/python scripts/gen_keys.py && .venv/bin/python scripts/issue_seals.py`.
+To keep everything running on a server, use the systemd user service in `deploy/tuttie.service`.
+
+## Working on Tuttie (team template)
+
+1. **Get it running:** clone, then follow "Run it" above. Working on the wallet UI:
+   `cd code/apps/wallet && npm run dev` (hot reload on <http://localhost:4041/wallet/>).
+2. **Pick your area:** [`documentation/architecture.md`](documentation/architecture.md)
+   maps every folder to its GitHub issue; the dev goals and build order are in
+   [`documentation/context/dev/goals.md`](documentation/context/dev/goals.md).
+3. **Before every push:**
+   ```bash
+   cd code
+   .venv/bin/pytest -q                                  # all tests green
+   .venv/bin/python scripts/demo_headless.py approved   # the real flow still works
+   (cd apps/wallet && npm run build)                    # the wallet still builds
+   ```
+4. **Rules:**
+   - Pull before you start; small commits with clear messages, one concern each.
+   - No secrets in git: keys go in `code/.env`, which is ignored.
+   - A short docstring for every module, comments where the *why* is not obvious, tests for
+     every feature.
+   - Signing only through `code/aps/`; prices only from node configs and signed messages.
+   - Changing `documentation/formats.md`? Tell the whole team first.
+   - Code in `code/`, docs in `documentation/`, presentation files in `assets/`.
+   - Check in with the pitch and design team regularly
+     ([`documentation/context/pitch/`](documentation/context/pitch/)); the demo is a run
+     through the real app.
 
 ## License
 
