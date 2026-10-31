@@ -149,23 +149,25 @@ export default function Activity({ state, readOnly = false, onPick, onLean, reve
     context: turn.context || lines.context, tool: turn.tool || lines.tool,
   }), {});
   const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
-  // What Tuttie did stays (steps, the chosen hotel, the booking); of what it said, only its
-  // current answer is shown. The history (readOnly) keeps every answer.
-  const current = state.turns.length - 1;
+  // What Tuttie did stays (steps, the chosen hotel, every booking in its own turn); of what it
+  // said, only its current answer (the newest one) is shown, until the next answer replaces it.
+  // The history (readOnly) keeps every answer.
+  const current = state.turns.findLastIndex(t => t.answer);
   return (
     <div className="activity" ref={box} data-scroll>
       {!readOnly && <Steps turn={liveProgress} latest={latest} />}
       {state.turns.map((turn, i) => {
         const showMarket = i === state.marketTurn && state.request && !state.booking && state.picked?.length;
-        const showBooking = i === state.bookingTurn && state.booking;
+        // Archived chats from before bookings were kept per turn only have `state.booking`.
+        const booking = turn.booking || (i === state.bookingTurn && state.booking);
         const showAnswer = turn.answer && (readOnly || i === current);
         // Empty historical turns still take a flex gap; omit them from the live layout.
-        if (!readOnly && !showMarket && !showBooking && !showAnswer) return null;
-        return <div className="turn" key={i}>
+        if (!readOnly && !showMarket && !booking && !showAnswer) return null;
+        return <div className="turn" key={turn.id || i}>
           {readOnly && turn.said && <div className="bubble user">{turn.said}</div>}
           {readOnly && <Steps turn={turn} latest={latest} />}
           {showMarket && <Market state={state} />}
-          {showBooking && <BookingCard booking={state.booking} />}
+          {booking && <BookingCard booking={booking} />}
           {showAnswer && (
             <Answer text={turn.answer} spoken={reveal?.answer === turn.answer ? reveal.text : null} />
           )}
