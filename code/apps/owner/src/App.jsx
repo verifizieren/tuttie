@@ -1,27 +1,23 @@
-// The owner view: one business. A sidebar of sections, the live state in the header, forms that
-// edit a draft and a bar to review and deploy it. Nothing reaches guests until it is deployed.
+// The owner view: one business on one page. Edit a few settings, review the changes, deploy.
+// Edits are a draft: guests' agents keep using what is live until the owner deploys.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DeployDialog from "./components/DeployDialog.jsx";
 import { EditorContext } from "./components/editor.jsx";
 import Login from "./components/Login.jsx";
-import { SECTIONS } from "./components/sections.jsx";
-import Versions, { formatTime } from "./components/Versions.jsx";
+import Sections from "./components/sections.jsx";
 import { useDraft } from "./hooks/useDraft.js";
 import { useOverview } from "./hooks/useOverview.js";
 import { forgetToken, saveToken, savedToken } from "./lib/api.js";
 import { ago } from "./lib/format.js";
 import { diff } from "./lib/settings.js";
 
-const HISTORY = { id: "versions", label: "Versions" };
-
 /** The page for a signed-in owner, once the business has been read from its node. */
 function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }) {
   const live = data.settings;
   const draft = useDraft(data.node_id, live, data.version);
-  const [sectionId, setSectionId] = useState(SECTIONS[0].id);
   const [errors, setErrors] = useState({});
   const [reviewing, setReviewing] = useState(false);
-  const [notice, setNotice] = useState(null);
+  const [deployedVersion, setDeployedVersion] = useState(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -34,7 +30,6 @@ function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }
   const update = useCallback(change => { setErrors({}); draft.update(change); }, [draft.update]);
   const editor = useMemo(() => ({ settings: draft.settings, live, set, update, errors }),
                          [draft.settings, live, set, update, errors]);
-
   const changes = useMemo(() => diff(live, draft.settings), [live, draft.settings]);
 
   const deployed = overview => {
@@ -42,87 +37,57 @@ function Workspace({ token, data, error, updatedAt, refresh, accept, onSignOut }
     accept(overview);
     setErrors({});
     setReviewing(false);
-    setNotice(`Version ${overview.version} is live. Your agent uses the new settings from its next request.`);
-  };
-  const restored = version => {
-    draft.restore(version.settings);
-    setSectionId(SECTIONS[0].id);
-    setNotice(`Version ${version.version} is loaded as a draft. Review it and deploy to go back to it.`);
+    setDeployedVersion(overview.version);
   };
   const refused = list => setErrors(Object.fromEntries(list.filter(e => e.path).map(e => [e.path, e.message])));
 
   useEffect(() => {
-    if (!notice) return undefined;
-    const timer = setTimeout(() => setNotice(null), 8000);
+    if (deployedVersion === null) return undefined;
+    const timer = setTimeout(() => setDeployedVersion(null), 6000);
     return () => clearTimeout(timer);
-  }, [notice]);
-
-  const showingHistory = sectionId === HISTORY.id;
-  const section = showingHistory ? HISTORY : SECTIONS.find(s => s.id === sectionId);
-  const Section = showingHistory ? null : section.component;
-  const offline = Boolean(error);
+  }, [deployedVersion]);
 
   return (
     <EditorContext.Provider value={editor}>
-      <div className="shell">
-        <aside className="sidebar">
-          <div className="brand">Tuttie <span>for business</span></div>
-          <nav>
-            {[...SECTIONS, HISTORY].map(s => (
-              <button key={s.id} className={`nav ${s.id === sectionId ? "active" : ""}`} onClick={() => setSectionId(s.id)}>
-                {s.label}
-                {s.private && <span className="lock" title="Private">private</span>}
-              </button>
-            ))}
-          </nav>
-          <button className="link" onClick={() => { draft.discard(); onSignOut(); }}>Sign out</button>
-        </aside>
+      <main className="page">
+        <header>
+          <h1>{data.name}</h1>
+          <p className="meta">
+            {data.seals.map(seal => <i key={seal.issuer} className={`seal ${seal.tier}`} title={seal.issuer} />)}
+            {data.uid && <span className="mono">{data.uid}</span>}
+          </p>
+          <p className="meta">
+            <span className={`live ${error ? "down" : ""}`}><i /> {error ? "Offline" : "Live"} · version {data.version} · {ago(updatedAt, now)}</span>
+            <button className="link" onClick={refresh}>Refresh</button>
+            <button className="link" onClick={() => { draft.discard(); onSignOut(); }}>Sign out</button>
+          </p>
+        </header>
 
-        <main className="main">
-          <header className="topbar">
-            <div>
-              <h1>{data.name}</h1>
-              <p className="muted">{section.label}</p>
-            </div>
-            <div className="topbar-side">
-              <span className={`live ${offline ? "down" : ""}`}>
-                <i /> {offline ? "Offline, showing the last state" : "Live"} · {ago(updatedAt, now)}
-              </span>
-              <button className="secondary" onClick={refresh}>Refresh</button>
-            </div>
-          </header>
+        {deployedVersion !== null && (
+          <p className="notice" role="status">Version {deployedVersion} is live. Your agent uses it from its next request.</p>
+        )}
 
-          {notice && <div className="banner success" role="status">{notice}</div>}
-          <div className={`banner ${draft.dirty ? "draft" : ""}`}>
-            {draft.dirty
-              ? `You are editing a draft. Guests' agents keep using version ${data.version} until you deploy.`
-              : `Live: version ${data.version}${data.deployed_at ? `, deployed ${formatTime(data.deployed_at)}` : ", the original configuration"}.${showingHistory ? "" : " Change anything below, then review and deploy."}`}
+        <Sections />
+
+        {(draft.dirty || draft.stale) && (
+          <div className="deploy-bar" role="region" aria-label="Unsaved changes">
+            <span>
+              {draft.stale
+                ? `Version ${data.version} went live after you started. Discard your draft to continue.`
+                : `${changes.length} change${changes.length === 1 ? "" : "s"}, not live yet`}
+            </span>
+            <div className="deploy-actions">
+              <button className="secondary" onClick={() => { draft.discard(); setErrors({}); }}>Discard</button>
+              {!draft.stale && <button onClick={() => setReviewing(true)}>Review</button>}
+            </div>
           </div>
-
-          {showingHistory
-            ? <Versions token={token} liveVersion={data.version} onRestore={restored} />
-            : <Section data={data} />}
-
-          {(draft.dirty || draft.stale) && (
-            <div className="deploy-bar" role="region" aria-label="Unsaved changes">
-              <span>
-                {draft.stale
-                  ? `Version ${data.version} was deployed after you started this draft. Discard the draft to continue from it.`
-                  : `${changes.length} change${changes.length === 1 ? "" : "s"} not deployed yet`}
-              </span>
-              <div className="deploy-actions">
-                <button className="secondary" onClick={() => { draft.discard(); setErrors({}); }}>Discard draft</button>
-                {!draft.stale && <button onClick={() => setReviewing(true)}>Review and deploy</button>}
-              </div>
-            </div>
-          )}
-        </main>
+        )}
 
         {reviewing && (
           <DeployDialog token={token} baseVersion={draft.baseVersion} settings={draft.settings} changes={changes}
                         onClose={() => setReviewing(false)} onDeployed={deployed} onRefused={refused} />
         )}
-      </div>
+      </main>
     </EditorContext.Provider>
   );
 }
@@ -137,7 +102,7 @@ function Dashboard({ token, onSignOut }) {
     if (error && (error.status === 401 || error.status === 503)) onSignOut(error.message);
   }, [error, onSignOut]);
 
-  if (!data) return <main className="center muted">{error ? error.message : "Loading your business…"}</main>;
+  if (!data) return <main className="center muted">{error ? error.message : "Loading…"}</main>;
   return <Workspace key={data.node_id} token={token} {...overview} onSignOut={onSignOut} />;
 }
 

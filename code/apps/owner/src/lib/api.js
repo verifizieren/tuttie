@@ -1,4 +1,4 @@
-// Talks to the business's node (code/node/owner.py: /owner/overview, /owner/versions, /owner/deploy).
+// Talks to the business's node (code/node/owner.py: /owner/overview and /owner/deploy).
 // The owner view shows one business. Which node: `?node=<url>` in the page address, else
 // VITE_NODE_URL, else the Gästehaus am Rhein's node (port 4009) on the host serving this page.
 
@@ -53,9 +53,6 @@ async function request(path, token, { signal, body } = {}) {
 /** The business as it is live right now. */
 export const fetchOverview = (token, signal) => request("/overview", token, { signal });
 
-/** Every deployed version, newest first. */
-export const fetchVersions = (token, signal) => request("/versions", token, { signal });
-
 /** Deploy `settings` on top of `baseVersion`; answers with the new live overview. */
-export const deploySettings = (token, baseVersion, settings, note) =>
-  request("/deploy", token, { body: { base_version: baseVersion, settings, note: note || null } });
+export const deploySettings = (token, baseVersion, settings) =>
+  request("/deploy", token, { body: { base_version: baseVersion, settings } });

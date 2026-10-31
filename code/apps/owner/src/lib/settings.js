@@ -21,9 +21,6 @@ export function setIn(value, path, next) {
   return copy;
 }
 
-export const appendTo = (settings, path, item) => setIn(settings, path, [...(getIn(settings, path) || []), item]);
-export const removeFrom = (settings, path, index) => setIn(settings, [...parts(path), String(index)], undefined);
-
 /** Drops what means "not set" (empty text, null, empty lists and objects), so a blank box and a
  *  missing key compare equal. */
 export function clean(value) {
@@ -47,20 +44,6 @@ function sortKeys(value) {
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, sortKeys(value[key])]));
   return value;
 }
-
-/** Lowercase letters, digits and dashes, as the node wants an add-on id. */
-export function slug(text) {
-  return String(text).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
-}
-
-/** A slug that is not in `taken`: "bike", then "bike-2", "bike-3"… */
-export function uniqueSlug(text, taken) {
-  const base = slug(text) || "extra";
-  let candidate = base;
-  for (let n = 2; taken.includes(candidate); n += 1) candidate = `${base}-${n}`.slice(0, 40);
-  return candidate;
-}
-
 
 // ---- the differences, in words ----
 

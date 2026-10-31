@@ -38,7 +38,6 @@ export function useDraft(nodeId, live, version) {
 
   const set = useCallback((path, value) => update(settings => setIn(settings, path, value)), [update]);
   const discard = useCallback(() => setDraft(null), []);
-  const restore = useCallback(settings => update(() => settings), [update]);
 
   const settings = draft ? draft.settings : live;
   return {
@@ -46,6 +45,6 @@ export function useDraft(nodeId, live, version) {
     dirty: Boolean(draft) && !sameSettings(draft.settings, live),
     stale: Boolean(draft) && draft.base_version !== version,
     baseVersion: draft ? draft.base_version : version,
-    update, set, discard, restore,
+    update, set, discard,
   };
 }

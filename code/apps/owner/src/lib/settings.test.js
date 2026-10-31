@@ -1,7 +1,7 @@
 // Tests for the settings helpers (run with `npm test`, Node's built-in test runner).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { appendTo, clean, describePath, diff, removeFrom, sameSettings, setIn, slug, uniqueSlug } from "./settings.js";
+import { clean, describePath, diff, sameSettings, setIn } from "./settings.js";
 
 const live = {
   facts: {
@@ -25,23 +25,11 @@ test("setIn changes a copy and removes a key when the value is undefined", () =>
   assert.deepEqual(setIn({}, "facts.profile.about", "hi"), { facts: { profile: { about: "hi" } } });
 });
 
-test("rows are appended and removed by index", () => {
-  const more = appendTo(live, "facts.rooms", { room_type: "suite" });
-  assert.equal(more.facts.rooms.length, 3);
-  assert.deepEqual(removeFrom(more, "facts.rooms", 0).facts.rooms.map(r => r.room_type), ["single", "suite"]);
-});
-
 test("an empty box and a missing value are the same setting", () => {
   assert.ok(sameSettings({ facts: { address: "", rooms: [], x: null } }, {}));
   assert.ok(sameSettings({ a: 1, b: 2 }, { b: 2, a: 1 }));
   assert.ok(!sameSettings(live, setIn(live, "persona.name", "Anni")));
   assert.deepEqual(clean({ a: "", b: { c: [] } }), undefined);
-});
-
-test("add-on ids are slugs and stay unique", () => {
-  assert.equal(slug("Late check-out (until 14:00)"), "late-check-out-until-14-00");
-  assert.equal(uniqueSlug("Breakfast", ["breakfast"]), "breakfast-2");
-  assert.equal(uniqueSlug("", []), "extra");
 });
 
 test("diff names a changed price in words", () => {
@@ -50,7 +38,7 @@ test("diff names a changed price in words", () => {
 });
 
 test("diff reports whole rows as added or removed, not field by field", () => {
-  const added = appendTo(live, "facts.rooms", { room_type: "suite", price_chf: 200, rate: "x", available: true });
+  const added = setIn(live, "facts.rooms.2", { room_type: "suite", price_chf: 200, rate: "x", available: true });
   assert.deepEqual(diff(live, added), [{ kind: "added", label: "Rooms › suite", before: "", after: "new" }]);
   assert.deepEqual(diff(added, live)[0].kind, "removed");
 });
