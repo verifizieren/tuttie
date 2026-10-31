@@ -107,6 +107,10 @@ big ones: `{ "size": "large | medium | small", "rooms_total", "about",
 "chain"? }`. It is public: `get_policies` and the agent card return it, and the node's agent may
 talk about it. The persona (`agent.persona`) only says who the *agent* is, not the business.
 
+`facts.charges` lists what the business may collect after a booking with `pay`:
+`[{ "purpose": "city tax", "price_chf": 4, "note" }]`. Public (in `get_policies`); the node
+takes the amount from here, never from the caller.
+
 `facts.negotiation = { "floor_chf", "max_rounds" }` holds the owner's limits. It is
 **private**: listed in `PRIVATE_FACTS` (`node/agent.py`), never put in an LLM prompt and
 never returned by any tool; only the node's own code may use it.
@@ -190,20 +194,40 @@ assistant serves its own checked identity at `GET /identity`
 
 ## Approval
 
-Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the phone
-page lists pending approvals, the user taps Approve/Decline; the decision is signed
-with the user's key and attached to the action (e.g. passed to `book`).
+Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals, offer_mandate}`;
+the wallet shows the pending approval, the user taps Approve (Face ID-style) or Decline; the
+decision is signed with the user's key and attached to the action (e.g. passed to `book`).
+`offer_mandate` (`{agent_id, purpose, max_chf, price_chf}` or null) offers a mandate for the
+business's small charge (the city tax); `POST /approvals/{id} {decision, allow_mandate}`
+with `allow_mandate: true` also signs that mandate (`sign_mandate`), and Tuttie then pays the
+charge right after the booking without asking. The pending `approval` event carries
+`detail.offer_mandate`; a paid charge is a `payment` event with the receipt in
+`detail.payload`.
 
 ## Business tools over MCP (`node/mcp_tools.py`)
 
 Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
 stateless, JSON answers) at `<endpoint>/mcp/`: `get_availability {date, guests}`,
-`get_policies {}` and `book {call}`. Each result is the node's signed envelope as JSON text;
-the caller verifies it against the node's registry record like any APS reply. Reading tools
-are open; `book` takes a signed call (below) whose `args` are the `BookRequest` fields. Its
-confirmation lists the signatures it rests on in `checked`, e.g. `["caller signature",
-"user approval", "hotel agreement"]` (or `"hotel commitments"` for extras). Agent
-conversations (`/agent`, sessions, `counter_offer`) stay on their HTTP endpoints.
+`get_policies {}`, `book {call}`, `pay {call}` and `counter_offer {counter, offer, last}`.
+Each result is the node's signed envelope as JSON text; the caller verifies it against the
+node's registry record like any APS reply. Reading tools are open; the actions take a signed
+call (below) and run only through the action gate (`aps/gate.py`):
+
+- `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
+  signed commitments, or its own signed agreement) and asks the gate with
+  `Needs("book", scope="book", approval=True, amount_chf=total)`. The confirmation
+  `{status: "confirmed", booking_id, total_chf, extras, checked, ...}` lists the gate's checks,
+  e.g. `["caller", "signature", "delegation", "agreement", "approval"]`, plus `"commitments"`
+  when extras were redeemed.
+- `pay`: `args = {purpose, booking_id, mandate | approval}`. The amount is the charge's
+  `price_chf` from `facts.charges`; each charge is paid once per booking at this business.
+  Gate: `Needs("pay", scope=None, approval=True, mandate=True, amount_chf, purpose)`. Receipt:
+  `{status: "paid", receipt_id, booking_id, purpose, amount_chf, paid_with: "mandate" |
+  "approval", checked}`.
+
+The HTTP `/tools/get_availability|get_policies|book` routes are gone; `counter_offer` is also
+still served at `POST /tools/counter_offer`, and the agent conversations (`/agent`, sessions)
+stay on HTTP.
 
 ## Signed call (MCP actions, `aps/call.py`)
 

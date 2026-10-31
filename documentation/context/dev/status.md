@@ -58,53 +58,30 @@ Build order from [goals.md](goals.md):
    lists `negotiation.counter` any more (`DEFAULT_WAKES_ON` never did). Anna offers the double
    with `late-arrival-dog` (CHF 135) for a dog guest: her config notes the single is too small
    for a dog. Verified headless: 135 → 121/131 → 126/130 → agreed 128 → approved → booked.
-5. **MCP services** — in progress (goal 4). Done (dev member 1): every node serves
-   `get_availability`, `get_policies` and `book` over MCP at `/mcp/` (`node/mcp_tools.py`,
-   SDK `mcp==2.3.0`, stateless, JSON); the HTTP `/tools/*` routes for them are gone. Tuttie
-   calls them through `assistant/mcp_client.py` behind the same trust gate and sends `book` as
-   a call signed with its key plus the user's delegation (C1). The node refuses unsigned,
-   forged, unknown-caller, replayed and wrong-tool calls; the confirmation lists `checked`
-   signatures. Tests: `test_node_book.py`, `test_tools.py`, in-process helpers in
-   `tests/mcp_helpers.py`; the headless story books at CHF 128 over MCP. Open: C2 gate (seals
-   of the caller, delegation scope; note `aps/delegation.py` SCOPES has no `book` yet), the
-   wallet showing `checked`, `counter_offer` over MCP (C4).
-   Original plan: Hotels offer their tools over MCP at `/mcp`;
-   an action runs only with the right signatures. Start with the contract (C1), then both
-   sides work in parallel. `pay` is part of the demo.
-   - **dev member 2 (APS, `code/aps/`, `code/negotiation/`):**
-     - C1 *signed call* contract in `formats.md`: Tuttie signs `{tool, args, agent_id,
-       nonce, timestamp}` with its key and attaches the user's delegation; `aps/call.py`
-       `sign_call` / `verify_call` (nonce + time window against replays).
-     - C2 one gate for actions, e.g. `aps/gate.py` `check_action(call, needs)`: caller key
-       matches the registry record and its seals verify, delegation signed by the user for
-       this agent with the tool's scope (`book`, `pay`), approval for exactly this amount and
-       payee, agreement if given. Returns a refusal reason naming the missing signature.
-       Refusal tests for each case (no/forged caller, wrong scope, expired, wrong amount,
-       used twice, replayed nonce).
-     - C3 (if `pay`) payment mandate: `aps/mandate.py`, user-signed payee, max CHF, purpose,
-       expiry; auto-pay ≤ CHF 10 to gold/blue, above needs approval.
-     - C4 `counter_offer` also offered as an MCP tool (his router), same checks.
-     - **Status:** C1, C2 and C4 done (dev member 2). C1: `aps/call.py`, contract in
-       formats.md "Signed call". C2: `aps/gate.py`, formats.md "Action gate"; Tuttie's
-       delegation now grants `book` (only Tuttie's registry record re-signed). C4:
-       `negotiation/hotel.py` `counter_offer_mcp_tool(config, signed, lookup)` →
-       `mcp_server.add_tool(..., name="counter_offer")`, the same `CounterOfferTool.reply` as
-       the HTTP route; tested through a real in-memory MCP server and client (mcp 2.3.0:
-       `MCPServer`, `Client`; FastMCP is gone in 2.x), skipped until `mcp` is in
-       requirements.txt (M1). **`pay` stays in the demo (decided):** C3 done,
-       `aps/mandate.py` (`sign_mandate`, `mandate_refusal`, `may_auto_pay`), formats.md
-       "Payment mandate"; the gate takes `Needs("pay", scope=None, approval=True,
-       mandate=True, amount_chf=, purpose=)`.
-   - **dev member 1 (nodes, Tuttie, wallet):**
-     - M1 MCP server on every node (`/mcp`, Python `mcp` SDK, streamable HTTP) with
-       `get_availability`, `get_policies`, `book` (and `pay`), reusing the `/tools/*`
-       functions; results stay signed envelopes.
-     - M2 Tuttie as MCP client (`assistant/mcp_client.py`): seal check before connecting,
-       envelope check on every result, signs action calls with C1; `call_tool` / `book` use it.
-     - M3 `book` (and `pay`) on the node call C2's gate before running.
-     - M4 timeline and wallet show which signatures an action passed ("approval ✓
-       delegation ✓ agreement ✓"), the "signatures are real" beat.
-     - M5 tests (MCP round trip in-process) and the headless story still ends booked at CHF 128.
+5. **MCP services** — done (goal 4), both sides:
+   - **APS side (dev member 2):** signed calls (`aps/call.py`, C1), the action gate
+     (`aps/gate.py`, C2; Tuttie's delegation grants `book`), payment mandates
+     (`aps/mandate.py`, C3), `counter_offer` as an MCP tool (`negotiation/hotel.py`, C4).
+   - **Nodes, Tuttie, wallet (dev member 1):**
+     - Every node serves `get_availability`, `get_policies`, `book`, `pay` and
+       `counter_offer` over MCP at `/mcp/` (`node/mcp_tools.py`, `mcp==2.3.0`, stateless,
+       JSON); the HTTP `/tools/*` routes for the first three are gone.
+     - `book` and `pay` on the node compute their own amount and run only through the
+       gate, then `commit`; the signed confirmation / receipt lists the passed `checked`.
+     - Hotels list `facts.charges` (city tax CHF 4) in their signed policies; `pay` collects
+       one charge once per booking, with the user's mandate or approval.
+     - Tuttie calls tools through `assistant/mcp_client.py` behind its trust gate and signs
+       action calls (`Toolbox.signed_call`). The booking approval offers a mandate for the
+       city tax; if the user allows it (switch on the wallet's approval sheet), the user's
+       key signs it and Tuttie pays the tax right after the booking (`may_auto_pay`), no
+       second prompt. Otherwise the charge stays open and `pay` asks on the phone.
+     - The wallet shows the booking card with the hotel's checks ("Tuttie is a sealed
+       agent", "Signed by Tuttie", "You let Tuttie book", "The hotel's signed deal",
+       "Approved by you") and the paid city tax.
+   - Tests: `test_node_book.py`, `test_node_pay.py`, `test_tools.py`,
+     `test_tuttie_market.py`; in-process MCP helpers in `tests/mcp_helpers.py`. Headless
+     story: 135 → 128 agreed → approved → booked through the gate → city tax CHF 4 paid
+     with the mandate.
 
 ### Who works on what
 
@@ -135,13 +112,7 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
    whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
    pitch needs first.
-2. **dev member 1:** M1–M3 against C1/C2: add `mcp` to requirements.txt (2.x API:
-   `from mcp.server.mcpserver import MCPServer`), register `counter_offer_mcp_tool`, sign
-   action calls with `sign_call` in Tuttie, and put `ActionGate.check_action` + `commit` in
-   front of `book` (hook in the `aps/gate.py` docstring; pass the node's existing
-   `AgreementRedeemer`); `pay` on the node with the gate, the wallet signs mandates with the
-   user key (`sign_mandate`) and Tuttie checks `may_auto_pay` before paying without asking. `test_conversations.py` needs `OPENAI_API_KEY` set (any value) or it
-   fails without `.env`.
+2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above).
 3. **dev member 2:** check with the pitch team where `pay` happens in the story (e.g. city tax
    with a mandate, under CHF 10, no phone; above that the phone asks); then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
    numbers in formats.md) and confirm it live with the real LLM
