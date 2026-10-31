@@ -72,6 +72,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
     # Checks every signed action call: caller, signature, delegation, agreement, approval.
     gate = ActionGate(node_id, own_public_key, load_public_key("user"), load_authorities(), lookup, agreements)
+    bookings: set[str] = set()  # booking ids confirmed here, so charges can follow them
+    paid: set[tuple[str, str]] = set()  # (booking id, purpose) already charged
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
@@ -106,6 +108,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "quiet": facts.get("quiet"),
             "quiet_note": facts.get("quiet_note"),
             "policies": facts.get("policies", {}),
+            "charges": facts.get("charges", []),  # collected after a booking with pay
         })
 
     async def book(call: dict) -> dict:
@@ -147,10 +150,12 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         if verdict.agreement is not None:
             items = list(verdict.agreement.includes)
         gate.commit(verdict)  # the approval and the agreement cannot be used again
+        booking_id = "BK-" + secrets.token_hex(3).upper()
+        bookings.add(booking_id)
         return signed({
             "tool": "book",
             "status": "confirmed",
-            "booking_id": "BK-" + secrets.token_hex(3).upper(),
+            "booking_id": booking_id,
             "hotel": config["name"],
             "date": req.date,
             "room_type": req.room_type,
@@ -162,7 +167,49 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             "checked": verdict.checks + (["commitments"] if req.extras and verdict.agreement is None else []),
         })
 
-    tools = mcp_server(config["name"], {"get_availability": get_availability, "get_policies": get_policies, "book": book},
+    async def pay(call: dict) -> dict:
+        """Collect one of this business's own charges (e.g. the city tax) for one of its bookings.
+
+        The business takes the amount from its config, never from the caller. The gate checks the
+        caller, its signature and the user's delegation, then either the user's approval for
+        exactly this amount or the user's mandate for this purpose (at most CHF 10 a payment).
+        Each charge is collected once per booking.
+        """
+        def refuse(reason: str) -> dict:
+            """A signed refusal with the reason."""
+            return signed({"tool": "pay", "status": "refused", "reason": reason})
+
+        body = call_body(call) if isinstance(call, dict) else None
+        if body is None:
+            return refuse("the call is not a signed call")
+        purpose, booking_id = body["args"].get("purpose"), body["args"].get("booking_id")
+        charge = next((c for c in facts.get("charges", []) if c["purpose"] == purpose), None)
+        if charge is None:
+            return refuse(f"this business has no charge for {purpose!r}")
+        if not isinstance(booking_id, str) or booking_id not in bookings:
+            return refuse("there is no such booking with this business")
+        if (booking_id, purpose) in paid:
+            return refuse(f"the {purpose} for {booking_id} is already paid")
+
+        verdict = await gate.check_action(call, Needs("pay", scope=None, approval=True, mandate=True,
+                                                      amount_chf=charge["price_chf"], purpose=purpose))
+        if not verdict.ok:
+            return refuse(verdict.reason)
+        gate.commit(verdict)  # an approval is used up; a mandate counts what was paid with it
+        paid.add((booking_id, purpose))
+        return signed({
+            "tool": "pay",
+            "status": "paid",
+            "receipt_id": "RC-" + secrets.token_hex(3).upper(),
+            "booking_id": booking_id,
+            "purpose": purpose,
+            "amount_chf": verdict.amount_chf,
+            "paid_with": "mandate" if verdict.mandate is not None else "approval",
+            "checked": verdict.checks,
+        })
+
+    tools = mcp_server(config["name"], {"get_availability": get_availability, "get_policies": get_policies, "book": book,
+                                        "pay": pay},
                        extra={"counter_offer": counter_offer_mcp_tool(config, signed, lookup)})
 
     @asynccontextmanager

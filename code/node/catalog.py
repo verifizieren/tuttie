@@ -35,9 +35,10 @@ TOOLS = {
         "description": "Answer a guest's counter-offer during negotiation, within the owner's limits.",
     },
     "pay": {
-        "status": PLANNED,
+        "status": AVAILABLE,
         "endpoint": "MCP /mcp/ pay (signed call)",
-        "description": "Take a payment under the guest's mandate.",
+        "description": "Collect one of the business's charges (e.g. the city tax) after a booking, "
+                       "with the user's approval or mandate.",
     },
 }
 

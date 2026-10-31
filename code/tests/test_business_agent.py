@@ -57,10 +57,11 @@ def test_hotel_sizes_differ_in_rooms():
     assert rooms["large"] > rooms["medium"] > rooms["small"]
 
 
-def test_agents_know_planned_tools_and_their_status():
+def test_agents_know_their_tools_and_their_status(monkeypatch):
     agent = BusinessAgent(config(HOTELS["large"]))
-    text = agent.persona_text()
-    assert "pay [planned]" in text and "counter_offer [available]" in text
+    assert "pay [available]" in agent.persona_text() and "counter_offer [available]" in agent.persona_text()
+    monkeypatch.setitem(TOOLS, "pay", {**TOOLS["pay"], "status": PLANNED})  # a tool not built yet
+    assert "pay [planned]" in BusinessAgent(config(HOTELS["large"])).persona_text()
     with pytest.raises(ValueError):
         tools_for(["teleport"])
 
@@ -85,15 +86,16 @@ def test_unsubscribed_event_is_ignored_without_the_llm():
     assert result["ignored"] is True
 
 
-def test_wake_up_reports_whether_the_next_tool_is_available():
+def test_wake_up_reports_whether_the_next_tool_is_available(monkeypatch):
     agent = agent_with(HOTELS["large"], {"interested": True, "reason": "We have rooms.", "next_tool": "make_offer"})
     result = asyncio.run(agent.invoke({"type": "posting.created", "posting": {"category": "hotel"}}))
     assert result["interested"] is True and result["next_tool"] == "make_offer"
     assert result["next_tool_available"] is True
     assert "You are Lena" in agent.llm.system
+    monkeypatch.setitem(TOOLS, "pay", {**TOOLS["pay"], "status": PLANNED})  # a tool not built yet
     planned = agent_with(HOTELS["large"], {"interested": True, "reason": "Pay!", "next_tool": "pay"})
     result = asyncio.run(planned.invoke({"type": "posting.updated"}))
-    assert TOOLS["pay"]["status"] == PLANNED and result["next_tool_available"] is False
+    assert result["next_tool_available"] is False
 
 
 def test_wake_up_drops_a_tool_the_agent_does_not_have():

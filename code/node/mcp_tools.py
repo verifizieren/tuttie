@@ -3,7 +3,7 @@
 Any MCP client can list and call the tools. Every result is the node's signed envelope (sent
 as JSON text), so the caller verifies it like any APS reply.
 
-Reading tools (get_availability, get_policies) are open. Actions (book) take a call signed by
+Reading tools (get_availability, get_policies) are open. Actions (book, pay) take a call signed by
 the calling agent (aps/call.py, "Signed call" in documentation/formats.md) and run only if it
 passes the action gate (aps/gate.py) on the node. Bargaining (counter_offer) brings its own
 checks (negotiation/hotel.py). This module only describes the tools; the node does the work.
@@ -22,8 +22,9 @@ def mcp_server(name: str, tools: dict[str, Callable], extra: dict[str, Callable]
     """The MCP server for one node.
 
     `tools` holds the node's own functions, each returning a signed envelope:
-    get_availability(date, guests), get_policies() and async book(call). `extra` are ready-made
-    tool functions registered as they are (their parameters and docstring describe them).
+    get_availability(date, guests), get_policies(), and the actions book(call) and pay(call).
+    `extra` are ready-made tool functions registered as they are (their parameters and
+    docstring describe them).
     """
     server = MCPServer(name, instructions=INSTRUCTIONS)
 
@@ -45,6 +46,15 @@ def mcp_server(name: str, tools: dict[str, Callable], extra: dict[str, Callable]
         total) and optionally agreement (this business's signed deal, replacing the total).
         Returns the signed confirmation with the checks it passed, or a signed refusal."""
         return await tools["book"](call)
+
+    @server.tool(name="pay")
+    async def pay(call: dict) -> dict:
+        """Pay one of this business's charges listed in get_policies (e.g. the city tax) for a
+        booking. `call` is a signed call (tool "pay") whose args are purpose, booking_id and
+        either approval (the user's signed decision for exactly the charge) or mandate (the
+        user's signed mandate for this purpose, at most CHF 10 a payment). The business sets
+        the amount. Returns a signed receipt with the checks it passed, or a signed refusal."""
+        return await tools["pay"](call)
 
     for tool_name, function in (extra or {}).items():
         server.add_tool(function, name=tool_name)
