@@ -50,7 +50,7 @@
   .status { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--green); }
   .broken .status { color: var(--red); }
   .step.untrusted { border-left-color: var(--grey); background: var(--grey-bg); }
-  .untrusted .status { color: var(--grey); }
+  .untrusted .status { display: none; }  /* the struck-through "untrusted" badge already says it */
   .untrusted .summary { text-decoration: line-through; color: var(--grey); }
   .summary { margin-top: 4px; }
   .broken .summary { text-decoration: line-through; color: var(--red); }
@@ -65,7 +65,8 @@
   .cite { font-size: 13px; font-weight: 700; padding: 0 6px; border-radius: 6px; border: 1px solid; vertical-align: 2px; }
   .cite.gold { color: var(--gold); background: var(--gold-bg); }
   .cite.blue { color: var(--blue); background: var(--blue-bg); }
-  .cite.grey { color: var(--grey); background: var(--grey-bg); }
+  .cite.grey { color: var(--grey); background: var(--grey-bg); text-decoration: line-through; }
+  .cite.broken { color: var(--red); background: var(--red-bg); text-decoration: line-through; }
   #qr { position: fixed; inset: 0; background: rgba(20, 23, 31, .85); display: none; place-items: center; }
   #qr.open { display: grid; }
   #qr div { background: #fff; padding: 24px; border-radius: 16px; text-align: center; }
@@ -193,7 +194,9 @@
 
   function addStep(event) {
     const valid = event.seals.filter(s => s.valid).map(s => s.tier);
-    if (valid.length) stepTier[event.step] = valid.sort((a, b) => TIER_RANK[b] - TIER_RANK[a])[0];
+    if (event.status === "broken") stepTier[event.step] = "broken";
+    else if (event.status === "untrusted") stepTier[event.step] = "grey";
+    else if (valid.length) stepTier[event.step] = valid.sort((a, b) => TIER_RANK[b] - TIER_RANK[a])[0];
     if (event.kind === "answer") return showAnswer(event);
     if (event.kind === "thinking") return addThought(event.summary);
     timeline.querySelector(".empty")?.remove();
