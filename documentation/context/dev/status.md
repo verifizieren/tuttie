@@ -287,8 +287,10 @@ Why things are the way they are, so nobody has to rediscover them:
   it again, or opening the wallet after a finished conversation, archives it and starts fresh
   (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
-- **No status text:** the open card shows no "Listening…" or phase line (only an error if Tuttie
-  cannot be reached). The eyes carry it: listening looks with small glances and a nod while
+- **Tasks in words, the rest in the eyes:** the line under the eyes shows only what Tuttie is
+  doing right now (`currentTask`: "Checking calendar", "2 offers in · checking seals", "Agreed
+  with …", "Waiting for your approval", "Booking…") or an error; it is empty while Tuttie only
+  listens or thinks. The eyes carry that: listening looks with small glances and a nod while
   waiting, thinking looks while busy, looking down at the cards while the user swipes (and
   following a dragged card), the answer's mood for a few seconds, then listening again
   (`LISTENING`, `WATCHING`, `THINKING` in `lib/activity.js`).
