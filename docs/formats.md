@@ -18,7 +18,7 @@ Implementation: `aps/canonical.py`.
   "node_id": "ch.basel.hotel-rheinblick",
   "name": "Hotel Rheinblick",
   "public_key": "<base64 ed25519 verify key>",
-  "endpoint": "http://localhost:8001",
+  "endpoint": "http://localhost:4001",
   "kind": "business",
   "capabilities": ["can_book", "can_take_payment"],
   "tags": ["hotel", "basel-sbb", "dog-friendly"],
@@ -75,7 +75,7 @@ Each seal signature = issuer's key over canonical
 
 ```json
 {
-  "node_id": "...", "name": "...", "port": 8001, "kind": "business",
+  "node_id": "...", "name": "...", "port": 4001, "kind": "business",
   "capabilities": [...], "tags": [...],
   "seals": [{ "issuer": "adobe", "tier": "blue" }],
   "facts": { "...": "everything the node's tools and agent may answer from" }
