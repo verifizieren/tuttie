@@ -19,7 +19,7 @@
 // Tuttie is doing (speaking, listening, searching, negotiating, ...), the voice levels and
 // one-off cues (an offer, an agreement, a blocked scam). Components below read it with
 // usePresenceState / usePresenceEvents; the face gets it at face.onPresence(event) if defined.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
 import ApprovalSheet from "./components/ApprovalSheet.jsx";
@@ -49,6 +49,12 @@ export default function App() {
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
   const [agent, actions, history, lastChange, switching, connectionError] = useAgentStream();
+  // An approval the server no longer knows (already decided or expired): the sheet said so and
+  // went; the wallet stops waiting for it even if no event about it arrives.
+  const [goneApproval, setGoneApproval] = useState(null);
+  const approval = agent.approval && agent.approval.id !== goneApproval ? agent.approval : null;
+  const approvalId = approval?.id;
+  const dropApproval = useCallback(() => setGoneApproval(approvalId), [approvalId]);
   const [showHistory, setShowHistory] = useState(false);
   // The past chat open in the history (null = the list), why it could not be continued, and
   // whether it is being restored.
@@ -92,7 +98,7 @@ export default function App() {
     setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !agent.approval) actions.newConversation(agent).catch(e => setError(e.message));
+      if (closedOnce.current && !approval) actions.newConversation(agent).catch(e => setError(e.message));
       closedOnce.current = false;
     }
     setMode("voice");
@@ -107,7 +113,7 @@ export default function App() {
   // A new conversation from the dock: the current one goes into the history.
   async function newChat() {
     setShowHistory(false);
-    if (agent.approval) return;  // the user must decide the waiting approval first
+    if (approval) return;  // the user must decide the waiting approval first
     try {
       await actions.newConversation(agent);
       setError("");
@@ -156,8 +162,8 @@ export default function App() {
 
   // An approval needs the user: open the card if it is closed.
   useEffect(() => {
-    if (agent.approval && mode === "closed") startVoice();
-  }, [agent.approval]);  // eslint-disable-line react-hooks/exhaustive-deps
+    if (approval && mode === "closed") startVoice();
+  }, [approval]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // `shown` is what the history keeps of the user's words; `text` is what Tuttie gets. A typed
   // message makes Tuttie answer quietly, in text only.
@@ -203,7 +209,7 @@ export default function App() {
           error={historyChat.error} resuming={historyChat.resuming} onClose={() => setShowHistory(false)}
           onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
           onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />}
-        <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
+        <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} />
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
