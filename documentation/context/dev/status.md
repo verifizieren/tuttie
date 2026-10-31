@@ -10,6 +10,26 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 
 ## Done
 
+- **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
+  timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
+  silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
+  attempts "Connection lost · retrying"), the wallet retries with backoff (0.5 s up to 10 s),
+  first catches up from `GET /history` by step (or reloads if the conversation changed or its
+  timeline was reset) and then reconnects; it also checks `/history` every 10 s while an
+  answer is awaited, and when the page becomes visible or the network comes back. A failed
+  first load retries the same way and re-enables sending. A message whose `POST /chat` fails
+  is dropped (it no longer stays an open turn that swallows later events); a sent one is
+  bound by the returned `turn_id`. Another tab starting/resuming a chat (`storage` event on
+  `tuttie.current`) or a 409 on send switches this tab to the server's conversation and
+  refreshes its history list. The swipe deck's position (index + liked hotels) is saved per
+  conversation on this device (`state.deck`, `saveCurrent`) and restored on reload.
+  Verified: 50 wallet tests; Playwright on a local test instance (real server events, LLM out
+  of credit so answers were error answers): aborted first `/chat` then the second answer shows;
+  stream killed + `/events` and `/history` blocked shows Reconnecting → Connection lost, the
+  answer finished meanwhile appears after recovery; first `/history` 502 twice recovers and
+  sends; tab two follows tab one's new chat and lists the old chat in History; deck with fake
+  cards stays at 2 of 3 after a reload. Not tested on a real phone.
+
 - **Turns with ids** (fix "messages disappear or get overwritten"): every typed or spoken
   request is a server turn (`assistant/conversations.py` `start` returns its id and emits a
   `turn` event; `assistant/events.py` stamps every event with the running turn via a
