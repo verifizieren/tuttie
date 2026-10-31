@@ -2,7 +2,7 @@
 
 import asyncio
 
-from assistant.context import SOURCES, UserContext
+from assistant.context import DONE, SOURCES, UserContext
 from assistant.events import EventBus
 
 
@@ -10,7 +10,8 @@ def test_recall_reads_every_source_then_says_what_it_found():
     bus = EventBus()
     context = asyncio.run(UserContext(pace_s=0).recall(bus))
     assert [e["detail"]["source"] for e in bus.history[:-1]] == [source for source, _ in SOURCES]
-    assert bus.history[-1]["detail"]["phase"] == "found" and "with Luna" in bus.history[-1]["summary"]
+    assert [e["summary"] for e in bus.history[:2]] == ["Checking location", "Checking messages"]
+    assert bus.history[-1]["detail"]["phase"] == "found" and bus.history[-1]["summary"] == DONE
     assert any("00:52" in item["what"] for item in context["calendar"])
 
 

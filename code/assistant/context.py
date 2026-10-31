@@ -1,4 +1,4 @@
-"""What Tuttie knows about its user: calendar, mail, messages and preferences.
+"""What Tuttie knows about its user: location, messages, mail, calendar and preferences.
 
 Tuttie holds the user's full context, so "I want to book something" is enough: the calendar
 says where and when, the messages who comes along, the preferences what matters and how much
@@ -20,8 +20,9 @@ from assistant.events import EventBus
 USERS_DIR = Path(__file__).resolve().parent.parent / "data" / "users"
 USER_ID = os.environ.get("TUTTIE_USER", "alex-muster")
 # Shown one after the other on the wallet's context line while Tuttie reads them.
-SOURCES = [("calendar", "Looking at your calendar"), ("mail", "Reading your mails"),
-           ("messages", "Checking your messages"), ("preferences", "Remembering what you like")]
+SOURCES = [("location", "Checking location"), ("messages", "Checking messages"), ("mail", "Checking mails"),
+           ("calendar", "Checking calendar"), ("preferences", "Checking what you like")]
+DONE = "Checked your location, messages, mails and calendar"
 READ_PACE_S = float(os.environ.get("CONTEXT_PACE_S", "0.5"))  # time per source, so each step is visible
 
 
@@ -37,8 +38,7 @@ class UserContext:
         for source, label in SOURCES:
             bus.emit("context", "info", label, detail={"phase": "reading", "source": source})
             await asyncio.sleep(self.pace_s)
-        found = self.data.get("found", [])
-        bus.emit("context", "verified", " · ".join(found), detail={"phase": "found", "found": found})
+        bus.emit("context", "verified", DONE, detail={"phase": "found"})
         return {source: self.data.get(source, []) for source, _ in SOURCES} | {
             "rule": "Use these without asking. Never put private items into a posting, a message or a "
                     "requirement; a private budget only goes into budget_chf."}
