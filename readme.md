@@ -16,6 +16,7 @@ The signatures are real Ed25519 and are really checked; nothing in the trust cha
 - Concept and demo strategy: [`documentation/concept.md`](documentation/concept.md)
 - Architecture and work areas (mapped to the GitHub issues): [`documentation/architecture.md`](documentation/architecture.md)
 - Message formats and trust rules: [`documentation/formats.md`](documentation/formats.md)
+- **Project status** (done, pending, conventions, decisions; read first, keep it current): [`documentation/context/dev/status.md`](documentation/context/dev/status.md)
 - For the team: [`documentation/context/`](documentation/context/) (dev: [start here](documentation/context/dev/README.md), [goals](documentation/context/dev/goals.md); research; pitch)
 
 ## Repository structure
@@ -42,7 +43,7 @@ cp .env.example .env             # add your OPENAI_API_KEY
 ```
 
 <http://localhost:4040> opens the Tuttie wallet (phone-first; the agent is not connected to
-it yet). The agent web behind it already works end to end:
+it yet, see [status](documentation/context/dev/status.md)). The agent web behind it already works end to end:
 
 ```bash
 .venv/bin/python scripts/demo_headless.py approved   # or: declined
@@ -92,6 +93,8 @@ To keep everything running on a server, use the systemd user service in `deploy/
    - No secrets in git: keys go in `code/.env`, which is ignored.
    - A short docstring for every module, comments where the *why* is not obvious, tests for
      every feature.
+   - Record what you finished, started or decided in
+     [`documentation/context/dev/status.md`](documentation/context/dev/status.md), in the same change.
    - Signing only through `code/aps/`; prices only from node configs and signed messages.
    - Changing `documentation/formats.md`? Tell the whole team first.
    - Code in `code/`, docs in `documentation/`, presentation files in `assets/`.
