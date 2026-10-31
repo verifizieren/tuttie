@@ -37,17 +37,19 @@ import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
-import { voiceNote } from "./lib/recovery.js";
+import { newChatFailure, voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
 const OPEN_GUARD_MS = 700;
 const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in full at once
 const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
+const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
 export default function App() {
   const [mode, setMode] = useState("closed");
   const [error, setError] = useState("");  // the only text under the eyes: Tuttie cannot be reached
+  const [notice, setNotice] = useState("");  // a short friendly note that is not an error; clears itself
   const canvas = useRef(null);
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
@@ -94,6 +96,11 @@ export default function App() {
     const timer = setTimeout(close, CLOSE_AFTER_MS);
     return () => clearTimeout(timer);
   }, [agent.closing, reveal, mode]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(""), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -102,7 +109,7 @@ export default function App() {
     setQuiet(false);
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !approval && startsFresh(agent)) actions.newConversation(agent).catch(e => setError(e.message));
+      if (closedOnce.current && !approval && startsFresh(agent)) actions.newConversation(agent).catch(failedNewChat);
       closedOnce.current = false;
     }
     setMode("voice");
@@ -122,7 +129,14 @@ export default function App() {
       await actions.newConversation(agent);
       setError("");
       presence.cue("new_chat");
-    } catch (e) { setError(e.message); }
+    } catch (e) { failedNewChat(e); }
+  }
+
+  // Tuttie still works on an answer (409): a note that goes by itself, not an error.
+  function failedNewChat(e) {
+    const { notice: note, error: reason } = newChatFailure(e);
+    if (note) setNotice(note);
+    else setError(reason);
   }
 
   function tapWhileOpen() {
@@ -210,7 +224,7 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
                                                      || (mode === "voice" && !quiet ? voiceNote(voice) : "")}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
