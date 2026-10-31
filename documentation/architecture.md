@@ -16,7 +16,7 @@ can work in parallel without stepping on each other. Contracts live in
          user's agent (code/assistant) <--> marketplace (code/marketplace) <--> registry
                          |                                        (code/registry)
                          v
-              console (apps/old/console): every signed step, live over SSE
+              timeline: every signed step, live over SSE (GET /events)
                                    all signing: code/aps
              demo (code/demo) drives the same real components
 ```
@@ -33,16 +33,15 @@ can work in parallel without stepping on each other. Contracts live in
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | card stack, agent view with eyes; not connected yet | approvals API, UI events |
 | Voice agent | `code/voice/` | #2, #3 | to build | text in/out of the user's agent |
 | Owner view | `code/apps/owner/` | #5 | to build | owner API (to define) that edits `data/nodes/*.json` facts |
-| Presentation site and QR | `code/apps/presentation/` | #1, #6 | to build | links into the wallet and console |
+| Presentation site and QR | `code/apps/presentation/` | #1, #6 | to build | links into the wallet |
 | Demo | `code/demo/` | #3, #2 | to build | drives the user's agent and the apps |
-| First prototype (console, approvals page) | `code/apps/old/` | — | done, kept for reference | UI events over SSE, approvals API |
 | Shared UI pieces | `code/apps/shared/` | — | brand stylesheet, seal badges | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
 
 ## Rules that keep the areas independent
 
 - **The demo runs the real app.** `code/demo/` never has its own UI. It drives the real
-  wallet (and console) by feeding the storyline's input into the same backend the user would use
+  wallet by feeding the storyline's input into the same backend the user would use
   (e.g. the user's lines instead of live speech) and lets the real flow run. Any feature
   the demo shows must exist in the app for real use; demo-only switches are limited to
   input and timing (e.g. `?demo=<script>` on the wallet), never to separate screens.

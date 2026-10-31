@@ -9,7 +9,7 @@ timing) that drives the real components, so the demo is predictable but nothing 
   mock-up page; do not copy that pattern, fold its look into the real wallet instead.
 
 - Input: the storyline (issue #3).
-- Drives: the user's agent (`assistant/`), the wallet and console apps, the voice layer.
+- Drives: the user's agent (`assistant/`), the wallet app, the voice layer.
 - Rule: the demo may fix what is said or chosen, never verification. A forged seal must
   fail in the demo exactly as in real use.
 - Reuse: `scripts/demo_headless.py` already runs the full current flow in one process with
