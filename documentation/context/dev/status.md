@@ -6,13 +6,13 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (bargaining tuned for the demo, coverage gaps closed) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
+Last updated: 2026-10-31 (MCP step 5, APS side: signed calls C1, action gate C2, counter_offer as MCP tool C4) (bargaining, step 4: counter_offer within private limits, Tuttie's parallel negotiating subagents).
 
 ## Done
 
 | Area | What works | Where |
 | --- | --- | --- |
-| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them; paying is never delegated). | `code/aps/`, `code/tests/` |
+| APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them: `ask_agents`, `post_requests`, `negotiate`, `book`; paying is never delegated). **For MCP actions:** signed calls (`aps/call.py`: the agent signs tool + args + nonce + time; replays fail the 300 s window or the nonce book) and one action gate (`aps/gate.py` `check_action(call, needs)`: caller seals, signature, nonce, delegation scope, the hotel's own agreement, the user's approval for exactly the amount; a refusal names the missing signature, `checks` lists what passed). | `code/aps/`, `code/tests/` |
 | Registry | Search by tags and capability, sealed records. | `code/registry/` |
 | Business nodes | Signed tools (`get_availability`, `get_policies`, which includes the business profile), `book` (only with the user's signed approval for exactly the right total, no replays). | `code/node/`, `code/data/nodes/` |
 | Company agents | The same agent object for every company: persona, a shared tool catalog with `available` / `planned` tools, a signed agent card (`GET /agent/card`), A2A answers in persona with priced add-ons from the config (`POST /agent`), wake-ups from the marketplace (`POST /agent/invoke`: interested?, which tool next), and sessions. The LLM never sets a price and never sees private facts (`PRIVATE_FACTS`: negotiation limits). Three hotel agents, each with a public profile and private negotiation limits: **Alpina Grand Basel** (large chain branch, 220 rooms, Lena, gold + blue), **Hotel Rheinblick** (medium, family-owned, 42 rooms, Marco, gold + blue), **Gästehaus am Rhein** (small independent, 7 rooms, Anna, gold). | `code/node/agent.py`, `code/node/catalog.py`, `code/node/README.md` |
@@ -74,6 +74,14 @@ Build order from [goals.md](goals.md):
      - C3 (if `pay`) payment mandate: `aps/mandate.py`, user-signed payee, max CHF, purpose,
        expiry; auto-pay ≤ CHF 10 to gold/blue, above needs approval.
      - C4 `counter_offer` also offered as an MCP tool (his router), same checks.
+     - **Status:** C1, C2 and C4 done (dev member 2). C1: `aps/call.py`, contract in
+       formats.md "Signed call". C2: `aps/gate.py`, formats.md "Action gate"; Tuttie's
+       delegation now grants `book` (only Tuttie's registry record re-signed). C4:
+       `negotiation/hotel.py` `counter_offer_mcp_tool(config, signed, lookup)` →
+       `mcp_server.add_tool(..., name="counter_offer")`, the same `CounterOfferTool.reply` as
+       the HTTP route; tested through a real in-memory MCP server and client (mcp 2.3.0:
+       `MCPServer`, `Client`; FastMCP is gone in 2.x), skipped until `mcp` is in
+       requirements.txt (M1). C3 waits for the `pay` decision.
    - **dev member 1 (nodes, Tuttie, wallet):**
      - M1 MCP server on every node (`/mcp`, Python `mcp` SDK, streamable HTTP) with
        `get_availability`, `get_policies`, `book` (and `pay`), reusing the `/tools/*`
@@ -114,17 +122,23 @@ Build order from [goals.md](goals.md):
 1. **dev member 1:** step-3 check-in with the pitch and design team (the wallet now shows the
    whole run); then voice (`code/voice/`) or the demo runner (`code/demo/`), whichever the
    pitch needs first.
-2. **dev member 2:** check the tuned story with the pitch team (`scripts/bargain_preview.py`,
+2. **dev member 1:** M1–M3 against C1/C2: add `mcp` to requirements.txt (2.x API:
+   `from mcp.server.mcpserver import MCPServer`), register `counter_offer_mcp_tool`, sign
+   action calls with `sign_call` in Tuttie, and put `ActionGate.check_action` + `commit` in
+   front of `book` (hook in the `aps/gate.py` docstring; pass the node's existing
+   `AgreementRedeemer`). `test_conversations.py` needs `OPENAI_API_KEY` set (any value) or it
+   fails without `.env`.
+3. **dev member 2:** decide C3 (`pay`) with the pitch team; then check the tuned story with the pitch team (`scripts/bargain_preview.py`,
    numbers in formats.md) and confirm it live with the real LLM
    (`scripts/demo_headless.py approved "<a request that asks for a better price>"`; needs
    `code/.env`). The stage numbers are pinned in `test_the_pitch_story_anna_s_guesthouse`; if
    they have to change, tell the pitch team.
-3. **Check-in with the pitch and design team** after these steps; agree the marketplace
+4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
 ### Test coverage
 
-163 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+207 tests, all green (`pytest -q`; set `OPENAI_API_KEY` to any value without `.env`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 company agent with a fake LLM, private facts, read tools, the three hotel configs),
 `test_business_agent.py` (same agent object, persona, tool catalog, card, wake-ups),
@@ -140,7 +154,7 @@ counter_offer tool), `test_negotiation_edges.py` (refusals mid-negotiation, Tutt
 cap, unreachable registry, signed non-object payloads), `test_registry.py` (search, records,
 live reload), `test_marketplace_edges.py` (unknown or broken requesters, unverifiable agent
 cards, odd wake-up replies), `test_tools.py` (assistant trust gate and Tuttie's identity,
-with mocked HTTP and the real demo keys).
+with mocked HTTP and the real demo keys), `test_call.py` (signed calls: tampering, time window, nonces), `test_gate.py` (the action gate: one refusal test per missing signature, agreement and approval used once), `test_counter_offer_mcp.py` (counter_offer over a real MCP server: same replies as HTTP, the pitch rounds).
 Coverage of `aps/`, `registry/`, `marketplace/`, `negotiation/`: 98 % (`pytest --cov`, with
 `pytest-cov` installed locally). Not covered yet: the assistant's LLM loop (`assistant/agent.py`) and its HTTP
 routes (`assistant/app.py`).
@@ -174,6 +188,17 @@ profiles in the readme.
 ## Decisions and lessons
 
 Why things are the way they are, so nobody has to rediscover them:
+
+- **MCP actions are signed calls through one gate.** Reading tools stay unsigned on the way in
+  (their answers are signed); actions need the caller's signature over tool + args, so an
+  approval or agreement in the args cannot be swapped. Nonce + 300 s window instead of a
+  stored call log: a nonce only has to be remembered while its call is fresh. The gate takes
+  the caller's key from the registry, never from the call, and refuses grey callers ("no
+  signature, no action"). Checks use nothing up; `commit` does, after the action succeeded,
+  so a failed booking does not burn the user's approval. APS does not import the
+  negotiation code: the node passes its `AgreementRedeemer` in.
+- **`book` is a delegation scope, paying is not.** The scope says Tuttie may book for the
+  user at all; each booking still needs the user's signed approval for its amount.
 
 - **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
   (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
