@@ -4,6 +4,7 @@
 // only for exactly this amount. Declining is immediate.
 import { useState } from "react";
 import { decide } from "../lib/api.js";
+import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs
 const CHECK_MS = 550;   // how long the check is shown before the sheet goes
@@ -47,15 +48,15 @@ export default function ApprovalSheet({ approval }) {
     }
   }
 
-  const tiers = approval.seals.filter(s => s.valid).map(s => s.tier);
   return (
     <div className="sheet" role="dialog" aria-label="Approve payment">
       <div className="sheet-hotel">
-        <span className="dots">{tiers.map((t, i) => <i key={i} className={`dot ${t}`} />)}</span>
+        <SealMarks seals={approval.seals} />
         {approval.hotel}
       </div>
       <div className="sheet-amount">CHF {approval.amount}</div>
       <div className="sheet-summary">{approval.summary.replace(/^Waiting for your phone\.\s*/, "")}</div>
+      <SealList seals={approval.seals} uid={approval.uid} />
       {stage === "ask" ? (
         <div className="sheet-buttons">
           <button type="button" className="decline" onClick={() => send("declined")}>Decline</button>

@@ -1,15 +1,8 @@
 // The human view of the marketplace, under Tuttie's eyes: what Tuttie asked for, which hotels
-// answered with which offer, the shortlist, the negotiation and Tuttie's answer.
-import { useEffect, useRef } from "react";
-
-/** Small coloured dots for a hotel's verified seals (gold, blue); the tier is shown by colour only. */
-function SealDots({ tiers }) {
-  return (
-    <span className="dots" aria-label={`seals: ${tiers.join(", ")}`}>
-      {tiers.map((tier, i) => <i key={i} className={`dot ${tier}`} />)}
-    </span>
-  );
-}
+// answered with which offer, the shortlist, the negotiation and Tuttie's answer. Tapping a
+// hotel shows who vouches for it (its seals) and what its offer includes.
+import { useEffect, useRef, useState } from "react";
+import { SealList, SealMarks } from "./Seals.jsx";
 
 function RequestCard({ request }) {
   const { constraints, tags } = request;
@@ -37,16 +30,41 @@ function Price({ hotel }) {
   return <span className="price muted">{waiting[hotel.status] || hotel.status}</span>;
 }
 
-function HotelRow({ hotel, overBudget }) {
-  const classes = ["hotel", hotel.shortlisted && "picked", hotel.agreed && "agreed", overBudget && "out"];
+function HotelRow({ hotel, overBudget, open, onToggle }) {
+  const classes = ["hotel", hotel.shortlisted && "picked", hotel.agreed && "agreed", overBudget && "out", open && "open"];
+  const includes = hotel.offer?.includes || [];
   return (
     <div className={classes.filter(Boolean).join(" ")}>
-      <SealDots tiers={hotel.tiers} />
-      <span className="hotel-name">
-        {hotel.name}
-        <small>{[hotel.size, overBudget && "over budget", hotel.agreed && "agreed"].filter(Boolean).join(" · ")}</small>
+      <button type="button" className="hotel-line" onClick={onToggle} aria-expanded={open}>
+        <SealMarks seals={hotel.seals} tiers={hotel.tiers} />
+        <span className="hotel-name">
+          {hotel.name}
+          <small>{[hotel.size, overBudget && "over budget", hotel.agreed && "agreed"].filter(Boolean).join(" · ")}</small>
+        </span>
+        <Price hotel={hotel} />
+      </button>
+      {open && (
+        <div className="hotel-more">
+          {includes.length > 0 && <div className="includes">Includes {includes.join(", ")}</div>}
+          <SealList seals={hotel.seals} uid={hotel.uid} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A business Tuttie never asked: a forged seal (red) or no seal at all (grey). */
+function SkippedRow({ business }) {
+  const forged = business.tier === "broken";
+  return (
+    <div className={`hotel skipped ${forged ? "forged" : "untrusted"}`}>
+      <span className="hotel-line">
+        <span className="seal-x" aria-hidden="true">{forged ? "!" : "?"}</span>
+        <span className="hotel-name">
+          <s>{business.name}</s>
+          <small>{forged ? "Forged seal · never asked" : "No valid seal · never asked"}</small>
+        </span>
       </span>
-      <Price hotel={hotel} />
     </div>
   );
 }
@@ -71,6 +89,7 @@ function order(hotels) {
 
 export default function Activity({ state }) {
   const box = useRef(null);
+  const [openId, setOpenId] = useState(null);
   // Tuttie's answer comes last; bring it into view when it arrives.
   useEffect(() => {
     if (state.answer) box.current?.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" });
@@ -81,11 +100,10 @@ export default function Activity({ state }) {
     <div className="activity" ref={box}>
       {state.request && <RequestCard request={state.request} />}
       {order(state.hotels).map(([nodeId, hotel]) => (
-        <HotelRow key={nodeId} hotel={hotel} overBudget={state.shortlistDone && hotel.offer && !hotel.shortlisted} />
+        <HotelRow key={nodeId} hotel={hotel} overBudget={state.shortlistDone && hotel.offer && !hotel.shortlisted}
+                  open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
       ))}
-      {state.skipped.length > 0 && (
-        <div className="skipped">Not asked: {state.skipped.map(s => `${s.name} (${s.reason})`).join(", ")}</div>
-      )}
+      {state.skipped.map((business, i) => <SkippedRow key={i} business={business} />)}
       {state.answer && <Answer text={state.answer} />}
     </div>
   );

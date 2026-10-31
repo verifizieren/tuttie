@@ -5,10 +5,10 @@
 export const EMPTY = {
   phase: "idle",        // idle | thinking | posted | offers | negotiating | approval | done
   request: null,        // the public part of Tuttie's posting
-  hotels: {},           // node_id -> { name, size, agent, tiers, status, offer, shortlisted, rounds, agreed }
-  skipped: [],          // [{ name, reason }] not woken: untrusted or broken
+  hotels: {},           // node_id -> { name, size, agent, tiers, seals, uid, status, offer, shortlisted, rounds, agreed }
+  skipped: [],          // [{ name, reason, tier }] not woken: untrusted or broken
   shortlistDone: false,
-  approval: null,       // { id, amount, hotel, summary, seals } while the phone waits
+  approval: null,       // { id, amount, hotel, summary, seals, uid } while the user decides
   answer: "",
   mood: "neutral",      // how Tuttie's answer feels (assistant/agent.py MOODS)
   thought: "",          // the latest reasoning summary title
@@ -17,7 +17,7 @@ export const EMPTY = {
 const validTiers = seals => seals.filter(s => s.valid).map(s => s.tier);
 
 function hotel(state, nodeId, name) {
-  return state.hotels[nodeId] || { name, size: null, agent: null, tiers: [], status: "woken", offer: null,
+  return state.hotels[nodeId] || { name, size: null, agent: null, tiers: [], seals: [], uid: null, status: "woken", offer: null,
                                    shortlisted: false, rounds: [], agreed: null };
 }
 
@@ -41,13 +41,13 @@ export function applyEvent(state, event) {
         hotels[nodeId] = { ...hotel(state, nodeId, info.name), size: info.profile?.size || null, agent: info.agent,
                            tiers: [info.trust_tier], status: info.status || "woken" };
       }
-      const skipped = Object.values(detail.skipped || {}).map(s => ({ name: s.name, reason: s.reason }));
+      const skipped = Object.values(detail.skipped || {}).map(s => ({ name: s.name, reason: s.reason, tier: s.trust_tier }));
       // A new posting starts a new run: earlier offers, approvals and answers no longer apply.
       return { ...EMPTY, phase: "posted", request: detail.request, hotels, skipped, thought: state.thought };
     }
     if (detail.phase === "offer" && event.node_id) {
       return { ...withHotel(state, event.node_id, event.node_name, {
-        offer: detail.offer, tiers: validTiers(event.seals), status: "offered",
+        offer: detail.offer, tiers: validTiers(event.seals), seals: event.seals, uid: event.uid, status: "offered",
         size: detail.profile?.size || hotel(state, event.node_id).size,
       }), phase: "offers" };
     }
@@ -74,7 +74,7 @@ export function applyEvent(state, event) {
   if (event.kind === "approval") {
     if (event.status === "pending") {
       return { ...state, phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
-        hotel: event.node_name, summary: event.summary, seals: event.seals } };
+        hotel: event.node_name, summary: event.summary, seals: event.seals, uid: event.uid } };
     }
     return { ...state, approval: null, phase: event.status === "approved" ? "booking" : "declined" };
   }

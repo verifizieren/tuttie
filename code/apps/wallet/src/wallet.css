@@ -112,7 +112,7 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .private { font-size: 12px; color: var(--dim); margin-top: 6px; }
 .private::before { content: "● "; color: var(--accent); }
 
-.hotel { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 16px;
+.hotel { padding: 0; border-radius: 16px;
          background: var(--panel2); border: 1px solid var(--line); animation: rise .45s var(--ease) both;
          transition: opacity .4s, border-color .4s; }
 .hotel.picked { border-color: rgba(217, 119, 87, .55); }
@@ -123,11 +123,44 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .price { font-size: 15px; white-space: nowrap; color: var(--text); }
 .price s { color: var(--dim); margin-right: 2px; }
 .price.muted { color: var(--dim); font-size: 13px; }
-.dots { display: inline-flex; gap: 3px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; }
-.dot.gold { background: var(--gold); }
-.dot.blue { background: #6f9bff; }
-.skipped { font-size: 12px; color: var(--dim); padding: 0 4px; }
+.hotel-line { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px; text-align: left;
+              font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.hotel-more { padding: 0 14px 14px; animation: rise .3s var(--ease) both; }
+.includes { font-size: 13px; color: var(--muted); margin: -2px 0 10px 48px; }
+
+/* Issuer marks in a row: small app-icon tiles, overlapping like a stack of passes. */
+.marks { display: inline-flex; flex: none; width: 38px; }
+.marks i { width: 22px; height: 22px; border-radius: 6px; box-shadow: 0 0 0 2px var(--panel2); }
+.marks i + i { margin-left: -6px; }
+.marks svg, .seal-mark svg { display: block; width: 100%; height: 100%; }
+
+/* Seals: an inset grouped list, one row per issuer. */
+.seal-list { border-radius: 14px; background: #1c1c1f; overflow: hidden; }
+.seal-head { font-size: 12px; font-weight: 500; color: var(--dim); padding: 9px 12px 2px; letter-spacing: .02em; }
+.seal-row { display: flex; align-items: center; gap: 11px; padding: 9px 12px; position: relative; }
+.seal-row + .seal-row::before { content: ""; position: absolute; top: 0; left: 53px; right: 0; height: 1px; background: var(--line); }
+.seal-mark { flex: none; width: 30px; height: 30px; border-radius: 8px; overflow: hidden; }
+.seal-text { flex: 1; min-width: 0; }
+.seal-text b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seal-text small { display: block; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seal-text .uid { font-family: var(--mono, ui-monospace, monospace); font-size: 11.5px; color: var(--text); opacity: .8; }
+.seal-badge { flex: none; width: 22px; height: 22px; }
+.seal-badge.gold path:first-child { fill: var(--gold); }
+.seal-badge.blue path:first-child { fill: #3d8bff; }
+.seal-x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+          font-size: 13px; font-weight: 700; color: #fff; background: var(--red, #ff453a); }
+.seal-row.forged .seal-mark { filter: grayscale(1); opacity: .5; }
+.seal-row.forged b { color: var(--red, #ff453a); }
+
+/* Businesses Tuttie never asked. */
+.hotel.skipped { cursor: default; }
+.hotel.skipped .hotel-line { cursor: default; }
+.hotel.skipped s { text-decoration-thickness: 1px; }
+.hotel.forged { border-color: rgba(255, 69, 58, .35); }
+.hotel.forged small { color: var(--red, #ff453a); }
+.hotel.untrusted { opacity: .55; }
+.hotel.untrusted .seal-x { background: #5a5a60; }
+.hotel.skipped .seal-x { margin-right: 16px; }
 .answer { font-size: 15px; line-height: 1.4; padding: 4px 4px 0; white-space: pre-wrap; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 
@@ -137,7 +170,9 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 @keyframes sheet { from { transform: translateY(110%); } }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
-.sheet-summary { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+.sheet-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.sheet .seal-list { margin-bottom: 16px; background: #2a2a2e; }
+.sheet .marks i { box-shadow: 0 0 0 2px #1c1c1f; }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sheet-buttons button { padding: 15px; border-radius: 16px; font-size: 16px; }
 .sheet-buttons .approve { background: #fff; color: #08080b; }
