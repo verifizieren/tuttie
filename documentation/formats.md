@@ -178,7 +178,7 @@ events the stream replays) and its conversation id in `X-Conversation-ID`. Readi
 creates a conversation: for a browser without one, `/history` answers `[]` with the id its
 first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a decision 404.
 `POST /voice/token` answers 429 (`Retry-After: 60`) after 10 new rooms a minute for one
-conversation or 60 for one client address; a room is never handed out twice.
+conversation or 300 for one client address; a room is never handed out twice.
 Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does
 following the promised id on `GET /events?conversation_id=<id>`; another id there is a 409. Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in

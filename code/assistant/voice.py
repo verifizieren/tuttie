@@ -35,7 +35,7 @@ API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
 API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 TOKEN_TTL_S = 2 * 60 * 60
 ROOMS_PER_CONVERSATION_PER_MIN = 10  # a flaky phone retries after 2, 4, 8 ... s; a loop gets 429
-ROOMS_PER_CLIENT_PER_MIN = 60  # new rooms per client address a minute (a venue's Wi-Fi shares one)
+ROOMS_PER_CLIENT_PER_MIN = 300  # per client address a minute: a venue's Wi-Fi shares one, and every page load asks
 MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; the oldest are forgotten
 
 router = APIRouter()

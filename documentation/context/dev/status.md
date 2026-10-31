@@ -84,7 +84,7 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   service; the market and Tuttie send it. **A Tuttie started by hand next to the running
   services (test instance on 4046) needs the same key: put `AGENT_WEB_KEY` in `code/.env` and
   restart the service once.** Unset (tests), the doors stay open. `POST /voice/token`: at most
-  10 new rooms a minute per conversation and 60 per client address, else 429 (the wallet
+  10 new rooms a minute per conversation and 300 per client address, else 429 (the wallet
   retries on its own); rooms are not reused because the voice agent closes its session when
   the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
 
