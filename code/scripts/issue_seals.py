@@ -20,6 +20,7 @@ REGISTRY_PATH = ROOT / "data" / "registry.json"
 
 
 def build_record(config: dict) -> dict:
+    """The signed registry record for one node config."""
     node_id = config["node_id"]
     record = {
         "node_id": node_id,

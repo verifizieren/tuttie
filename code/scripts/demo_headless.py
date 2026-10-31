@@ -43,6 +43,7 @@ class PortRouter(httpx.AsyncBaseTransport):
 
 
 async def fake_phone(approvals: ApprovalBook, decision: str) -> None:
+    """Stand in for the phone: answer every pending approval with `decision`."""
     while True:
         await asyncio.sleep(0.2)
         for approval in list(approvals.pending.values()):
