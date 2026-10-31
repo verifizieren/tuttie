@@ -23,7 +23,7 @@ USER_ID = os.environ.get("TUTTIE_USER", "alex-muster")
 SOURCES = [("location", "Checking location"), ("messages", "Checking messages"), ("mail", "Checking mails"),
            ("calendar", "Checking calendar"), ("preferences", "Checking what you like")]
 DONE = "Checked your location, messages, mails and calendar"
-READ_PACE_S = float(os.environ.get("CONTEXT_PACE_S", "0.5"))  # time per source, so each step is visible
+READ_PACE_S = float(os.environ.get("CONTEXT_PACE_S", "0.15"))  # time per source: each step shows, briefly
 
 
 class UserContext:
