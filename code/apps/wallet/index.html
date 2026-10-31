@@ -1,6 +1,6 @@
 <!doctype html>
-<!-- Tuttie wallet: the phone app. A wallet card stack; the Tuttie card expands into the agent
-     (big eyes, voice first, text as a fallback). Not connected to the agent backend yet. -->
+<!-- Tuttie wallet: the phone app. The Tuttie card is the agent's face. Tapping the face wakes the
+     agent into voice mode; text is a fallback (the eyes close while typing). Not connected yet. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -13,56 +13,57 @@
   html, body { height: 100%; }
   body { background: #000; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
   .app { position: relative; max-width: 430px; height: 100dvh; margin: 0 auto; overflow: hidden;
-         padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+         --top: max(16px, env(safe-area-inset-top)); --bottom: max(16px, env(safe-area-inset-bottom));
+         padding: var(--top) 16px var(--bottom); }
 
   .head { display: flex; justify-content: space-between; align-items: center; height: 52px; padding: 0 4px;
           transition: opacity .4s var(--ease), transform .5s var(--ease); }
   .head h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -.01em; }
-  .round { width: 34px; height: 34px; border-radius: 50%; background: #1c1c1f; display: grid; place-items: center; font-size: 20px; color: var(--text); }
+  .round { width: 34px; height: 34px; border-radius: 50%; background: #1c1c1f; display: grid; place-items: center; font-size: 20px; }
   .app.open .head { opacity: 0; transform: translateY(-14px); pointer-events: none; }
 
   /* Card stack: earlier cards show only their top strip, the Tuttie card is in front. */
   .card { position: absolute; left: 16px; right: 16px; height: 210px; border-radius: 18px; overflow: hidden;
           box-shadow: 0 -1px 0 rgba(255, 255, 255, .12) inset, 0 -8px 24px rgba(0, 0, 0, .55);
-          transition: top .7s var(--ease), height .6s var(--ease), transform .7s var(--ease), opacity .5s var(--ease); }
+          transition: top .7s var(--ease), height .6s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .6s var(--ease); }
   .card[data-i="0"] { top: 84px; }
   .card[data-i="1"] { top: 148px; }
-  .card.agent { top: 212px; cursor: pointer; touch-action: none; }
   .bank-a { background: linear-gradient(135deg, #3a63e8, #1b2f8f 60%, #111c55); }
   .bank-b { background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
   .chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px;
           background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
-  .agent { background: linear-gradient(140deg, #e69373 0%, #c4623f 55%, #8f3f27 100%); }
-  .agent::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-                  background: radial-gradient(90% 70% at 100% 0%, rgba(255, 255, 255, .18), transparent 60%); }
-  .agent .name { position: absolute; top: 18px; left: 20px; font-size: 21px; font-weight: 700; color: #fff7f0; transition: opacity .3s; }
-  .agent .hint { position: absolute; bottom: 18px; right: 20px; font-size: 13px; font-weight: 600; color: rgba(255, 247, 240, .75); transition: opacity .3s; }
 
-  /* The eyes live in a dark screen inside the card; it grows when the agent opens. */
-  .screen { position: absolute; left: 20px; bottom: 18px; width: 120px; height: 64px; border-radius: 14px; background: #08080b;
-            transition: all .65s var(--ease); z-index: 1; }
-  .screen canvas { width: 100%; height: 100%; display: block; }
+  /* The Tuttie card is nothing but the agent's face. */
+  .agent { top: 212px; cursor: pointer; touch-action: none; background: #08080b;
+           box-shadow: 0 0 0 1px rgba(217, 119, 87, .35), 0 -8px 24px rgba(0, 0, 0, .55); }
+  .agent canvas { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 100%; display: block;
+                  transition: height .6s var(--ease); }
+  .agent .edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease);
+                 box-shadow: inset 0 0 0 2px rgba(255, 181, 150, .55), inset 0 0 60px rgba(217, 119, 87, .35); }
+  .app.voice .agent .edge { opacity: 1; animation: listen 2.4s ease-in-out infinite; }
+  @keyframes listen { 50% { box-shadow: inset 0 0 0 2px rgba(255, 181, 150, .9), inset 0 0 90px rgba(217, 119, 87, .55); } }
 
-  /* Open: the other cards drop away, the Tuttie card fills the screen and becomes the agent. */
+  /* Open: the other cards drop away and the face fills the screen. */
   .app.open .card:not(.agent) { transform: translateY(110vh); opacity: 0; }
-  .app.open .agent { top: max(16px, env(safe-area-inset-top)); height: calc(100dvh - 2 * max(16px, env(safe-area-inset-top))); cursor: default;
-                     background: #08080b; box-shadow: 0 0 0 1px var(--line); }
-  .app.open .agent::after, .app.open .agent .name, .app.open .agent .hint { opacity: 0; }
-  .app.open .screen { left: 0; right: 0; bottom: auto; top: 70px; width: 100%; height: 38%; border-radius: 0; }
+  .app.open .agent { top: var(--top); height: calc(100dvh - var(--top) - var(--bottom)); border-radius: 32px; }
+  .app.open .agent canvas { height: 72%; }
+  .app.typing .agent canvas { height: 46%; }
 
-  .talk { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 20px 22px; display: flex; flex-direction: column; gap: 14px;
-          opacity: 0; transform: translateY(20px); pointer-events: none; transition: opacity .4s var(--ease) .25s, transform .5s var(--ease) .25s; }
-  .app.open .talk { opacity: 1; transform: none; pointer-events: auto; }
-  .close { position: absolute; top: 18px; right: 18px; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .3s; background: #1c1c1f; font-size: 14px; padding: 7px 14px; border-radius: 20px; }
-  .app.open .close { opacity: 1; pointer-events: auto; }
-  .said { min-height: 84px; text-align: center; font-size: 22px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
-  .said small { display: block; margin-top: 6px; font-size: 14px; font-weight: 500; color: var(--muted); }
-  .mic { align-self: center; width: 84px; height: 84px; border-radius: 50%; padding: 0; display: grid; place-items: center;
-         background: radial-gradient(circle at 35% 30%, #ffd1bb, #d97757 60%, #9c4429); box-shadow: 0 0 40px rgba(217, 119, 87, .45); }
-  .mic svg { width: 32px; height: 32px; }
-  .mic.on { animation: listen 1.3s ease-in-out infinite; }
-  @keyframes listen { 50% { transform: scale(1.08); box-shadow: 0 0 70px rgba(217, 119, 87, .8); } }
-  form { display: flex; gap: 8px; }
+  .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 20px 22px; display: flex; flex-direction: column; gap: 14px; align-items: center;
+              opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .4s var(--ease) .25s, transform .5s var(--ease) .25s; }
+  .app.open .controls { opacity: 1; transform: none; pointer-events: auto; }
+  .status { font-size: 15px; font-weight: 500; color: var(--muted); text-align: center; min-height: 20px; }
+  .said { font-size: 20px; font-weight: 600; text-align: center; line-height: 1.3; min-height: 26px; color: var(--text); }
+  .pill { background: #1c1c1f; color: var(--text); font-size: 14px; padding: 8px 16px; border-radius: 20px; }
+  .done { position: absolute; top: 18px; right: 18px; z-index: 2; opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .app.open .done { opacity: 1; pointer-events: auto; }
+  form { display: none; width: 100%; gap: 8px; }
+  .app.typing form { display: flex; }
+  .app.typing #keyboard { display: none; }
+  /* Text is a deliberate choice: a small, dim keyboard icon in the corner, never the default. */
+  .kbd { position: absolute; right: 18px; bottom: 18px; width: 40px; height: 40px; padding: 8px; border-radius: 50%;
+         background: transparent; color: var(--dim); }
+  .kbd:active { color: var(--muted); background: #1c1c1f; }
   input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--panel2); border: 1px solid var(--line2);
           border-radius: 22px; padding: 11px 16px; }
   input:focus { outline: none; border-color: var(--accent); }
@@ -75,18 +76,18 @@
 
   <div class="card bank-a" data-i="0"><span class="chip"></span></div>
   <div class="card bank-b" data-i="1"><span class="chip"></span></div>
-  <div class="card agent" id="agent">
-    <span class="name">Tuttie</span>
-    <span class="hint">Tap to talk</span>
-    <div class="screen" id="screen"><canvas id="eyes"></canvas></div>
-    <button class="close" id="close" type="button">Done</button>
-    <div class="talk">
-      <div class="said" id="said">Hi, I'm Tuttie.<small>Tap the mic and tell me what you need.</small></div>
-      <button class="mic" id="mic" type="button" aria-label="Talk to Tuttie">
-        <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 1 0-7 0v6A3.5 3.5 0 0 0 12 15zm6-3.5a.9.9 0 1 0-1.8 0 4.2 4.2 0 0 1-8.4 0 .9.9 0 1 0-1.8 0 6 6 0 0 0 5.1 5.9V20H9a.9.9 0 1 0 0 1.8h6a.9.9 0 1 0 0-1.8h-2.1v-2.6a6 6 0 0 0 5.1-5.9z"/></svg>
+  <div class="card agent" id="agent" aria-label="Tuttie, tap to talk">
+    <canvas id="eyes"></canvas>
+    <div class="edge"></div>
+    <button class="pill done" id="done" type="button">Done</button>
+    <div class="controls" id="controls">
+      <div class="said" id="said"></div>
+      <div class="status" id="status">Tap Tuttie to talk</div>
+      <button class="kbd" id="keyboard" type="button" aria-label="Type instead">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg>
       </button>
       <form id="form" autocomplete="off">
-        <input id="text" placeholder="Type instead…" enterkeyhint="send">
+        <input id="text" placeholder="Message Tuttie…" enterkeyhint="send">
         <button type="submit">Send</button>
       </form>
     </div>
@@ -94,66 +95,71 @@
 </div>
 <script src="/shared/face.js"></script>
 <script>
-  // UI only for now: the agent is not connected to the backend yet; the eyes react locally.
+  // UI only for now: voice and text are not connected to the agent backend yet.
+  // States: asleep (eyes closed) → tap the face → voice mode (eyes open, stays on until Done or
+  // Type instead). Typing closes the eyes; tapping the face goes back to voice.
   const app = document.getElementById("app");
   const agent = document.getElementById("agent");
+  const status = document.getElementById("status");
   const said = document.getElementById("said");
-  const mic = document.getElementById("mic");
+  const input = document.getElementById("text");
   const face = new TuttieFace(document.getElementById("eyes"));
+  face.sleep(0);
 
-  function say(text, note = "") {
-    said.textContent = text;
-    if (note) { const small = document.createElement("small"); small.textContent = note; said.append(small); }
+  let openedAt = 0;  // taps on the controls right after opening are ignored (no accidental keyboard)
+
+  function startVoice() {
+    if (!app.classList.contains("open")) openedAt = performance.now();
+    app.classList.add("open", "voice");
+    app.classList.remove("typing");
+    input.blur();
+    face.wake("happiness");
+    setTimeout(() => app.classList.contains("voice") && face.set("neutral", 700), 1300);
+    status.textContent = "Listening… (voice is not connected yet)";
   }
 
-  function open() {
-    if (app.classList.contains("open")) return;
-    app.classList.add("open");
-    face.set("happiness");
-    setTimeout(() => face.set("neutral", 700), 1400);
+  function startTyping() {
+    app.classList.remove("voice");
+    app.classList.add("typing");
+    face.sleep();
+    status.textContent = "Tap Tuttie to talk instead";
+    input.focus();
   }
 
   function close() {
-    app.classList.remove("open");
-    mic.classList.remove("on");
-    face.set("neutral");
+    app.classList.remove("open", "voice", "typing");
+    input.blur();
+    said.textContent = "";
+    status.textContent = "Tap Tuttie to talk";
+    face.sleep();
   }
 
-  // Tap or swipe up on the Tuttie card opens the agent.
+  // Tapping (or swiping up on) the face wakes Tuttie into voice mode. While voice is on,
+  // further taps keep it on: the agent is never sent away by accident.
   let startY = null;
   agent.addEventListener("pointerdown", e => { startY = e.clientY; });
   agent.addEventListener("pointerup", e => {
-    if (startY === null || app.classList.contains("open")) return;
-    if (startY - e.clientY > 30 || Math.abs(startY - e.clientY) < 8) open();
+    if (startY === null || e.target.closest("button, form")) { startY = null; return; }
+    const tap = Math.abs(startY - e.clientY) < 8, swipeUp = startY - e.clientY > 30;
     startY = null;
-  });
-  document.getElementById("close").addEventListener("click", e => { e.stopPropagation(); close(); });
-
-  mic.addEventListener("click", () => {
-    const listening = mic.classList.toggle("on");
-    face.set(listening ? "amazement" : "neutral");
-    say(listening ? "Listening…" : "Hi, I'm Tuttie.", listening ? "Voice is not connected yet." : "Tap the mic and tell me what you need.");
+    if (!(tap || swipeUp)) return;
+    if (app.classList.contains("voice")) face.set("excitement", 250), setTimeout(() => face.set("neutral", 500), 600);
+    else startVoice();
   });
 
-  const input = document.getElementById("text");
-  input.addEventListener("focus", () => face.lookAt(0, .8));
-  input.addEventListener("blur", () => face.lookAt(0, 0));
+  document.getElementById("done").addEventListener("click", () => {
+    if (performance.now() - openedAt > 700) close();
+  });
+  document.getElementById("keyboard").addEventListener("click", () => {
+    if (performance.now() - openedAt > 700) startTyping();
+  });
   document.getElementById("form").addEventListener("submit", e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
-    face.set("excitement");
-    say(`“${text}”`, "Got it. I'm not connected to the agent web yet.");
-    setTimeout(() => face.set("neutral", 700), 1600);
-  });
-
-  // Tap the big eyes to try the expressions ported from pycozmo.
-  let expression = 0;
-  document.getElementById("screen").addEventListener("click", () => {
-    if (!app.classList.contains("open")) return;
-    expression = (expression + 1) % TuttieFace.EXPRESSIONS.length;
-    face.set(TuttieFace.EXPRESSIONS[expression]);
+    said.textContent = `“${text}”`;
+    status.textContent = "Not connected to the agent web yet";
   });
 </script>
 </body>
