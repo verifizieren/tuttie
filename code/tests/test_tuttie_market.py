@@ -19,6 +19,9 @@ from assistant.marketplace import MarketDesk, shortlist
 from assistant.tools import load_authorities
 from marketplace.app import create_app as create_market_app
 from marketplace.market import Market
+from assistant.approvals import ApprovalBook
+from assistant.tools import Toolbox
+from negotiation_helpers import registry_lookup
 from node.server import create_app
 from registry.app import app as registry_app
 
@@ -39,7 +42,7 @@ def stub_llm(monkeypatch):
     monkeypatch.setattr(node.agent, "LLM", StubLLM)
 
 
-def run_find(**kwargs) -> tuple[dict, EventBus, Market]:
+def run_find(negotiate_budget: float | None = None, **kwargs) -> tuple[dict, EventBus, Market]:
     async def scenario():
         transports = {}
 
@@ -51,7 +54,7 @@ def run_find(**kwargs) -> tuple[dict, EventBus, Market]:
             apps = {4000: registry_app}
             for path in (DATA / "nodes").glob("*.json"):
                 config = json.loads(path.read_text())
-                apps[config["port"]] = create_app(config, http=http)
+                apps[config["port"]] = create_app(config, http=http, lookup=registry_lookup)
             market_app = create_market_app(http)
             market = Market(http, "http://localhost:4000", load_authorities(), load_public_key("user"),
                             "http://localhost:4010")
@@ -61,7 +64,11 @@ def run_find(**kwargs) -> tuple[dict, EventBus, Market]:
             bus = EventBus()
             desk = MarketDesk(http, "http://localhost:4000", bus, load_authorities(),
                               market_url="http://localhost:4010", offer_wait_s=3)
-            return await desk.find(**kwargs), bus, market
+            result = await desk.find(**kwargs)
+            if negotiate_budget is not None:
+                toolbox = Toolbox(http, "http://localhost:4000", bus, ApprovalBook(), market=desk)
+                result["negotiation"] = await toolbox.negotiate(budget_chf=negotiate_budget)
+            return result, bus, market
 
     return asyncio.run(scenario())
 
@@ -110,3 +117,14 @@ def test_tuttie_rejects_an_offer_whose_signature_does_not_match():
 
     checked, bus = asyncio.run(scenario())
     assert checked is None and bus.history[-1]["status"] == "broken"
+
+
+def test_tuttie_negotiates_its_shortlist_and_gets_a_signed_agreement():
+    result, bus, _ = run_find(negotiate_budget=200, date="2026-11-14", tags=["basel-sbb"], budget_chf=200)
+    negotiation = result["negotiation"]
+    assert negotiation["best"]["hotel"] == "Hotel Rheinblick"
+    assert negotiation["best"]["price_chf"] <= 180  # bargained from the offer, within the private budget
+    agreement = [e for e in bus.history if e["detail"].get("phase") == "agreement"][-1]
+    assert agreement["detail"]["agreement"]["payload"]["type"] == "agreement"
+    # The private budget was never sent: no event or message on the way mentions it as a limit.
+    assert all("max_price" not in json.dumps(e) for e in bus.history)
