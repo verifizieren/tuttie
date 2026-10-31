@@ -562,10 +562,15 @@ Why things are the way they are, so nobody has to rediscover them:
   lists, markdown, emoji or square brackets, no ids or codes (node ids, booking ids, receipt
   numbers: the wallet shows them), numbers as people say them ("CHF 128", "6 pm", "14
   November", "about 9 degrees", "25 percent"); no "[3]" step citations any more (results still
-  carry `source_step`); a booking is confirmed as "booked" plus the total. The voice
-  (`spoken()` in `voice/agent.py`) drops any [...] note and says 24-hour times as "6 pm",
-  "12:52 am", "midnight", "noon"; the wallet (`cleanAnswer`, `lib/history.js`) hides any [...]
-  note. Reason: "18:00" was read as "1800", and "[confirmed]" / "[receipt RC-...]" showed up.
+  carry `source_step`); a booking is confirmed as "booked" plus the total. Bracketed notes
+  the model still writes are cleaned the same on screen (`withoutNotes`/`cleanAnswer` in
+  `apps/wallet/src/lib/activity.js`) and in voice (`spoken()` in `voice/agent.py`): citations,
+  a few labels ([confirmed]), booking/receipt ids and node ids are dropped; any other note keeps
+  its words without the brackets, so a fee or "cancelled" is never hidden. Shared cases:
+  `code/tests/fixtures/answer_notes.json`. The voice says two-digit 24-hour times as "6 pm",
+  "12:52 am", "midnight", "noon" and leaves "8:30 pm", durations ("1:30 hours", "14:00 hrs") and
+  "18:00:30" alone. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
+  showed up. Found and checked by a bug hunter and two attacker rounds.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
 - **Broken vs untrusted:** a forged or invalid seal is broken (red); self-signed or unsigned
