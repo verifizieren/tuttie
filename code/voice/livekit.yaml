@@ -1,0 +1,14 @@
+# LiveKit server for Tuttie's voice, self-hosted on the team server (started by scripts/run_all.py).
+# The team server only exposes ports 4000-4049, and the wallet runs on https, so:
+#   - signaling (WebSocket) stays local on 7880; the assistant proxies wss://<site>/rtc to it
+#     (assistant/voice.py), so it rides on the same https origin as the wallet;
+#   - media goes straight to the public IP: TCP 4042 (always reachable) and UDP 4043 (if the
+#     network lets it through). The IP comes from LIVEKIT_NODE_IP (--node-ip).
+# API key and secret come from the environment (LIVEKIT_KEYS="<key>: <secret>", set by run_all.py).
+port: 7880
+rtc:
+  tcp_port: 4042
+  udp_port: 4043
+  use_external_ip: false
+logging:
+  level: info
