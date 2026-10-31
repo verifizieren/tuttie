@@ -18,7 +18,7 @@ import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import { sendChat } from "./lib/api.js";
-import { BUSY, EXPRESSION, THINKING, statusLine } from "./lib/activity.js";
+import { BUSY, EXPRESSION, MOOD, THINKING, statusLine } from "./lib/activity.js";
 
 const STATUS = {
   closed: "Tap Tuttie to talk",
@@ -77,7 +77,8 @@ export default function App() {
   // While it is busy, it moves through a few thinking looks instead of holding one.
   useEffect(() => {
     if (mode !== "voice" || !EXPRESSION[agent.phase]) return;
-    face.current?.set(EXPRESSION[agent.phase], 500);
+    // A finished answer shows how it feels: glad about a deal, sorry about bad news.
+    face.current?.set(agent.phase === "done" ? MOOD[agent.mood] || "happiness" : EXPRESSION[agent.phase], 500);
     if (!BUSY.has(agent.phase)) return;
     let i = 0;
     const timer = setInterval(() => {
@@ -86,7 +87,7 @@ export default function App() {
       face.current?.lookAt(look[0], look[1], 600);
     }, THINKING_MS);
     return () => clearInterval(timer);
-  }, [agent.phase, mode, face]);
+  }, [agent.phase, agent.mood, mode, face]);
 
   // An approval needs the user: open the card if it is closed.
   useEffect(() => {

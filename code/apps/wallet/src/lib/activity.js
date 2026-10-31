@@ -10,6 +10,7 @@ export const EMPTY = {
   shortlistDone: false,
   approval: null,       // { id, amount, hotel, summary, seals } while the phone waits
   answer: "",
+  mood: "neutral",      // how Tuttie's answer feels (assistant/agent.py MOODS)
   thought: "",          // the latest reasoning summary title
 };
 
@@ -31,7 +32,7 @@ export function applyEvent(state, event) {
     const title = event.summary.match(/^\*\*(.+?)\*\*/);
     return { ...state, thought: title ? title[1] : state.thought, phase: state.phase === "idle" ? "thinking" : state.phase };
   }
-  if (event.kind === "answer") return { ...state, answer: event.summary, phase: "done" };
+  if (event.kind === "answer") return { ...state, answer: event.summary, mood: detail.mood || "neutral", phase: "done" };
 
   if (event.kind === "marketplace") {
     if (detail.phase === "posted") {
@@ -104,6 +105,13 @@ export const THINKING = [
   { name: "neutral", look: [.7, -.6] },
   { name: "skepticism", look: [-.3, .3] },
 ];
+
+/** The face for each answer mood, so even small talk shows on Tuttie's face. */
+export const MOOD = {
+  happy: "happiness", excited: "excitement", proud: "happiness", thoughtful: "skepticism",
+  surprised: "surprise", confused: "confusion", sad: "sadness", sorry: "guilt", worried: "fear",
+  neutral: "neutral",
+};
 
 /** Phases in which Tuttie is busy and the face cycles through THINKING. */
 export const BUSY = new Set(["thinking", "posted", "negotiating", "booking"]);
