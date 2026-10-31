@@ -29,7 +29,9 @@ from assistant.events import EventBus  # noqa: E402
 from assistant.tools import Toolbox  # noqa: E402
 from llm import LLM  # noqa: E402
 
-APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # wallet/, shared/, old/ (first prototype), ...
+APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps: shared/, old/ (first prototype), ...
+# The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
+WALLET_DIST = APPS_DIR / "wallet" / "dist"
 REGISTRY_URL = os.environ.get("REGISTRY_URL", f"http://localhost:{os.environ.get('REGISTRY_PORT', '4000')}")
 
 bus = EventBus()
@@ -125,6 +127,9 @@ def old_phone_link() -> RedirectResponse:
     return RedirectResponse("/old/wallet/")
 
 
+if not WALLET_DIST.exists():
+    print(f"warning: {WALLET_DIST} is missing; build the wallet with `npm run build` in apps/wallet")
+app.mount("/wallet", StaticFiles(directory=WALLET_DIST, html=True, check_dir=False), name="wallet")
 app.mount("/", StaticFiles(directory=APPS_DIR, html=True), name="apps")
 
 
