@@ -53,6 +53,8 @@ class Assistant:
             self.messages.append({"role": "user", "content": text})
             for _ in range(MAX_ROUNDS):
                 message = await self.llm.complete(self.messages, SCHEMAS)
+                for thought in message.pop("reasoning", []):
+                    self.bus.emit("thinking", "info", thought)
                 self.messages.append(message)
                 if not message.get("tool_calls"):
                     answer = message["content"] or ""
