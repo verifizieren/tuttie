@@ -69,10 +69,13 @@ def francs(match: re.Match) -> str:
 
 
 def spoken(answer: str) -> str:
-    """An answer as it should sound: amounts in francs, no citations, no markdown, no emoji."""
+    """An answer as it should sound: amounts in francs, temperatures in degrees, no citations,
+    no markdown, no emoji."""
     text = re.sub(r"\s*\[\d+\]", "", answer)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
+    text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
+    text = re.sub(r"(\d)\s?%", r"\1 percent", text)
     text = re.sub(r"[*_`#]", "", text)
     text = re.sub(r"[\U0001F000-\U0001FFFF☀-➿]", "", text)
     return " ".join(line for line in text.splitlines() if not line.strip().lower().startswith("ignored:")).strip()

@@ -1,5 +1,5 @@
 // The hotels as a deck of cards: swipe right to like, left to pass. Each card shows the hotel's
-// photos (tap the left or right side to flip through them), its rating, its features as green
+// photos (tap the left third to go back, anywhere else to go on), its rating, its features as green
 // or red icons and the price Tuttie's agents bargained, with the hotel's own offer crossed out.
 // All of it comes from signed facts (assistant/cards.py). After the last card the wallet books
 // the best liked deal. A gesture that starts mostly up or down scrolls the conversation instead.
@@ -13,10 +13,13 @@ const FLICK_SPEED = 0.5;     // px per ms that decides a shorter drag
 const FLY_MS = 260;
 const LEAN_PX = 150;         // drag distance at which Tuttie's eyes look all the way to the side
 
-function Photos({ photos, name }) {
+/** The hotel's photos. `flipRef.current(step)` flips them: the deck calls it for a tap, because a
+ *  finger's tap moves a few pixels and browsers then often drop the click (it did, on phones). */
+function Photos({ photos, name, flipRef }) {
   const [shown, setShown] = useState(0);
   const [failed, setFailed] = useState(false);
   const flip = step => setShown(i => Math.min(photos.length - 1, Math.max(0, i + step)));
+  if (flipRef) flipRef.current = photos.length > 1 ? flip : null;
   return (
     <div className="swipe-photo">
       {photos.length > 0 && !failed
@@ -24,7 +27,7 @@ function Photos({ photos, name }) {
         : <div className="photo-missing" />}
       {photos.length > 1 && (
         <>
-          {/* Taps on the left or right third flip the photo; drags still swipe the card. */}
+          {/* For the keyboard only (Enter / Space): pointer taps are read by the deck (pointer-events: none). */}
           <button type="button" className="photo-prev" aria-label="Previous photo" data-tap onClick={() => flip(-1)} />
           <button type="button" className="photo-next" aria-label="Next photo" data-tap onClick={() => flip(1)} />
         </>
@@ -33,11 +36,11 @@ function Photos({ photos, name }) {
   );
 }
 
-function HotelCard({ card, hotel, position, count, style, handlers, verdict, className = "" }) {
+function HotelCard({ card, hotel, position, count, style, handlers, verdict, className = "", flipRef = null }) {
   const price = card.agreed_chf ?? card.price_chf;
   return (
     <article className={`swipe-card ${className}`} style={style} {...handlers}>
-      <Photos photos={card.photos || []} name={card.name} />
+      <Photos photos={card.photos || []} name={card.name} flipRef={flipRef} />
       <div className="hotel-bars" role="img" aria-label={`Hotel ${position + 1} of ${count}`}>
         {Array.from({ length: count }, (_, i) => <i key={i} className={i === position ? "on" : ""} />)}
       </div>
@@ -79,6 +82,7 @@ export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
   const flight = useRef(null);
   const consumed = useRef(null);
   const gesture = useRef(null);               // { x, y, t, axis, scroller, scrollTop }
+  const flipTop = useRef(null);               // flips the top card's photos (set by its Photos)
 
   useEffect(() => {
     const done = setTimeout(() => setNudge(false), 1600);
@@ -139,7 +143,13 @@ export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
     onPointerUp: e => {
       const g = gesture.current;
       gesture.current = null;
-      if (!g || g.axis !== "x") return;
+      if (!g) return;
+      if (!g.axis) {  // never moved enough to be a swipe or a scroll: a tap
+        const photo = e.target.closest(".swipe-photo")?.getBoundingClientRect();
+        if (photo) flipTop.current?.(e.clientX < photo.left + photo.width / 3 ? -1 : 1);
+        return;
+      }
+      if (g.axis !== "x") return;
       const dx = e.clientX - g.x, speed = Math.abs(dx) / Math.max(16, performance.now() - g.t);
       if (Math.abs(dx) > DECIDE_PX || (Math.abs(dx) > 30 && speed > FLICK_SPEED)) decide(dx > 0 ? "like" : "pass");
       else { setDrag(null); lean(0); }
@@ -171,7 +181,7 @@ export default function Deck({ cards, hotels, onDone, onLean, commands = [] }) {
         )}
         <HotelCard key={cards[index].node_id} card={cards[index]} hotel={hotels[cards[index].node_id]}
                    style={nudge && index === 0 && !drag ? undefined : top} className={nudge && index === 0 && !drag ? "nudge" : ""}
-                   position={index} count={cards.length} handlers={handlers} verdict={verdict} />
+                   position={index} count={cards.length} handlers={handlers} verdict={verdict} flipRef={flipTop} />
       </div>
       <div className="deck-count">{index + 1} of {cards.length}</div>
     </section>
