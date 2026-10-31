@@ -250,6 +250,15 @@ profiles in the readme.
 
 Why things are the way they are, so nobody has to rediscover them:
 
+- **A booking is bound to the selected offer, in code.** Offers and Agreements carry
+  `room_type`, `date` and `rate` (cancellation terms) as fields; the hotel copies them into the
+  Agreement unchanged. `book(use_agreement=true)` books exactly those terms and refuses LLM
+  arguments that would change room, night or extras (before the phone is asked); the approval
+  carries the `terms`, the user's key signs them, and the node refuses an agreement booked as
+  another room/night/rate or an approval for other terms. Before this, the LLM's `room_type`
+  went to the node unchecked, so a non-refundable deal could be booked as the flexible rate.
+  The approval sheet and booking card show the room and rate.
+
 - **The owner view reads and changes the node, behind a token.** The live data comes from the
   node's own config (`node/owner.py`), not from the signed public tools, because add-ons and the
   private negotiation limits are not public. The nodes' ports are open on the team server, so the

@@ -234,6 +234,14 @@ charge right after the booking without asking. The pending `approval` event carr
 `detail.offer_mandate`; a paid charge is a `payment` event with the receipt in
 `detail.payload`.
 
+A booking approval also carries `terms` (`aps/approval.py`, `booking_terms`):
+`{room_type, date, rate, includes, offer_id?}` (`offer_id` only when an Agreement is
+redeemed). The wallet shows them under the amount, and the signed decision includes them
+(`sign_decision` adds `terms` to the signed body whenever the approval has them;
+`verify_decision` checks them when present). The node books only if the decision's `terms`
+equal the terms it is about to book, so an approval for the non-refundable double cannot
+book the flexible rate. The pending `approval` event carries `detail.terms`.
+
 ## Business tools over MCP (`node/mcp_tools.py`)
 
 Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
@@ -245,8 +253,14 @@ call (below) and run only through the action gate (`aps/gate.py`):
 
 - `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
   signed commitments, or its own signed agreement) and asks the gate with
-  `Needs("book", scope="book", approval=True, amount_chf=total)`. The confirmation
-  `{status: "confirmed", booking_id, total_chf, extras, checked, ...}` lists the gate's checks,
+  `Needs("book", scope="book", approval=True, amount_chf=total)`. With an agreement the
+  call must name the agreement's `room_type`, `date` and a room with its `rate`, and carry no
+  `extras` (refusals: `the agreement is for a <room> room, not <x>` / `... for the night of
+  <date>, not <x>` / `... for the rate ..., not ...` / `an agreement fixes what is included:
+  book it without extras`); an approval with other `terms` is refused (`the approval is for
+  other terms than this booking ...`). The confirmation
+  `{status: "confirmed", booking_id, total_chf, room_type, rate, offer_id, extras, checked, ...}`
+  names the rate booked (`offer_id` null without an agreement) and lists the gate's checks,
   e.g. `["caller", "signature", "delegation", "agreement", "approval"]`, plus `"commitments"`
   when extras were redeemed.
 - `pay`: `args = {purpose, booking_id, mandate | approval}`. The amount is the charge's
@@ -408,7 +422,10 @@ of a signed envelope), is recorded but advisory; only a signed offer counts.
   "type": "offer",
   "request_id": "rq-7f3a",
   "offer_id": "of-rheinblick-1",
-  "item": "double room 14 Nov",
+  "item": "double room 2026-11-14",
+  "room_type": "double",
+  "date": "2026-11-14",
+  "rate": "best rate, non-refundable",
   "price_chf": 195,
   "includes": ["late check-in after 22:00 with dog"],
   "conditions": ["non-refundable"],
@@ -417,6 +434,9 @@ of a signed envelope), is recorded but advisory; only a signed offer counts.
 ```
 
 Prices come from the node config (`facts.rooms`, `facts.add_ons`), never from an LLM.
+`room_type`, `date` and `rate` (the room's cancellation terms from `facts.rooms`) are the
+bookable terms; they are optional in the model (older offers lack them) but `make_offer`
+always sets them.
 Sent as a signed envelope to the posting's `offer_url`. The marketplace accepts it only from
 an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_until`.
 
@@ -456,7 +476,8 @@ the guest can only accept it (a counter at that price) or walk away.
 ```json
 {
   "type": "agreement", "request_id": "rq-7f3a", "offer_id": "of-rheinblick-1", "round": 2,
-  "item": "double room 2026-11-14", "price_chf": 185,
+  "item": "double room 2026-11-14", "room_type": "double", "date": "2026-11-14",
+  "rate": "best rate, non-refundable", "price_chf": 185,
   "includes": ["late check-in after 22:00 with dog"], "conditions": ["non-refundable"],
   "valid_until": "2026-11-13T22:00:00Z"
 }
@@ -465,7 +486,10 @@ the guest can only accept it (a counter at that price) or walk away.
 The price both sides accept. It is what the user approves on the phone (see Approval) and
 what booking redeems instead of the list price (`negotiation/agreement.py`,
 `AgreementRedeemer`): only with this hotel's own signature, before `valid_until`, and only
-once per `offer_id`; the user's approval must be for exactly `price_chf`. `book` takes it as
+once per `offer_id`; the user's approval must be for exactly `price_chf`. `room_type`,
+`date` and `rate` are copied unchanged from the offer: the agreement is the selected offer,
+and booking it books exactly those terms (Tuttie's `book(use_agreement=true)` refuses LLM
+arguments that would change them, before the phone is asked). `book` takes it as
 an optional `agreement` field once the hook in `node/server.py` is in.
 
 ### Rejection (business → guest agent)
