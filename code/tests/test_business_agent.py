@@ -60,7 +60,7 @@ def test_hotel_sizes_differ_in_rooms():
 def test_agents_know_planned_tools_and_their_status():
     agent = BusinessAgent(config(HOTELS["large"]))
     text = agent.persona_text()
-    assert "counter_offer [planned]" in text and "make_offer [available]" in text
+    assert "pay [planned]" in text and "counter_offer [available]" in text
     with pytest.raises(ValueError):
         tools_for(["teleport"])
 
@@ -91,9 +91,9 @@ def test_wake_up_reports_whether_the_next_tool_is_available():
     assert result["interested"] is True and result["next_tool"] == "make_offer"
     assert result["next_tool_available"] is True
     assert "You are Lena" in agent.llm.system
-    planned = agent_with(HOTELS["large"], {"interested": True, "reason": "Counter!", "next_tool": "counter_offer"})
+    planned = agent_with(HOTELS["large"], {"interested": True, "reason": "Pay!", "next_tool": "pay"})
     result = asyncio.run(planned.invoke({"type": "negotiation.counter"}))
-    assert TOOLS["counter_offer"]["status"] == PLANNED and result["next_tool_available"] is False
+    assert TOOLS["pay"]["status"] == PLANNED and result["next_tool_available"] is False
 
 
 def test_wake_up_drops_a_tool_the_agent_does_not_have():

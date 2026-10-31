@@ -30,7 +30,7 @@ TOOLS = {
         "description": "Answer a marketplace posting with a signed offer (room, price, add-ons, conditions); prices come from the hotel's config.",
     },
     "counter_offer": {
-        "status": PLANNED,
+        "status": AVAILABLE,
         "endpoint": "POST /tools/counter_offer",
         "description": "Answer a guest's counter-offer during negotiation, within the owner's limits.",
     },
