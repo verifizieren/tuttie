@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { applyEvent, bindTurn, dropTurn, EMPTY, startTurn, withDeck } from "../lib/activity.js";
 import { catchUp, OFFLINE_AFTER, retryDelay } from "../lib/stream.js";
-import { newConversation, resumeConversation } from "../lib/api.js";
+import { newConversation, resumeConversation, UNREACHABLE } from "../lib/api.js";
 import { archive, CURRENT_KEY, HISTORY_KEY, loadCurrent, loadHistory, saveCurrent } from "../lib/history.js";
 import { restoreConversation } from "../lib/conversation.js";
 
@@ -26,11 +26,13 @@ function reducer(state, action) {
 const CHECK_MS = 10000;  // while an answer is awaited, also compare with GET /history this often
 
 async function timeline() {
-  const response = await fetch("/history");
-  if (!response.ok) throw new Error("Tuttie is unreachable right now");
+  const response = await fetch("/history").catch(() => null);
+  if (!response?.ok) throw new Error(UNREACHABLE);
   const id = response.headers.get("X-Conversation-ID");
   if (!id) throw new Error("The server needs an update before conversations can be resumed");
-  return { events: await response.json(), id };
+  const events = await response.json().catch(() => null);
+  if (!Array.isArray(events)) throw new Error(UNREACHABLE);  // e.g. a proxy's error page
+  return { events, id };
 }
 
 export default function useAgentStream() {
