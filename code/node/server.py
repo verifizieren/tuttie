@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import verify_decision
 from aps.keys import load_public_key
+from negotiation.agreement import AgreementInvalid, AgreementRedeemer
 from negotiation.hotel import counter_offer_router, registry_lookup
 from node.agent import BusinessAgent
 from sessions import SessionClosed, SessionStore
@@ -56,6 +57,7 @@ class BookRequest(BaseModel):
     guest_name: str
     extras: list[dict] = []  # signed A2A envelopes from this node that carry a commitment
     approval: dict  # the user's signed decision, see aps/approval.py
+    agreement: dict | None = None  # this node's signed Agreement from a negotiation (negotiation/agreement.py)
 
 
 def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=registry_lookup) -> FastAPI:
@@ -70,6 +72,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     own_public_key = public_key_b64(signing_key)
     user_public_key = load_public_key("user")
     used_approvals: set[str] = set()
+    agreements = AgreementRedeemer(node_id, own_public_key)  # negotiated prices, each bookable once
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
@@ -113,8 +116,10 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     def book(req: BookRequest) -> dict:
         """Confirm a booking only with the user's signed approval for exactly this total.
 
-        Extras are this node's own signed A2A commitments, so their price is the one
-        the node promised, whatever the caller claims.
+        The total is either a negotiated price (this node's own signed Agreement, redeemed
+        once) or the room's price plus extras, which are this node's own signed A2A
+        commitments: either way the price is the one the node promised, whatever the caller
+        claims.
         """
         def refuse(reason: str) -> dict:
             """A signed refusal with the reason."""
@@ -127,21 +132,30 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             return refuse("approval does not approve a booking with this hotel")
         if approval["approval_id"] in used_approvals:
             return refuse("approval was already used")
-        room = next((r for r in facts.get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
-        if room is None:
-            return refuse(f"no available room of type {req.room_type}")
-
-        total, items = room["price_chf"], []
-        for extra in req.extras:
-            commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
-            if not commitment or not verify_envelope(extra, own_public_key, expected_node_id=node_id):
-                return refuse("an extra is not a commitment signed by this hotel")
-            total += commitment["price_chf"]
-            items.append(commitment["item"])
+        agreement = None
+        if req.agreement is not None:
+            try:
+                agreement = agreements.check(req.agreement)
+            except AgreementInvalid as error:
+                return refuse(str(error))
+            total, items = agreement.price_chf, list(agreement.includes)
+        else:
+            room = next((r for r in facts.get("rooms", []) if r["room_type"] == req.room_type and r.get("available")), None)
+            if room is None:
+                return refuse(f"no available room of type {req.room_type}")
+            total, items = room["price_chf"], []
+            for extra in req.extras:
+                commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
+                if not commitment or not verify_envelope(extra, own_public_key, expected_node_id=node_id):
+                    return refuse("an extra is not a commitment signed by this hotel")
+                total += commitment["price_chf"]
+                items.append(commitment["item"])
         if round(total, 2) != round(approval["amount_chf"], 2):
             return refuse(f"approved CHF {approval['amount_chf']} does not match total CHF {total}")
 
         used_approvals.add(approval["approval_id"])
+        if agreement is not None:
+            agreements.mark_used(agreement)
         return signed({
             "tool": "book",
             "status": "confirmed",
