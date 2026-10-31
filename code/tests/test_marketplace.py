@@ -22,7 +22,7 @@ from aps.delegation import verify_delegation
 from aps.keys import load_public_key
 from marketplace.app import create_app, load_authorities
 from marketplace.client import new_request_id, sign_request
-from marketplace.market import Market, MarketError, shortlist
+from marketplace.market import Market, MarketError
 from marketplace.messages import Request
 
 REGISTRY = json.loads((Path(__file__).resolve().parent.parent / "data" / "registry.json").read_text())
@@ -40,10 +40,11 @@ def stamp(moment: datetime) -> str:
 class World:
     """A mocked registry plus business agents; records who was contacted and what they got."""
 
-    def __init__(self, registry=REGISTRY, invoke_reply=None, down=()):
+    def __init__(self, registry=REGISTRY, invoke_reply=None, down=(), unsubscribed=()):
         self.registry = registry
         self.invoke_reply = invoke_reply or {"interested": True, "next_tool": "make_offer"}
         self.down = set(down)  # node ids whose /agent/invoke fails
+        self.unsubscribed = set(unsubscribed)  # node ids whose agent does not wake on new postings
         self.events: dict[str, dict] = {}  # node_id -> PostingCreated it received
         self.http = httpx.AsyncClient(transport=httpx.MockTransport(self.handle))
 
@@ -55,6 +56,12 @@ class World:
         if path.startswith("/nodes/"):
             record = next((r for r in self.registry if r["node_id"] == path.removeprefix("/nodes/")), None)
             return httpx.Response(200, json=record) if record else httpx.Response(404)
+        if path == "/agent/card":  # signed by the business, like the real node
+            node = next(r for r in self.registry if r["endpoint"].endswith(f":{request.url.port}"))
+            wakes_on = [] if node["node_id"] in self.unsubscribed else ["posting.created"]
+            card = {"node_id": node["node_id"], "persona": {"name": "Agent"}, "profile": {"size": "medium"},
+                    "wakes_on": wakes_on}
+            return httpx.Response(200, json=sign_envelope(node["node_id"], card, load_signing_key(node["node_id"])))
         if path == "/agent/invoke":
             node = next(r for r in self.registry if r["endpoint"].endswith(f":{request.url.port}"))
             if node["node_id"] in self.down:
@@ -102,13 +109,21 @@ def refused(coroutine) -> MarketError:
 # --- postings ------------------------------------------------------------------------------
 
 
-def test_posting_wakes_matching_businesses_but_never_broken_ones():
+def test_posting_wakes_only_verified_businesses():
     _, world, view = posted()
-    assert set(view["invited"]) == {ALPINA, RHEINBLICK, SPALENHOF, GUNDELI, BUDGET_ROOMS}
-    assert set(world.events) == set(view["invited"])  # the scam hotel was never contacted
-    assert view["invited"][BUDGET_ROOMS]["trust_tier"] == "grey"
-    assert view["invited"][RHEINBLICK] == {"name": "Hotel Rheinblick", "trust_tier": "gold",
-                                           "status": "interested", "next_tool": "make_offer"}
+    assert set(view["invited"]) == {ALPINA, RHEINBLICK, SPALENHOF, GUNDELI}
+    assert set(world.events) == set(view["invited"])  # untrusted and broken ones never contacted
+    assert view["skipped"][BUDGET_ROOMS] == {"name": "Basel Budget Rooms", "trust_tier": "grey", "reason": "untrusted"}
+    assert view["skipped"][SCAM]["reason"] == "broken seal"
+    assert view["invited"][RHEINBLICK] == {"name": "Hotel Rheinblick", "trust_tier": "gold", "agent": "Agent",
+                                           "profile": {"size": "medium"}, "status": "interested",
+                                           "next_tool": "make_offer"}
+
+
+def test_only_agents_subscribed_to_new_postings_are_woken():
+    _, world, view = posted(World(unsubscribed={SPALENHOF}))
+    assert SPALENHOF not in view["invited"] and SPALENHOF not in world.events
+    assert view["skipped"][SPALENHOF]["reason"] == "not subscribed to new postings"
 
 
 def test_woken_business_can_verify_tuttie_itself():
@@ -170,15 +185,14 @@ def test_signed_offer_from_invited_business_is_accepted():
     market, _, _ = posted()
     accepted = asyncio.run(market.receive_offer("rq-test1", offer_envelope(), now=NOW))
     assert accepted["trust_tier"] == "gold" and accepted["uid"] == "CHE-526.018.151"
-    assert accepted["within_budget"] is True and accepted["offer"]["price_chf"] == 195
+    assert accepted["offer"]["price_chf"] == 195
     assert verify_envelope(accepted["envelope"], load_public_key(RHEINBLICK), RHEINBLICK)
     assert market.view("rq-test1")["offers"] == [accepted]
 
 
-def test_over_budget_offer_is_kept_but_flagged():
+def test_untrusted_business_may_not_offer():
     market, _, _ = posted()
-    accepted = asyncio.run(market.receive_offer("rq-test1", offer_envelope(price=250), now=NOW))
-    assert accepted["within_budget"] is False
+    assert refused(market.receive_offer("rq-test1", offer_envelope(BUDGET_ROOMS), now=NOW)).status == 403
 
 
 def test_refuses_offers_from_businesses_that_were_not_invited():
@@ -210,20 +224,6 @@ def test_refuses_offers_for_unknown_or_expired_postings():
     assert refused(market.receive_offer("rq-test1", offer_envelope(), now=later)).status == 410
 
 
-# --- shortlist -----------------------------------------------------------------------------
-
-
-def test_shortlist_ranks_by_price_puts_untrusted_last_and_drops_unfit_offers():
-    market, _, _ = posted()
-    for node_id, price, offer_id in ((RHEINBLICK, 195, "of-r"), (GUNDELI, 160, "of-g"),
-                                     (BUDGET_ROOMS, 90, "of-b"), (SPALENHOF, 230, "of-s")):
-        asyncio.run(market.receive_offer("rq-test1", offer_envelope(node_id, price, offer_id), now=NOW))
-    ranked = [o["node_id"] for o in shortlist(market.view("rq-test1")["offers"], now=NOW)]
-    assert ranked == [GUNDELI, RHEINBLICK, BUDGET_ROOMS]  # small gold first; Spalenhof over budget
-    assert shortlist(market.view("rq-test1")["offers"], now=NOW + timedelta(hours=2)) == []
-    assert len(shortlist(market.view("rq-test1")["offers"], size=1, now=NOW)) == 1
-
-
 # --- formats and the HTTP service ----------------------------------------------------------
 
 
@@ -236,13 +236,13 @@ def test_request_format_is_strict():
         request(request_id=new_request_id()).model_dump()).type == "request"
 
 
-def test_http_flow_post_offer_shortlist():
+def test_http_flow_post_and_offer():
     world = World()
     with TestClient(create_app(world.http)) as client:
         envelope = sign_request(request(), TUTTIE, load_signing_key(TUTTIE))
         assert client.post("/postings", json=envelope).status_code == 201
         assert client.post("/postings/rq-test1/offers", json=offer_envelope(timestamp=None)).status_code == 201
-        assert [o["node_id"] for o in client.get("/postings/rq-test1/shortlist").json()] == [RHEINBLICK]
+        assert [o["node_id"] for o in client.get("/postings/rq-test1").json()["offers"]] == [RHEINBLICK]
         refusal = client.post("/postings/rq-test1/offers", json=offer_envelope(SCAM))
         assert refusal.status_code == 403 and refusal.json()["refused"] is True
         assert client.get("/postings/rq-nope").status_code == 404

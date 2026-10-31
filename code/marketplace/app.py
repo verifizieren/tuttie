@@ -3,7 +3,6 @@
 POST /postings                       a user agent's signed Request (envelope)
 POST /postings/{request_id}/offers   a business's signed Offer (envelope)
 GET  /postings/{request_id}          the posting, who was invited and all accepted offers
-GET  /postings/{request_id}/shortlist  the best five offers for the user agent
 
 Run from code/: python -m marketplace.app
 """
@@ -18,7 +17,7 @@ from fastapi import FastAPI, Request as HttpRequest
 from fastapi.responses import JSONResponse
 
 from aps.keys import load_public_key
-from marketplace.market import Market, MarketError, shortlist
+from marketplace.market import Market, MarketError
 
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.environ.get("MARKETPLACE_PORT", "4010"))
@@ -63,11 +62,6 @@ def create_app(http: httpx.AsyncClient | None = None) -> FastAPI:
     def get_posting(request_id: str) -> dict:
         """The posting, the invited businesses and every accepted offer."""
         return app.state.market.view(request_id)
-
-    @app.get("/postings/{request_id}/shortlist")
-    def get_shortlist(request_id: str) -> list[dict]:
-        """The best five current offers within budget (see market.shortlist)."""
-        return shortlist(app.state.market.view(request_id)["offers"])
 
     return app
 

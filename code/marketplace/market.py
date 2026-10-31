@@ -3,16 +3,18 @@
 1. A user agent (Tuttie) posts a Request in a signed envelope. The market accepts it only
    if the agent's seals hold, the envelope is fresh and signed by the agent's key, and the
    user's delegation grants "post_requests".
-2. The market finds matching businesses in the registry (category + tags) and wakes each
-   one with a PostingCreated event at POST {endpoint}/agent/invoke. Businesses with broken
-   seals are never contacted. The posting carries Tuttie's signed request unchanged, so
-   every business can verify the requester itself.
+2. The market finds matching businesses in the registry (category + tags). Only verified
+   ones (gold or blue) are considered: broken and untrusted (grey) businesses are listed as
+   skipped and never contacted. For each, it reads the agent's signed card (GET /agent/card)
+   and wakes it with a PostingCreated event at POST {endpoint}/agent/invoke only if the agent
+   subscribed to "posting.created" (its `wakes_on`). The posting carries Tuttie's signed
+   request unchanged, so every business can verify the requester itself.
 3. Woken businesses send signed Offers to the posting's offer_url. The market accepts an
    offer only from an invited business, signed with its key, fresh, for this request and
    still valid. It never changes a price; it only checks and stores signed offers.
 
 The market decides nothing for the user: it hands every accepted offer to the user agent,
-which picks (see shortlist). No LLM runs here.
+which builds the shortlist (assistant/marketplace.py). No LLM runs here.
 """
 
 import asyncio
@@ -30,6 +32,8 @@ from marketplace.messages import Offer, Posting, PostingCreated, Request
 NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 MAX_MESSAGE_AGE_S = 300  # signed postings and offers must be this fresh (replay protection)
 INVOKE_TIMEOUT_S = 20  # a business agent may run an LLM before it answers the wake-up
+TRUSTED_TIERS = ("gold", "blue")  # untrusted (grey) and broken businesses are never woken
+EVENT = "posting.created"
 
 
 class MarketError(Exception):
@@ -44,21 +48,6 @@ class MarketError(Exception):
 def utc(now: datetime | None) -> datetime:
     """`now` if given (tests pin the clock), else the current UTC time."""
     return now or datetime.now(timezone.utc)
-
-
-def shortlist(offers: list[dict], size: int = 5, now: datetime | None = None) -> list[dict]:
-    """The best `size` accepted offers for the user agent to look at.
-
-    Offers that are expired or over the budget are left out. Gold and blue businesses
-    rank by price alone, so a small gold guesthouse beats a big chain on price; grey
-    (untrusted) ones come last because they may never be booked.
-    """
-    current = [
-        o for o in offers
-        if o["within_budget"] and parse_timestamp(o["offer"]["valid_until"]) > utc(now)
-    ]
-    ranked = sorted(current, key=lambda o: (o["trust_tier"] == "grey", o["offer"]["price_chf"]))
-    return ranked[:size]
 
 
 class Market:
@@ -125,27 +114,56 @@ class Market:
             expires_at=request.expires_at,
         )
         entry = {"posting": posting.model_dump(), "request": request.model_dump(mode="json"),
-                 "requester_tier": verdict["tier"], "invited": {}, "offers": []}
+                 "requester_tier": verdict["tier"], "invited": {}, "skipped": {}, "offers": []}
         self.postings[request.request_id] = entry
-        entry["invited"] = await self.wake(posting, [request.category, *request.tags])
+        entry["invited"], entry["skipped"] = await self.wake(posting, [request.category, *request.tags])
         return self.view(request.request_id)
 
-    async def wake(self, posting: Posting, tags: list[str]) -> dict[str, dict]:
-        """Send PostingCreated to every matching business, in parallel; broken ones are skipped."""
+    async def wake(self, posting: Posting, tags: list[str]) -> tuple[dict[str, dict], dict[str, dict]]:
+        """Wake every matching, verified business that subscribed to new postings, in parallel.
+
+        Returns (invited, skipped): invited businesses were woken and may send offers;
+        skipped ones (untrusted, broken, not subscribed, card unreadable) were not.
+        """
         response = await self.http.get(f"{self.registry_url}/search", params={"tags": ",".join(tags)})
-        candidates = []
+        skipped, candidates = {}, []
         for record in response.json():
             if record.get("kind") != "business":
                 continue
             verdict = evaluate_record(record, self.authorities)
-            if verdict["tier"] != "broken":
+            if verdict["tier"] in TRUSTED_TIERS:
                 candidates.append((record, verdict))
+            else:
+                skipped[record["node_id"]] = {"name": record["name"], "trust_tier": verdict["tier"],
+                                              "reason": "broken seal" if verdict["tier"] == "broken" else "untrusted"}
+        cards = await asyncio.gather(*(self.agent_card(record) for record, _ in candidates))
         event = PostingCreated(posting=posting).model_dump()
-        replies = await asyncio.gather(*(self.invoke(record, event) for record, _ in candidates))
-        return {
-            record["node_id"]: {"name": record["name"], "trust_tier": verdict["tier"], **reply}
-            for (record, verdict), reply in zip(candidates, replies)
+        subscribed = []
+        for (record, verdict), card in zip(candidates, cards):
+            if card is None or EVENT not in card.get("wakes_on", []):
+                reason = "no verifiable agent card" if card is None else "not subscribed to new postings"
+                skipped[record["node_id"]] = {"name": record["name"], "trust_tier": verdict["tier"], "reason": reason}
+            else:
+                subscribed.append((record, verdict, card))
+        replies = await asyncio.gather(*(self.invoke(record, event) for record, _, _ in subscribed))
+        invited = {
+            record["node_id"]: {"name": record["name"], "trust_tier": verdict["tier"],
+                                "agent": card.get("persona", {}).get("name"), "profile": card.get("profile"), **reply}
+            for (record, verdict, card), reply in zip(subscribed, replies)
         }
+        return invited, skipped
+
+    async def agent_card(self, record: dict) -> dict | None:
+        """The business agent's card, if it is signed by the business; None otherwise."""
+        try:
+            response = await self.http.get(f"{record['endpoint']}/agent/card", timeout=INVOKE_TIMEOUT_S)
+            envelope = response.json()
+        except (httpx.HTTPError, ValueError):
+            return None
+        if response.status_code != 200 or not verify_envelope(envelope, record["public_key"],
+                                                              expected_node_id=record["node_id"]):
+            return None
+        return envelope["payload"]
 
     async def invoke(self, record: dict, event: dict) -> dict:
         """Wake one business agent. Its answer (interested?, next tool) is kept for the timeline;
@@ -193,14 +211,12 @@ class Market:
         if any(o["offer"]["offer_id"] == offer.offer_id for o in entry["offers"]):
             raise MarketError("offer_id already received", 409)
 
-        budget = entry["request"]["constraints"]["budget_chf"]
         accepted = {
             "node_id": sender,
             "name": record["name"],
             "trust_tier": verdict["tier"],
             "uid": verdict["uid"],
             "offer": offer.model_dump(),
-            "within_budget": budget is None or offer.price_chf <= budget,
             "envelope": envelope,  # kept signed: the user agent re-verifies it, booking redeems it
         }
         entry["offers"].append(accepted)
@@ -213,4 +229,4 @@ class Market:
         entry = self.postings.get(request_id)
         if entry is None:
             raise MarketError("no such posting", 404)
-        return {"request_id": request_id, **{k: entry[k] for k in ("posting", "request", "invited", "offers")}}
+        return {"request_id": request_id, **{k: entry[k] for k in ("posting", "request", "invited", "skipped", "offers")}}
