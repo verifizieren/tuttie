@@ -66,6 +66,15 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   (`LLM_TIMEOUT_S`, one retry); hotel agents also fall back on Anthropic errors; a hotel never
   offers a room whose note rules out a need (Anna's single for a dog guest), and an unknown room
   choice gets the cheapest real room. Tests: `test_agent_errors.py`, `test_node_agent.py`, `test_llm.py`.
+- Budget leak fixed (2026-11-01, bug #18, branch wip/budget-leak): Tuttie's counters were capped
+  at the private budget, so a hotel far above it got the budget itself as a counter (CHF 160 to
+  Rheinblick and Alpina). Now a counter comes only from the offer and the hotel's prices: open
+  10 % below the offer, else 20 % below, else walk away without a counter; move halfway, or hold
+  the last counter when the step would not stay below the budget. A hotel price at or below the
+  budget is still accepted. Demo numbers unchanged (Gästehaus 121/126 → 128, Rheinblick
+  175/182 → 185 at budget 200). Also in code, not the prompt: `post_request` drops requirements
+  that name a price or the budget's number, and `ask_agent` refuses a question naming a private
+  amount. Tests: `test_budget_leak.py`.
 - API hardening (2026-11-01, branch wip/harden-api): reading endpoints (`/history`,
   `/approvals/pending`, `/approvals/{id}`, `/reset`, `/identity`) no longer create a
   conversation, so crawlers and QR previews without cookies cannot fill the store and evict
@@ -386,7 +395,8 @@ Why things are the way they are, so nobody has to rediscover them:
 
 - **Bargaining is code, not LLM.** Both sides decide prices with deterministic rules
   (`negotiation/rules.py`, `negotiation/tuttie.py`): the hotel meets halfway and never goes
-  below its floor; Tuttie opens 10 % below and moves halfway, within the private budget. An
+  below its floor; Tuttie opens 10 % below and moves halfway, always below the private budget,
+  and no counter price is ever computed from the budget (bug #18, see above). An
   LLM could leak a limit or invent a price; code can be tested for both.
 - **Strategy tuned for a visible story, not maximum savings:** with a 15 % opening and halfway
   hotel steps, the hotels hit their floor in round 1 and the bargaining ended after two
