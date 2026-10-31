@@ -16,13 +16,17 @@ const MIC = { echoCancellation: true, noiseSuppression: true, autoGainControl: t
  * @param active  voice mode is on (the card is open and the user is not typing)
  * @param face    ref to the TuttieFace (src/lib/face.js)
  * @param onSpeech  ({ id, text, done }) => void: Tuttie's words so far, as it speaks them
+ * @param onLevels  (speaking, hearing) => void: both voice levels (0..1), every LEVEL_MS while live,
+ *                  and (0, 0) when voice stops; feeds Tuttie's presence (hooks/usePresence.js)
  * @returns { state, unlockAudio, muted, toggleMute }: state is "off" | "connecting" | "live" |
  *          "unavailable"; call unlockAudio() from a tap if the browser blocked Tuttie's voice;
  *          muted keeps the microphone off (e.g. in a noisy room) until toggled again
  */
-export default function useVoice(active, face, onSpeech) {
+export default function useVoice(active, face, onSpeech, onLevels) {
   const speech = useRef(onSpeech);
   speech.current = onSpeech;
+  const levelsTo = useRef(onLevels);
+  levelsTo.current = onLevels;
   const [state, setState] = useState("off");
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
@@ -69,7 +73,9 @@ export default function useVoice(active, face, onSpeech) {
       setState("live");
       levels = setInterval(() => {
         const tuttie = [...lk.remoteParticipants.values()][0];
-        face.current?.setVoice((tuttie?.audioLevel || 0) * 2.5, lk.localParticipant.audioLevel * 3);
+        const speaking = Math.min(1, (tuttie?.audioLevel || 0) * 2.5), hearing = Math.min(1, lk.localParticipant.audioLevel * 3);
+        face.current?.setVoice(speaking, hearing);
+        levelsTo.current?.(speaking, hearing);
       }, LEVEL_MS);
     })().catch(() => !closed && setState("unavailable"));
 
@@ -77,6 +83,7 @@ export default function useVoice(active, face, onSpeech) {
       closed = true;
       clearInterval(levels);
       face.current?.setVoice(0, 0);
+      levelsTo.current?.(0, 0);
       lk?.disconnect();
       room.current = null;
       setState("off");

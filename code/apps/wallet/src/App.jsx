@@ -14,6 +14,11 @@
 // There is one conversation at a time: once the user swipes Tuttie down, the next opening
 // starts a fresh one (unless an approval still waits for the user). The dock under the open
 // card shows earlier conversations (kept on this device), starts a new one, or switches to typing.
+//
+// Tuttie's presence (hooks/usePresence.js) folds all of this into one signal for the eyes: what
+// Tuttie is doing (speaking, listening, searching, negotiating, ...), the voice levels and
+// one-off cues (an offer, an agreement, a blocked scam). Components below read it with
+// usePresenceState / usePresenceEvents; the face gets it at face.onPresence(event) if defined.
 import { useEffect, useRef, useState } from "react";
 import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
@@ -23,6 +28,7 @@ import Dock from "./components/Dock.jsx";
 import History from "./components/History.jsx";
 import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
+import { PresenceProvider, usePresenceSource } from "./hooks/usePresence.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
@@ -43,12 +49,14 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history] = useAgentStream();
+  const [agent, actions, history, lastChange] = useAgentStream();
   const [showHistory, setShowHistory] = useState(false);
   const [quiet, setQuiet] = useState(false);  // the user typed: Tuttie answers in text only
   // A new answer in voice mode: shown as Tuttie speaks it ({ answer, id, text } while revealing).
   const [reveal, setReveal] = useState(null);
-  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, face, onSpeech);
+  const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
+  const { state: voice, unlockAudio, muted, toggleMute } = useVoice(mode === "voice" && !quiet, face, onSpeech,
+                                                                    presence.levels);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
   function onSpeech({ id, text, done }) {
@@ -99,6 +107,7 @@ export default function App() {
     setShowHistory(false);
     if (agent.approval) return;  // the user must decide the waiting approval first
     actions.newConversation(agent);
+    presence.cue("new_chat");
     face.current?.set("happiness", 300);
     setTimeout(() => face.current?.set("neutral", 600), 700);
   }
@@ -107,6 +116,7 @@ export default function App() {
     unlockAudio();
     setQuiet(false);  // tapping Tuttie's face brings its voice back after typing
     if (mode !== "voice") return startVoice();
+    presence.cue("tap");
     face.current?.set("excitement", 250);  // a tap never ends voice mode, Tuttie just reacts
     setTimeout(() => face.current?.set("neutral", 500), 600);
   }
@@ -171,12 +181,14 @@ export default function App() {
   // While a hotel card is dragged, Tuttie looks the same way.
   function lean(x) {
     leaning.current = x !== 0;
+    presence.update({ lean: x });
     face.current?.lookAt(x, 0, 120);
   }
 
   const classes = ["app", mode !== "closed" && "open", mode === "voice" && "voice", mode === "typing" && "typing",
                    busy && "busy"];
   return (
+    <PresenceProvider value={presence}>
     <div className={classes.filter(Boolean).join(" ")}>
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
@@ -190,5 +202,6 @@ export default function App() {
       <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
     </div>
+    </PresenceProvider>
   );
 }

@@ -5,7 +5,7 @@
 // runs (Tuttie working, an approval waiting); a finished one goes into the history on this
 // device (lib/history.js) and Tuttie starts fresh. The stream replays the timeline on connect;
 // those events were already folded from /history, so they are skipped.
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { applyEvent, EMPTY, finished, startTurn } from "../lib/activity.js";
 import { resetConversation } from "../lib/api.js";
 import { archive, loadCurrent, loadHistory, saveCurrent } from "../lib/history.js";
@@ -30,7 +30,11 @@ async function timeline() {
 }
 
 export default function useAgentStream() {
-  const [state, dispatch] = useReducer(reducer, EMPTY);
+  const [state, rawDispatch] = useReducer(reducer, EMPTY);
+  // The kind of the latest change ("load", "reset", "say", "pick" or "event"), so the eyes can
+  // tell a live moment from a conversation that was loaded or cleared (hooks/usePresence.js).
+  const lastChange = useRef("load");
+  const dispatch = useCallback(action => { lastChange.current = action.type; rawDispatch(action); }, []);
   const [history, setHistory] = useState(loadHistory);
 
   useEffect(() => {
@@ -74,6 +78,6 @@ export default function useAgentStream() {
       dispatch({ type: "reset" });
       await resetConversation().catch(() => {});
     },
-  }), []);
-  return [state, actions, history];
+  }), [dispatch]);
+  return [state, actions, history, lastChange];
 }
