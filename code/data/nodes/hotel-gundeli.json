@@ -26,10 +26,10 @@
     },
     "add_ons": [
       {
-        "id": "cot",
-        "item": "baby cot in the room",
+        "id": "child-bed",
+        "item": "children's bed or baby cot in the family room",
         "price_chf": 0,
-        "conditions": ["set up before arrival"]
+        "conditions": ["set up before arrival", "for children up to 12"]
       },
       {
         "id": "child-breakfast",
