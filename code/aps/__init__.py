@@ -1,5 +1,6 @@
-"""APS (Agent Protocol Secure): canonical JSON, Ed25519 keys, signed envelopes, seals and Swiss UIDs."""
+"""APS (Agent Protocol Secure): canonical JSON, Ed25519 keys, signed envelopes and calls, seals and Swiss UIDs."""
 
+from aps.call import sign_call, verify_call
 from aps.canonical import canonical
 from aps.envelope import sign_envelope, utc_now, verify_envelope
 from aps.keys import generate_key_file, load_signing_key, public_key_b64
@@ -14,7 +15,9 @@ __all__ = [
     "issue_seal",
     "load_signing_key",
     "public_key_b64",
+    "sign_call",
     "sign_envelope",
     "utc_now",
+    "verify_call",
     "verify_envelope",
 ]

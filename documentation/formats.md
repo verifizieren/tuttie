@@ -192,6 +192,39 @@ Assistant creates `{id, action, payee_node_id, amount_chf, summary, seals}`; the
 page lists pending approvals, the user taps Approve/Decline; the decision is signed
 with the user's key and attached to the action (e.g. passed to `book`).
 
+## Signed call (MCP actions, `aps/call.py`)
+
+Reading tools (`get_availability`, `get_policies`) need no caller signature: their answers
+are signed by the business. An **action** (`book`, `pay`) is called with a call signed by the
+calling agent (Tuttie); the MCP tool gets it as its arguments, unchanged:
+
+```json
+{
+  "tool": "book",
+  "args": {"date": "2026-11-14", "room_type": "double", "approval": {...}, "agreement": {...}},
+  "agent_id": "ch.tuttie.alex-muster",
+  "nonce": "<32 hex chars, new for every call>",
+  "timestamp": "2026-11-14T00:12:00Z",
+  "signature": "<agent key over canonical {tool, args, agent_id, nonce, timestamp}>",
+  "delegation": "<the user's signed delegation for this agent, as in its registry record>"
+}
+```
+
+- `args` are the tool's normal arguments (for `book`: the `BookRequest` fields, with the
+  user's signed `approval` and an optional `agreement`). The signature covers them, so
+  nothing in them (amount, approval, agreement) can be swapped, and a call for one tool is
+  not valid for another.
+- The service takes the caller's public key from the caller's **registry record**, never
+  from the call. A call is valid for 300 s (`CALL_MAX_AGE_S`, 60 s clock skew), and each
+  `nonce` is accepted once per agent (`NonceBook`): an old call fails the time window, a
+  recent one replayed fails the nonce.
+- `delegation` is attached, not signed again: the user's signature binds it to this agent's
+  id and key already.
+- Python: `sign_call(tool, args, agent_id, key, delegation)` on the caller's side;
+  `verify_call(call, public_key, tool=)` + `NonceBook.use(agent_id, nonce)` on the service's
+  side. Whether the action is *allowed* (seals, scope, approval, agreement) is decided by the
+  action gate (below).
+
 ## DRAFT: marketplace messages (Tuttie, issues #8 #10)
 
 Proposal so the marketplace, node and wallet work can start in parallel. **Not fully agreed
