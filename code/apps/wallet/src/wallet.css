@@ -109,13 +109,11 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .activity::-webkit-scrollbar { display: none; }
 .app.open .activity { opacity: 1; pointer-events: auto; }
 .app.typing .activity { top: 16%; bottom: 112px; }
-.app.clearing .activity { opacity: 0; transform: translateX(-40%); transition-delay: 0s; }
 .turn { display: flex; flex-direction: column; gap: 10px; }
 
-/* Bubbles: the user's words on the right, Tuttie's answer highlighted. */
+/* Tuttie's answer, highlighted. */
 .bubble { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45;
           animation: rise .4s var(--ease) both; overflow-wrap: anywhere; }
-.bubble.user { align-self: flex-end; background: #2a2a2f; color: var(--text); border-bottom-right-radius: 6px; }
 .bubble.tuttie { align-self: stretch; max-width: none; padding: 14px 16px; font-size: 16px; line-height: 1.5;
                  background: linear-gradient(180deg, rgba(217, 119, 87, .13), rgba(217, 119, 87, .06));
                  border: 1px solid rgba(217, 119, 87, .28); border-bottom-left-radius: 6px; }
@@ -203,10 +201,11 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 
 /* ---------- Progress: a context line and a tool line, joined, each updating in place ---------- */
 .steps { list-style: none; margin: 0; padding: 2px 4px; display: grid; gap: 10px; }
-.steps li { position: relative; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted);
+.steps li { position: relative; display: flex; align-items: flex-start; gap: 12px; line-height: 1.35; font-size: 14px; color: var(--muted);
             min-height: 20px; }
-.steps li span { min-width: 0; animation: rise .3s var(--ease) both; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.steps .dot { flex: none; width: 9px; height: 9px; margin: 0 3px; border-radius: 50%; background: var(--accent); }
+/* A long line wraps downwards inside the card instead of running off to the right. */
+.steps li span { min-width: 0; animation: rise .3s var(--ease) both; overflow-wrap: anywhere; }
+.steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
 .steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
 .steps li.done .dot { background: var(--green); }
 .steps li.done span { color: var(--text); }
@@ -215,62 +214,54 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
 
 /* ---------- The hotel cards: swipe right to like, left to pass ---------- */
-.deck { display: flex; flex-direction: column; gap: 10px; }
-.deck-stack { position: relative; height: 384px; }
-.swipe-card { position: absolute; inset: 0; border-radius: 22px; overflow: hidden; background: var(--panel2);
-              border: 1px solid var(--line); touch-action: pan-y; user-select: none; -webkit-user-select: none;
+.deck { display: flex; flex-direction: column; gap: 8px; }
+.deck-stack { position: relative; height: 392px; }
+.swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel2);
+              border: 1px solid var(--line); touch-action: none; user-select: none; -webkit-user-select: none;
               cursor: grab; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
-.swipe-photo { position: relative; height: 176px; }
-.swipe-photo svg, .swipe-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-                                     display: block; pointer-events: none; }
-.swipe-photo::after { content: ""; position: absolute; inset: 0;
-                      background: linear-gradient(to bottom, rgba(0, 0, 0, .25), transparent 35%, transparent 55%, rgba(14, 14, 18, .95)); }
-.swipe-top { position: absolute; top: 12px; left: 14px; right: 12px; display: flex; justify-content: space-between;
-             align-items: center; z-index: 1; }
+.swipe-photo { position: absolute; inset: 0 0 76px; }
+.swipe-photo img, .photo-missing { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                                   display: block; pointer-events: none; background: #1d1d22; }
+.swipe-photo::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                      background: linear-gradient(to bottom, rgba(0, 0, 0, .35), transparent 22%, transparent 62%, rgba(14, 14, 18, .96)); }
+.photo-bars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 4px; }
+.photo-bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+.photo-bars i.on { background: #fff; }
+.photo-prev, .photo-next { position: absolute; top: 0; bottom: 0; width: 34%; z-index: 1; border: 0; padding: 0;
+                           background: none; cursor: pointer; }
+.photo-prev { left: 0; }
+.photo-next { right: 0; }
+.swipe-top { position: absolute; top: 20px; left: 14px; right: 12px; display: flex; justify-content: space-between;
+             align-items: center; z-index: 2; pointer-events: none; }
 .rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b;
           background: rgba(255, 255, 255, .92); }
-.swipe-name { position: absolute; top: 128px; left: 16px; right: 16px; z-index: 1; font-size: 20px; font-weight: 700;
-              letter-spacing: -.01em; line-height: 1.15; }
-.swipe-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
-.swipe-body { position: relative; height: calc(100% - 176px); padding: 14px 16px; }
-.features { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-.features li { display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.features i { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; }
-.features svg { width: 17px; height: 17px; }
-.features .yes i { color: var(--green); background: rgba(52, 199, 123, .14); }
-.features .no { color: var(--muted); }
-.features .no i { color: #ff6b6b; background: rgba(255, 95, 95, .14); }
-.swipe-price { position: absolute; right: 16px; bottom: 14px; text-align: right; font-size: 24px; font-weight: 750;
-               letter-spacing: -.02em; }
-.swipe-price small { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0; color: #ff8a8a; }
-.stamp { position: absolute; top: 56px; z-index: 2; padding: 4px 12px; border: 3px solid; border-radius: 10px;
-         font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.swipe-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700;
+              letter-spacing: -.01em; line-height: 1.15; pointer-events: none; }
+.swipe-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; padding: 0 16px; display: flex;
+              align-items: center; justify-content: space-between; gap: 10px; }
+.feature-icons { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+.feature-icons li { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.feature-icons svg { width: 18px; height: 18px; }
+.feature-icons .yes { color: var(--green); background: rgba(52, 199, 123, .14); }
+.feature-icons .no { color: #ff6b6b; background: rgba(255, 95, 95, .14); }
+.swipe-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.swipe-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
+.swipe-price s { font-size: 13px; color: var(--dim); }
+.stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px;
+         font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; pointer-events: none; }
 .stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
 .stamp.pass { right: 18px; color: #ff6b6b; transform: rotate(12deg); }
-.deck-hint { text-align: center; font-size: 12px; color: var(--dim); }
+/* The first card leans left and right once, so it is clear that it can be swiped. */
+.swipe-card.nudge { animation: nudge 1.3s var(--ease) .5s both; }
+@keyframes nudge {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-22px) rotate(-1.5deg); }
+  60% { transform: translateX(22px) rotate(1.5deg); }
+}
+.deck-count { text-align: center; font-size: 12px; color: var(--dim); }
 .deck-empty { display: grid; gap: 10px; justify-items: center; padding: 18px; font-size: 14px; color: var(--muted); }
 .deck-empty button { font: inherit; color: var(--accent); background: none; border: 0; cursor: pointer; }
-.forged-line { display: flex; align-items: center; gap: 10px; padding: 2px 4px; font-size: 13px; color: #ff8a8a; }
-.forged-line s { color: var(--muted); }
-.forged-line .seal-x { width: 18px; height: 18px; font-size: 11px; }
 
-/* ---------- History of earlier conversations (this device only) ---------- */
-.history { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; padding-top: 40px;
-           background: #0c0c10; border-radius: inherit; animation: slide-in .32s var(--ease) both; }
-.history-bar { display: flex; justify-content: space-between; align-items: center; padding: 0 18px 8px;
-               font-size: 17px; font-weight: 650; }
-.history-bar button { font: inherit; font-size: 15px; font-weight: 500; color: var(--accent); background: none;
-                      border: 0; padding: 6px 0; cursor: pointer; }
-.history-list { flex: 1; overflow-y: auto; padding: 4px 16px 24px; display: flex; flex-direction: column; gap: 8px;
-                touch-action: pan-y; overscroll-behavior: contain; }
-.history-item { display: grid; gap: 2px; padding: 12px 14px; border-radius: 16px; text-align: left; font: inherit;
-                color: inherit; background: var(--panel2); border: 1px solid var(--line); cursor: pointer; }
-.history-item b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-item small { font-size: 13px; color: var(--muted); }
-.history-item time { font-size: 12px; color: var(--dim); }
-.history-empty { color: var(--muted); font-size: 14px; padding: 24px 4px; text-align: center; }
-.history .activity { position: relative; inset: auto; top: auto; bottom: auto; flex: 1; opacity: 1; pointer-events: auto; }
-@keyframes slide-in { from { opacity: 0; transform: translateX(-24px); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- Approval sheet ---------- */

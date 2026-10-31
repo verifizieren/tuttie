@@ -1,7 +1,6 @@
-// One conversation under Tuttie's eyes, turn by turn: what the user said, two progress lines
-// (what Tuttie knows, what it does), the hotel cards to swipe, the negotiation with the liked
-// hotels, the booking and Tuttie's answer. Tapping a hotel shows who vouches for it. The same
-// view shows an archived conversation from the history (readOnly).
+// One conversation under Tuttie's eyes, turn by turn: two progress lines (what Tuttie knows,
+// what it does), the hotel cards to swipe, the chosen hotel, the booking and Tuttie's answer.
+// The user's own words are not repeated. Tapping a hotel shows who vouches for it.
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
@@ -43,7 +42,7 @@ function HotelRow({ hotel, overBudget, open, onToggle }) {
         <SealMarks seals={hotel.seals} tiers={hotel.tiers} />
         <span className="hotel-name">
           {hotel.name}
-          <small>{[hotel.size, overBudget && "over budget", hotel.agreed && "agreed"].filter(Boolean).join(" · ")}</small>
+          {(overBudget || hotel.agreed) && <small>{overBudget ? "over budget" : "agreed"}</small>}
         </span>
         <Price hotel={hotel} />
       </button>
@@ -57,14 +56,6 @@ function HotelRow({ hotel, overBudget, open, onToggle }) {
   );
 }
 
-/** A business with a forged seal: Tuttie never asked it. One quiet red line. */
-function Forged({ business }) {
-  return (
-    <div className="forged-line"><span className="seal-x" aria-hidden="true">!</span>
-      <s>{business.name}</s> forged seal, never asked
-    </div>
-  );
-}
 
 /** **bold** inside a line. */
 function Inline({ text }) {
@@ -101,16 +92,16 @@ function order(hotels) {
     rank(a) - rank(b) || (a.agreed ?? a.offer?.price_chf ?? 1e9) - (b.agreed ?? b.offer?.price_chf ?? 1e9));
 }
 
-/** What happened on the market: the forged business, then the cards to swipe or the liked hotels. */
-function Market({ state, readOnly, onPick }) {
+/** What happened on the market: the cards to swipe, then the hotel the user chose. Businesses
+ *  with forged or missing seals are not shown at all: Tuttie never asked them. */
+function Market({ state, onPick, onLean }) {
   const [openId, setOpenId] = useState(null);
-  const swiping = state.cards && !state.picked && !readOnly;
-  // Once the user liked some, those show the negotiation; the progress line covers everything before.
-  const liked = order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
+  const swiping = state.cards && !state.picked;
+  // The chosen hotel, until the booking card replaces it.
+  const liked = state.booking ? [] : order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
   return (
     <>
-      {state.skipped.filter(b => b.tier === "broken").map((business, i) => <Forged key={i} business={business} />)}
-      {swiping && <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} />}
+      {swiping && <Deck cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} />}
       {liked.map(([nodeId, hotel]) => (
         <HotelRow key={nodeId} hotel={hotel} overBudget={false}
                   open={openId === nodeId} onToggle={() => setOpenId(openId === nodeId ? null : nodeId)} />
@@ -120,30 +111,29 @@ function Market({ state, readOnly, onPick }) {
 }
 
 /**
- * @param state     the conversation (lib/activity.js)
- * @param readOnly  an archived conversation from the history: nothing can be picked
- * @param onPick    (liked cards) => void
+ * @param state   the conversation (lib/activity.js)
+ * @param onPick  (liked cards) => void
+ * @param onLean  (x in -1..1) => void while a card is dragged
  */
-export default function Activity({ state, readOnly = false, onPick }) {
+export default function Activity({ state, onPick, onLean }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
-  // New content comes last; bring it into view when it arrives (not for archived conversations).
+  // New content comes last; bring it into view when it arrives.
   // The cards to swipe are shown from their top, so the whole card is in view.
   useEffect(() => {
-    if (readOnly || !box.current) return;
+    if (!box.current) return;
     const deck = state.cards && !state.picked && box.current.querySelector(".deck");
     const top = deck ? deck.offsetTop - 8 : box.current.scrollHeight;
     box.current.scrollTo({ top, behavior: "smooth" });
-  }, [readOnly, state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
+  }, [state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
   return (
-    <div className={`activity${readOnly ? " archived" : ""}`} ref={box} data-scroll>
+    <div className="activity" ref={box} data-scroll>
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
-          {turn.said && <div className="bubble user">{turn.said}</div>}
           <Steps turn={turn} />
-          {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} />}
+          {i === state.marketTurn && state.request && <Market state={state} onPick={onPick} onLean={onLean} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
           {turn.answer && <Answer text={turn.answer} />}
         </div>
