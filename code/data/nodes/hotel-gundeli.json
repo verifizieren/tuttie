@@ -26,6 +26,9 @@
       "late_arrival": "Reception is open 24 hours.",
       "cancellation": "Free cancellation until 24h before arrival."
     },
+    "charges": [
+      { "purpose": "city tax", "price_chf": 4, "note": "Basel city tax for one guest and night, collected after booking" }
+    ],
     "add_ons": [
       {
         "id": "child-bed",

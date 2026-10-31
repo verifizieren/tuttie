@@ -38,6 +38,9 @@
       "late_arrival": "Arrivals until 02:00 are fine: Anna sends a door code on the day.",
       "cancellation": "Free cancellation until 48h before arrival."
     },
+    "charges": [
+      { "purpose": "city tax", "price_chf": 4, "note": "Basel city tax for one guest and night, collected after booking" }
+    ],
     "negotiation": { "floor_chf": 125, "max_rounds": 3 },
     "add_ons": [
       { "id": "late-arrival-dog", "item": "late arrival with dog (door code)", "price_chf": 0, "conditions": ["door code sent on the day", "dogs stay free"] },
