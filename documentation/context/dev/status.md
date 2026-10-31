@@ -10,6 +10,14 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
 
 ## Done
 
+- Wallet and local development fixes (2026-10-31): zero-duration face transitions finish
+  immediately, preventing invalid coordinates when the first frame shares the startup
+  timestamp; regression test added. Wallet dev proxy forwards history, reset, voice and RTC
+  WebSockets. Owner tests use explicit test-file discovery compatible with Node 22.
+  Validation: 310 Python, 23 wallet and 7 owner tests pass; both apps build. Local Chrome
+  check confirms eyes render and animate, including the equal-timestamp startup case.
+  Voice/WebSocket operation has not been verified end to end.
+
 | Area | What works | Where |
 | --- | --- | --- |
 | APS signing | Canonical JSON, Ed25519 keys, signed envelopes with an optional freshness check (the assistant drops node replies older than 5 min as replays), seals with gold / blue / grey / broken tiers, Swiss UIDs (check digit) bound into every seal and verified only by the commercial register's seal, signed user approvals, user delegations (the user's key signs which scopes an agent may use for them: `ask_agents`, `post_requests`, `negotiate`, `book`; paying is never delegated). **For MCP actions:** signed calls (`aps/call.py`: the agent signs tool + args + nonce + time; replays fail the 300 s window or the nonce book) and one action gate (`aps/gate.py` `check_action(call, needs)`: caller seals, signature, nonce, delegation scope, the hotel's own agreement, the user's approval for exactly the amount; a refusal names the missing signature, `checks` lists what passed). | `code/aps/`, `code/tests/` |
