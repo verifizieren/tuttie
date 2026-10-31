@@ -32,7 +32,7 @@ function visible() {
  *          unlockAudio() from a tap if the browser blocked Tuttie's voice; muted keeps the
  *          microphone off (e.g. in a noisy room) until toggled again
  */
-export default function useVoice(active, onSpeech, onLevels) {
+export default function useVoice(active, onSpeech, onLevels, conversationId) {
   const speech = useRef(onSpeech);
   speech.current = onSpeech;
   const levelsTo = useRef(onLevels);
@@ -105,7 +105,7 @@ export default function useVoice(active, onSpeech, onLevels) {
       setJoined(null);
       setState("off");
     };
-  }, [shown, attempt]);
+  }, [shown, attempt, conversationId]);
 
   // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the presence.
   useEffect(() => {

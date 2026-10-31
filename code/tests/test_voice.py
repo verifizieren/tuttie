@@ -32,7 +32,8 @@ def test_a_token_opens_a_room_tied_to_this_browsers_conversation(monkeypatch):
     with TestClient(app) as client:
         token = client.post("/voice/token", headers={"x-forwarded-proto": "https", "x-forwarded-host": "web4.example"}).json()
         assert token["url"] == "wss://web4.example" and token["token"].count(".") == 2
-        assert app.state.voice_rooms[token["room"]] == client.cookies[SESSION_COOKIE]
+        conv = app.state.conversations.get(client.cookies[SESSION_COOKIE])
+        assert app.state.voice_rooms[token["room"]] == (client.cookies[SESSION_COOKIE], conv.id)
         grants = jwt_claims(token["token"])["video"]
         assert grants["canUpdateOwnMetadata"]  # the wallet sets voice=on|off: Tuttie speaks only in voice mode
 
@@ -112,3 +113,16 @@ def test_a_wallets_voice_report_is_logged_and_cut(capsys):
         assert client.post("/voice/diag", content=b'{"state": "failed"}' + b"x" * 5000).status_code == 204
     line = capsys.readouterr().out.strip().splitlines()[-1]
     assert line.startswith('voice diag: {"state": "failed"}') and len(line) < voice.DIAG_MAX_BYTES + 20
+
+
+def test_old_voice_room_cannot_send_into_a_new_chat(monkeypatch):
+    configure(monkeypatch)
+    with TestClient(app) as client:
+        old_id = client.get('/history').headers['X-Conversation-ID']
+        room = client.post('/voice/token').json()['room']
+        client.post('/conversations')
+        response = client.post('/voice/say', json={'room': room, 'text': 'Book it'},
+                               headers={'Authorization': 'Bearer secret-for-tests'})
+        assert response.status_code == 409
+        assert client.get('/history').json() == []
+        assert client.post(f'/conversations/{old_id}/resume').status_code == 200

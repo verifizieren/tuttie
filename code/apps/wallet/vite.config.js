@@ -20,6 +20,7 @@ export default defineConfig({
       "/identity": ASSISTANT,
       "/history": ASSISTANT,
       "/reset": ASSISTANT,
+      "/conversations": ASSISTANT,
       "/voice": ASSISTANT,
       "/rtc": { target: ASSISTANT, ws: true },
     },

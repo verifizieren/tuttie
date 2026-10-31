@@ -17,6 +17,15 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   Validation: 310 Python, 23 wallet and 7 owner tests pass; both apps build. Local Chrome
   check confirms eyes render and animate, including the equal-timestamp startup case.
   Voice/WebSocket operation has not been verified end to end.
+- Resumable wallet history: New chat retains the prior assistant and verified booking
+  context in a bounded, browser-owned server cache. History → Continue chat restores its
+  timeline, tool state and signed agreements; legacy/expired entries remain readable and
+  explain that a fresh request is required. Reload keeps the selected conversation. Voice
+  rooms reconnect on selection and reject utterances from an inactive chat. History text
+  no longer uses the live view's fade mask. Validation: 318 Python tests, 25 wallet tests,
+  wallet build; browser regression with API fixtures covers new → history → continue →
+  choose → approve → booked, plus expired history. Real signed agreement redemption after
+  switching is covered by the in-process backend test (only the LLM is stubbed).
 
 | Area | What works | Where |
 | --- | --- | --- |
@@ -343,8 +352,11 @@ Why things are the way they are, so nobody has to rediscover them:
 - **One conversation at a time, history on the device:** no sideways gestures on Tuttie's
   card. A dock under the open card has three buttons: history (earlier conversations, kept in
   `localStorage`, `lib/history.js`), new chat, and the keyboard. Swiping Tuttie down and opening
-  it again, or opening the wallet after a finished conversation, archives it and starts fresh
-  (`/reset`), unless an approval waits; a running conversation resumes (`GET /history`). The
+  it again archives it and starts fresh (`POST /conversations`), unless a request or approval
+  waits. Reload keeps the selected conversation (`GET /history`, `X-Conversation-ID`).
+  History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
+  old or expired entries stay read-only. Saved conversations are in memory, capped at 200
+  globally in addition to the 200 active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
   LiveKit 1.13.11 + LiveKit Agents 1.8.10 with ElevenLabs (Scribe v2 realtime, Flash v2.5).
