@@ -317,9 +317,9 @@ Endpoints of every node (all answers are signed envelopes):
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}` |
+| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}`; the marketplace reads it to check the subscription |
 | `POST /agent` `{question, context}` | A2A reply `{answer, commitment}` (see above) |
-| `POST /agent/invoke` `{event}` | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to |
+| `POST /agent/invoke` with the event itself as body | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to. If interested in a `posting.created` with `next_tool: make_offer`, the node then sends a signed `Offer` to the posting's `offer_url` in the background |
 
 `event` is a marketplace event, e.g. `{"type": "posting.created", "posting": {...}}`
 (postings: see "DRAFT: marketplace messages"). The marketplace will wake the agents
