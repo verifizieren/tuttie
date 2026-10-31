@@ -36,4 +36,4 @@ def test_the_first_tool_is_forced_for_that_message_only():
 
 def test_chat_accepts_only_known_first_steps():
     with TestClient(app) as client:
-        assert client.post("/chat", json={"message": "hi", "first_tool": "book"}).status_code == 422
+        assert client.post("/chat", json={"message": "hi", "first_tool": "pay"}).status_code == 422

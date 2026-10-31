@@ -63,8 +63,8 @@ def conversation(request: Request) -> Conversation:
     return request.app.state.conversations.get(request.state.session_id)
 
 
-# Steps the wallet may fix for a message: after swiping the cards, Tuttie negotiates first.
-FIRST_TOOLS = {"negotiate"}
+# Steps the wallet may fix for a message: after swiping the cards, Tuttie books the liked deal.
+FIRST_TOOLS = {"book", "negotiate"}
 
 
 class ChatRequest(BaseModel):
