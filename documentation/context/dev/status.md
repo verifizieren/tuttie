@@ -342,6 +342,9 @@ Why things are the way they are, so nobody has to rediscover them:
   confirmation, answer, Face ID prompt only). Signaling is proxied through the assistant (`/rtc`,
   forwards the token header), media on TCP 4042 / UDP 4043. Verified end to end through
   https://web4.mendes.dev with a spoken request. See `code/voice/README.md`.
+- **Voice in the wallet:** answers appear word by word as Tuttie speaks them; a typed message
+  makes Tuttie quiet (text only) until its face or the mic button is tapped; the dock has a mic
+  mute button; the user can interrupt any time (two or more words). Voice "Germain" on the demo.
 - **Posting tags:** only the city (`basel`); an area went into tags and hid the guesthouse in
   Kleinbasel (the train arrives at Basel SBB). Offers wait up to 45 s (stops when all offered).
 - **Tasks in words, the rest in the eyes:** the line under the eyes shows only what Tuttie is

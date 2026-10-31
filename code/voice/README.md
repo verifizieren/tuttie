@@ -23,7 +23,11 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   isolation clean the microphone; a stricter voice detector (threshold .65, at least 0.2 s);
   fragments under two words or noise tags are dropped; only two or more words (0.5 s) interrupt
   Tuttie, and it resumes after a false interruption. The dock's mic button mutes the microphone.
-- Voice: ElevenLabs "Eric" (free, conversational) with Turbo v2.5.
+- Voice: ElevenLabs Turbo v2.5; the demo server uses "Germain" (`TUTTIE_VOICE_ID=XJeDCVLci9KGsGtVpFLM`,
+  a library voice, needs a paid plan); without it the free "Eric".
+- The wallet shows each spoken answer word by word in step with the voice (LiveKit
+  "lk.transcription" streams), then the full formatted answer. After a typed message Tuttie
+  answers in text only (no voice) until the user taps its face or the mic button.
 - Self-hosted LiveKit (`livekit.yaml`): the team server only exposes ports 4000-4049, so
   signaling goes through the assistant on the wallet's own https origin (`/rtc`) and media uses
   TCP 4042 / UDP 4043 on `LIVEKIT_NODE_IP`.
