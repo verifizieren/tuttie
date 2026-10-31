@@ -17,6 +17,7 @@ Last updated: 2026-10-31.
 | Business nodes | Signed tools (`get_availability`, `get_policies`), `book` (only with the user's signed approval for exactly the right total, no replays), own A2A agent whose LLM only picks a priced add-on from the config and never sees private facts (negotiation limits). `get_policies` includes the business profile (size). | `code/node/`, `code/data/nodes/` |
 | Demo data | The three hotel agents in the planned sizes, each with add-ons and private negotiation limits: Rheinblick (branch of a chain, 160 rooms, gold + blue), Spalenhof (mid-sized, family-owned, 48 rooms, blue), Gundeli (small independent guesthouse, 11 rooms, gold only, family rooms). Also Basel Budget Rooms (unsigned → untrusted), basel-cheap-hotels (forged seal → broken); a licensed lawyer (gold) and a self-signed fake lawyer (untrusted). | `code/data/nodes/` |
 | User's agent | LLM tool loop with the trust gate: search, signed facts, A2A commitments, booking with phone approval, cited answers, reasoning summaries as "thinking". Own identity: Tuttie (`ch.tuttie.alex-muster`) has its own key, an Adobe (blue) seal and the user's signed delegation; `GET /identity` returns it checked. | `code/assistant/`, `code/data/agents/` |
+| Marketplace (agent layer) | Built against the draft formats: Tuttie's signed postings in (seals, freshness, user delegation `post_requests`), matching businesses woken in parallel at `POST /agent/invoke` (broken ones never contacted), signed offers in (only from invited businesses, fresh, for this request, still valid), shortlist (by price, grey last). Formats as strict Pydantic models in one place. | `code/marketplace/` (:4010) |
 | End-to-end run | The whole signed flow in one process with a simulated phone. | `code/scripts/demo_headless.py` |
 | Wallet app | React + Vite PWA, phone-first: card stack, the Tuttie card is the agent's face (pycozmo eyes), asleep → tap to voice mode, text behind a keyboard icon, iOS-sheet swipe to close, keyboard-safe, installable. **Not connected to the backend yet.** | `code/apps/wallet/` |
 | Hosting | Live at <https://web4.mendes.dev> on the team server, kept running by a systemd user service. | `code/deploy/tuttie.service` |
@@ -28,29 +29,53 @@ Build order from [goals.md](goals.md):
 
 1. **Agents** — done: Tuttie's identity, the three hotel agents in the planned sizes. Tuttie
    does not sign its own outgoing messages yet; that comes with the marketplace.
-2. **Agent layer of the marketplace** — not started (`code/marketplace/`, draft formats in
-   `documentation/formats.md`).
+2. **Agent layer of the marketplace** — marketplace side built (`code/marketplace/`). Waits
+   for the business side: `/agent/invoke` and `make_offer` (in progress, see below); until
+   then woken hotels show as `unreachable`. Formats are still a draft (see Decisions).
 3. **Human layer in the wallet** — not started: postings, offers and approvals in the wallet;
    connect the wallet to `POST /chat`, `GET /events` and the approvals API.
-4. **Negotiation and subagents** — not started.
+4. **Negotiation and subagents** — agent side in progress in parallel (see below).
 5. **MCP services** — not started.
+
+### In progress in parallel (do not build twice)
+
+A teammate is building the agent side of steps 1 and 4 and pushes it soon. Until then, do
+not change `node/agent.py`, `node/server.py` or the hotel configs:
+
+- `node/agent.py` → `BusinessAgent`: one agent object per company with a persona per config
+  (`agent` section), a shared tool catalog (`node/catalog.py`; `make_offer`, `counter_offer`,
+  `pay` planned) and a signed agent card at `GET /agent/card`.
+- Wake-up: `POST /agent/invoke {event}`, e.g. `{"type": "posting.created", "posting": {...}}`;
+  the agent answers whether it is interested and which tool it would use next. The
+  marketplace already wakes agents exactly this way.
+- Sessions with memory (`code/sessions/`): one isolated conversation per negotiation, context
+  classed public / negotiation / private.
+- Tuttie's subagents (`assistant/subagents.py`): one per hotel, in parallel, only shareable
+  context, everything through the trust gate.
+
+The hotel roster stays as it is (Rheinblick chain branch, Spalenhof mid-sized, Gundeli
+small); profiles, `PRIVATE_FACTS` and Tuttie's identity are kept and fitted into the agent
+object.
 
 ### Where to start next
 
-1. **Step 1 check-in with the pitch and design team** (goals.md: every step ends with one):
-   the hotel sizes, profiles and prices, and Tuttie's identity.
-2. **Step 2:** agree on the draft marketplace formats in `documentation/formats.md`,
-   then build `code/marketplace/` (:4010) test-first in the same style as `test_tools.py`.
-   APS is ready for it: Tuttie signs requests with its own key, and businesses check its
-   delegation (`verify_delegation(..., scope="post_requests")`) before answering.
-3. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
+1. **After the business agent is pushed: connect step 2 end to end.** Its `make_offer` posts
+   a signed `Offer` to the posting's `offer_url`; add an integration test with real node apps
+   (`TestClient`) and a fake LLM; give Tuttie (or its subagents) a tool that posts a request
+   with `marketplace/client.py` and reads the shortlist. Then run the flow end to end.
+2. **Step 1 and 2 check-in with the pitch and design team** (goals.md: every step ends with
+   one): hotel sizes and profiles, Tuttie's identity, how offers come in.
+3. **Agree the marketplace formats as a team** and update formats.md + `messages.py`
+   together.
+4. **Wallet:** show Tuttie's verified identity on its card from `GET /identity` (proxied in
    the Vite dev server).
 
 ### Test coverage
 
-58 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
+72 tests, all green (`pytest -q`), no network and no LLM: `test_aps.py` (signing, freshness,
 seals, tiers, UIDs, approvals, delegations), `test_node_book.py` (node `book`: approval, commitments, replay), `test_node_agent.py` (the
 node's A2A agent with a fake LLM, private facts, read tools, the three hotel configs),
+`test_marketplace.py` (postings, wake-up, offers, shortlist, strict formats, HTTP service),
 `test_tools.py` (assistant trust gate and Tuttie's identity, with mocked HTTP and the real
 demo keys).
 Not covered yet: `registry/app.py`, the assistant's LLM loop (`assistant/agent.py`) and its HTTP
@@ -95,6 +120,13 @@ Why things are the way they are, so nobody has to rediscover them:
   approvals and delegations, never messages. User agents live in `data/agents/` (in the
   registry, but no node server) and `issue_seals.py` re-signs the delegation for 365 days
   on every run.
+- **Marketplace built against the draft formats** to save time until Sunday 12:00, not
+  after a full team round. All formats live in `code/marketplace/messages.py` (strict:
+  unknown fields are refused) so changes stay cheap; formats.md is updated with every change.
+- **The marketplace never decides and never prices.** It only checks signatures and stores
+  signed offers; Tuttie picks. Woken businesses get Tuttie's signed request unchanged, so
+  they verify the requester themselves. Grey businesses are invited and may offer (shown,
+  ranked last), but can never be booked.
 - **Private facts never reach an LLM.** The node's agent used to get all `facts` in its
   prompt; with negotiation floors in the config that would leak them to any agent that asks
   cleverly. `PRIVATE_FACTS` in `node/agent.py` keeps them out of the prompt and out of every
