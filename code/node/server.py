@@ -303,16 +303,17 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         (marketplace/messages.py, PostingCreated).
         """
         decision = await business_agent.invoke(event)
+        choice = decision.pop("offer_choice", None)  # chosen while deciding; not part of the reply
         if (event.get("type") == "posting.created" and decision.get("interested")
                 and decision.get("next_tool") == "make_offer"):
-            task = asyncio.create_task(send_offer(event["posting"]))  # the market need not wait for it
+            task = asyncio.create_task(send_offer(event["posting"], choice))  # the market need not wait for it
             background.add(task)
             task.add_done_callback(background.discard)
         return signed(decision)
 
-    async def send_offer(posting: dict) -> None:
+    async def send_offer(posting: dict, choice=None) -> None:
         """make_offer: let the agent compose an offer and post it, signed, to the market."""
-        offer = await business_agent.make_offer(posting)
+        offer = await business_agent.make_offer(posting, choice)
         if offer is None:
             return
         client = http or httpx.AsyncClient(timeout=20)

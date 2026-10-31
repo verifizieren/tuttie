@@ -120,3 +120,14 @@ def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
                                     {"add_ons": []}])
 def test_no_offer_for_unknown_rooms_or_add_ons(choice):
     assert asyncio.run(agent_with(HOTELS["medium"], choice).make_offer(POSTING)) is None
+
+
+def test_a_new_posting_decides_and_chooses_the_offer_in_one_llm_call():
+    agent = agent_with(HOTELS["medium"], {"interested": True, "reason": "Happy to.", "room_type": "double",
+                                          "add_ons": ["late-checkin-dog"]})
+    decision = asyncio.run(agent.invoke({"type": "posting.created", "posting": POSTING}))
+    choice = decision["offer_choice"]
+    assert choice.room_type == "double" and "room_type" in agent.llm.system
+    agent.llm = None  # the offer needs no second call
+    offer = asyncio.run(agent.make_offer(POSTING, choice))
+    assert offer["price_chf"] == 180 + 15
