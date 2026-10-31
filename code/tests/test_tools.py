@@ -21,6 +21,8 @@ NODE_REPLIES = {  # by MCP tool name or agent path
     "/agent": {"answer": "Fine.", "commitment": {"item": "late check-in with dog", "price_chf": 15,
                                                  "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}},
     "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195},
+    "get_policies": {"tool": "get_policies", "charges": [{"purpose": "city tax", "price_chf": 4}]},
+    "pay": {"tool": "pay", "status": "paid", "amount_chf": 4, "checked": ["caller", "signature", "delegation", "mandate"]},
 }
 
 
@@ -184,3 +186,35 @@ def test_identity_without_delegation_does_not_act_for_the_user():
     me = asyncio.run(toolbox.identity(RHEINBLICK))  # a sealed node, but nobody delegated to it
     assert me["acts_for_user"] is False and me["scopes"] == []
     assert asyncio.run(toolbox.identity("ch.nobody.here"))["rejected"] is True
+
+
+def book_and_decide(allow_mandate: bool) -> tuple[dict, Toolbox, EventBus]:
+    """Book Rheinblick; the user approves on the phone, allowing the offered mandate or not."""
+    toolbox, bus, _ = make_toolbox()
+
+    async def flow():
+        await toolbox.call_tool(RHEINBLICK, "get_availability", {"date": "2026-11-14"})
+        booking = asyncio.create_task(toolbox.book(RHEINBLICK, "2026-11-14", "double", "Alex Muster"))
+        while not toolbox.approvals.pending:
+            await asyncio.sleep(0.01)
+        [approval] = toolbox.approvals.pending.values()
+        assert approval["offer_mandate"]["purpose"] == "city tax" and approval["offer_mandate"]["max_chf"] == 4
+        toolbox.approvals.decide(approval["id"], "approved", allow_mandate=allow_mandate)
+        return await booking
+
+    return asyncio.run(flow()), toolbox, bus
+
+
+def test_an_allowed_mandate_pays_the_city_tax_right_after_booking_without_asking():
+    result, toolbox, bus = book_and_decide(allow_mandate=True)
+    assert result["charges_paid"][0]["status"] == "paid" and "open_charges" not in result
+    call = toolbox.mcp.sent["pay"]["call"]
+    assert call["args"]["mandate"]["purpose"] == "city tax" and "approval" not in call["args"]
+    assert [e["status"] for e in bus.history if e["kind"] == "approval"] == ["pending", "approved"]  # only the booking
+    assert bus.history[-1]["kind"] == "payment" and "with your mandate" in bus.history[-1]["summary"]
+
+
+def test_without_a_mandate_the_city_tax_stays_open_for_the_phone():
+    result, toolbox, _ = book_and_decide(allow_mandate=False)
+    assert result["open_charges"] == [{"purpose": "city tax", "price_chf": 4}] and "pay" not in toolbox.mcp.sent
+    assert toolbox.approvals.mandates == {}

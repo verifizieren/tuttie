@@ -23,6 +23,7 @@ import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
 from aps.call import sign_call
+from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
 from aps.keys import load_public_key
@@ -119,6 +120,17 @@ SCHEMAS = [
         },
         ["node_id", "date", "room_type", "guest_name"],
     ),
+    function(
+        "pay",
+        "Pay one of a hotel's charges listed in its policies (e.g. the city tax) for a confirmed booking. "
+        "The hotel sets the amount. Uses the user's mandate if they allowed it, otherwise the phone asks.",
+        {
+            "node_id": {"type": "string"},
+            "purpose": {"type": "string", "description": "the charge's purpose, e.g. \"city tax\""},
+            "booking_id": {"type": "string"},
+        },
+        ["node_id", "purpose", "booking_id"],
+    ),
 ]
 
 
@@ -207,11 +219,12 @@ class Toolbox:
         self.commitments: dict[str, list[dict]] = {}  # node_id -> signed A2A envelopes with a commitment
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
+        self.charges: dict[str, list[dict]] = {}  # node_id -> charges from its signed policies
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments."""
         tools = {"post_request": self.market.find, "negotiate": self.negotiate, "search_registry": self.search_registry,
-                 "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book}
+                 "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
         return await tools[name](**args)
@@ -434,9 +447,10 @@ class Toolbox:
                                 chosen: list[dict], amount: float, summary: str, agreement: dict | None = None) -> dict:
         """Wait for the user's signed approval of exactly `amount`, then let the node book."""
         node_id = record["node_id"]
-        approval = self.approvals.create("book", record, amount, summary, verdict["seals"])
+        offer = await self.mandate_offer(node_id)
+        approval = self.approvals.create("book", record, amount, summary, verdict["seals"], offer)
         self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
-                      {"approval_id": approval["id"], "amount_chf": amount})
+                      {"approval_id": approval["id"], "amount_chf": amount, "offer_mandate": offer})
         decision = await self.approvals.wait(approval["id"])
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
@@ -458,4 +472,71 @@ class Toolbox:
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
-        return {"node_id": node_id, "source_step": step, **confirmation}
+        answer = {"node_id": node_id, "source_step": step, **confirmation}
+        if confirmation.get("status") == "confirmed":
+            # Charges the user already allowed with a mandate are paid right away, without asking.
+            for charge in self.charges.get(node_id, []):
+                if (node_id, charge["purpose"]) in self.approvals.mandates:
+                    paid = await self.pay(node_id, charge["purpose"], confirmation["booking_id"])
+                    answer.setdefault("charges_paid", []).append(paid)
+                else:
+                    answer.setdefault("open_charges", []).append(charge)
+        return answer
+
+    async def mandate_offer(self, node_id: str) -> dict | None:
+        """A mandate to offer with a booking: for the hotel's small charge (e.g. the city tax), if any."""
+        small = [c for c in await self.load_charges(node_id) if c["price_chf"] <= AUTO_PAY_LIMIT_CHF]
+        if not small:
+            return None
+        charge = small[0]
+        return {"agent_id": self.market.agent_id, "purpose": charge["purpose"], "max_chf": charge["price_chf"],
+                "price_chf": charge["price_chf"]}
+
+    async def load_charges(self, node_id: str) -> list[dict]:
+        """The charges a hotel lists in its signed policies (kept for this conversation)."""
+        if node_id not in self.charges:
+            result = await self.verified_mcp(node_id, "get_policies", {}, "a2t", "get_policies")
+            self.charges[node_id] = result.payload.get("charges", []) if isinstance(result, Verified) else []
+        return self.charges[node_id]
+
+    async def pay(self, node_id: str, purpose: str, booking_id: str) -> dict:
+        """Pay a hotel's charge for a booking: with the user's mandate if it covers it, else after
+        the user's signed approval on the phone. The amount comes from the hotel's signed policies."""
+        found = await self.lookup(node_id)
+        if found is None or "can_take_payment" not in found[1]["capabilities"]:
+            return {"node_id": node_id, "rejected": True, "reason": "node is not trusted for payments"}
+        record, verdict = found
+        charge = next((c for c in await self.load_charges(node_id) if c["purpose"] == purpose), None)
+        if charge is None:
+            return {"error": f"{record['name']} lists no charge for {purpose!r} in its signed policies"}
+        amount = charge["price_chf"]
+        mandate = self.approvals.mandates.get((node_id, purpose))
+        refusal = "no mandate" if mandate is None else may_auto_pay(
+            mandate, self.user_public_key, self.market.agent_id, record, self.authorities, amount, purpose)
+        args = {"purpose": purpose, "booking_id": booking_id}
+        if refusal is None:
+            args["mandate"] = mandate
+            how = "with your mandate, no phone needed"
+        else:
+            summary = f"Pay {record['name']}: {purpose} for {booking_id} = CHF {amount:g}"
+            approval = self.approvals.create("pay", record, amount, summary, verdict["seals"])
+            self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
+                          {"approval_id": approval["id"], "amount_chf": amount})
+            decision = await self.approvals.wait(approval["id"])
+            step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
+                                 " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
+            if decision["decision"] != "approved":
+                return {"declined": True, "source_step": step}
+            args["approval"] = decision
+            how = "approved on your phone"
+
+        result = await self.verified_mcp(node_id, "pay", {"call": await self.signed_call("pay", args)}, "payment", "pay")
+        if not isinstance(result, Verified):
+            return result
+        receipt = result.payload
+        if receipt.get("status") == "paid":
+            text = f"pay: {purpose} CHF {receipt['amount_chf']:g} paid {how} (checked: {', '.join(receipt['checked'])})"
+        else:
+            text = f"pay refused by {record['name']}: {receipt.get('reason')}"
+        step = self.emit_verified("payment", text, result)
+        return {"node_id": node_id, "source_step": step, **receipt}
