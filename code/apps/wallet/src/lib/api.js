@@ -9,7 +9,8 @@ async function post(path, body) {
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `${path} failed: HTTP ${response.status}`);
+    // The status travels with the error, so callers can tell an expired chat (404/410) from a busy one (409).
+    throw Object.assign(new Error(error.detail || `${path} failed: HTTP ${response.status}`), { status: response.status });
   }
   return response.json();
 }

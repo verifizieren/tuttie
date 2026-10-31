@@ -1,6 +1,6 @@
 // Past conversations, kept on this device only (localStorage), newest first. A conversation is
 // archived when the user starts a new chat, when Tuttie is opened again after being swiped down,
-// or when Tuttie is opened again after being swiped down. The server retains the assistant
+// or when another conversation is resumed from the history. The server retains the assistant
 // in memory; the snapshot supplies the display and user messages when resuming it.
 // Storage can be missing or full (private mode): then history simply stays empty.
 
@@ -48,3 +48,13 @@ export const saveCurrent = state => write(CURRENT, { id: state.id, turns: state.
 
 /** The open conversation's id and the user's messages, if the wallet was reloaded meanwhile. */
 export const loadCurrent = () => read(CURRENT, null);
+
+/** The line shown in the history when a past chat cannot be continued (lib/api.js errors carry
+ *  the HTTP status): expired chats say so plainly, nothing silently starts elsewhere. */
+export function resumeFailure(error) {
+  if (error?.status === 404 || error?.status === 410) {
+    return "This chat has expired and can no longer be continued. Start a new chat to check current offers.";
+  }
+  if (error?.status === 409) return error.message || "This chat cannot be continued right now.";
+  return `Could not continue this chat: ${error?.message || "Tuttie is unreachable right now"}`;
+}
