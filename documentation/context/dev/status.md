@@ -88,6 +88,17 @@ Last updated: 2026-10-31 (weather and train services: sealed, signed MCP tools, 
   retries on its own); rooms are not reused because the voice agent closes its session when
   the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
 
+- Demo-story polish (2026-10-31, branch wip/story-polish), from live runs: (1) the facts note
+  Tuttie gets every round (`current_deals`) now carries each card hotel's signed policies
+  (check-in, dogs, cancellation, address, amenities, charges; `policy_facts` in
+  assistant/tools.py), so "what time is check-in?" after booking is answered from signed facts;
+  (2) after swiping, the wallet's booking message names the other liked hotels with their
+  prices (`lib/picks.js`), and after a decline Tuttie offers the next one in one question
+  (prompt rule 4); (3) Tuttie's recommendation stays visible under the deck (`.deck-note`,
+  3 lines max) and the prompt asks it to invite a swipe, never "shall I book"; (4) a card over
+  the user's private budget says "over your budget" under the price (wallet only; judged on
+  the agreed price). Checked at iPhone 14 Pro with a static build and fake events.
+
 - Local voice/offer follow-up on `fix/voice-offer-sync`: hotel-position bars (count hotels, not photos), spoken like/pass
   reaches the visible swipe deck, single-word commands survive voice filtering; verified
   agreement facts are available to price follow-ups and final counters say quoted.
@@ -454,8 +465,9 @@ Why things are the way they are, so nobody has to rediscover them:
   5 feature icons (green yes / red no, needs first) and the agreed price with the offer crossed
   out. Swipe right = like, left = pass; the first card nudges once to show it can be swiped,
   and Tuttie's eyes follow the drag. Up/down drags scroll the conversation. After the last card
-  the wallet sends the cheapest liked deal with `first_tool: "book"`; the user approves as
-  usual. `scripts/demo_headless.py` likes the recommended cards like the wallet.
+  the wallet sends the cheapest liked deal with `first_tool: "book"` and names the other liked
+  hotels (offered after a decline); the user approves as usual. `scripts/demo_headless.py`
+  likes every card like the wallet and asks for the check-in time after booking.
 - **Progress lines:** each turn shows two joined lines that update in place and wrap downwards:
   context, then tools (asked N hotels → offers in, checking seals → comparing → bargaining →
   N hotels for you; later booking, booked).
@@ -501,7 +513,8 @@ Why things are the way they are, so nobody has to rediscover them:
   loaded or resumed chat never closes itself; a new message cancels it). No voice filler for it.
 - **Chat layout:** actions stay in the chat (steps, chosen hotel, booking card, payments); of
   Tuttie's answers only the current one is shown (the history shows all). While the swipe cards
-  are up they fill the conversation's space alone (`.activity.swiping`), no old answer behind.
+  are up they fill the conversation's space (`.activity.swiping`) with only Tuttie's short
+  recommendation under them.
 - **iPhone voice:** Safari sets up WebRTC connections only while the page uses the microphone.
   Joining the room ahead with the mic off left iPhones stuck in ICE "checking" (no checks, no
   relay allocation; wallet report `closed while checking`). The first tap now captures the mic,
