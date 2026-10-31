@@ -1,17 +1,52 @@
-# BaselHack Code Repo Template
+# Two Webs: an Agent Web prototype
 
-This is the template repository, which makes our lives (and especially the lives of the jury) easier,
-if you follow our structure.
+BaselHack 2026, Adobe challenge.
 
-## Explanation
+A parallel "agent web" next to the human web: every business is a **signed node** that
+AI agents can discover, query and transact with. Every response carries an **APS seal**
+(Agent Protocol Secure) that says who answered, which authorities vouch for them and
+what they are allowed to do. Agents drop anything that does not verify, so scams become
+invisible to them.
 
-Please make sure that everything, that is code related, goes into `code` directory.
+The signatures are real Ed25519 and are really checked. Nothing in the trust chain is mocked.
 
-If you have documentation about the code (e.g. UML Diagrams, a readme etc.), that should go into the `documentation` directory.
+## Repository structure
 
-If you have assets (like videos, presentations etc.), this can go into the `assets` directory.
+This repo follows the BaselHack template:
 
-You can use the MIT license in this template. Make sure to adjust the copy right holders in the placeholder `<copyright holder>` and add every team member to it.
-You are also free to choose any other license - depending on the consensus of your team.
+| Folder | Contents |
+| --- | --- |
+| `code/` | all source code: `aps/` library, `registry/`, `node/`, `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `documentation/` | `formats.md`: the APS wire formats and trust rules |
+| `assets/` | presentation material |
 
-Thanks a lot!
+## Run it
+
+Requires Python 3.11+.
+
+```bash
+cd code
+python3 -m venv .venv            # or: uv venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env             # add your OPENAI_API_KEY
+./run.sh                         # registry on :4000, business nodes on :4001-4005
+.venv/bin/pytest -q              # tests for the APS library and demo data
+```
+
+Try it:
+
+```bash
+curl "http://localhost:4000/search?tags=hotel,basel-sbb"
+curl -X POST localhost:4001/tools/get_availability -H 'content-type: application/json' \
+     -d '{"date": "2026-11-14", "guests": 1}'
+```
+
+The registry returns three hotels. Hotel Rheinblick verifies as gold and Hotel Spalenhof
+as blue. `basel-cheap-hotels` claims a government seal but signed it with its own key,
+so its seal is broken.
+
+To regenerate the demo keys and seals: `.venv/bin/python scripts/gen_keys.py && .venv/bin/python scripts/issue_seals.py`.
+
+## License
+
+MIT, see `license.txt`.
