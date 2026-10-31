@@ -57,7 +57,7 @@ async def fake_phone(approvals: ApprovalBook, decision: str) -> None:
         await asyncio.sleep(0.2)
         for approval in list(approvals.pending.values()):
             print(f"phone: {approval['payee_name']} CHF {approval['amount_chf']:g} -> {decision}")
-            approvals.decide(approval["id"], decision)
+            approvals.decide(approval["id"], decision, allow_mandate=True)  # also allows the offered city tax mandate
 
 
 async def main(decision: str, request: str) -> None:
