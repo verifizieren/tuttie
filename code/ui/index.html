@@ -16,7 +16,7 @@
   header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--ink); color: #fff; }
   header h1 { margin: 0; font-size: 24px; }
   header span { color: #b9c0cc; }
-  header button { margin-left: auto; }
+  header #phone { margin-left: auto; }
   main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; height: calc(100vh - 64px); }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
   section h2 { margin: 0; padding: 14px 18px; font-size: 18px; border-bottom: 1px solid var(--line); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -51,7 +51,10 @@
   .cite.gold { color: var(--gold); background: var(--gold-bg); }
   .cite.blue { color: var(--blue); background: var(--blue-bg); }
   .cite.grey { color: var(--grey); background: var(--grey-bg); }
-  header a { color: #b9c0cc; }
+  #qr { position: fixed; inset: 0; background: rgba(20, 23, 31, .85); display: none; place-items: center; }
+  #qr.open { display: grid; }
+  #qr div { background: #fff; padding: 24px; border-radius: 16px; text-align: center; }
+  #qr img { width: min(70vh, 80vw); display: block; }
   @keyframes in { from { opacity: 0; transform: translateY(6px); } }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } section { height: 70vh; } }
 </style>
@@ -59,7 +62,7 @@
 <body>
 <header>
   <h1>Two Webs</h1><span>your assistant on the agent web</span>
-  <a href="/phone.html" target="_blank">phone</a>
+  <button id="phone" type="button">Phone</button>
   <button id="reset" type="button">New demo</button>
 </header>
 <main>
@@ -76,6 +79,7 @@
     <div class="scroll" id="timeline"><p class="empty">Signed steps will appear here.</p></div>
   </section>
 </main>
+<div id="qr" title="Click to close"><div><img src="/phone-qr.svg" alt="QR code of the phone page"><p>Scan to approve on your phone</p></div></div>
 <script>
   const KIND_LABELS = { registry: "Registry", a2t: "A2T", a2a: "A2A", marketplace: "Marketplace",
                         payment: "Payment", approval: "Approval", answer: "Answer" };
@@ -176,6 +180,9 @@
   input.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send.click(); }
   });
+  const qr = document.getElementById("qr");
+  document.getElementById("phone").addEventListener("click", () => qr.classList.add("open"));
+  qr.addEventListener("click", () => qr.classList.remove("open"));
   document.getElementById("reset").addEventListener("click", () => fetch("/reset", { method: "POST" }));
 </script>
 </body>
