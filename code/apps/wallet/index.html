@@ -22,19 +22,26 @@
   .app { position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-h, 100dvh);
          max-width: 430px; margin: 0 auto; overflow: hidden;
          --top: max(16px, env(safe-area-inset-top)); --bottom: max(16px, env(safe-area-inset-bottom));
+         /* Everything below is derived from the safe areas and the screen width, so the stack
+            fits any phone and never slides under the title or the status bar. */
+         --head: 56px; --peek: clamp(50px, 15vw, 64px);
+         --card-w: calc(min(100vw, 430px) - 32px); --card-h: calc(var(--card-w) / 1.586);
+         --stack: calc(var(--top) + var(--head) + 12px);
          padding: var(--top) 16px var(--bottom); }
 
-  .head { display: flex; justify-content: space-between; align-items: center; height: 52px; padding: 0 4px;
+  .head { display: flex; justify-content: space-between; align-items: center; height: var(--head); padding: 0 4px;
           transition: opacity .4s var(--ease), transform .5s var(--ease); }
-  .head h1 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -.01em; }
+  .head h1 { margin: 0; font-size: clamp(28px, 8.5vw, 34px); font-weight: 700; letter-spacing: -.01em; }
   .app.open .head { opacity: 0; transform: translateY(-14px); pointer-events: none; }
 
   /* Card stack: earlier cards show only their top strip, the Tuttie card is in front. */
-  .card { position: absolute; left: 16px; right: 16px; height: 210px; border-radius: 18px; overflow: hidden;
+  .card { position: absolute; left: 16px; right: 16px; top: calc(var(--stack) + var(--i) * var(--peek)); height: var(--card-h);
+          border-radius: calc(var(--card-w) * .045); overflow: hidden; will-change: transform;
           box-shadow: 0 -1px 0 rgba(255, 255, 255, .12) inset, 0 -8px 24px rgba(0, 0, 0, .55);
-          transition: top .7s var(--ease), height .6s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .6s var(--ease); }
-  .card[data-i="0"] { top: 84px; }
-  .card[data-i="1"] { top: 148px; }
+          transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
+  .card[data-i="0"] { --i: 0; }
+  .card[data-i="1"] { --i: 1; }
+  .card:active:not(.agent) { transform: scale(.985); }
   .bank-a { background: linear-gradient(135deg, #3a63e8, #1b2f8f 60%, #111c55); }
   .bank-b { background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
   .chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90, 68, 28, .55); stroke-width: 1; }
@@ -42,10 +49,12 @@
           background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
 
   /* The Tuttie card is nothing but the agent's face. */
-  .agent { top: 212px; cursor: pointer; touch-action: none; background: #08080b;
+  .agent { --i: 2; cursor: pointer; touch-action: none; background: #08080b;
            box-shadow: 0 0 0 1px rgba(217, 119, 87, .35), 0 -8px 24px rgba(0, 0, 0, .55); }
-  .agent canvas { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 100%; display: block;
-                  transition: height .6s var(--ease); }
+  /* The face keeps its 2:1 shape (like pycozmo's 128x64 screen) and is only moved and scaled
+     with transforms, so opening the card never re-renders it at a new size mid-animation. */
+  .agent canvas { position: absolute; left: 0; width: 100%; aspect-ratio: 2 / 1; top: 50%; display: block;
+                  transform: translateY(-50%) scale(.92); transition: top .7s var(--ease), transform .7s var(--ease); }
   .agent .edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease);
                  box-shadow: inset 0 0 0 2px rgba(255, 181, 150, .55), inset 0 0 60px rgba(217, 119, 87, .35); }
   .app.voice .agent .edge { opacity: 1; animation: listen 2.4s ease-in-out infinite; }
@@ -55,10 +64,11 @@
   .app.open .card:not(.agent) { transform: translateY(110vh); opacity: 0; }
   .app.open .agent { top: var(--top); height: calc(var(--app-h, 100dvh) - var(--top) - var(--bottom)); border-radius: 32px; }
   .app.typing { --bottom: 8px; }
-  .app.open .agent canvas { height: 72%; }
-  .app.typing .agent canvas { height: 46%; }
+  .app.open .agent canvas { top: 42%; transform: translateY(-50%) scale(1.15); }
+  .app.typing .agent canvas { top: 30%; transform: translateY(-50%) scale(.8); }
+  @media (prefers-reduced-motion: reduce) { .card, .agent canvas, .head, .controls { transition-duration: .01s !important; } }
 
-  .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 20px 22px; display: flex; flex-direction: column; gap: 14px; align-items: center;
+  .controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 64px 24px;  /* sides leave room for the keyboard icon */ display: flex; flex-direction: column; gap: 14px; align-items: center;
               opacity: 0; transform: translateY(16px); pointer-events: none; transition: opacity .4s var(--ease) .25s, transform .5s var(--ease) .25s; }
   .app.open .controls { opacity: 1; transform: none; pointer-events: auto; }
   .status { font-size: 15px; font-weight: 500; color: var(--muted); text-align: center; min-height: 20px; }
@@ -68,6 +78,7 @@
   .app.open .done { opacity: 1; pointer-events: auto; }
   form { display: none; width: 100%; gap: 8px; }
   .app.typing form { display: flex; }
+  .app.typing .controls { padding: 0 20px 22px; }
   .app.typing #keyboard { display: none; }
   /* Text is a deliberate choice: a small, dim keyboard icon in the corner, never the default. */
   .kbd { position: absolute; right: 18px; bottom: 18px; width: 40px; height: 40px; padding: 8px; border-radius: 50%;
@@ -138,7 +149,7 @@
     input.blur();
     face.wake("happiness");
     setTimeout(() => app.classList.contains("voice") && face.set("neutral", 700), 1300);
-    status.textContent = "Listening… (voice is not connected yet)";
+    status.textContent = "Listening…";
   }
 
   function startTyping() {
