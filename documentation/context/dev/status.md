@@ -206,6 +206,11 @@ Why things are the way they are, so nobody has to rediscover them:
   better than longer prompts: search results split into `verified` / `rejected`, an enum for
   `capability` (the model invented values like "hotel_booking"), booking totals computed only
   from signed facts, commitments built from fixed `add_ons` in the node config.
+- **Place tags:** every Basel hotel carries the city tag `basel`; `post_request` only posts
+  `basel-sbb` or `kleinbasel` when the user names that area. With `basel-sbb` the Gästehaus am
+  Rhein (Kleinbasel) was never woken, so the pitch story (Anna wins) could not happen.
+- **Wallet face while busy:** in the thinking, posted, negotiating and booking phases the eyes
+  move through a few thinking looks with glances (`THINKING` in `lib/activity.js`).
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
 - **Broken vs untrusted:** a forged or invalid seal is broken (red); self-signed or unsigned
