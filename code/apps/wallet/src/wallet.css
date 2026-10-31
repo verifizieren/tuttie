@@ -207,8 +207,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .steps li span { min-width: 0; animation: rise .3s var(--ease) both; overflow-wrap: anywhere; }
 .steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
 .steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
-.steps li.done .dot { background: var(--green); }
-.steps li.done span { color: var(--text); }
+/* Done lines rest: a still, grey dot; only the line Tuttie is working on breathes. */
+.steps li.done .dot { background: #4a4a52; }
 .steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px;
                          background: var(--line2); }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }

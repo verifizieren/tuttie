@@ -65,7 +65,10 @@ function withHotel(state, nodeId, name, changes) {
 
 function withAnswer(state, text, mood) {
   const base = withTurn(state), i = activeTurn(base);
-  const turns = base.turns.map((t, n) => (n === i ? { ...t, answer: text, mood } : t));
+  // Tuttie has answered: nothing in this turn is still running, so its progress lines are done.
+  const settle = line => (line ? { ...line, done: true } : line);
+  const turns = base.turns.map((t, n) => (n === i ? { ...t, answer: text, mood, context: settle(t.context),
+                                                       tool: settle(t.tool) } : t));
   return { ...base, turns, answer: text, mood, phase: "done" };
 }
 
