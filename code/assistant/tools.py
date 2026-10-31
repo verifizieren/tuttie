@@ -562,8 +562,22 @@ class Toolbox:
         step = self.emit_verified("a2t", summarize(tool, result.payload), result)
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, "data": result.payload}
 
+    def private_amounts(self) -> set[int]:
+        """The user's private amounts (the budget): from the last posting and from private context
+        items that name a CHF amount. Free text to a business must not contain them (bug #18)."""
+        amounts = {int(self.market.last_budget)} if self.market.last_budget else set()
+        for items in self.user.data.values():
+            for item in items if isinstance(items, list) else []:
+                if isinstance(item, dict) and item.get("visibility") == "private":
+                    amounts |= {int(n) for n in re.findall(r"CHF\s*(\d+)", str(item.get("what", "")))}
+        return amounts
+
     async def ask_agent(self, node_id: str, question: str) -> dict:
-        """Ask a node's own agent (A2A); a commitment in the reply is kept for booking."""
+        """Ask a node's own agent (A2A); a commitment in the reply is kept for booking.
+
+        A question that names the private budget is not sent: code checks it, not the prompt."""
+        if any(re.search(rf"(?<![\d.]){n}(?!\d)", question) for n in self.private_amounts()):
+            return {"error": "not sent: the question names the user's private budget; ask without it"}
         result = await self.verified_post(node_id, "/agent", {"question": question, "context": {}}, "a2a", "ask_agent")
         if not isinstance(result, Verified):
             return result
