@@ -7,13 +7,17 @@ Tools answer only from the config's "facts"; the company's agent (node/agent.py)
 agents (POST /agent), is woken by the marketplace (POST /agent/invoke) and describes itself
 (GET /agent/card). Agents that want an ongoing conversation open a session
 (POST /agent/sessions): each session has its own memory, so many run in parallel.
+When the marketplace wakes an interested agent for a new posting, the node sends the agent's
+signed offer to the posting's offer_url in the background (make_offer).
 """
 
 import argparse
+import asyncio
 import json
 import secrets
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel
@@ -53,8 +57,11 @@ class BookRequest(BaseModel):
     approval: dict  # the user's signed decision, see aps/approval.py
 
 
-def create_app(config: dict) -> FastAPI:
-    """Build the FastAPI app for one node config."""
+def create_app(config: dict, http: httpx.AsyncClient | None = None) -> FastAPI:
+    """Build the FastAPI app for one node config.
+
+    `http` is the client used to send offers to the marketplace (tests pass an in-process one).
+    """
     node_id = config["node_id"]
     facts = config.get("facts", {})
     signing_key = load_signing_key(node_id)
@@ -63,6 +70,7 @@ def create_app(config: dict) -> FastAPI:
     used_approvals: set[str] = set()
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
+    background: set[asyncio.Task] = set()  # offers being prepared and sent
     app = FastAPI(title=config["name"])
 
     def signed(payload: dict) -> dict:
@@ -200,7 +208,27 @@ def create_app(config: dict) -> FastAPI:
         The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
         (marketplace/messages.py, PostingCreated).
         """
-        return signed(await business_agent.invoke(event))
+        decision = await business_agent.invoke(event)
+        if (event.get("type") == "posting.created" and decision.get("interested")
+                and decision.get("next_tool") == "make_offer"):
+            task = asyncio.create_task(send_offer(event["posting"]))  # the market need not wait for it
+            background.add(task)
+            task.add_done_callback(background.discard)
+        return signed(decision)
+
+    async def send_offer(posting: dict) -> None:
+        """make_offer: let the agent compose an offer and post it, signed, to the market."""
+        offer = await business_agent.make_offer(posting)
+        if offer is None:
+            return
+        client = http or httpx.AsyncClient(timeout=20)
+        try:
+            await client.post(posting["offer_url"], json=signed(offer))
+        except httpx.HTTPError:
+            pass  # the market is unreachable: the offer is lost, like a missed phone call
+        finally:
+            if http is None:
+                await client.aclose()
 
     return app
 
