@@ -176,3 +176,12 @@ def test_a_list_price_booking_names_its_rate_and_checks_the_approved_terms():
     assert result["status"] == "confirmed" and result["rate"] == FLEX and result["offer_id"] is None
     swapped = {**body, "room_type": "double", "approval": approval(180, "ap-b8", terms=terms)}
     assert "other terms" in signed_book(client, swapped)["reason"]
+
+
+def test_a_past_or_invalid_night_is_never_booked():
+    client = node()
+    for night in ("1999-01-01", "not-a-date", "2026-02-30"):
+        body = {"date": night, "room_type": "double", "guest_name": "Alex Muster", "extras": [],
+                "approval": approval(180)}
+        result = signed_book(client, body)
+        assert result["status"] == "refused" and ("YYYY-MM-DD" in result["reason"] or "nights" in result["reason"])

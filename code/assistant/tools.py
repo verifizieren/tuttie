@@ -541,8 +541,8 @@ class Toolbox:
         result = await self.verified_mcp(node_id, tool, args or {}, "a2t", tool)
         if not isinstance(result, Verified):
             return result
-        if tool == "get_availability":
-            self.availability[node_id] = result.payload
+        if tool == "get_availability" and result.payload.get("status") != "refused":
+            self.availability[node_id] = result.payload  # a refusal must not replace offered rooms
         step = self.emit_verified("a2t", summarize(tool, result.payload), result)
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, "data": result.payload}
 

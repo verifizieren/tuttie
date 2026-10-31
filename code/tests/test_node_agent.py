@@ -240,3 +240,29 @@ def test_invoke_refuses_an_unsigned_posting_before_the_llm_runs(no_llm):
     app = create_app(RHEINBLICK, lookup=registry_lookup)
     response = TestClient(app).post("/agent/invoke", json=posting_event())
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize("args, reason", [
+    ({"date": "not-a-date"}, "YYYY-MM-DD"),
+    ({"date": "14.11.2026"}, "YYYY-MM-DD"),
+    ({"date": "2026-02-30"}, "YYYY-MM-DD"),
+    ({"date": "1999-01-01"}, "bookable nights"),
+    ({"date": "2099-01-01"}, "bookable nights"),
+    ({"date": "2026-11-14", "guests": -5}, "guests"),
+    ({"date": "2026-11-14", "guests": 0}, "guests"),
+    ({"date": "2026-11-14", "guests": 1000000000}, "guests"),
+])
+def test_availability_is_refused_signed_for_an_impossible_stay(args, reason):
+    envelope = call_tool(create_app(RHEINBLICK), "get_availability", args)
+    assert verify_envelope(envelope, load_public_key(RHEINBLICK["node_id"]), RHEINBLICK["node_id"])
+    payload = envelope["payload"]
+    assert payload["status"] == "refused" and reason in payload["reason"] and "rooms" not in payload
+
+
+def test_stay_problem_counts_from_the_swiss_today():
+    from datetime import date
+    today = date(2026, 11, 1)
+    assert node.server.stay_problem("2026-11-01", 2, today) is None
+    assert node.server.stay_problem("2026-10-31", 1, today)  # yesterday
+    assert node.server.stay_problem("2026-11-14", True, today)  # a bool is not a guest count
+    assert node.server.stay_problem("2026-11-14", 10, today) is None

@@ -17,10 +17,14 @@ import asyncio
 import copy
 import json
 import os
+import re
 import secrets
 from contextlib import asynccontextmanager
+from datetime import date as Date
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import httpx
 from dotenv import load_dotenv
@@ -43,6 +47,33 @@ from node.owner import owner_app
 from node.settings import apply as apply_settings
 from node.settings import validate as validate_settings
 from sessions import SessionClosed, SessionStore
+
+
+SWISS_TIME = ZoneInfo("Europe/Zurich")
+ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+MAX_DAYS_AHEAD = 365  # how far ahead a business takes bookings
+MAX_GUESTS = 10
+
+
+def stay_problem(day, guests=1, today: Date | None = None) -> str | None:
+    """Why a night and guest count cannot be offered or booked, or None.
+
+    The night must be a YYYY-MM-DD date from today (Swiss time) up to MAX_DAYS_AHEAD; guests
+    a whole number from 1 to MAX_GUESTS. A business signs its answers, so it never signs
+    rooms for a night that does not exist or has passed.
+    """
+    today = today or datetime.now(SWISS_TIME).date()
+    if not isinstance(day, str) or not ISO_DAY.match(day):
+        return "date must be YYYY-MM-DD"
+    try:
+        night = Date.fromisoformat(day)
+    except ValueError:
+        return "date must be YYYY-MM-DD"
+    if not today <= night <= today + timedelta(days=MAX_DAYS_AHEAD):
+        return f"bookable nights are from {today} to {today + timedelta(days=MAX_DAYS_AHEAD)}"
+    if isinstance(guests, bool) or not isinstance(guests, int) or not 1 <= guests <= MAX_GUESTS:
+        return f"guests must be a whole number from 1 to {MAX_GUESTS}"
+    return None
 
 
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
@@ -154,7 +185,9 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         return sign_envelope(node_id, payload, signing_key)
 
     def get_availability(date: str, guests: int = 1) -> dict:
-        """Signed list of available rooms and prices for a date."""
+        """Signed list of available rooms and prices for a date, or a signed refusal (stay_problem)."""
+        if problem := stay_problem(date, guests):
+            return signed({"tool": "get_availability", "status": "refused", "reason": problem})
         rooms = [
             {k: room[k] for k in ("room_type", "price_chf", "rate")}
             for room in facts().get("rooms", []) if room.get("available")
@@ -208,6 +241,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             req = BookRequest(**body["args"])
         except ValidationError as error:
             return refuse(f"invalid arguments: {error.errors()[0]['msg']}")
+        if problem := stay_problem(req.date):
+            return refuse(problem)
         total, items = None, []
         if req.agreement is not None and req.extras:
             return refuse("an agreement fixes what is included: book it without extras")
