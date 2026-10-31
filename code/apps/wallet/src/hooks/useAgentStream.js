@@ -227,14 +227,17 @@ export default function useAgentStream() {
             lastStep.current = events.at(-1)?.step || 0;
           }
         } catch {
+          // Unreachable (e.g. offline for a moment): keep trying in the background; the first
+          // GET /history that works loads whichever chat the server has and clears this.
           verified = false;
-          setConnectionError("Could not verify the active chat. Reload the wallet before continuing.");
+          setConnectionError("Tuttie is unreachable right now · retrying");
         }
         throw error;
       } finally {
-        if (verified) live.current.connect();
         switchingRef.current = false;
         setSwitching(false);
+        if (verified) live.current.connect();
+        else { retry.current.attempt = 0; live.current.reconnect(); }
       }
     }
     return {
@@ -248,6 +251,12 @@ export default function useAgentStream() {
       failed: (said, error) => {
         dispatch({ type: "drop", said });
         if (error?.status === 409 && !switchingRef.current) live.current.reconnect(true);
+      },
+      // The user acts while the stream is down: try to reconnect now instead of waiting.
+      retry: () => {
+        if (stream.current || switchingRef.current) return;
+        retry.current.attempt = 0;
+        live.current.reconnect(true);
       },
       pick: nodeIds => dispatch({ type: "pick", nodeIds }),
       deck: progress => dispatch({ type: "deck", progress }),

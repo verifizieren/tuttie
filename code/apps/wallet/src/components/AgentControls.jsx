@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 /**
  * @param mode    "closed" | "voice" | "typing"
  * @param status  the task Tuttie is doing now, a problem (e.g. it cannot be reached), or ""
- * @param onSend  (text) => void
+ * @param onSend  (text) => Promise<boolean>: false if the text did not reach Tuttie
  */
 export default function AgentControls({ mode, status, onSend }) {
   const input = useRef(null);
@@ -18,11 +18,14 @@ export default function AgentControls({ mode, status, onSend }) {
     else input.current?.blur();
   }, [mode]);
 
-  function submit(e) {
+  // A message that did not reach Tuttie comes back into the field (unless the user already
+  // typed something new), so it is never lost.
+  async function submit(e) {
     e.preventDefault();
-    if (!text.trim()) return;
-    onSend(text.trim());
+    const sent = text.trim();
+    if (!sent) return;
     setText("");
+    if (await onSend(sent) === false) setText(current => current || sent);
   }
 
   return (

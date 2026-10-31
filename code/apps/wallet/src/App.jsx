@@ -190,10 +190,13 @@ export default function App() {
   // reach Tuttie (network, server failure; never a refusal) is sent once more by itself.
   // Returns whether Tuttie got it.
   async function send(text, firstTool = null, shown = text, typed = false, resend = false) {
-    if (switching || connectionError) {
-      setError(connectionError || "Please wait for the conversation to load");
+    if (switching) {
+      setError("Please wait for the conversation to load");
       return false;
     }
+    // Not connected: reconnect now, and still try to send; the server refuses (409) a message
+    // for a chat it no longer has, and a failed send keeps the typed text in the field.
+    if (connectionError) actions.retry();
     if (typed) setQuiet(true);
     actions.say(shown);
     setShowHistory(false);
@@ -207,6 +210,7 @@ export default function App() {
       } catch (e) {
         if (!resend || tries > 1 || !shouldResend(e)) {
           actions.failed(shown, e);  // not sent: it must not hold the place of the next request's answer
+          if (typed) setMode("typing");  // back to the field, where the text waits to be sent again
           setError(e.status === 409 ? "The chat changed elsewhere. Showing the current one, please say it again."
                                     : e.message || "Tuttie is unreachable right now");
           return false;

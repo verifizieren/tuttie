@@ -27,9 +27,14 @@ export function shouldResend(error) {
 /** Tuttie is still working on an answer (HTTP 409): a new chat has to wait for it. */
 export const BUSY_NOTE = "Tuttie is still working — new chat after this answer";
 
-/** The words for a failed "new chat": a busy Tuttie is a friendly note, anything else the
- *  server's reason. */
+/** A "new chat" that did not reach the server: the wallet reconnects by itself, so this is
+ *  only a passing note, never an error that outlives the connection coming back. */
+export const OFFLINE_NOTE = "Tuttie is unreachable right now — try again in a moment";
+
+/** The words for a failed "new chat": a busy Tuttie or a lost connection is a friendly note,
+ *  anything else the server's reason. */
 export function newChatFailure(error) {
   if (error?.status === 409) return { notice: BUSY_NOTE };
+  if (!error?.status) return { notice: OFFLINE_NOTE };
   return { error: error?.message || "Tuttie is unreachable right now" };
 }
