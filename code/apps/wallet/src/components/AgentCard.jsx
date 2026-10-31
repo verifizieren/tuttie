@@ -1,5 +1,5 @@
-// The Tuttie card: the agent's face on a dark card, a quiet name label, and (when open) a grab
-// bar, what Tuttie is doing (children: activity, approval sheet) and the controls. Gestures
+// The Tuttie card: the agent's face on a dark card and (when open) a grab bar, what Tuttie is
+// doing (children: activity, approval sheet, history) and the controls. Gestures
 // (tap, swipe up, swipe down) come from useCardGestures.
 import { useRef } from "react";
 import useCardGestures from "../hooks/useCardGestures.js";
@@ -25,7 +25,6 @@ export default function AgentCard({ canvasRef, mode, onOpen, onClose, onTap, chi
       <canvas ref={canvasRef} />
       <div className="edge" />
       <div className="grabber" />
-      <span className="label">Tuttie</span>
       {children}
       <AgentControls mode={mode} {...controls} />
     </div>

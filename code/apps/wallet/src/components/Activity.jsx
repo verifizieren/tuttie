@@ -97,9 +97,9 @@ function order(hotels) {
 
 /** What happened on the market: the cards to swipe, then the hotel the user chose. Businesses
  *  with forged or missing seals are not shown at all: Tuttie never asked them. */
-function Market({ state, onPick, onLean }) {
+function Market({ state, readOnly, onPick, onLean }) {
   const [openId, setOpenId] = useState(null);
-  const swiping = state.cards && !state.picked;
+  const swiping = state.cards && !state.picked && !readOnly;
   // The chosen hotel, until the booking card replaces it.
   const liked = state.booking ? [] : order(state.hotels).filter(([nodeId]) => state.picked?.includes(nodeId));
   return (
@@ -114,21 +114,22 @@ function Market({ state, onPick, onLean }) {
 }
 
 /**
- * @param state   the conversation (lib/activity.js)
- * @param onPick  (liked cards) => void
- * @param onLean  (x in -1..1) => void while a card is dragged
+ * @param state     the conversation (lib/activity.js)
+ * @param readOnly  an earlier conversation from the history: nothing to swipe
+ * @param onPick    (liked cards) => void
+ * @param onLean    (x in -1..1) => void while a card is dragged
  */
-export default function Activity({ state, onPick, onLean }) {
+export default function Activity({ state, readOnly = false, onPick, onLean }) {
   const box = useRef(null);
   const last = state.turns.at(-1);
   // New content comes last; bring it into view when it arrives.
   // The cards to swipe are shown from their top, so the whole card is in view.
   useEffect(() => {
-    if (!box.current) return;
+    if (readOnly || !box.current) return;
     const deck = state.cards && !state.picked && box.current.querySelector(".deck");
     const top = deck ? deck.offsetTop - 8 : box.current.scrollHeight;
     box.current.scrollTo({ top, behavior: "smooth" });
-  }, [state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
+  }, [readOnly, state.turns.length, last?.answer, state.cards, state.booking, state.picked]);
 
   if (!state.turns.length && !state.request) return null;
   const latest = state.turns.flatMap(t => [t.context, t.tool]).filter(line => line?.done).at(-1);
@@ -137,7 +138,7 @@ export default function Activity({ state, onPick, onLean }) {
       {state.turns.map((turn, i) => (
         <div className="turn" key={i}>
           <Steps turn={turn} latest={latest} />
-          {i === state.marketTurn && state.request && <Market state={state} onPick={onPick} onLean={onLean} />}
+          {i === state.marketTurn && state.request && <Market state={state} readOnly={readOnly} onPick={onPick} onLean={onLean} />}
           {i === state.bookingTurn && state.booking && <BookingCard booking={state.booking} />}
           {turn.answer && <Answer text={turn.answer} />}
         </div>

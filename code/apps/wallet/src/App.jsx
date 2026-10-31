@@ -11,12 +11,15 @@
 // recognition is its own work area (code/voice) and not connected yet.
 //
 // There is one conversation at a time: once the user swipes Tuttie down, the next opening
-// starts a fresh one (unless an approval still waits for the user).
+// starts a fresh one (unless an approval still waits for the user). The dock under the open
+// card shows earlier conversations (kept on this device), starts a new one, or switches to typing.
 import { useEffect, useRef, useState } from "react";
 import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
 import ApprovalSheet from "./components/ApprovalSheet.jsx";
 import BankCard from "./components/BankCard.jsx";
+import Dock from "./components/Dock.jsx";
+import History from "./components/History.jsx";
 import useAgentStream from "./hooks/useAgentStream.js";
 import useFace from "./hooks/useFace.js";
 import useVisibleViewport from "./hooks/useVisibleViewport.js";
@@ -40,7 +43,8 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions] = useAgentStream();
+  const [agent, actions, history] = useAgentStream();
+  const [showHistory, setShowHistory] = useState(false);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -59,7 +63,7 @@ export default function App() {
   function startVoice() {
     if (mode === "closed") {
       openedAt.current = performance.now();
-      if (closedOnce.current && !agent.approval) actions.newConversation();
+      if (closedOnce.current && !agent.approval) actions.newConversation(agent);
       closedOnce.current = false;
     }
     setMode("voice");
@@ -67,7 +71,17 @@ export default function App() {
 
   function close() {
     setMode("closed");
+    setShowHistory(false);
     closedOnce.current = true;
+  }
+
+  // A new conversation from the dock: the current one goes into the history.
+  function newChat() {
+    setShowHistory(false);
+    if (agent.approval) return;  // the user must decide the waiting approval first
+    actions.newConversation(agent);
+    face.current?.set("happiness", 300);
+    setTimeout(() => face.current?.set("neutral", 600), 700);
   }
 
   function tapWhileOpen() {
@@ -103,6 +117,7 @@ export default function App() {
 
   async function send(text, firstTool = null) {
     actions.say(text);
+    setShowHistory(false);
     setMode("voice");  // Tuttie is awake while it works
     try {
       await sendChat(text, firstTool);
@@ -131,11 +146,12 @@ export default function App() {
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
       <AgentCard canvasRef={canvas} mode={mode} status={statusLine(agent) || status}
-                 onOpen={startVoice} onClose={close} onTap={tapWhileOpen}
-                 onKeyboard={startTyping} onSend={send}>
+                 onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={send}>
         <Activity state={agent} onPick={pick} onLean={lean} />
+        {showHistory && <History entries={history} onClose={() => setShowHistory(false)} />}
         <ApprovalSheet key={agent.approval?.id} approval={agent.approval} />
       </AgentCard>
+      <Dock onHistory={() => setShowHistory(true)} onNewChat={newChat} onKeyboard={startTyping} />
     </div>
   );
 }
