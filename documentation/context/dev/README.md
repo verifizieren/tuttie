@@ -1,8 +1,46 @@
-# Dev context
+# Dev team: start here
 
-Reference material for building Tuttie: design examples, API notes, library links,
-screenshots of what works and what does not.
+What we build next and how we work: **[goals.md](goals.md)**.
+Concept and demo strategy: `documentation/concept.md` · work areas: `documentation/architecture.md`
+· message formats and trust rules: `documentation/formats.md`.
 
-Start with `documentation/concept.md`, `documentation/architecture.md` (work areas) and
-`documentation/formats.md` (message formats). Issues: #2 wallet, #5 owner view,
-#8 marketplace, #9 backend concept, #10 backend PoC and signatures.
+## Get the project running
+
+```bash
+git clone https://github.com/verifizieren/baselhack2026.git
+cd baselhack2026/code
+python3 -m venv .venv              # or: uv venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env               # add OPENAI_API_KEY (ask the team)
+./run.sh                           # registry :4000, nodes :4001-4007, assistant + apps :4040
+```
+
+- Wallet (the app): <http://localhost:4040/> · first prototype: `/old/console/`
+- Live team instance: <https://web4.mendes.dev> (shared server, ports 4000-4049)
+
+## Before every push
+
+```bash
+.venv/bin/pytest -q                                  # all tests green
+.venv/bin/python scripts/demo_headless.py approved   # the real flow still works end to end
+```
+
+## Working rules
+
+- Pull before you start; small commits with clear messages; one concern per commit.
+- No secrets in git: keys go in `code/.env`, which is ignored.
+- Every module gets a short docstring; add tests with every feature.
+- Signing only through `code/aps/`; prices only from node configs and signed messages.
+- Changing `documentation/formats.md`? Tell the whole team first.
+- Code stays in `code/`, docs in `documentation/`, presentation files in `assets/`
+  (BaselHack template).
+- Check in with the pitch and design team regularly (`documentation/context/pitch/`).
+
+## Where to put things
+
+| What | Where |
+| --- | --- |
+| Notes, links, design examples for devs | this folder |
+| Backend and agents | `code/marketplace/`, `code/node/`, `code/assistant/`, `code/aps/` |
+| Apps (wallet, owner view, presentation) | `code/apps/` |
+| Hotel agents' data | `code/data/nodes/` |
