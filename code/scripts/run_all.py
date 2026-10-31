@@ -1,4 +1,4 @@
-"""Start the registry, one node server per config and the assistant; Ctrl+C stops them all."""
+"""Start the registry, the marketplace, one node server per config and the assistant; Ctrl+C stops them all."""
 
 import subprocess
 import sys
@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> None:
-    commands = [[sys.executable, "-m", "registry.app"]]
+    commands = [[sys.executable, "-m", "registry.app"], [sys.executable, "-m", "marketplace.app"]]
     commands += [
         [sys.executable, "-m", "node.server", "--config", str(path.relative_to(ROOT))]
         for path in sorted((ROOT / "data" / "nodes").glob("*.json"))

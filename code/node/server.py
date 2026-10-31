@@ -15,7 +15,7 @@ import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from aps import load_signing_key, public_key_b64, sign_envelope, verify_envelope
@@ -33,10 +33,6 @@ class AvailabilityRequest(BaseModel):
 class AgentRequest(BaseModel):
     question: str
     context: dict = {}
-
-
-class InvokeRequest(BaseModel):
-    event: dict  # a marketplace event, e.g. {"type": "posting.created", "posting": {...}}
 
 
 class SessionOpenRequest(BaseModel):
@@ -198,9 +194,13 @@ def create_app(config: dict) -> FastAPI:
         return signed({"session_id": session_id, "status": sessions.close(session_id).status})
 
     @app.post("/agent/invoke")
-    async def agent_invoke(req: InvokeRequest) -> dict:
-        """The marketplace wakes the agent on a change; it answers whether and how it would respond."""
-        return signed(await business_agent.invoke(req.event))
+    async def agent_invoke(event: dict = Body(...)) -> dict:
+        """The marketplace wakes the agent on a change; it answers whether and how it would respond.
+
+        The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
+        (marketplace/messages.py, PostingCreated).
+        """
+        return signed(await business_agent.invoke(event))
 
     return app
 

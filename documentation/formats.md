@@ -190,8 +190,10 @@ with the user's key and attached to the action (e.g. passed to `book`).
 
 ## DRAFT: marketplace messages (Tuttie, issues #8 #10)
 
-Proposal so the marketplace, node and wallet work can start in parallel. **Not implemented
-yet; agree on it as a team before building.** Every message below is the `payload` of a
+Proposal so the marketplace, node and wallet work can start in parallel. **Not fully agreed
+by the team yet; the marketplace agent layer is built against this draft** (decision to save
+time until Sunday 12:00). The source of truth is `code/marketplace/messages.py` (strict
+Pydantic models, unknown fields are refused); change both together. Every message below is the `payload` of a
 signed envelope (see above), signed by its sender: the user's agent with its own key (its
 delegation proves it acts for the user),
 business agents with their node key.
@@ -206,12 +208,38 @@ business agents with their node key.
   "tags": ["basel-sbb"],
   "constraints": {
     "date": "2026-11-14",
+    "guests": 1,
     "budget_chf": 200,
     "requirements": ["quiet", "dog", "arrival 01:00"]
   },
   "expires_at": "2026-11-13T20:00:00Z"
 }
 ```
+
+Only public information goes into a request: every matching business sees it. `guests`
+defaults to 1; `budget_chf` and `requirements` are optional.
+
+### Posting and wake-up (marketplace → business agent)
+
+When the marketplace accepts a request it wakes every matching, non-broken business at
+`POST {endpoint}/agent/invoke` with:
+
+```json
+{
+  "type": "posting.created",
+  "posting": {
+    "request_id": "rq-7f3a",
+    "requester_id": "ch.tuttie.alex-muster",
+    "request": { "...": "the user agent's signed envelope, unchanged" },
+    "offer_url": "http://localhost:4010/postings/rq-7f3a/offers",
+    "expires_at": "2026-11-13T20:00:00Z"
+  }
+}
+```
+
+The business can verify the requester itself from `request` (seals, signature, delegation).
+Its answer, e.g. `{"interested": true, "next_tool": "make_offer"}` (plain or as the payload
+of a signed envelope), is recorded but advisory; only a signed offer counts.
 
 ### Offer (business agent → user's agent)
 
@@ -229,6 +257,20 @@ business agents with their node key.
 ```
 
 Prices come from the node config (`facts.rooms`, `facts.add_ons`), never from an LLM.
+Sent as a signed envelope to the posting's `offer_url`. The marketplace accepts it only from
+an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_until`.
+
+### Marketplace API (port 4010)
+
+| Call | Body / answer |
+| --- | --- |
+| `POST /postings` | signed request envelope → `{request_id, posting, request, invited: {node_id: {name, trust_tier, status, next_tool}}, offers}` |
+| `POST /postings/{id}/offers` | signed offer envelope → `{node_id, name, trust_tier, uid, offer, within_budget, envelope}` |
+| `GET /postings/{id}` | the posting with `invited` and all accepted `offers` |
+| `GET /postings/{id}/shortlist` | best five current offers within budget: by price, grey last |
+
+`status` is `interested`, `declined`, `invited` (no clear answer) or `unreachable`.
+Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410 or 422.
 
 ### Counter-offer (either side, during negotiation)
 
