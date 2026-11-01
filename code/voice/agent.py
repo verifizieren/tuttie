@@ -10,7 +10,8 @@ signed MCP calls, bargaining, booking. It follows that conversation's timeline (
 booking after swiping), and asks for the Face ID approval.
 
 The user can talk at any time, also while Tuttie works or speaks; what they say is queued as
-the next message. Robust in a noisy room: English only, fragments without meaning (one word,
+the next message (except while the Face ID sheet is up: then it asks the user to decide on the
+phone first). Robust in a noisy room: English only, fragments without meaning (one word,
 noises) are dropped, and only real words (two or more, half a second) interrupt Tuttie; if a
 noise cut it off and no words follow, it carries on. The wallet can mute the microphone.
 
@@ -21,6 +22,7 @@ import asyncio
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 from assistant.card_commands import card_choice
@@ -65,6 +67,10 @@ UPDATES = {"approval": "Please confirm with Face ID."}
 BUSY = "One moment please."  # too many turns a minute (429): the user can say it again shortly
 NOT_PASSED = "Sorry, that did not go through. Could you say it again?"
 # After Tuttie recommends a hotel, the choice goes to the user (said once, after the answer).
+# While the Face ID sheet is up, the running turn holds Tuttie: a spoken line would wait behind it
+# for minutes (and a "yes, book it" could run after the decision), so it is not passed on.
+DECIDE_FIRST = "Please approve or decline on your phone first."
+DECIDE_FIRST_EVERY_S = 5  # said at most this often, so noise does not make it repeat
 RECONNECT_S = (0.5, 10.0)  # wait before following the timeline again: first, and at most (doubling)
 HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
@@ -245,10 +251,16 @@ class Tuttie(Agent):
         self.http = http
         self.turns = 0
         self.asked = None  # what the user asked last, until Tuttie uses a tool for it or answers
+        self.pending_approvals: set[str] = set()  # approval ids on the phone, kept by follow()
+        self.decide_first_at = float("-inf")  # when DECIDE_FIRST was said last
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         text = (new_message.text_content or "").strip()
-        if meaningful(text):  # noise and stray words are not requests
+        if meaningful(text) and self.pending_approvals:  # the phone decides first
+            if time.monotonic() - self.decide_first_at >= DECIDE_FIRST_EVERY_S:
+                self.decide_first_at = time.monotonic()
+                self.speak(DECIDE_FIRST)
+        elif meaningful(text):  # noise and stray words are not requests
             self.turns += 1
             self.asked = text
             if trouble := await self.pass_on(fitted(text)):
@@ -286,6 +298,24 @@ class Tuttie(Agent):
         return options[self.turns % len(options)]
 
 
+def track_approvals(event: dict, pending: set[str]) -> None:
+    """Keep `pending` (approval ids on the phone) up to date from a timeline event: a pending
+    approval adds its id, a decided one (approved, declined, expired) removes it. An answer
+    clears all: Tuttie answers only after its turn is done, so nothing waits on the phone then
+    (also when an approval was dropped without a decision event)."""
+    detail = event.get("detail") if isinstance(event.get("detail"), dict) else {}
+    if event["kind"] == "answer":
+        pending.clear()
+    elif event["kind"] == "approval" and event.get("status") == "pending":
+        pending.add(str(detail.get("approval_id") or "?"))
+    elif event["kind"] == "approval":
+        decision = detail.get("decision") if isinstance(detail.get("decision"), dict) else {}
+        if decision.get("approval_id"):
+            pending.discard(str(decision["approval_id"]))
+        else:
+            pending.clear()
+
+
 def voice_on(room: rtc.Room) -> bool:
     """The wallet is in voice mode (card open, not typing): it sets the attribute voice=on.
 
@@ -303,6 +333,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
     for good when the room is unknown (404) or its conversation is no longer active (409).
     """
     said: set[str] = set()
+    pending: set[str] = getattr(agent, "pending_approvals", set())  # shared with the agent's turns
     cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
     def say(text: str) -> None:
@@ -314,6 +345,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
         if line.startswith("event: reset"):
             said.clear()
             cards = None
+            pending.clear()  # a reset declines open approvals
         if not line.startswith("data:"):
             return
         try:
@@ -324,6 +356,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
             return
         if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
             cards = event.get("turn") or "?"
+        track_approvals(event, pending)
         if event["kind"] == "answer":
             said.clear()  # the next turn may prompt again
             agent.asked = None  # answered without (or after) a tool: no filler any more
