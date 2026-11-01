@@ -816,7 +816,7 @@ function onNums() {
 function numsTarget(dir) {
   const r = $("#nums").getBoundingClientRect(), h = slotH(), top = scrollY + r.top, n = figs.length;
   if (r.top > 2) return dir > 0 && r.top <= h + 10 ? top : null;                 // just above: enter
-  if (r.bottom < h - 2) return dir < 0 && r.bottom >= -10 ? top + (n - 1) * h : null;  // just below: back in
+  if (r.bottom < h - 2) return dir < 0 && r.bottom >= h - 60 ? top + (n - 1) * h : null;  // only just left: back in; further down the page scrolls natively
   const next = Math.round(-r.top / h) + dir;
   if (next < 0) return Math.max(0, top - h);
   if (next >= n) return top + n * h;
