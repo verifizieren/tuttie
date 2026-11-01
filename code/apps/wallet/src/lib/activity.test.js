@@ -190,3 +190,47 @@ test('a booking decided in another tab keeps the cards away here too (no second 
   assert.equal(choosing(s), false);
   assert.deepEqual(s.picked, ['h1']);
 });
+
+// The server's decided event: the approval id is inside the signed decision.
+const pendingEv = (id, step) => ({ kind: 'approval', status: 'pending', step, node_id: 'ch.basel.x', node_name: 'X',
+  summary: 'Book', seals: [], detail: { approval_id: id, amount_chf: 100 } });
+const decidedEv = (id, status, step) => ({ kind: 'approval', status, step, node_id: 'ch.basel.x', node_name: 'X',
+  summary: '', seals: [], detail: { decision: { approval_id: id, decision: status } } });
+
+test('a decided event for an old approval id does not close the newer approval that waits', () => {
+  let s = applyEvent(startTurn(EMPTY, 'book'), pendingEv('ap-1', 1));
+  s = applyEvent(s, pendingEv('ap-2', 2));
+  s = applyEvent(s, decidedEv('ap-1', 'declined', 3));
+  assert.equal(s.approval?.id, 'ap-2');
+  assert.equal(s.phase, 'approval');
+  assert.deepEqual(s.decided, { id: 'ap-1', status: 'declined' });  // the old sheet can still finish
+  const done = applyEvent(s, decidedEv('ap-2', 'approved', 4));
+  assert.equal(done.approval, null);
+  assert.equal(done.phase, 'booking');
+});
+
+test('hotel cards whose text is not text become plain text the deck can always show', () => {
+  const odd = { node_id: { x: 1 }, name: { x: 1 }, agent: { a: 1 }, about: ['z'], trust_tier: { t: 1 },
+                price_chf: { n: 1 }, agreed_chf: '12', over_budget_chf: [], rating: { score: { s: 1 } },
+                features: [null, 'dog', { key: { k: 1 }, ok: 'yes', label: { l: 1 } }], photos: ['/a.jpg', { u: 1 }] };
+  const s = applyEvent(startTurn(EMPTY, 'hotel'), { step: 1, kind: 'marketplace', status: 'verified', summary: '',
+                                                    detail: { phase: 'cards', cards: [odd, null, 'x'] } });
+  assert.equal(s.cards.length, 1);
+  const [c] = s.cards;
+  for (const key of ['node_id', 'name', 'agent', 'about', 'trust_tier']) assert.equal(c[key], '', key);
+  assert.equal(c.price_chf, null);
+  assert.equal(c.agreed_chf, null);
+  assert.equal(c.over_budget_chf, null);
+  assert.equal(c.rating, null);
+  assert.deepEqual(c.features, [{ key: '', ok: false, label: '' }]);
+  assert.deepEqual(c.photos, ['/a.jpg']);
+});
+
+test('normal hotel cards keep every field', () => {
+  const card = { node_id: 'ch.basel.a', name: 'Rheinblick', agent: 'A', about: 'Quiet', trust_tier: 'gold', price_chf: 150,
+                 agreed_chf: 128, over_budget_chf: null, rating: { score: 4.5, count: 12 }, features: [{ key: 'dog', ok: true, label: 'Dogs' }],
+                 photos: ['/hotels/a.jpg'], extra: 1 };
+  const s = applyEvent(startTurn(EMPTY, 'hotel'), { step: 1, kind: 'marketplace', status: 'verified', summary: '',
+                                                    detail: { phase: 'cards', cards: [card] } });
+  assert.deepEqual(s.cards[0], card);
+});

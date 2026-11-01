@@ -55,6 +55,25 @@ export function approvalOf(event, detail) {
     terms: terms && { room_type: plain(terms.room_type), date: plain(terms.date), rate: plain(terms.rate) },
   };
 }
+/** A hotel card (assistant/cards.py) as the deck shows it: the shown fields are plain text,
+ *  numbers or null, never an object (a hotel's own text flows into a card, and an object in
+ *  React's output breaks the whole chat view). Other fields stay as they came. */
+const number = value => (typeof value === "number" && Number.isFinite(value) ? value : null);
+export function cardOf(card) {
+  const score = number(card.rating?.score);
+  return {
+    ...card,
+    node_id: plain(card.node_id), name: plain(card.name), agent: plain(card.agent), about: plain(card.about),
+    trust_tier: plain(card.trust_tier), price_chf: number(card.price_chf), agreed_chf: number(card.agreed_chf),
+    over_budget_chf: number(card.over_budget_chf),
+    rating: score === null ? null : { ...card.rating, score },
+    features: (Array.isArray(card.features) ? card.features : []).filter(f => f && typeof f === "object")
+      .map(f => ({ ...f, key: plain(f.key), ok: f.ok === true, label: plain(f.label) })),
+    photos: (Array.isArray(card.photos) ? card.photos : []).filter(p => typeof p === "string"),
+  };
+}
+const cardsOf = cards => (Array.isArray(cards) ? cards : []).filter(c => c && typeof c === "object" && !Array.isArray(c)).map(cardOf);
+
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
@@ -282,9 +301,10 @@ export function applyEvent(state, event) {
       return { ...progress(state, "tool", "Comparing offers", false, at), hotels, shortlistDone: true };
     }
     if (detail.phase === "cards") {
-      const n = (detail.cards || []).length;
+      const cards = cardsOf(detail.cards);
+      const n = cards.length;
       return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true, at),
-               cards: detail.cards || [], cardsStep: event.step, swipes: [], deck: null, phase: "picking" };
+               cards, cardsStep: event.step, swipes: [], deck: null, phase: "picking" };
     }
     return state;
   }
@@ -325,12 +345,15 @@ export function applyEvent(state, event) {
       return { ...progress(state, "tool", "Waiting for your approval", false, at), ...chosen, phase: "approval",
                approval: approvalOf(event, detail) };
     }
+    // the approval id is inside the signed decision (aps/approval.py sign_decision)
+    const decided = { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) };
+    // The end of an older approval while a newer one waits: only remembered (its sheet may still
+    // be finishing), the newer approval stays.
+    if (decided.id && state.approval && decided.id !== state.approval.id) return { ...state, decided };
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
     const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
-    return { ...progress(state, "tool", line, !approved, at), approval: null,
-             // the approval id is inside the signed decision (aps/approval.py sign_decision)
-             decided: { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) },
+    return { ...progress(state, "tool", line, !approved, at), approval: null, decided,
              phase: approved ? "booking" : "declined" };
   }
   return state;

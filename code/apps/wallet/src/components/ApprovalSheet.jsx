@@ -110,6 +110,17 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
   const [allow, setAllow] = useState(true);      // sign the offered mandate as well
   const busy = useRef(false);                    // one decision in flight at a time (double taps)
   const finished = useRef(false);                // the final mark is shown once: by the answer or the stream
+  const gone = useRef(false);                    // the server said this approval no longer waits
+  const unmounted = useRef(false);
+  const latest = useRef({ id: approval?.id, onFinished });
+  latest.current = { id: approval?.id, onFinished };
+
+  // A sheet that goes while its decision is still open (another sheet took its place) tells the
+  // wallet, so the decision is never left "finishing" with no sheet to end it.
+  useEffect(() => () => {
+    unmounted.current = true;
+    if (busy.current && !finished.current) latest.current.onFinished?.(latest.current.id, gone.current);
+  }, []);
 
   // The server's decision arrived on the event stream while the sheet still waits for the answer
   // to its call (which may never come): finish with what the server recorded.
@@ -158,6 +169,8 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
     } catch (e) {
       if (finished.current) return;  // the stream already showed the decision: a late failure changes nothing
       const failure = failureOf(e);
+      gone.current = failure.gone;
+      if (unmounted.current) return onFinished?.(approval.id, failure.gone);  // no sheet left to say it
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits

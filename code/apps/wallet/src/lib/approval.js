@@ -31,3 +31,8 @@ export function serverDecision(state, id) {
   const decided = state?.decided;
   return id && decided?.id === id && DECISIONS.includes(decided.status) ? decided.status : null;
 }
+
+/** The approval the sheet shows: one that is finishing (the user decided, its final mark is still
+ *  to be seen) comes first; a newer approval (e.g. the city tax right after a booking) follows
+ *  once that sheet is done. */
+export const sheetOf = (approval, finishing) => finishing || approval || null;

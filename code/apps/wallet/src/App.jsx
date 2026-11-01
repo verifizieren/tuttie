@@ -35,7 +35,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
-import { serverDecision } from "./lib/approval.js";
+import { serverDecision, sheetOf } from "./lib/approval.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 import { bookingRequest } from "./lib/picks.js";
@@ -66,9 +66,10 @@ export default function App() {
   const [goneApproval, setGoneApproval] = useState(null);
   const approval = agent.approval && agent.approval.id !== goneApproval ? agent.approval : null;
   // A decided approval stays on screen until its sheet has shown the final mark (the Face ID
-  // checkmark or the X) and slid away, even though the server already stopped waiting for it.
+  // checkmark or the X) and slid away, even though the server already stopped waiting for it;
+  // a newer approval (the city tax right after the booking) is shown after it.
   const [finishing, setFinishing] = useState(null);
-  const sheetApproval = approval || finishing;
+  const sheetApproval = sheetOf(approval, finishing);
   const approvalId = sheetApproval?.id;
   const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
   // Only the sheet that is finishing clears it: a late finish of an older sheet leaves a newer one.

@@ -24,5 +24,5 @@ export function bookingRequest(liked) {
   if (others.length) {
     text += ` If I decline it, I also liked: ${others.map(label).join(", ")}.`;
   }
-  return { best, text, shown: `Book ${best.name}` };
+  return { best, text, shown: `Book ${clean(best.name) || "this hotel"}` };
 }
