@@ -50,7 +50,7 @@ export function sameOrigin(value, fallback) {
   }
 }
 
-// The deck lives next to the wallet (/presentation/ and /wallet/); ?wallet= may point to another
+// The deck lives next to the wallet (/keynote/ and /wallet/); ?wallet= may point to another
 // path on the same origin, for layout checks.
 wallet.src = sameOrigin(params.get("wallet"), "/wallet/");
 
