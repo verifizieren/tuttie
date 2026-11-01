@@ -81,5 +81,9 @@ test('the /chat turn id binds the message even when its "turn" event never arriv
   assert.deepEqual(state.turns.map(t => t.id), [undefined, 't2']);  // the newest unsent copy
   state = applyEvent(state, answer(5, 't2', 'Hello again'));
   assert.equal(state.turns[1].answer, 'Hello again');
-  assert.equal(bindTurn(state, 'Hi', 't2'), state);  // never twice
+  // The same id again means the server joined a second send of these words to t2: its unsent
+  // copy goes (it would stay open forever), and t2 is never bound twice.
+  const joined = bindTurn(state, 'Hi', 't2');
+  assert.deepEqual(joined.turns.map(t => t.id), ['t2']);
+  assert.equal(bindTurn(joined, 'Hi', 't2'), joined);
 });

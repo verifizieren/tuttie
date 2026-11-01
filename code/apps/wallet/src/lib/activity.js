@@ -103,9 +103,12 @@ export function startTurn(state, said, id = null, source = "text") {
 const unsent = (state, said) => state.turns.findLastIndex(t => !t.id && !t.answer && t.said === said);
 
 /** POST /chat accepted a message as turn `id`: bind it now, so its events land in it even if the
- *  "turn" event is late or was missed. Never twice. */
+ *  "turn" event is late or was missed. Never twice: an id already bound drops this send's copy. */
 export function bindTurn(state, said, id) {
-  if (!id || state.turns.some(t => t.id === id)) return state;
+  if (!id) return state;
+  // The server joined these words to a turn that already has its local twin (two tabs, a
+  // retype): this send is not a turn of its own, so its unsent copy goes.
+  if (state.turns.some(t => t.id === id)) return dropTurn(state, said);
   const i = unsent(state, said);
   if (i === -1) return state;
   return { ...state, turns: state.turns.map((t, n) => (n === i ? { ...t, id } : t)) };
