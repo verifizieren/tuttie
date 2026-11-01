@@ -1,14 +1,16 @@
 # Keynote: the pitch deck
 
-The three-minute pitch as a static web page, served by the assistant at `/keynote/`, on the
+The three-minute pitch as a static web page, served by the assistant at `/keynote2/`, on the
 same origin as the wallet (`/wallet/`) and the owner view (`/owner/`). Plain HTML, CSS and ES
 modules: no build step, no CDN at runtime. Only the live wallet, the owner view and the QR target
 need the network. The assistant serves the folder from disk (`assistant/app.py`, static mount
-at `/`), so deck changes need no build and no restart. Open it at `/keynote/` on the same
-server as the wallet (live: https://web4.mendes.dev/keynote/ once on `main`).
+at `/`), so deck changes need no build and no restart. Open it at `/keynote2/` on the same
+server as the wallet.
 
-The speaker is the star: the screen is black most of the time, shows at most three words, and
-never shows the spoken sentence. The spoken lines are in `SPEAKER-NOTES.md` and the presenter view.
+The speaker is the star: the screen is empty most of the time, shows at most three words, and
+never shows the spoken sentence. The stage uses the wallet's light design: page `#f2f2f7`, black
+text, accents blue, purple and pink only, no URL text anywhere (the QR code carries the link).
+The spoken lines are in `SPEAKER-NOTES.md` and the presenter view.
 
 ## Controls (a clicker sends PageDown/PageUp)
 
@@ -33,9 +35,9 @@ or a held key, moves one step only.
 
 ## Beats
 
-0 black · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 black, then the cheap listing ·
-3 Tuttie's eyes · 4 demo: the eyes move into the phone and the real wallet takes over, side
-words "Never asked." and "One tap." · 5 black, the honesty line is spoken (hotels and register
+0 empty · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 empty, then the cheap listing ·
+3 Tuttie's white card with her eyes · 4 demo: the eyes move into the phone and the real wallet takes over, side
+words "Never asked." and "One tap." · 5 empty, the honesty line is spoken (hotels and register
 are demo, signatures are real) · 6 2000 website → 2033 signature ·
 7 one more thing: Anna's owner view in a laptop frame (optional) · 8 closing lines, then QR code.
 
@@ -46,13 +48,15 @@ wallet does not hear the speaker). `demo.js` supplies input and timing only: eac
 the matching step of `createDemo(iframe).steps` (open, ask, forged, like, approve, done), once
 per reset, and only when moving forward one click. Entering the demo beat runs "open": the
 wallet's microphone is muted first (the frame has no microphone permission), Tuttie's card
-opens, and the big eyes land on her awake eyes in the open card. "ask" posts the request to
+opens, and the big eyes fly into the phone and land on her eyes in the open card (canvas on
+canvas: both draw the same face in the same 2:1 box). "ask" posts the request to
 `POST /chat` for the wallet's own conversation, so Tuttie stays awake and shows her progress. Steps can wait on the wallet (offers take some
 seconds); the stage shows nothing while they wait, the presenter view shows "WAITING". If
 `demo.js` is missing or fails, the deck still runs and the demo clicks do nothing.
 
 The fallback recording is `media/fallback.webm` (390x844 at 2x), shown at exactly the iframe's
-size. It is loaded on the first V or L; if it is missing, nothing changes on stage.
+size. It was recorded on the old dark wallet and still shows the old eyes: re-record it on the
+light wallet before relying on it. It is loaded on the first V or L; if it is missing, nothing changes on stage.
 
 ## Options
 
@@ -61,11 +65,12 @@ size. It is loaded on the first V or L; if it is missing, nothing changes on sta
 - `?wallet=<url>` frames another wallet path on the same origin (layout checks only).
 
 Beat 7 shows `img/owner.webp`, a screenshot of the real owner view (Gästehaus am Rhein, review
-before deploy), so it needs no sign-in on stage.
+before deploy), so it needs no sign-in on stage. The owner view is still dark.
 
 ## Files
 
 `index.html`, `deck.css`, `deck.js` (stage, step machine, phone, keys), `beats.js` (beats, steps,
-spoken lines and cues; shared with the presenter view), `eyes.js` (Tuttie's eyes),
+spoken lines and cues; shared with the presenter view), `eyes.js` (starts Tuttie's eyes),
+`face.js` (a copy of the wallet's `src/lib/face.js`; keep the two in sync),
 `presenter.html` + `presenter.js`, `demo.js` (demo driver), `img/` (photo, QR code),
 `fonts/` (Inter), `media/` (fallback recording). Credits: `CREDITS.md`.
