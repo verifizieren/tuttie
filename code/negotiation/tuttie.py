@@ -180,7 +180,17 @@ class TuttieNegotiator:
         `offers` are accepted marketplace offers ({"node_id", "envelope", ...}); the outcomes
         come back in the same order.
         """
-        return await asyncio.gather(*(self.negotiate(o["node_id"], o["envelope"], context) for o in offers))
+        return await asyncio.gather(*(self.isolated(o, context) for o in offers))
+
+    async def isolated(self, offer: dict, context: Context) -> Outcome:
+        """negotiate for one offer; an unexpected error ends only this hotel's talk, as refused."""
+        try:
+            return await self.negotiate(offer["node_id"], offer["envelope"], context)
+        except Exception as error:  # noqa: BLE001 - one hotel's failure must not drop the others
+            payload = (offer.get("envelope") or {}).get("payload") or {}
+            price = payload.get("price_chf") if is_price(payload.get("price_chf")) else 0
+            return Outcome(str(offer.get("node_id", "")), str(payload.get("offer_id", "")), "refused", price,
+                           reason=f"negotiation failed: {type(error).__name__}")
 
 
 TERMS = ("request_id", "offer_id", "item", "room_type", "date", "rate", "includes", "conditions")
