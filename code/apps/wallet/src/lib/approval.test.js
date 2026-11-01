@@ -90,3 +90,27 @@ test("a sheet that is finishing stays until it is done, a newer approval comes a
   assert.equal(sheetOf(null, a1), a1);
   assert.equal(sheetOf(null, null), null);
 });
+
+test("a tap counts only on a sheet that was on screen when the finger came down", async () => {
+  const { tapAccepted, ARM_MS } = await import("./approval.js");
+  const shownAt = 1000;
+  // a click from code or the keyboard (detail 0) always counts: the keynote deck uses button.click()
+  assert.equal(tapAccepted({ detail: 0, shownAt, downAt: null }), true);
+  // a finger tap that started on the sheet before (the old sheet that slid away) never counts
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null }), false);
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: 900 }), false);
+  // the finger came down while the sheet was still sliding in: aimed at what was there before
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: shownAt + ARM_MS - 1 }), false);
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: shownAt + ARM_MS }), true);
+});
+
+test("the streamed decision finishes a sheet the user decided on, also after a timeout or a gone answer", async () => {
+  const { finishesOn } = await import("./approval.js");
+  assert.equal(finishesOn("approved", "sending", "approved"), true);
+  assert.equal(finishesOn("approved", "ask", "approved"), true);     // after the 15 s timeout
+  assert.equal(finishesOn("approved", "gone", "declined"), true);    // Decline at the retry: 404, yet it was approved
+  assert.equal(finishesOn("approved", "ask", null), false);          // never tapped: nothing to finish here
+  assert.equal(finishesOn(null, "sending", "approved"), false);
+  assert.equal(finishesOn("approved", "scan", "approved"), false);   // not sent yet: the call says what happens
+  assert.equal(finishesOn("approved", "done", "approved"), false);   // already finished
+});

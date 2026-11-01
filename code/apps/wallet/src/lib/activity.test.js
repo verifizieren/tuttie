@@ -249,3 +249,10 @@ test('an agreement after the cards never puts a non-number price on a card', () 
                                detail: { payload: { type: 'agreement', price_chf: 128 } } });
   assert.equal(good.cards.find(c => c.node_id === 'ch.h2').agreed_chf, 128);
 });
+
+test('a card rating is a score from 0 to 5, anything else is not shown', async () => {
+  const { cardOf } = await import('./activity.js');
+  const base = { node_id: 'ch.a', name: 'A', price_chf: 150, rating: { score: 4.5 } };
+  for (const score of [1e300, -3, 5.01, -0.1]) assert.equal(cardOf({ ...base, rating: { score } }).rating, null, String(score));
+  for (const score of [0, 4.5, 5]) assert.equal(cardOf({ ...base, rating: { score } }).rating.score, score);
+});
