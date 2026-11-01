@@ -14,6 +14,7 @@ from assistant.card_commands import card_choice
 from assistant.events import EventBus
 from assistant.tools import SCHEMAS, Toolbox
 from llm import LLM
+from speech import said_times
 
 MAX_ROUNDS = 12
 log = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ class Assistant:
             self.messages.append(message)
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
-                answer = drop_notes(answer) or fallback_answer(said_goodbye)
+                answer = said_times(drop_notes(answer)) or fallback_answer(said_goodbye)
                 self.bus.emit("answer", "verified", answer, detail={"mood": mood})
                 return answer
             for call in message["tool_calls"]:
