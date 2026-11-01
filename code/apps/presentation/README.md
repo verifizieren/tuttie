@@ -3,7 +3,9 @@
 The three-minute pitch as a static web page, served by the assistant at `/presentation/`, on the
 same origin as the wallet (`/wallet/`) and the owner view (`/owner/`). Plain HTML, CSS and ES
 modules: no build step, no CDN at runtime. Only the live wallet, the owner view and the QR target
-need the network.
+need the network. The assistant serves the folder from disk (`assistant/app.py`, static mount
+at `/`), so deck changes need no build and no restart. Open it at `/presentation/` on the same
+server as the wallet (live: https://web4.mendes.dev/presentation/ once on `main`).
 
 The speaker is the star: the screen is black most of the time, shows at most three words, and
 never shows the spoken sentence. The spoken lines are in `SPEAKER-NOTES.md` and the presenter view.
@@ -20,7 +22,7 @@ never shows the spoken sentence. The spoken lines are in `SPEAKER-NOTES.md` and 
 | N | presenter view in a second window (current and next line, cue, clock, time against plan) |
 | V | play the fallback recording in the phone, from the start (again: back to live) |
 | L | switch between live wallet and recording without restarting it |
-| R | reset: back to the start, fresh demo conversation, wallet reloaded |
+| R | reset: back to the start, fresh demo conversation (`POST /reset`), wallet reloaded |
 
 Keys also work while a framed page has focus, except while typing in one of its fields.
 
@@ -28,7 +30,8 @@ Keys also work while a framed page has focus, except while typing in one of its 
 
 0 black · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 black, then the cheap listing ·
 3 Tuttie's eyes · 4 demo: the eyes move into the phone and the real wallet takes over, side
-words "Never asked." and "One tap." · 5 black · 6 2000 website → 2033 signature ·
+words "Never asked." and "One tap." · 5 black, the honesty line is spoken (hotels and register
+are demo, signatures are real) · 6 2000 website → 2033 signature ·
 7 one more thing: Anna's owner view in a laptop frame (optional) · 8 closing lines, then QR code.
 
 ## The demo (beat 4)
