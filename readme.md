@@ -27,7 +27,7 @@ This repo follows the BaselHack template:
 
 | Folder | Contents |
 | --- | --- |
-| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `negotiation/` (bargaining), `sessions/` (agent memory), `services/` (weather, trains), `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `keynote/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `negotiation/` (bargaining), `sessions/` (agent memory), `services/` (weather, trains), `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `keynote1/, keynote2/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
 | `documentation/` | concept, architecture, formats, team context |
 | `assets/` | presentation material |
 

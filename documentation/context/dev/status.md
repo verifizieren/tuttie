@@ -10,6 +10,11 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
 
 ## Done
 
+- **Design rules (1 Nov)**: black/white with blue #2f6fe0, purple #7a5af8, pink #e5489b accents, no
+  orange, no italic, no small labels above headings, no URL text, pill buttons; the top seal tier is
+  purple. Wallet, owner (now light), QR page, `/keynote1/` and `/keynote2/` follow them. The QR page has
+  a story-style demo (tap left/right), one number per scroll, source logos and a reverse-marketplace section.
+  Open: keynote2's fallback recording still shows the old dark wallet (needs a real re-recording).
 - **Keynote pitch deck** (merged 1 Nov, still the dark design): a static deck
   in `code/apps/keynote2/`, served at `/keynote2/` by the assistant's static mount (no build). Black
   stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
