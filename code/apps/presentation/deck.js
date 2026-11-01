@@ -95,8 +95,10 @@ try {
 }
 const demoStep = id => demo?.steps?.find(step => step.id === id);
 
+let runGeneration = 0;           // bumped by reset(): an older step's finish must not touch the new run
 function runDemo(id) {
   if (!id || ran.has(id)) return;
+  const mine = runGeneration;
   ran.add(id);
   const step = demoStep(id);
   if (!step) return console.warn(`[deck] no demo step "${id}"`);
@@ -104,7 +106,7 @@ function runDemo(id) {
   broadcast();
   Promise.resolve().then(() => step.run())
     .catch(e => console.warn(`[deck] demo step "${id}" failed`, e))
-    .finally(() => { pending.delete(id); broadcast(); });
+    .finally(() => { if (mine === runGeneration) { pending.delete(id); broadcast(); } });
 }
 
 // ---------- fallback recording ----------
@@ -117,7 +119,11 @@ function loadFallback() {
     video.addEventListener("error", () => resolve(false), { once: true });
     try {
       if (typeof demo?.fallback === "function") demo.fallback(video);
-      else video.src = typeof demo?.fallback === "string" ? demo.fallback : "media/fallback.webm";
+      else {
+        const src = typeof demo?.fallback === "string" ? demo.fallback : "media/fallback.webm";
+        // Safari versions without VP9 get the H.264 copy next to it.
+        video.src = video.canPlayType('video/webm; codecs="vp9"') ? src : src.replace(/\.webm$/, ".mp4");
+      }
     } catch (e) {
       console.warn("[deck] fallback setup failed", e);
     }
@@ -154,7 +160,9 @@ function placeFace(rect, pose) {
   bigFace.eyes.forEach((eye, i) => Object.assign(eye.style, eyeStyle(pose, i ? "right" : "left")));
 }
 
+let faceMove = 0;               // the queued frame of faceIntoPhone, cancelled by faceHome
 function faceHome(shown) {
+  cancelAnimationFrame(faceMove);
   faceBox.classList.remove("moving", "gone");
   placeFace(FACE_HOME, OPEN);
   faceBox.classList.toggle("shown", shown);
@@ -167,7 +175,7 @@ function faceIntoPhone() {
   const s = PHONE.scale, ox = PHONE.x + PHONE.frame * s, oy = PHONE.y + PHONE.frame * s;
   faceBox.getBoundingClientRect();  // commit the start pose before transitioning
   faceBox.classList.add("moving");
-  requestAnimationFrame(() => {
+  faceMove = requestAnimationFrame(() => {
     placeFace({ x: ox + r.x * s, y: oy + r.y * s, w: r.w * s, h: r.h * s }, ASLEEP);
     faceBox.classList.add("gone");
   });
@@ -224,6 +232,7 @@ function go(target, { step = false } = {}) {
 }
 
 async function reset() {
+  runGeneration++;
   ran.clear();
   pending.clear();
   startedAt = 0;
@@ -237,9 +246,18 @@ async function reset() {
 
 // ---------- keys ----------
 
+const FORWARD = new Set(["ArrowRight", " ", "PageDown", "ArrowDown"]);
+const DEBOUNCE_MS = 300;        // a clicker that fires twice, or a held key, moves one step only
+let lastForward = 0;
 function key(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   const k = e.key;
+  if (e.repeat) return true;    // a held key: swallow it
+  if (FORWARD.has(k)) {
+    const now = performance.now();
+    if (now - lastForward < DEBOUNCE_MS) return true;
+    lastForward = now;
+  }
   if (k === "ArrowRight" || k === " " || k === "PageDown" || k === "ArrowDown") go(pos + 1, { step: true });
   else if (k === "ArrowLeft" || k === "PageUp" || k === "ArrowUp") go(pos - 1, { step: true });
   else if (k === "Home") go(0);
