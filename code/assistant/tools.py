@@ -808,11 +808,6 @@ class Toolbox:
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
             return {"error": f"call get_availability on {node_id} for {date} first"}
-        card = next((o["offer"] for o in self.market.last_offers if o["node_id"] == node_id), None)
-        if card is not None and (offered := offered_room(card)) and offered != room_type:
-            # The user liked the card, so the booking is for the card's room (its rate may differ).
-            return {"error": f"{record['name']}'s card offer is for the {offered} room: book room_type "
-                             f"{offered!r}, or tell the user that room differs from the card"}
         room = next((r for r in availability["rooms"] if r["room_type"] == room_type), None)
         if room is None:
             return {"error": f"room_type must be one of {[r['room_type'] for r in availability['rooms']]}"}
