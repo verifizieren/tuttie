@@ -12,3 +12,6 @@
   Copyright (c) 2019-2020).
 - `img/qr.svg`: generated with [segno](https://github.com/heuer/segno) for
   https://web4.mendes.dev/wallet/.
+- `img/owner.webp`: an unedited screenshot of the owner view (`apps/owner`, 1280x800 at 2.25x)
+  signed in to the Gästehaus am Rhein's own node, with a draft of two changes open in the review
+  dialog (not deployed).
