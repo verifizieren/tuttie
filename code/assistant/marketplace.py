@@ -197,10 +197,10 @@ class MarketDesk:
             record = (await self.http.get(f"{self.registry_url}/nodes/{node_id}")).json()
             verdict = evaluate_record(record, self.authorities)
             offer = item["offer"]
-            summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
             if number(offer["price_chf"]) is None:
                 raise ValueError("the price is not a finite number")
-        except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
+            summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, ArithmeticError):
             self.bus.emit("marketplace", "broken", "A malformed offer or one from an unknown business, ignored")
             return None
         valid_until = parse_timestamp(offer.get("valid_until", ""))

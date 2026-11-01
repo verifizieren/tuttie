@@ -210,8 +210,12 @@ def agreement_problem(offer: Offer, reply: dict, ceiling: float) -> str:
 
 def is_price(value) -> bool:
     """A real price in CHF: a finite number above zero (a bool is not a number here)."""
-    return (isinstance(value, (int, float)) and not isinstance(value, bool)
-            and math.isfinite(value) and value > 0)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value) and value > 0
+    except OverflowError:  # an int too big for a float
+        return False
 
 
 def best(outcomes: list[Outcome]) -> Outcome | None:
