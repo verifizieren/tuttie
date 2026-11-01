@@ -136,3 +136,24 @@ test('runs of "[" are fast', () => {
 test('the indentation of untouched lines is kept', () => {
   assert.equal(cleanAnswer('Rooms:\n  - double CHF 180\n  - single CHF 120'), 'Rooms:\n  - double CHF 180\n  - single CHF 120');
 });
+
+test('an approval in an odd shape becomes plain text and numbers the sheet can always show', () => {
+  const odd = { step: 1, kind: 'approval', status: 'pending', node_name: { x: 1 }, uid: ['CHE'], seals: [null, 'gold', { issuer: { a: 1 }, tier: 'gold', valid: 'yes' }],
+                detail: { approval_id: 'a1', amount_chf: { n: 1 }, terms: { room_type: { a: 1 }, date: 'x', rate: { x: 1 } },
+                          offer_mandate: { purpose: ['tax'], price_chf: 4 } } };
+  const { approval } = applyEvent(startTurn(EMPTY, 'book'), odd);
+  assert.deepEqual(approval, { id: 'a1', amount: '', hotel: '', summary: '', uid: null,
+    seals: [{ issuer: '', tier: 'gold', valid: false }],
+    offerMandate: { purpose: 'the next charge', price_chf: 4 }, terms: { room_type: '', date: 'x', rate: '' } });
+  const word = applyEvent(startTurn(EMPTY, 'book'), { ...odd, seals: 'gold' });
+  assert.deepEqual(word.approval.seals, []);
+});
+
+test('a normal approval keeps its amount, hotel, seals and terms', () => {
+  const seals = [{ issuer: 'handelsregister-bs', tier: 'gold', valid: true }];
+  const { approval } = applyEvent(startTurn(EMPTY, 'book'), { step: 1, kind: 'approval', status: 'pending', node_name: 'Rheinblick',
+    uid: 'CHE-1', seals, summary: 'Book', detail: { approval_id: 'a1', amount_chf: 172, offer_mandate: null,
+      terms: { room_type: 'double', date: '2026-11-14', rate: 'flexible', includes: [] } } });
+  assert.deepEqual(approval, { id: 'a1', amount: 172, hotel: 'Rheinblick', summary: 'Book', seals, uid: 'CHE-1', offerMandate: null,
+    terms: { room_type: 'double', date: '2026-11-14', rate: 'flexible' } });
+});

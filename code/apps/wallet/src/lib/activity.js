@@ -28,7 +28,32 @@ export const EMPTY = {
   closing: null,        // the user said goodbye: "asked" (end_conversation), "ready" once Tuttie answered
 };
 
-const validTiers = (seals = []) => (seals || []).filter(s => s?.valid).map(s => s.tier);
+const validTiers = (seals = []) => sealsOf(seals).filter(s => s.valid).map(s => s.tier);
+
+/** A value the wallet shows as text: a string or a number, anything else (an object, null) is "". */
+export const plain = value => (typeof value === "string" ? value
+  : typeof value === "number" && Number.isFinite(value) ? String(value) : "");
+
+/** An event's seals as a list of seal objects with a plain issuer and tier; anything else in an
+ *  event (null, a word) is dropped. */
+export const sealsOf = seals => (Array.isArray(seals) ? seals : [])
+  .filter(s => s && typeof s === "object" && !Array.isArray(s))
+  .map(s => ({ ...s, issuer: plain(s.issuer), tier: plain(s.tier), valid: s.valid === true }));
+
+/** A booking approval as the sheet shows it: only plain text and numbers, never an object
+ *  (a hotel's signed facts flow into it, and the sheet must always be able to render). */
+const amountOf = value => (typeof value === "number" && Number.isFinite(value) ? value : plain(value));
+
+export function approvalOf(event, detail) {
+  const terms = detail.terms && typeof detail.terms === "object" ? detail.terms : null;
+  const offer = detail.offer_mandate && typeof detail.offer_mandate === "object" ? detail.offer_mandate : null;
+  return {
+    id: plain(detail.approval_id), amount: amountOf(detail.amount_chf), hotel: plain(event.node_name),
+    summary: plain(event.summary), seals: sealsOf(event.seals), uid: plain(event.uid) || null,
+    offerMandate: offer && { purpose: plain(offer.purpose) || "the next charge", price_chf: amountOf(offer.price_chf) },
+    terms: terms && { room_type: plain(terms.room_type), date: plain(terms.date), rate: plain(terms.rate) },
+  };
+}
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
@@ -210,7 +235,7 @@ export function applyEvent(state, event) {
     }
     if (detail.phase === "offer" && event.node_id) {
       const next = withHotel(state, event.node_id, event.node_name, {
-        offer: detail.offer, tiers: validTiers(event.seals), seals: event.seals || [], uid: event.uid, status: "offered",
+        offer: detail.offer, tiers: validTiers(event.seals), seals: sealsOf(event.seals), uid: event.uid, status: "offered",
         size: detail.profile?.size || hotel(state, event.node_id).size,
       });
       const n = offerCount(next);
@@ -253,15 +278,13 @@ export function applyEvent(state, event) {
     const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true, at);
     return withBooking({ ...base, phase: "booked", bookingTurn: turnOf(base, at) },
                        { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
-                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: event.seals || [], uid: event.uid,
+                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: sealsOf(event.seals), uid: event.uid,
                          payments: [] });
   }
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
-      return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
-        hotel: event.node_name, summary: event.summary, seals: event.seals || [], uid: event.uid,
-        offerMandate: detail.offer_mandate || null, terms: detail.terms || null } };
+      return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: approvalOf(event, detail) };
     }
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
