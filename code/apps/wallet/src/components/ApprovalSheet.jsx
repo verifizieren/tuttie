@@ -133,13 +133,13 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
       await wait(DONE_MS);  // the checkmark (or X) is seen in full
       setLeaving(true);
       await wait(LEAVE_MS);
-      onFinished?.();
+      onFinished?.(approval.id);
     } catch (e) {
       const failure = failureOf(e);
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
-      if (!failure.gone) onFinished?.();  // still waiting: shown as the server's approval again
+      if (!failure.gone) onFinished?.(approval.id);  // still waiting: shown as the server's approval again
     }
   }
 

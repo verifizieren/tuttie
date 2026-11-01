@@ -69,7 +69,8 @@ export default function App() {
   const sheetApproval = approval || finishing;
   const approvalId = sheetApproval?.id;
   const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
-  const sheetDone = useCallback(() => setFinishing(null), []);
+  // Only the sheet that is finishing clears it: a late finish of an older sheet leaves a newer one.
+  const sheetDone = useCallback(id => setFinishing(f => (f && f.id !== id ? f : null)), []);
   const [showHistory, setShowHistory] = useState(false);
   // The past chat open in the history (null = the list), why it could not be continued, and
   // whether it is being restored.
@@ -101,10 +102,10 @@ export default function App() {
   // The user said goodbye (Tuttie's end_conversation): once the goodbye is shown and spoken, the
   // card closes itself, as if swiped down.
   useEffect(() => {
-    if (agent.closing !== "ready" || reveal || mode === "closed" || approval) return undefined;  // never away from an approval
+    if (agent.closing !== "ready" || reveal || mode === "closed" || sheetApproval) return undefined;  // never away from an approval sheet
     const timer = setTimeout(close, CLOSE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [agent.closing, reveal, mode, approval]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agent.closing, reveal, mode, sheetApproval]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!notice) return undefined;
     const timer = setTimeout(() => setNotice(""), NOTICE_MS);
