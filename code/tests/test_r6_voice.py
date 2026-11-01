@@ -207,3 +207,54 @@ def test_voice_diag_logs_one_clean_line_and_is_throttled(capsys):
         for _ in range(voice.DIAGS_PER_CLIENT_PER_MIN + 5):
             client.post("/voice/diag", content=b"x")
         assert len(capsys.readouterr().out.strip().splitlines()) == voice.DIAGS_PER_CLIENT_PER_MIN - 1
+
+
+def test_while_the_phone_asks_spoken_lines_wait_for_the_decision(monkeypatch):
+    """While the Face ID sheet is up, a spoken line (also "yes, book it" or a goodbye) is not
+    passed on (it would queue behind the running turn for minutes and could run after the
+    decision): the voice says to decide on the phone, at most once every few seconds. After the
+    decision (or a reset) lines go through again."""
+    from livekit.agents import StopResponse
+
+    pending = {"kind": "approval", "status": "pending", "summary": "Waiting for your phone.", "turn": "t1",
+               "detail": {"approval_id": "ap-0000000a", "amount_chf": 128}}
+    decided = {"kind": "approval", "status": "declined", "summary": "You declined CHF 128", "turn": "t1",
+               "detail": {"decision": {"approval_id": "ap-0000000a", "decision": "declined"}}}
+    streams = [frames(pending)]
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(200, text=streams.pop(0)) if streams else httpx.Response(409)
+
+    lines, sent = [], []
+    monkeypatch.setattr(Tuttie, "session", property(lambda self: Session(lines)), raising=False)
+
+    class Message:
+        def __init__(self, text):
+            self.text_content = text
+
+    async def turn(agent, text):
+        try:
+            await agent.on_user_turn_completed(None, Message(text))
+        except StopResponse:
+            pass
+
+    async def run():
+        async with httpx.AsyncClient(base_url="http://a", transport=httpx.MockTransport(handler)) as http:
+            agent = Tuttie("tuttie-x", http)
+
+            async def pass_on(text):
+                sent.append(text)
+            agent.pass_on = pass_on
+            await asyncio.wait_for(follow(Session(lines), agent, http, Room()), 2)
+            assert agent.pending_approvals
+            await turn(agent, "yes book it")
+            await turn(agent, "ok thanks bye")
+            assert sent == [] and lines == [UPDATES["approval"], "Please approve or decline on your phone first."], lines
+            streams.append(frames(decided))
+            await asyncio.wait_for(follow(Session(lines), agent, http, Room()), 2)
+            assert not agent.pending_approvals
+            await turn(agent, "ok thanks bye")
+            assert sent == ["ok thanks bye"]
+    asyncio.run(run())
