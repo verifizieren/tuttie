@@ -47,7 +47,6 @@ LLM_ERRORS = (ValidationError, json.JSONDecodeError, OpenAIError, AnthropicError
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
 DEFAULT_WAKES_ON = ["posting.created", "posting.updated"]
 OFFER_MAX_VALID_H = 24  # an offer never stays open longer than this
-COMMITMENT_DAYS = 30  # validity of a commitment when the arrival date is unknown
 MAX_DAYS_AHEAD = 365  # how far ahead a business takes bookings (and a commitment may reach)
 # The company agents' decisions are small (interested?, which room and add-ons, a short answer),
 # so they use a fast model without reasoning (AGENT_LLM_MODEL, e.g. claude-haiku-5-5).
@@ -78,13 +77,13 @@ PRIVATE_FACTS = ("negotiation",)
 
 ANSWER_PROMPT = """{persona}
 
-Another AI agent asks on behalf of a guest. Answer ONLY from these facts; if they do not cover
+Today is {today}. Another AI agent asks on behalf of a guest (the context may name the stay's
+night as "date"). Answer ONLY from these facts; if they do not cover
 the question, say so:
 {facts}
 
 The add-ons you can commit to are listed under "add_ons". Return a JSON object:
-{{"answer": "<one or two sentences, in your persona's tone>", "add_on": "<id of the ONE add-on that covers what is asked, or null>",
-  "arrival_date": "<YYYY-MM-DD of the guest's arrival if known, else null>"}}
+{{"answer": "<one or two sentences, in your persona's tone>", "add_on": "<id of the ONE add-on that covers what is asked, or null>"}}
 Pick the add-on that covers everything the guest needs (e.g. late arrival AND a dog). An add-on is
 not the reservation itself: room, date and payment are handled later by the book tool, so never
 refuse an add-on because you cannot reserve the room here. Use null if no add-on fits.
@@ -145,7 +144,6 @@ class AgentReply(BaseModel):
 
     answer: str
     add_on: str | None = None
-    arrival_date: date | None = None
 
 
 class OfferChoice(BaseModel):
@@ -166,17 +164,22 @@ class WakeDecision(BaseModel):
     add_ons: list[str] = []
 
 
-def bounded_arrival(arrival: date | None, stay_night, today: date | None = None) -> date | None:
-    """The LLM's arrival date if it is plausible: from today up to MAX_DAYS_AHEAD, and not after
-    the stay's night (`stay_night`, YYYY-MM-DD, when known); else None or that night."""
+def commitment_night(stay_night, today: date | None = None) -> date:
+    """The night a commitment is anchored to: the stay's night (`stay_night`, YYYY-MM-DD, from
+    the context the asking agent shared), clamped to today .. MAX_DAYS_AHEAD (+1 day for the
+    Swiss/UTC skew). Without a readable night, the last bookable one: the promise then holds for
+    any booking, which still redeems it only once (node/server.py UsedCommitments).
+
+    Never the LLM's guess of the arrival: it does not know the night and often guesses today,
+    which made the promise expire before the booked night (red team round 5).
+    """
     today = today or datetime.now(timezone.utc).date()
-    if arrival is None or not today <= arrival <= today + timedelta(days=MAX_DAYS_AHEAD):
-        return None
+    last = today + timedelta(days=MAX_DAYS_AHEAD + 1)
     try:
         night = date.fromisoformat(stay_night) if isinstance(stay_night, str) else None
     except ValueError:
         night = None
-    return min(arrival, night) if night and night >= today else arrival
+    return min(max(night, today), last) if night else last
 
 
 def offer_valid_until(request: dict, now: datetime | None = None) -> str | None:
@@ -256,21 +259,17 @@ class BusinessAgent:
 
     # ---------- Answering other agents (A2A) ----------
 
-    def commitment(self, add_on_id: str | None, arrival: date | None, context: dict | None = None) -> dict | None:
-        """The signed promise for one add-on, valid until noon after the arrival night.
+    def commitment(self, add_on_id: str | None, context: dict | None = None) -> dict | None:
+        """The signed promise for one add-on, valid until noon after the stay's night.
 
-        The arrival comes from the LLM, so code bounds it: a past one or one beyond
-        MAX_DAYS_AHEAD is ignored (then COMMITMENT_DAYS apply), and it never lies after the
-        stay's night when the shared context names one ("date").
+        The night comes from the shared context ("date"), bounded by code (commitment_night);
+        the LLM only picks the add-on, never the price or the validity.
         """
         add_on = self.add_ons.get(add_on_id or "")
         if add_on is None:
             return None
-        arrival = bounded_arrival(arrival, (context or {}).get("date"))
-        if arrival:
-            valid_until = datetime.combine(arrival + timedelta(days=1), time(12), timezone.utc)
-        else:
-            valid_until = datetime.now(timezone.utc) + timedelta(days=COMMITMENT_DAYS)
+        night = commitment_night((context or {}).get("date"))
+        valid_until = datetime.combine(night + timedelta(days=1), time(12), timezone.utc)
         return {
             "item": add_on["item"],
             "price_chf": add_on["price_chf"],
@@ -283,7 +282,8 @@ class BusinessAgent:
 
         `history` is the session so far (oldest first), when the question comes in a session.
         """
-        system = ANSWER_PROMPT.format(persona=self.persona_text(), facts=self.facts_json)
+        system = ANSWER_PROMPT.format(persona=self.persona_text(), facts=self.facts_json,
+                                      today=datetime.now(timezone.utc).date().isoformat())
         request = {"question": question, "context": context}
         if history:
             request["conversation_so_far"] = history
@@ -292,7 +292,7 @@ class BusinessAgent:
             reply = AgentReply.model_validate(await self._llm().complete_json(system, user))
         except LLM_ERRORS:
             return FALLBACK
-        return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, reply.arrival_date, context)}
+        return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, context)}
 
     # ---------- Being woken by the marketplace ----------
 

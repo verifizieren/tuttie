@@ -12,7 +12,10 @@ station, cancel, breakfast, wifi, parking, small), `ok` paints it green or red. 
 answer the user's needs come first.
 """
 
+import re
+
 MAX_CARDS = 5
+PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)")
 MAX_FEATURES = 5
 WALK_M_PER_MIN = 80
 NEAR_STATION_M = 1000
@@ -61,6 +64,17 @@ def features(facts: dict) -> list[dict]:
     return found
 
 
+def own_photos(node_id: str, photos) -> list[str]:
+    """Only the hotel's own photos served with the wallet: `hotels/<node_id>/<file>.jpg|jpeg|png|webp`
+    (optionally with a leading "/"). Anything else (other hosts, another hotel's folder, "..",
+    query strings) is dropped, so a verified hotel cannot track the user or borrow photos."""
+    if not isinstance(photos, list):
+        return []
+    prefix = f"hotels/{node_id}/"
+    return [p for p in photos if isinstance(p, str) and p.removeprefix("/").startswith(prefix)
+            and PHOTO_FILE.fullmatch(p.removeprefix("/")[len(prefix):])]
+
+
 def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: float | None,
                shortlisted: bool, agreed_chf: float | None = None) -> dict:
     """One hotel's card: photos, rating, price, what is included and its features for this user.
@@ -84,7 +98,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
         "about": profile.get("about"),
         "agent": item.get("agent"),
         "rating": facts.get("rating"),
-        "photos": facts.get("photos", []),
+        "photos": own_photos(item["node_id"], facts.get("photos")),
         "offer_id": offer["offer_id"],
         "item": offer["item"],
         "price_chf": price,

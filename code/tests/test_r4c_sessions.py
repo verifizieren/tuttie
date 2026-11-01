@@ -300,12 +300,13 @@ def test_r4c_a_commitment_books_once():
 
 
 def test_r4c_llm_arrival_cannot_stretch_a_commitment():
-    """The arrival date the LLM picks is bounded: not beyond MAX_DAYS_AHEAD, not after the stay."""
+    """A commitment's validity is bounded by code: never beyond MAX_DAYS_AHEAD, not after the stay."""
     agent = node.agent.BusinessAgent(hotel("hotel-rheinblick.json"))
     add_on = next(iter(agent.add_ons))
     today = datetime.now(timezone.utc).date()
-    far = agent.commitment(add_on, today + timedelta(days=30_000))
-    assert far["valid_until"] <= (today + timedelta(days=node.agent.COMMITMENT_DAYS + 1)).isoformat()
+    bound = (today + timedelta(days=node.agent.MAX_DAYS_AHEAD + 2)).isoformat()
+    assert agent.commitment(add_on, {"date": (today + timedelta(days=30_000)).isoformat()})["valid_until"][:10] <= bound
+    assert agent.commitment(add_on, {})["valid_until"][:10] <= bound
     night = today + timedelta(days=10)
-    late = agent.commitment(add_on, today + timedelta(days=200), {"date": night.isoformat()})
+    late = agent.commitment(add_on, {"date": night.isoformat()})
     assert late["valid_until"].startswith((night + timedelta(days=1)).isoformat())

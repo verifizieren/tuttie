@@ -35,6 +35,8 @@ SHORTLIST_SIZE = 5
 POSTING_HOURS = 2      # how long a posting stays open
 OFFER_WAIT_S = 45      # longest wait for the interested agents' offers (it stops as soon as all have offered)
 POLL_S = 0.5
+CARD_TIMEOUT_S = 5
+MAX_CARD_AGE_S = 300   # as in marketplace/market.py: a node signs its agent card on every GET
 
 
 # A price in a requirement ("max CHF 160", "160 francs", "budget 160", "under 160.-"): the LLM
@@ -177,11 +179,29 @@ class MarketDesk:
         if problem:
             self.bus.emit("marketplace", "broken", f"{summary}: {problem}, ignored", record, verdict["seals"])
             return None
+        # Name, uid, agent and profile come from signed data only (the sealed registry record and
+        # the business's own signed agent card), never from the market's unsigned relay.
+        card = await self.agent_card(record)
+        agent, profile = (card.get("persona") or {}).get("name"), card.get("profile")
         event = self.bus.emit("marketplace", "verified", summary, record, verdict["seals"],
-                              {"phase": "offer", "offer": offer, "agent": invited.get("agent"),
-                               "profile": invited.get("profile")})
-        return {**item, "trust_tier": verdict["tier"], "source_step": event["step"],
-                "agent": invited.get("agent"), "profile": invited.get("profile")}
+                              {"phase": "offer", "offer": offer, "agent": agent, "profile": profile})
+        return {"node_id": node_id, "name": record["name"], "uid": verdict.get("uid"),
+                "offer": offer, "envelope": item["envelope"], "trust_tier": verdict["tier"],
+                "source_step": event["step"], "agent": agent, "profile": profile}
+
+    async def agent_card(self, record: dict) -> dict:
+        """The business's signed, fresh agent card from its sealed endpoint; {} if unavailable."""
+        try:
+            response = await self.http.get(f"{record['endpoint']}/agent/card", timeout=CARD_TIMEOUT_S)
+            envelope = response.json()
+            if (response.status_code == 200
+                    and verify_envelope(envelope, record["public_key"], expected_node_id=record["node_id"],
+                                        max_age_s=MAX_CARD_AGE_S)
+                    and isinstance(envelope["payload"], dict)):
+                return envelope["payload"]
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            pass
+        return {}
 
     @staticmethod
     def view(item: dict) -> dict:
