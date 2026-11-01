@@ -210,10 +210,20 @@ section.block { padding: 90px 0; }
          border-radius: 60px; padding: 8px; background: #1b1b20;
          box-shadow: inset 0 0 0 2px #3a3a42, inset 0 0 0 5px #0d0d10, 0 18px 44px rgba(23,23,29,.12), 0 0 0 1px #000;
          will-change: transform; pointer-events: auto; }
-.paused-tag { position: absolute; left: 50%; top: 50%; z-index: 8; transform: translate(-50%, -50%); padding: 14px 26px; border-radius: 30px;
-              font-size: 26px; font-weight: 650; color: #fff; background: rgba(23,23,29,.78); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-              white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .25s; }
-.phone.paused .paused-tag { opacity: 1; }
+/* Story controls: tap right = next part, tap left = previous part, hold = pause, arrow keys on
+   desktop. The side buttons show on wide screens; on a phone the whole stage is the tap area. */
+.demo .pin.story { cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.snav { position: absolute; z-index: 5; top: 50%; width: 56px; height: 56px; margin-top: -28px; border-radius: 50%; padding: 0; display: none;
+        place-items: center; cursor: pointer; color: var(--text); background: #fff; border: 1px solid var(--line2); box-shadow: var(--shadow);
+        opacity: 0; pointer-events: none; transition: opacity .4s var(--ease), transform .2s var(--ease); }
+.snav svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.snav:hover { transform: scale(1.06); }
+.snav:active { transform: scale(.94); }
+.snav.prev { left: calc(50% - 330px); } .snav.next { right: calc(50% - 330px); }
+.story .snav { opacity: 1; pointer-events: auto; }
+@media (min-width: 760px) and (hover: hover) { .snav { display: grid; } }
+.bars i.done b { width: 100% !important; }
+.held .bars { opacity: .5; }
 .cap h3 { padding-right: 84px; }
 .replay { position: absolute; z-index: 4; right: var(--gut); top: calc(4px + env(safe-area-inset-top)); padding: 8px 14px; border-radius: 16px;
           font: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
@@ -624,6 +634,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <h3 id="capT">&nbsp;</h3>
       <p id="capP">&nbsp;</p>
     </div>
+    <button class="snav prev" id="sPrev" type="button" aria-label="Previous part"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="snav next" id="sNext" type="button" aria-label="Next part"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
     <div class="stagebox" id="stagebox">
       <div class="phone" id="phone">
         <div class="screen" id="screen">
@@ -658,7 +670,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
             <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
           </div>
           <div class="tap" id="tap"></div>
-          <div class="paused-tag">Paused · tap to play</div>
 
           <div class="sheet" id="sheet">
             <div class="sh-hotel"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>Gästehaus am Rhein</div>
@@ -879,7 +890,7 @@ function line(id, text, state) {
 const show = (id, on = true) => { const el = $(id); el.classList.toggle("hide", !on); if (on) { el.classList.remove("fadein"); void el.offsetWidth; el.classList.add("fadein"); } };
 const call = (id, on) => $(id).classList.toggle("show", on);
 const cls = (c, on) => screen.classList.toggle(c, on);
-function tapAt(x, y) { const t = $("#tap"); t.style.left = x + "px"; t.style.top = y + "px"; t.classList.remove("go"); void t.offsetWidth; t.classList.add("go"); }
+function tapAt(x, y) { if (seeking) return; const t = $("#tap"); t.style.left = x + "px"; t.style.top = y + "px"; t.classList.remove("go"); void t.offsetWidth; t.classList.add("go"); }
 
 const EVENTS = [
   [1700, () => tapAt(195, 355)],
@@ -942,19 +953,38 @@ function setCaption(i) {
   clearTimeout(capTimer);
   capTimer = setTimeout(() => { $("#capT").textContent = CAPS[i][0]; $("#capP").textContent = CAPS[i][1]; cap.classList.remove("swap"); }, capIndex === 0 && clock < 50 ? 0 : 220);
 }
-function restart() { resetDemo(); tapPaused = false; $("#phone").classList.remove("paused"); clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
-function tickDemo(dt) {
-  if (!playing || finished) return;
-  clock += dt;
+function restart() { resetDemo(); clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
+let seeking = false;
+// Jump to any moment: replay every event up to it at once (CSS transitions settle the screen).
+function seek(t) {
+  resetDemo(); clock = Math.min(t, DURATION); fired = 0; finished = false; $("#replay").classList.remove("show");
+  seeking = true;
   while (fired < EVENTS.length && EVENTS[fired][0] <= clock) EVENTS[fired++][1]();
-  for (const t of typers) if (clock >= t.start && clock < (t.until ?? Infinity)) t.el.textContent = t.text.slice(0, Math.ceil(t.text.length * clamp((clock - t.start) / t.dur)));
-  let ci = 0; capAt.forEach((a, i) => { if (clock >= a) ci = i; });
-  setCaption(ci);
+  seeking = false;
+  for (const ty of typers) ty.el.textContent = clock >= ty.start ? ty.text.slice(0, Math.ceil(ty.text.length * clamp((clock - ty.start) / ty.dur))) : "";
+  render();
+}
+const partAt = t => { let ci = 0; capAt.forEach((a, i) => { if (t >= a) ci = i; }); return ci; };
+function nextPart() { const i = partAt(clock); if (finished) return; seek(i + 1 < capAt.length ? capAt[i + 1] : DURATION); }
+function prevPart() {
+  const i = finished ? capAt.length - 1 : partAt(clock);
+  seek(!finished && clock - capAt[i] < 1200 && i > 0 ? capAt[i - 1] : capAt[i]);
+}
+function render() {
+  setCaption(partAt(clock));
   barFills.forEach((b, i) => {
     const a = capAt[i], z = capAt[i + 1] ?? DURATION;
     b.style.width = `${clamp((clock - a) / (z - a)) * 100}%`;
   });
   if (clock >= DURATION) { finished = true; $("#replay").classList.add("show"); }
+  document.body.classList.toggle("demo-done", finished);
+}
+function tickDemo(dt) {
+  if (!playing || finished) return;
+  clock += dt;
+  while (fired < EVENTS.length && EVENTS[fired][0] <= clock) EVENTS[fired++][1]();
+  for (const t of typers) if (clock >= t.start && clock < (t.until ?? Infinity)) t.el.textContent = t.text.slice(0, Math.ceil(t.text.length * clamp((clock - t.start) / t.dur)));
+  render();
 }
 // "Watch it again": land where the phone is docked, so the demo plays right away.
 $("#again").addEventListener("click", e => {
@@ -963,13 +993,36 @@ $("#again").addEventListener("click", e => {
   scrollTo({ top: d.offsetTop + (d.offsetHeight - innerHeight) * .36, behavior: "smooth" });
 });
 $("#replay").addEventListener("click", e => { e.stopPropagation(); restart(); playing = true; });
-// Tap the phone to pause and resume; a tap pause sticks until the next tap (scrolling back
-// into view resumes only an automatic pause).
-let tapPaused = false;
-$("#phone").addEventListener("click", () => {
-  if (!started || finished) return;
-  playing = !playing; tapPaused = !playing;
-  $("#phone").classList.toggle("paused", tapPaused);
+// Like a story: tap the right side for the next part, the left side for the previous one,
+// press and hold to pause. Arrow keys on desktop (Space pauses). Scrolling still works: a touch
+// that turns into a scroll is cancelled by the browser and never counts as a tap.
+let held = false, keyPaused = false, press = null;
+const demoPin = $("#demo .pin");
+const setHeld = on => { held = on; demoPin.classList.toggle("held", on); };
+demoPin.addEventListener("pointerdown", e => {
+  if (!started || e.button > 0 || e.target.closest("button")) return;
+  press = { x: e.clientX, y: e.clientY, t: performance.now(), timer: setTimeout(() => { if (press) setHeld(true); }, 280) };
+});
+demoPin.addEventListener("pointermove", e => {
+  if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) { clearTimeout(press.timer); press = null; setHeld(false); }
+});
+const endPress = tap => e => {
+  if (!press) return;
+  clearTimeout(press.timer);
+  const wasHeld = held; press = null; setHeld(false);
+  if (!tap || wasHeld) return;
+  if (e.clientX < innerWidth * .33) prevPart(); else nextPart();
+};
+demoPin.addEventListener("pointerup", endPress(true));
+demoPin.addEventListener("pointercancel", endPress(false));
+demoPin.addEventListener("contextmenu", e => { if (started) e.preventDefault(); });
+$("#sPrev").addEventListener("click", () => prevPart());
+$("#sNext").addEventListener("click", () => nextPart());
+addEventListener("keydown", e => {
+  if (!started || !document.body.classList.contains("in-demo") || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === "ArrowRight") { e.preventDefault(); nextPart(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); prevPart(); }
+  else if (e.key === " ") { e.preventDefault(); keyPaused = !keyPaused; }
 });
 
 // ---------- Scroll into the demo ----------
@@ -1001,9 +1054,8 @@ function onDemo() {
   $("#cap").classList.toggle("show", z > .9);
   document.body.classList.toggle("in-demo", r.top <= 0 && r.bottom > innerHeight * .5);
   if (docked && visible && !started) { started = true; restart(); playing = true; }
-  if (started && (!visible || !docked)) playing = false;
-  else if (started && visible && docked && !finished && !tapPaused) playing = true;
-  if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); }
+  demoPin.classList.toggle("story", started && docked && visible);
+  if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); document.body.classList.remove("demo-done"); }
 }
 
 $("#totop").addEventListener("click", () => scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }));
@@ -1016,6 +1068,7 @@ layoutPhone();
 function loop(now) {
   const dt = last ? Math.min(100, now - last) : 0; last = now;
   if (dirty) { dirty = false; onNums(); onDemo(); $("#totop").classList.toggle("show", scrollY > innerHeight * 1.2); }
+  if (started) playing = demoPin.classList.contains("story") && !held && !keyPaused;
   tickDemo(dt);
   requestAnimationFrame(loop);
 }
