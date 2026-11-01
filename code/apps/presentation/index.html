@@ -362,6 +362,9 @@ section.block { padding: 90px 0; }
 .honest b { color: var(--text); font-weight: 600; }
 footer { padding: 30px 0 calc(40px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.7; color: var(--dim); }
 footer a { color: var(--muted); }
+footer .gh { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 14px; padding: 0 18px; border-radius: 999px;
+             font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none; background: var(--panel); border: 1px solid var(--line2); }
+footer .gh svg { width: 18px; height: 18px; fill: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
   .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
@@ -658,7 +661,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
     Built in one weekend at <b>BaselHack 2026</b><br>
     Adobe challenge · The Post-Website Business<br>
     Jonas · Stan · Sebastian · Thomas · Max · Chris<br>
-    <a href="https://github.com/verifizieren/tuttie">github.com/verifizieren/tuttie</a>
+    <a class="gh" href="https://github.com/verifizieren/tuttie"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.7 0-1 .4-1.9 1-2.6-.1-.2-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.5.6.7 1 1.6 1 2.6 0 3.7-2.3 4.5-4.4 4.7.3.3.7.9.7 1.8v2.7c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5z"/></svg>Code on GitHub</a>
   </footer>
 </section>
 
