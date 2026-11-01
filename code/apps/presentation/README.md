@@ -44,6 +44,10 @@ in `apps/wallet/src/components/BankCard.jsx`. `face.js` is a copy of
 `apps/wallet/src/lib/face.js`: keep it in sync. Photos: `img/` (copied from
 `apps/wallet/public/hotels`, credits in `apps/wallet/public/hotels/CREDITS.md`).
 
+Dark mode follows the phone's setting (`prefers-color-scheme`, one block at the end of the
+styles): the page swaps its colour variables; the Tuttie card and the wallet inside the phone
+stay light, as the wallet looks (`.phone` sets the light variables again).
+
 Speed: both faces paint only while their canvas is on screen (`paintOnlyOnScreen` wraps the
 instance, so `face.js` stays an exact copy); each frame draws two eyes with a blurred halo at
 up to 3x resolution. Inter loads without blocking the first paint. Only the top bar keeps a

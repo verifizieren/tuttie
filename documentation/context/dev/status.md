@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch) and `/keynote2/` (live demo); the demo runner is open).
+Last updated: 2026-11-01 (QR page: dark mode, speed, 5 % fee; light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch) and `/keynote2/` (live demo); the demo runner is open).
 
 ## Done
 
@@ -24,6 +24,8 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
   switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
   skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
   page in `code/apps/presentation/`. Details: `code/apps/keynote2/README.md`.
+- **QR page dark mode (1 Nov)**: follows the phone's setting; the Tuttie card and the wallet mock in
+  the phone stay light. Light mode unchanged (pixel compare).
 - **QR page speed (1 Nov)**: the two faces painted 60 frames a second even off screen (724 blurred
   draws in 3 s while reading the business part); now they paint only while visible. Fonts no longer
   block the first paint; two invisible nested backdrop blurs removed. Look unchanged (pixel compare).
