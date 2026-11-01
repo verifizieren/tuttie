@@ -134,7 +134,8 @@ class ActionGate:
         self.paid_with_mandate: dict[str, float] = {}  # mandate id -> CHF paid with it
 
     def made_before_start(self, timestamp: str, now: datetime) -> bool:
-        """Whether `timestamp` is from before this gate started (stamps are whole seconds). A clock before the start (tests) never counts."""
+        """Whether `timestamp` is from before this gate started (stamps are whole seconds).
+        A clock before the start (tests) never counts."""
         stamped = parse_timestamp(timestamp)
         if stamped is None or now < self.started_at:
             return False
