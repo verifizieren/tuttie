@@ -123,16 +123,28 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
         transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
 .has-wallet .card { transform: none; }
 .fwd.at-wallet .card.b0 { transition-delay: 2.15s; } .fwd.at-wallet .card.b1 { transition-delay: 2.25s; } .fwd.at-wallet .card.agent { transition-delay: 2.35s; }
-.b0 { --i: 0; background: linear-gradient(135deg, #3a63e8, #1b2f8f 60%, #111c55); }
+.b0 { --i: 0; background: linear-gradient(135deg, #1487d4, #07529b 58%, #04356e); }
 .b1 { --i: 1; background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
 .chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px; overflow: hidden; background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
 .chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90,68,28,.55); stroke-width: 1; }
-.agent { --i: 2; background: #0c0c10; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 -8px 24px rgba(0,0,0,.55); }
+/* Swiss bank marks, as BankCard.jsx draws them: ZKB (blue, Swiss cross) and UBS (black, keys). */
+.bank-brand { position: absolute; top: 18px; right: 20px; height: 34px; display: flex; align-items: center; color: #fff; line-height: 1; }
+.ubs-brand { gap: 8px; }
+.ubs-brand b { font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 700; letter-spacing: -.06em; }
+.ubs-keys { width: 39px; height: 28px; overflow: visible; }
+.zkb-brand { gap: 9px; text-align: left; }
+.zkb-brand b { display: block; font-size: 21px; font-weight: 800; letter-spacing: .02em; }
+.zkb-brand small { display: block; margin-top: 3px; font-size: 8px; font-weight: 650; letter-spacing: .015em; opacity: .9; }
+.swiss-mark { position: relative; display: block; width: 27px; height: 27px; box-sizing: border-box; border: 1.5px solid rgba(255,255,255,.9); border-radius: 7px; }
+.swiss-mark i { position: absolute; left: 50%; top: 50%; display: block; background: #fff; transform: translate(-50%, -50%); }
+.swiss-mark i:first-child { width: 13px; height: 4px; }
+.swiss-mark i:last-child { width: 4px; height: 13px; }
+.agent { --i: 2; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.05), 0 8px 28px rgba(23,23,40,.10), 0 -4px 16px rgba(23,23,40,.06); }
 .agent canvas { position: absolute; left: 0; width: 356px; height: 178px; top: 50%; display: block;
                 transform: translateY(-50%) scale(.92); transition: top .7s var(--ease), transform .7s var(--ease); }
-.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1px rgba(255,181,150,.45); }
-.label { position: absolute; top: 16px; left: 20px; z-index: 2; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgba(236,235,244,.38); transition: top .7s var(--ease), left .7s var(--ease); }
-.grabber { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(255,255,255,.28); opacity: 0; transition: opacity .3s; z-index: 2; }
+.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1.5px rgba(217,119,87,.45); }
+.label { position: absolute; top: 16px; left: 20px; z-index: 2; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgba(23,23,29,.42); transition: top .7s var(--ease), left .7s var(--ease); }
+.grabber { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(0,0,0,.22); opacity: 0; transition: opacity .3s; z-index: 2; }
 /* open: the bank cards drop away and the face takes the screen */
 .has-ask .whead { opacity: 0; transform: translateY(-14px); }
 .has-ask .bank { transform: translateY(110vh); opacity: 0; }
@@ -552,8 +564,12 @@ html.dark-theme #proof .proof-paper { color:#ecebf4; }
 
       <div class="wl">
         <div class="whead"><h1>Wallet</h1></div>
-        <div class="card bank b0"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span></div>
-        <div class="card bank b1"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span></div>
+        <div class="card bank b0" aria-label="ZKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+          <span class="bank-brand zkb-brand" aria-hidden="true"><span class="swiss-mark"><i></i><i></i></span><span><b>ZKB</b><small>Zürcher Kantonalbank</small></span></span></div>
+        <div class="card bank b1" aria-label="UBS card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+          <span class="bank-brand ubs-brand" aria-hidden="true"><svg class="ubs-keys" viewBox="0 0 42 30"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="15" r="4.5"/><path d="M11.5 15h24l4-4M31 15l4 4M26 15v4"/><circle cx="13" cy="6" r="3.5"/><path d="M16 8l18 13 5-1M31 19l-1 4"/>
+            <circle cx="13" cy="24" r="3.5"/><path d="M16 22L34 9l5 1M31 11l-1-4"/></g></svg><b>UBS</b></span></div>
         <div class="card agent">
           <canvas id="face"></canvas>
           <div class="edge"></div><div class="grabber"></div><span class="label">Tuttie</span>
