@@ -85,7 +85,7 @@ def test_an_invalid_stored_version_is_skipped_not_fatal(folder):
     deploy(client, edited(client, lambda s: s["facts"]["rooms"][0].update(price_chf=160)), base_version=1)
     path = folder / f"{CONFIG['node_id']}.json"
     data = json.loads(path.read_text())
-    data["versions"][1]["settings"]["facts"]["rooms"] = []  # what an empty deploy stored before
+    data["versions"][1]["settings"]["facts"]["rooms"][0]["price_chf"] = -1  # a check added after the deploy
     path.write_text(json.dumps(data))
     store = DeploymentStore(CONFIG["node_id"], CONFIG, folder)
     assert store.current["version"] == 1
