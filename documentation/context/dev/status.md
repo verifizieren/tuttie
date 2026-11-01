@@ -573,9 +573,11 @@ Why things are the way they are, so nobody has to rediscover them:
   its words without the brackets, so a fee or "cancelled" is never hidden. Shared cases:
   `code/tests/fixtures/answer_notes.json`. The voice says two-digit 24-hour times as "6 pm",
   "12:52 am", "midnight", "noon" (also "14:00 hrs" / "18:00 Uhr") and leaves "8:30 pm",
-  durations ("1:30 hours") and "18:00:30" alone. Only the "Ignored: ..." part of a line is
-  dropped (never the whole answer); citation links never read out a URL; spaces are tidied only
-  where a note was removed. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
+  durations ("1:30 hours") and "18:00:30" alone. Only whole lines starting with "Ignored:" are
+  dropped, and a non-empty answer never cleans to nothing (its words stay, unbracketed); a time
+  after "takes"/"for"/"in" is a duration and stays; booking and receipt ids are never spoken;
+  citation links never read out a URL; spaces are tidied only where a note was removed. Both
+  sides are tested against the same "screen" column of the fixture. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
   showed up. Found and checked by a bug hunter and two attacker rounds.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
