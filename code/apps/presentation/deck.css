@@ -346,3 +346,10 @@ body.idle { cursor: none; }
   transition: opacity 500ms ease;
 }
 #black.on { opacity: 1; pointer-events: auto; }
+
+/* A deck tab that another tab took over: a small mark, so nobody presents from it by mistake. */
+.passive body::after {
+  content: "passive";
+  position: fixed; right: 16px; bottom: 12px;
+  font: 500 12px/1 Inter, sans-serif; letter-spacing: .04em; color: #86868b;
+}

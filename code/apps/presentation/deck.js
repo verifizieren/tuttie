@@ -97,6 +97,7 @@ const demoStep = id => demo?.steps?.find(step => step.id === id);
 
 let runGeneration = 0;           // bumped by reset(): an older step's finish must not touch the new run
 function runDemo(id) {
+  if (passive) return console.warn("[deck] another deck tab drives the wallet; this one only shows");
   if (!id || ran.has(id)) return;
   const mine = runGeneration;
   ran.add(id);
@@ -227,7 +228,10 @@ function go(target, { step = false } = {}) {
   render(previous, forward);
   keepFocus();
   if (step && forward && s.demo) runDemo(s.demo);   // only a single click forward drives the wallet
-  if (beat.id !== "demo" && phone.classList.contains("fallback")) video.pause();
+  if (phone.classList.contains("fallback")) {
+    if (beat.id !== "demo") video.pause();
+    else video.play().catch(() => {});  // back in the demo beat: the recording goes on
+  }
   broadcast();
 }
 
@@ -246,17 +250,17 @@ async function reset() {
 
 // ---------- keys ----------
 
-const FORWARD = new Set(["ArrowRight", " ", "PageDown", "ArrowDown"]);
+const STEP_KEYS = new Set(["ArrowRight", " ", "PageDown", "ArrowDown", "ArrowLeft", "PageUp", "ArrowUp"]);
 const DEBOUNCE_MS = 300;        // a clicker that fires twice, or a held key, moves one step only
-let lastForward = 0;
+let lastStep = 0;
 function key(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   const k = e.key;
   if (e.repeat) return true;    // a held key: swallow it
-  if (FORWARD.has(k)) {
+  if (STEP_KEYS.has(k)) {
     const now = performance.now();
-    if (now - lastForward < DEBOUNCE_MS) return true;
-    lastForward = now;
+    if (now - lastStep < DEBOUNCE_MS) return true;
+    lastStep = now;
   }
   if (k === "ArrowRight" || k === " " || k === "PageDown" || k === "ArrowDown") go(pos + 1, { step: true });
   else if (k === "ArrowLeft" || k === "PageUp" || k === "ArrowUp") go(pos - 1, { step: true });
@@ -271,7 +275,7 @@ function key(e) {
   else return false;
   return true;
 }
-addEventListener("keydown", e => { if (key(e)) e.preventDefault(); });
+addEventListener("keydown", e => { claim(); if (key(e)) e.preventDefault(); });
 
 /** Keys pressed while a framed page has focus still drive the deck, unless someone is typing
  *  in it (the owner token, a request typed by hand). */
@@ -279,6 +283,7 @@ function forwardKeys(frame) {
   try {
     frame.contentWindow.addEventListener("keydown", e => {
       if (e.target.closest?.("input, textarea, [contenteditable]")) return;
+      claim();
       if (key(e)) e.preventDefault();
     });
     frame.contentWindow.addEventListener("pointerdown", e => { if (e.isTrusted) lastFrameTouch = Date.now(); }, true);
@@ -317,6 +322,7 @@ function openPresenter() {
 }
 
 function broadcast() {
+  if (passive) return;
   channel?.postMessage({
     type: "state", pos, startedAt, entered: { ...entered },
     black: blackout.classList.contains("on"), fallback: phone.classList.contains("fallback"),
@@ -325,12 +331,32 @@ function broadcast() {
   });
 }
 
+// Tabs of one browser share the wallet's session, so only one deck may drive it: the tab used
+// last claims the stage, every other deck tab turns passive (no presenter keys, no demo steps).
+const deckId = Math.random().toString(36).slice(2);
+let passive = false;
+function claim() {
+  if (!passive && claimed) return;
+  passive = false;
+  claimed = true;
+  document.documentElement.classList.remove("passive");
+  channel?.postMessage({ type: "claim", id: deckId });
+  broadcast();
+}
+let claimed = false;
+
 channel?.addEventListener("message", ({ data }) => {
+  if (data?.type === "claim" && data.id !== deckId) {
+    passive = true;
+    document.documentElement.classList.add("passive");
+  }
+  if (passive) return;
   if (data?.type === "hello") broadcast();
   if (data?.type === "key") key({ key: data.key });
 });
 
 // Start: black, eyes waiting at home. ?step=n opens a given step (for rehearsal and screenshots).
 faceHome(false);
+claim();
 go(Number(params.get("step")) || 0);
 window.deck = { go: n => go(n), next: () => go(pos + 1, { step: true }), get pos() { return pos; }, steps: flat.length };
