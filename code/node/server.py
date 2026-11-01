@@ -37,6 +37,7 @@ from aps import agent_key
 from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import booking_terms
 from aps.call import call_body
+from aps.delegation import verify_delegation
 from aps.envelope import is_fresh, parse_timestamp
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
@@ -123,9 +124,12 @@ def effective_port(url) -> int | None:
     return url.port or {"http": 80, "https": 443}.get(url.scheme)
 
 
-async def requester_problem(posting, lookup, authorities: dict, now=None) -> str | None:
+async def requester_problem(posting, lookup, authorities: dict, now=None,
+                            user_public_key: str | None = None) -> str | None:
     """Why a posting's request is not a fresh one signed by a verified user agent, or None.
 
+    The user agent must also carry the user's delegation with the "post_requests" scope
+    (checked against `user_public_key`, by default the demo user's key in keys/).
     Only then is a posting worth an LLM call: a made-up posting costs the business nothing.
     """
     envelope, requester = posting.request, posting.requester_id
@@ -134,6 +138,9 @@ async def requester_problem(posting, lookup, authorities: dict, now=None) -> str
         return "the requester is not a user agent in the registry"
     if evaluate_record(record, authorities)["tier"] not in ("gold", "blue"):
         return "the requester's seals do not verify"
+    if not verify_delegation(record.get("delegation") or {}, user_public_key or load_public_key("user"),
+                             record["node_id"], record["public_key"], scope="post_requests", now=now):
+        return "the requester has no valid delegation from the user to post requests"
     if not verify_envelope(envelope, record["public_key"], expected_node_id=requester):
         return "the request is not signed by the requester"
     if not is_fresh(envelope["timestamp"], MAX_REQUEST_AGE_S, now):

@@ -126,6 +126,24 @@ def test_the_genuine_user_agent_may_post_requests():
     assert requester_check(copy.deepcopy(REGISTRY[TUTTIE])) is None
 
 
+def test_a_user_agent_without_the_users_delegation_may_not_post_requests():
+    record = copy.deepcopy(REGISTRY[TUTTIE])
+    del record["delegation"]
+    assert evaluate_record(record, AUTHS)["tier"] == "blue"  # the delegation is not part of the seal
+    assert "delegation" in requester_check(record)
+
+
+def test_a_delegation_with_a_string_of_scopes_is_no_delegation():
+    """`"post" in "post_requests"` would be a substring match; only a list counts."""
+    record = REGISTRY[TUTTIE]
+    delegation = sign_delegation(TUTTIE, record["public_key"], ["post_requests"], "2099-01-01T00:00:00Z",
+                                 load_signing_key("user"))
+    user = load_public_key("user")
+    assert verify_delegation(delegation, user, TUTTIE, record["public_key"], scope="post_requests")
+    forged = {**delegation, "scopes": "post_requests"}
+    assert not verify_delegation(forged, user, TUTTIE, record["public_key"], scope="post")
+
+
 def wake_with(monkeypatch, record: dict, card: dict) -> tuple[list, dict]:
     """Run Market.wake against a registry holding only `record` whose node serves `card`."""
     monkeypatch.setenv("AGENT_WEB_KEY", "s3cret")
