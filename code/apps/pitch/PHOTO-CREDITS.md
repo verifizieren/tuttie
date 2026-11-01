@@ -11,3 +11,10 @@ used to illustrate the demo hotels (the hotels themselves are fictional).
 
 `img/hand-left.webp` and `img/hand-right.webp` (mirrored): "Female Hand Swipe Left" by FootageCrate
 (footagecrate.com), cut to the swipe, 1.25x speed, transparent background.
+
+## Bank logos
+
+Trademarks of their owners, shown on the illustrated bank cards (drawn white on the card).
+
+- `img/ubs-logo.svg`: UBS logo, https://en.wikipedia.org/wiki/File:UBS_Logo.svg
+- `img/zkb-logo.svg`: Zürcher Kantonalbank logo, https://commons.wikimedia.org/wiki/File:Zürcher_Kantonalbank_logo.svg
