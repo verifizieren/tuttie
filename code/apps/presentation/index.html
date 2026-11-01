@@ -88,12 +88,23 @@ a { color: inherit; }
 .ring circle { fill: none; stroke-width: 10; }
 .ring .bg { stroke: #e2e2e8; }
 .ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease); }
-.spark { width: 100%; max-width: 330px; height: 96px; }
-.spark path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1.6s var(--ease); }
-.fig.on .spark path { stroke-dashoffset: 0; }
+.years { display: flex; align-items: flex-end; gap: 22px; height: 96px; }
+.years div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; font-size: 12px; font-weight: 600; color: var(--muted); }
+.years i { display: block; width: 46px; height: 0; border-radius: 8px 8px 3px 3px; background: #d7d7df; transition: height 1.4s var(--ease); }
+.years .now i { background: var(--peach); }
+/* Bar heights to scale: the 2025 holidays are 6.39 times the 2024 holidays (+539 %). */
+.fig.on .years .then i { height: 11px; }
+.fig.on .years .now i { height: 72px; }
 .ticks { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; z-index: 2; }
 .ticks i { width: 4px; height: 18px; border-radius: 2px; background: #d7d7df; transition: background .4s, height .4s; }
 .ticks i.on { background: var(--accent); height: 30px; }
+
+/* ---------- Under the hood ---------- */
+.tech { margin-top: 26px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow); }
+.tech div { padding: 14px 16px; }
+.tech div + div { border-top: 1px solid var(--line); }
+.tech b { display: block; font-size: 15px; font-weight: 600; }
+.tech span { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--muted); }
 
 /* ---------- The idea ---------- */
 section.block { padding: 90px 0; }
@@ -140,7 +151,7 @@ section.block { padding: 90px 0; }
 .bar .keep { background: var(--green); }
 .bar .fee { background: var(--red); opacity: .85; }
 .bill.in .bar .keep.a { width: 83.5%; } .bill.in .bar .fee.a { width: 16.5%; }
-.bill.in .bar .keep.b { width: 100%; }
+.bill.in .bar .keep.b { width: 97%; } .bill.in .bar .fee.b { width: 3%; background: var(--muted); }
 .barrow strong { font-weight: 700; font-variant-numeric: tabular-nums; }
 .barrow .lost { color: var(--red); }
 .model { margin-top: 18px; display: grid; gap: 10px; }
@@ -484,7 +495,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   <div class="wrap">
     <div class="tcard rv"><canvas id="heroFace"></canvas></div>
     <h1 class="rv">Your agent<br><em>for the web.</em></h1>
-    <p class="rv">It searches, checks and bargains for you.<br>Fakes never reach you.</p>
+    <p class="rv">It searches, checks and bargains for you.<br>Forged seals never reach you.</p>
   </div>
   <div class="cue">Scroll<i></i></div>
 </header>
@@ -512,10 +523,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <div class="src">HOTREC, 2024</div>
     </div>
     <div class="fig">
-      <div class="viz"><svg class="spark" viewBox="0 0 330 96" preserveAspectRatio="none"><path d="M4 88 C 120 86, 200 80, 250 56 S 310 14, 326 6"/></svg></div>
+      <div class="viz years"><div class="then"><i></i>Holidays 2024</div><div class="now"><i></i>Holidays 2025</div></div>
       <div class="big accent">+<span class="count" data-to="539">0</span><small>%</small></div>
-      <p>AI traffic to travel sites. <span>Agents already shop.</span></p>
-      <div class="src">Adobe Analytics, US holidays 2025 · curve illustrative</div>
+      <p>AI traffic to travel sites, vs the 2024 holidays. <span>Agents already shop.</span></p>
+      <div class="src">Adobe Analytics, US travel sites, Nov–Dec 2025 vs Nov–Dec 2024 · bars to scale</div>
     </div>
   </div>
 </section>
@@ -546,6 +557,23 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   </div>
 </section>
 
+<!-- ============ Under the hood ============ -->
+<section class="block" style="padding-top:20px">
+  <div class="wrap">
+    <div class="kicker rv">Under the hood</div>
+    <h2 class="rv">What is signed.</h2>
+    <div class="tech rv">
+      <div><b>Who a business is</b><span>The register or a platform signs its Swiss UID (Ed25519 seal).</span></div>
+      <div><b>What it says</b><span>Offers, counters and agreements are signed. Tuttie checks them before the AI reads them.</span></div>
+      <div><b>What Tuttie may do</b><span>Your key allows asking, bargaining and booking. Paying always needs your own signature.</span></div>
+      <div><b>What you approve</b><span>One business, one exact amount, once. Signed with your key.</span></div>
+      <div><b>Small charges</b><span>A signed mandate pays the city tax: at most CHF 10, trusted businesses only.</span></div>
+      <div><b>Prices</b><span>Totals come from signed offers. Limits are compared in code, never by the AI.</span></div>
+    </div>
+    <p class="src rv" style="margin:12px 0 0">Real signatures, demo keys. Code: <code>code/aps/</code> in the repo.</p>
+  </div>
+</section>
+
 <!-- ============ Business case ============ -->
 <section class="block" style="padding-top:20px">
   <div class="wrap">
@@ -555,14 +583,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <div class="anna"><b>7</b><span>rooms · Anna's guesthouse</span></div>
       <div><b>220</b><span>rooms · a chain</span></div>
     </div>
+    <p class="src rv" style="margin:12px 0 0">Tuttie ranks offers on signed facts (quiet, dogs welcome) and your budget, not on ad spend. In the demo the guesthouse fits; the chain is over budget.</p>
 
     <div class="bill rv" id="bill">
       <h4>One night, CHF 135</h4>
       <div class="barrow"><span>Agency</span><strong class="lost">− CHF 20–24</strong>
         <div class="bar"><i class="keep a"></i><i class="fee a"></i></div></div>
-      <div class="barrow"><span>Tuttie</span><strong>Anna keeps it</strong>
-        <div class="bar"><i class="keep b"></i></div></div>
-      <p class="src" style="margin:12px 0 0">Typical 15–18% commission. Anna is a demo persona.</p>
+      <div class="barrow"><span>Tuttie</span><strong>− a fixed fee</strong>
+        <div class="bar"><i class="keep b"></i><i class="fee b"></i></div></div>
+      <p class="src" style="margin:12px 0 0">Agencies: typically 15–18% commission. Tuttie: a fixed fee per signed booking, not a share of the price (amount not set yet). Anna is a demo persona.</p>
     </div>
 
     <div class="model">
@@ -632,6 +661,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
           </div>
 
           <div class="call" id="cBudget" style="top:96px"><small>Behind the screen</small><b>Budget CHF 160 is never sent</b></div>
+          <div class="call" id="cContext" style="top:96px"><small>Behind the screen</small><b>Your day, from your phone</b><span>Demo data here. A real Tuttie reads it on the phone.</span></div>
           <div class="call red" id="cForged" style="top:330px"><small>Behind the screen</small><b>Forged seal · refused</b>
             <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
           <div class="call" id="cBargain" style="top:330px"><small>Behind the screen</small><b>Both limits stay private</b><span>Compared in code, never by AI.</span></div>
@@ -646,7 +676,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 <!-- ============ Close ============ -->
 <section class="close">
   <div class="wrap">
-    <h2 class="rv">Signed businesses reach you.<br><span>Fakes never do.</span></h2>
+    <h2 class="rv">Signed businesses reach you.<br><span>Forged ones never do.</span></h2>
     <p class="year rv">In 2000 you needed a website.<br><b>In 2033 you need a signature.</b></p>
     <a class="go rv" href="#demo" id="again">Watch it again
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></a>
@@ -722,11 +752,11 @@ const CAPS = [
   ["Tuttie lives in your wallet", "Tap to talk."],
   ["You ask once", "“Quiet room in Basel, with my dog, under 160.”"],
   ["She knows your day", "A signed request goes out."],
-  ["Fakes never reach you", "Forged seal: refused, never shown."],
+  ["Forged seals never reach you", "Refused, never shown. Unsigned ones never book."],
   ["She bargains for you", "CHF 135 → 128."],
   ["You swipe", "Right to like, left to pass."],
   ["One tap, signed", "This hotel, this price. Nothing without you."],
-  ["Booked", "Seven rooms beat 220."],
+  ["Booked", "Seven rooms beat 220 on fit and price."],
 ];
 const REPLY = "Booked: Gästehaus am Rhein on the 14th for CHF 128, and the city tax is paid. Anna sends the door code on the day.";
 const DURATION = 38500;
@@ -782,13 +812,13 @@ const EVENTS = [
   [3200, () => call("#cBudget", true)],
   [6000, () => { call("#cBudget", false); face.setVoice(0, 0); }],
   [6600, () => { cls("s-voice", false); cls("s-busy", true); face.set("skepticism", 400); face.lookAt(-.6, -.5); }],
-  [7100, () => { show("#steps"); line("#lCtx", "Checking location", "active"); }],
+  [7100, () => { show("#steps"); line("#lCtx", "Checking location", "active"); call("#cContext", true); }],
   [7400, () => line("#lCtx", "Checking messages", "active")],
   [7700, () => line("#lCtx", "Checking mails", "active")],
   [8000, () => line("#lCtx", "Checking calendar", "active")],
   [8300, () => line("#lCtx", "Checking what you like", "active")],
   [8600, () => { line("#lCtx", "Checked your location, messages, mails and calendar", "done"); line("#lTool", "Asked 3 hotels", "active"); face.set("confusion", 400); face.lookAt(.5, -.4); }],
-  [9600, () => { call("#cForged", true); face.set("suspicion", 350); face.lookAt(0, .2); }],
+  [9600, () => { call("#cContext", false); call("#cForged", true); face.set("suspicion", 350); face.lookAt(0, .2); }],
   [11900, () => $("#cForged").classList.add("gone")],
   [12700, () => { call("#cForged", false); line("#lTool", "Comparing offers", "active"); face.set("neutral", 400); face.lookAt(.7, -.6); }],
   [13300, () => { line("#lTool", "Bargaining with Gästehaus am Rhein · CHF 135 → CHF 131", "active"); call("#cBargain", true); face.set("skepticism", 400); }],
