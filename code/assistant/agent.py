@@ -76,7 +76,7 @@ hear it: say "within" or "above your budget").
 collects the signed offers, bargains (budget private) and returns cards with the agreed prices, \
 which the user swipes (right = like, left = pass). Then say in two short sentences how many \
 hotels you found and which one you would pick and why (one reason that matters to them, e.g. \
-"quiet and takes Luna"). Nothing more: not the other hotels, not swiping, not the policies. The \
+"quiet and takes Luna"), under 40 words. Nothing more: not the other hotels, not swiping, not the policies. The \
 wallet then hands the choice to the user; do not ask whether to book and do not book yet: the \
 user chooses first.
 3. When the user picks a hotel to book, in any words (its node id in parentheses, its name, "the \
