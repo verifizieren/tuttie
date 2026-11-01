@@ -42,11 +42,19 @@ class Subagent:
         if not isinstance(result, Verified):
             self.memory.add("system", "refused", result)
             return result
-        self.remote_session = result.payload["session_id"]
-        self.session_token = str(result.payload.get("session_token", ""))
+        payload = result.payload if isinstance(result.payload, dict) else {}
+        session_id, agent = payload.get("session_id"), payload.get("agent")
+        if not isinstance(session_id, str) or not session_id:
+            # A signed but malformed reply: this hotel is skipped, the others go on bargaining.
+            refused = {"error": "the business's agent sent no usable session"}
+            self.memory.add("system", "refused", refused)
+            return refused
+        self.remote_session = session_id
+        self.session_token = str(payload.get("session_token", ""))
         self.memory.add("system", "opened", {"node_id": self.node_id, "remote_session": self.remote_session})
-        self.toolbox.emit_verified("a2a", f"Subagent opened a session with {result.payload['agent']}", result)
-        return result.payload
+        name = agent if isinstance(agent, str) and agent else "the business's agent"
+        self.toolbox.emit_verified("a2a", f"Subagent opened a session with {name[:60]}", result)
+        return payload
 
     async def send(self, message: str) -> dict:
         """Send a message in the session and remember both sides of the turn."""
