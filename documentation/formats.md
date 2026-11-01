@@ -187,7 +187,9 @@ first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a d
 conversation or 300 for one client address; a room is never handed out twice.
 `POST /chat` answers 429 (`Retry-After` in seconds, a `detail` sentence for the user) after
 10 turns a minute for one browser or 600 for one client address (an IPv6 address counts by
-its /64); spoken turns (`POST /voice/say`) count towards the browser's 10. A refused body
+its /64). Spoken turns (`POST /voice/say`) have their own count: 20 a minute per browser, and an
+exact card command ("next", "like") while hotel cards can be swiped counts only towards 30 a
+minute; neither uses up the browser's 10 typed turns. A refused body
 (422, or 409 for a stale `conversation_id`) does not count as a turn. `POST /conversations`
 (new chat) answers the same 429 after 10 a minute for one browser or 120 for one client
 address; an empty chat is not kept, so resuming its id is a 410. A browser whose conversation
