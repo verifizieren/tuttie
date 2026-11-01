@@ -14,8 +14,10 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   on the apps' unhashed files, service worker fetches with `cache: "no-cache"`, `CACHE` v3; reload the
   presenter phone after a deploy anyway); a hotel's malformed signed session reply skips that hotel
   instead of sinking all bargaining (`assistant/subagents.py`); a free (CHF 0) signed add-on books. A hand-started stack without `AGENT_WEB_KEY` shares the keyless 10 postings/min across all users
-  (run.sh/run_all.py always set a key). The service worker caches only successful answers. The action gate refuses calls and approvals stamped more than 5 s before
-  it started, so nothing captured before a node restart books again.
+  (run.sh/run_all.py always set a key). The service worker caches only successful answers. The action gate refuses calls and approvals stamped before
+  it started (whole-second stamps), so nothing captured before a node restart books again. After a
+  decline the very next yes books the offered hotel at once, for the room of its card offer
+  (`book` refuses another room without a deal; the cards summary names each card's room).
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
