@@ -39,6 +39,13 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   pm", "00:52" is "12:52 am", also "midnight", "noon"; "8:30 pm" and durations stay), and of
   notes in square brackets only citations, labels like [confirmed] and ids are dropped: any
   other note is spoken without its brackets (the wallet shows the same text).
+- Never silent when the words do not reach Tuttie: long dictation is cut to 2000 characters
+  (at a word); if `/voice/say` answers 429 (too many turns) the agent says "One moment
+  please.", on any other refusal or a connection error "Sorry, that did not go through. Could
+  you say it again?".
+- Rooms are protected: anyone can ask for rooms, but above 1000 only unused ones are forgotten
+  (conversation gone, or unused for 2 min); a room the agent follows never goes
+  (`VoiceRooms` in `assistant/voice.py`).
 - Voice: the demo server uses "Germain" (`TUTTIE_VOICE_ID=XJeDCVLci9KGsGtVpFLM`,
   a library voice, needs a paid plan); without it the free "Eric".
 - The wallet shows each spoken answer word by word in step with the voice (LiveKit
