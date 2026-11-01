@@ -66,7 +66,12 @@ def test_cookieless_requests_cannot_push_out_peoples_chats(monkeypatch):
     assert store.by_session["chatting"] is chatting and store.by_session["waiting"] is waiting
     assert len(store.by_session) == 3
     store.by_session["anonymous-9"].bus.emit("answer", "verified", "Hi")  # now all three are used
-    store.get("someone-new")  # the least recently used idle chat goes; a pending approval stays
+    store.get("someone-new")  # chats with history stay up to twice the limit
+    assert store.by_session["chatting"] is chatting and len(store.by_session) == 4
+    store.by_session["someone-new"].bus.emit("answer", "verified", "Hi")
+    for n in range(3):
+        store.get(f"late-{n}").bus.emit("answer", "verified", "Hi")
+    # above twice the limit the least recently used idle chat goes; a pending approval stays
     assert "chatting" not in store.by_session and store.by_session["waiting"] is waiting
 
 
