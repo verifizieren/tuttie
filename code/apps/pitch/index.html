@@ -226,11 +226,11 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .c-back { transform: scale(.95) translateY(10px); opacity: .6; }
 .lean-l .c-top { transform: translateX(-60px) rotate(-3.3deg); transition-duration: .7s; }
 .lean-l .c-top .stamp.pass { opacity: 1; }
-.sw1 .c-top { transform: translate(-520px, 40px) rotate(-29deg); }
+.sw1 .c-top { transform: translate(-520px, 40px) rotate(-29deg); transition: transform 1.34s cubic-bezier(.2,.7,.3,1), opacity .4s; }
 .sw1 .c-back { transform: none; opacity: 1; }
 .lean-r .c-back { transform: translateX(60px) rotate(3.3deg); transition-duration: .7s; }
 .lean-r .c-back .stamp.like { opacity: 1; }
-.sw2 .c-back { transform: translate(520px, 40px) rotate(29deg); }
+.sw2 .c-back { transform: translate(520px, 40px) rotate(29deg); transition: transform 1.34s cubic-bezier(.2,.7,.3,1), opacity .4s; }
 .sw2 .deck { display: none; }
 /* the chosen hotel */
 .hotel { display: none; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
@@ -930,9 +930,9 @@ const face = new TuttieFace($("#face"));
 let cur = -1, timers = [];
 const startedAt = {};
 const later = (fn, ms) => timers.push(setTimeout(fn, ms));
-// A real hand swipes the cards: a 1.6 s clip (rise, touch at 0.37 s, swipe 0.57-0.73 s, leave).
+// A real hand swipes the cards: a 2 s clip at real speed (rise, touch at 0.46 s, swipe 0.71-0.91 s, leave).
 // A fresh URL restarts the animated WebP; the clip ends empty, the class hides it after.
-const HAND = { touch: 370, swipe: 570, end: 1650 };
+const HAND = { touch: 460, swipe: 710, end: 2050 };
 const hands = [...document.querySelectorAll(".hand")];
 hands.forEach(h => { new Image().src = h.dataset.src; });
 function playHand(h) { h.src = `${h.dataset.src}?t=${Date.now()}`; h.classList.add("on"); later(() => h.classList.remove("on"), HAND.end); }
@@ -1103,8 +1103,8 @@ function go(i, fromAuto = false) {
   else if (name === "negotiate") { face.wake("neutral", 1); face.hold = true; face.lookAt(0, .8, 400); later(() => { face.set("happiness", 500); face.lookAt(0, 0, 400); face.hold = false; }, fwd ? 5600 : 0); }
   else if (name === "swipe") {
     face.wake("neutral", 1); face.hold = true;
-    if (fwd) { later(() => face.lookAt(-2, .4, 400), 1040); later(() => face.lookAt(0, .4, 400), 2200); later(() => face.lookAt(2, .4, 400), 3640);
-               later(() => { face.lookAt(0, 0, 400); face.set("happiness", 500); face.hold = false; }, 5000); }
+    if (fwd) { later(() => face.lookAt(-2, .4, 400), 1160); later(() => face.lookAt(0, .4, 400), 2750); later(() => face.lookAt(2, .4, 400), 3760);
+               later(() => { face.lookAt(0, 0, 400); face.set("happiness", 500); face.hold = false; }, 5350); }
     else { face.set("happiness", 1); face.hold = false; }
   }
   else if (name === "approve") { face.wake("neutral", 1); later(() => face.set("happiness", 400), fwd ? 4700 : 0); }

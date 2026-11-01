@@ -10,7 +10,7 @@ used to illustrate the demo hotels (the hotels themselves are fictional).
 ## Hand
 
 `img/hand-left.webp` and `img/hand-right.webp` (mirrored): "Female Hand Swipe Left" by FootageCrate
-(footagecrate.com), cut to the swipe, 1.25x speed, transparent background.
+(footagecrate.com), cut to the swipe, real speed, transparent background.
 
 ## Bank logos
 
