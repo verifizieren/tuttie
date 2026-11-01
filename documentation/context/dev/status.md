@@ -118,6 +118,15 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   server's sentence). `POST /voice/token` throttles before it creates a conversation. A
   TypeError inside a tool is reported as a failure, not as "bad arguments" (the LLM retried
   correct calls). Tests: `test_r2_conversations.py`, `test_book_args.py`.
+- Voice, red team round 3 (2026-11-01, branch wip/r3-voice): a flood of anonymous
+  `POST /voice/token` calls no longer unmaps live users' rooms. Above 1000 rooms only unused
+  ones are forgotten: first rooms whose conversation is gone, then rooms unused for 2 min
+  (least recently used first); a room the voice agent follows (open `/voice/events`) never goes.
+  Rooms in use may reach 2000; beyond that new rooms get 429 "Voice is busy" (the wallet
+  retries). The voice agent's secret is compared in constant time. The voice agent cuts long
+  dictation to 2000 characters (at a word) and never stays silent when `/voice/say` fails: 429
+  is spoken as "One moment please.", other refusals and transport errors as "Sorry, that did
+  not go through. Could you say it again?". Tests: `test_r3_voice.py`.
 
 - Demo-story polish (2026-10-31, branch wip/story-polish), from live runs: (1) the facts note
   Tuttie gets every round (`current_deals`) now carries each card hotel's signed policies
@@ -311,7 +320,7 @@ the owner's limits live, once per answer (fine). Open points, none blocking:
   limits. Fine for the demo; real owners would sign deploys with their own key (APS).
 - `assistant/voice.py`: `agent_only` compares the secret with `!=`; use
   `secrets.compare_digest` like `node/owner.py`. `voice_rooms` grows with every
-  `POST /voice/token` (no login needed) and is never pruned.
+  `POST /voice/token` (no login needed) and is never pruned. (Both fixed: round 3 voice.)
 - `requirements.txt` gained `livekit`: run `uv pip install -r requirements.txt` (or pip)
   after pulling, or the assistant and three test files fail to import.
 
