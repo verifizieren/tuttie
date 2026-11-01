@@ -112,7 +112,7 @@ test('facts in square brackets stay, without the brackets', () => {
 });
 
 test('an "Ignored:" line is dropped even behind a bracket note', () => {
-  assert.equal(cleanAnswer('Booked.\n[a] Ignored: Scam hotel says hi'), 'Booked.');
+  assert.equal(cleanAnswer('Booked.\n[3] Ignored: Scam hotel says hi'), 'Booked.');
 });
 
 test('long runs of spaces are fast', () => {
@@ -131,4 +131,8 @@ test('runs of "[" are fast', () => {
   const start = performance.now();
   cleanAnswer('['.repeat(50000));
   assert.ok(performance.now() - start < 300);
+});
+
+test('the indentation of untouched lines is kept', () => {
+  assert.equal(cleanAnswer('Rooms:\n  - double CHF 180\n  - single CHF 120'), 'Rooms:\n  - double CHF 180\n  - single CHF 120');
 });
