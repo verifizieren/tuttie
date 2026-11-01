@@ -20,7 +20,11 @@ const DONE_MS = 1400;   // how long the final mark (checkmark or X) is shown bef
 const LEAVE_MS = 350;   // the slide down (wallet.css .sheet.leaving)
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+// The night as "14 Nov"; a date in another form is shown as it came.
+function day(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
 
 /** The Face ID glyph as on an iPhone: rounded corner brackets around a simple face (eyes, an
  *  L-shaped nose, a smile). Scanning, the face turns a little and the brackets pulse; once
@@ -56,6 +60,35 @@ function Progress({ stage, decision }) {
     <div className="faceid" aria-live="polite">
       {approved ? <FaceId /> : <div className="faceid-wait" aria-hidden="true" />}
       <span>{stage === "scan" ? "Face ID" : sendingLabel(decision)}</span>
+    </div>
+  );
+}
+
+/** What replaces the sheet if it cannot be shown (an approval in a shape this version does not
+ *  expect): the user can still decline, so nothing waits on a sheet nobody can see. */
+export function ApprovalFallback({ approval, onGone }) {
+  const [state, setState] = useState("ask");  // ask | sending | failed | done
+  if (!approval) return null;
+  async function decline() {
+    setState("sending");
+    try {
+      await decide(approval.id, "declined", false);
+      setState("done");
+    } catch (e) {
+      if (failureOf(e).gone) return setState("done");
+      setState("failed");
+    }
+  }
+  return (
+    <div className="sheet" role="dialog" aria-label="Approve payment">
+      <p className="sheet-error" role="alert">
+        {state === "done" ? "Declined." : "This payment request cannot be shown, so it cannot be approved here."}
+        {state === "failed" && " Declining did not work, please try again."}
+      </p>
+      <div className="sheet-buttons sheet-close">
+        {state === "done" ? <button type="button" className="decline" onClick={onGone}>Close</button>
+          : <button type="button" className="decline" disabled={state === "sending"} onClick={decline}>Decline</button>}
+      </div>
     </div>
   );
 }

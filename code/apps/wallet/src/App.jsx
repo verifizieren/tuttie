@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
-import ApprovalSheet from "./components/ApprovalSheet.jsx";
+import ApprovalSheet, { ApprovalFallback } from "./components/ApprovalSheet.jsx";
 import BankCard from "./components/BankCard.jsx";
 import Boundary from "./components/Boundary.jsx";
 import Dock from "./components/Dock.jsx";
@@ -271,8 +271,10 @@ export default function App() {
             onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
-        <ApprovalSheet key={approvalId} approval={sheetApproval} onGone={dropApproval} note={notice}
-                       onDecide={setFinishing} onFinished={sheetDone} />
+        {sheetApproval && <Boundary key={approvalId} fallback={<ApprovalFallback approval={sheetApproval} onGone={() => { dropApproval(); sheetDone(); }} />}>
+          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice}
+                         onDecide={setFinishing} onFinished={sheetDone} />
+        </Boundary>}
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
