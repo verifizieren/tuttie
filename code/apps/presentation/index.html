@@ -77,11 +77,9 @@ em, i, cite, address, dfn, var { font-style: normal; }
 @keyframes cue { 0%, 100% { transform: scaleY(.4); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
 
 /* ---------- Numbers: one figure per screen, pinned while you scroll ---------- */
-/* Each number owns one screen-high slot; the pin sits on top of the slots (negative margin), so
-   the section is exactly N screens long and slot k shows number k. One scroll gesture = one step. */
-.nums { position: relative; }
-.nums .pin { margin-bottom: -100svh; }
-.slot { height: 100svh; }
+/* Each number owns one screen of scroll: the section is exactly N screens long (N = 3), so at
+   scroll offset k screens number k shows. One scroll gesture = one step (see numsTarget). */
+.nums { position: relative; height: 300svh; }
 .pin { position: sticky; top: 0; height: 100svh; overflow: hidden; display: flex; align-items: center; }
 .fig { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 70px var(--gut) 60px;
        max-width: 520px; margin: 0 auto; opacity: 0; transform: translateY(46px); transition: opacity .7s var(--ease), transform .8s var(--ease);
@@ -542,7 +540,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <div class="src"><img src="img/sources/adobe.png" alt="">Adobe Analytics, AI traffic report, Jan 2026</div>
     </div>
   </div>
-  <div class="slot"></div><div class="slot"></div><div class="slot"></div>
 </section>
 
 <!-- ============ The idea ============ -->
@@ -728,7 +725,7 @@ function showFig(i) {
   f.querySelectorAll(".count").forEach(countUp);
   $("#ring").style.strokeDashoffset = i === 1 ? 263.9 * (1 - .296) : 263.9;
 }
-const slotH = () => document.querySelector("#nums .slot").offsetHeight;
+const slotH = () => document.querySelector("#nums .pin").offsetHeight;
 function onNums() {
   const r = $("#nums").getBoundingClientRect(), h = slotH();
   if (r.top > h * .5) return;  // not on screen yet: the first count-up waits for it
