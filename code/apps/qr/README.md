@@ -24,9 +24,9 @@ What it shows, top to bottom (little text on purpose):
    the room-count comparison cards. The commission an agency takes on a CHF 135 night
    (15–18 %) against Tuttie's 5 % per signed booking (CHF 6.75), bars to scale. No invented
    market numbers.
-7. **The agent web:** "One web. Two layers." Websites remain for people; agents exchange
-   signed facts and offers alongside them. A responsive HTML/CSS and inline SVG diagram
-   shows the two layers, ownership links and APS exchanges, with a screen-reader description.
+7. **The agent web:** "One web. Two layers." Our vision adds an agent layer while existing
+   websites stay the same. A responsive HTML/CSS diagram shows two offset cards: a familiar
+   website in front and an illustrative code layer behind, with a screen-reader description.
    **APS** follows as a nested "Trust, signed." subsection about sender identity, offer
    integrity and user permission, with a smaller heading and a subtle divider.
 8. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:

@@ -67,9 +67,6 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .phone .btn.act { left: -4px; top: 190px; height: 44px; }
 .phone .btn.v1 { left: -4px; top: 270px; height: 74px; }
 .phone .btn.v2 { left: -4px; top: 360px; height: 74px; }
-.phone .btn.side::after { content: ""; position: absolute; inset: -8px -10px; border-radius: 10px; background: rgba(47,111,224,.25); filter: none; opacity: 0; }
-.fwd.at-wallet .phone .btn.side::after { animation: dbl .9s 1.1s both; }
-@keyframes dbl { 0%, 100% { opacity: 0; } 12%, 30% { opacity: .9; } 42% { opacity: 0; } 56%, 74% { opacity: .9; } 88% { opacity: 0; } }
 #shadow { position: absolute; left: 760px; top: 975px; width: 400px; height: 60px; border-radius: 50%; opacity: 0;
           background: radial-gradient(closest-side, rgba(0,0,0,.9), transparent); filter: blur(18px); transition: opacity 1.4s ease, transform 1.7s var(--cam); }
 .has-reveal #shadow { opacity: .8; }
@@ -466,31 +463,34 @@ html:not(.dark-theme) #shadow {
 }
 
 
-/* Show the physical action before the wallet opens. */
-.phone .btn.side { width:7px; right:-5px; transform-origin:right center; }
-.fwd.at-wallet .phone .btn.side { animation:side-press 1.15s 1s both; }
+/* A quick double-click on the side button, then the wallet snaps in: the cue leaves before the
+   lock screen does, and the cards rise from below the screen edge, so nothing overlaps. */
+.phone .btn.side { width:7px; right:-5px; }
+.fwd.at-wallet .phone .btn.side { animation:side-press .5s .85s both; }
+/* Two fast clicks: the button sinks into the frame and sends out one soft blue pulse each time. */
 @keyframes side-press {
-  0%, 12%, 38%, 58%, 90%, 100% { transform:none; }
-  20%, 30%, 68%, 80% { transform:translateX(-3px) scaleX(.65); }
+  0%, 10%, 38%, 48%, 76%, 100% { transform:none; background:linear-gradient(90deg, #2c2c30, #8a8a90, #2c2c30); }
+  14%, 30%, 52%, 68% { transform:translateX(-3px); background:var(--blue); }
+  0%, 12%, 50% { box-shadow:0 0 0 0 rgba(47,111,224,.55); }
+  40%, 88%, 100% { box-shadow:0 0 0 16px rgba(47,111,224,0); }
+  41% { box-shadow:0 0 0 0 rgba(47,111,224,0); }
 }
-.phone .btn.side::after { inset:-4px -5px; filter:none; background:rgba(47,111,224,.18); box-shadow:0 0 0 2px var(--blue); }
-.fwd.at-wallet .phone .btn.side::after { animation:press-highlight 1.15s 1s both; }
-@keyframes press-highlight { 0%,12%,38%,58%,90%,100%{opacity:0} 20%,30%,68%,80%{opacity:1} }
 .side-press-cue { position:absolute; left:470px; top:275px; width:250px; color:#5a5967; font-size:28px; font-weight:500; line-height:1.3; opacity:0; transform:translateX(8px); }
-.side-press-cue::before { content:""; position:absolute; left:-47px; top:27px; width:32px; height:2px; background:var(--blue); }
-.fwd.at-wallet .side-press-cue { animation:side-cue 3.15s .15s both; }
-@keyframes side-cue { 0%,100%{opacity:0;transform:translateX(8px)} 15%,82%{opacity:1;transform:none} }
+.side-press-cue::before { content:""; position:absolute; left:-47px; top:17px; width:32px; height:2px; background:var(--blue); }
+.fwd.at-wallet .side-press-cue { animation:side-cue 1.2s .1s both; }
+@keyframes side-cue { 0%{opacity:0;transform:translateX(8px)} 22%,80%{opacity:1;transform:none} 100%{opacity:0;transform:none} }
 .fwd.at-wallet .hint { animation:none; }
-.fwd.at-wallet .ls { transition-delay:2.65s; }
-.fwd.at-wallet .wl { transition-delay:2.7s; }
-.fwd.at-wallet .card.b0 { transition-delay:2.8s; }
-.fwd.at-wallet .card.b1 { transition-delay:2.9s; }
-.fwd.at-wallet .card.agent { transition-delay:3s; }
+.card { transform:translateY(780px); }   /* start below the screen edge, not halfway up it */
+.fwd.at-wallet .ls { transition-duration:.15s; transition-delay:1.3s; }
+.fwd.at-wallet .wl { transition-duration:.15s; transition-delay:1.3s; }
+.fwd.at-wallet .card { transition-duration:.55s; }
+.fwd.at-wallet .card.b0 { transition-delay:1.42s; }
+.fwd.at-wallet .card.b1 { transition-delay:1.47s; }
+.fwd.at-wallet .card.agent { transition-delay:1.52s; }
 html.dark-theme .side-press-cue { color:#a5a5ad; }
 @media (prefers-reduced-motion:reduce) {
  .fwd.at-wallet .phone .btn.side { animation:none; }
- .fwd.at-wallet .side-press-cue { animation:none; opacity:1;transform:none; }
- .fwd.at-wallet .phone .btn.side::after { animation:none;opacity:1; }
+ .fwd.at-wallet .side-press-cue { animation:none; opacity:0; }
 }
 
 
@@ -658,6 +658,65 @@ html #try .try-row .qr { margin-top: 0; }
             opacity: 0; transform: rotate(-7deg) translateY(30px) scale(.9); transition: opacity .6s ease, transform .9s cubic-bezier(.3,1.5,.5,1); }
 .at-try .try-card { opacity: 1; transform: rotate(-7deg); transition-delay: .35s; }
 .try-card canvas { position: absolute; left: 0; top: 50%; width: 356px; height: 178px; transform: translateY(-50%); display: block; }
+
+/* Two layers: on the like swipe Anna's card leaves the phone whole (not cut off at the screen edge) and waits to the
+   right; on "agents" (next click) the phone moves left, the card grows on the right and splits into the card (for
+   people) and the signed agent layer behind it (APS, for agents), and the camera settles on the agent layer.
+   Base state = swiped out, to the right of the phone. */
+#layers { position:absolute; inset:0; perspective:2400px; perspective-origin:70% 50%; pointer-events:none; }
+.lx { position:absolute; left:1130px; top:228px; width:460px; height:625px; box-sizing:border-box; border-radius:26px; background:var(--panel);
+      box-shadow:0 0 0 1px var(--line), 0 30px 70px rgba(23,23,40,.14);
+      opacity:0; transform:translate3d(330px, 80px, 0) rotate(29deg) scale(.709);
+      transition:transform .8s var(--cam), opacity .25s ease .6s; }
+/* the like is its own click: the "Pass" from the click before stays up */
+.at-like .swipe-word.l { opacity:1; transform:none; }
+/* the like swipe: the card in the phone vanishes (.sw2 .deck) and this copy flies out from the same spot, whole */
+.at-swipe .lx-front { opacity:0; transform:translate3d(-336px, 34px, 0) rotate(3.3deg) scale(.709); transition:none; }
+.at-swipe.sw2 .lx-front { opacity:1; transform:translate3d(330px, 80px, 0) rotate(29deg) scale(.709); transition:transform 1.34s cubic-bezier(.2,.7,.3,1); }
+/* step "agents": the phone moves left, the card comes upright and grows on the right */
+.at-agents #cam { transform:translate3d(-330px, 0, 0) scale(1); }
+.at-agents #shadow { transform:translateX(-330px); }
+.at-agents .lx { opacity:1; transform:none; transition:transform 1s var(--cam), opacity .2s; }
+.lx-front { z-index:2; overflow:hidden; }
+.split .lx-front { transform:translate3d(120px, 40px, 140px) rotateY(-24deg); transition:transform .7s var(--cam); }
+.split .lx-back { transform:translate3d(-150px, -40px, -220px) rotateY(-24deg); transition:transform .7s var(--cam); }
+.focus .lx-front { opacity:0; transform:translate3d(900px, 60px, 200px) rotateY(-24deg); transition:transform .8s var(--cam), opacity .4s ease .1s; }
+.focus .lx-back { transform:translate3d(-60px, 0, 0) scale(1.22); transition:transform .8s var(--cam); }
+/* sketch labels: a thin leader line to each layer */
+.lx-tag { position:absolute; left:50%; font-size:26px; font-weight:600; letter-spacing:-.01em; color:var(--muted); white-space:nowrap;
+          transform:translateX(-50%); opacity:0; transition:opacity .4s ease; }
+.lx-tag::after { content:""; position:absolute; left:50%; width:2px; height:34px; background:var(--line2); }
+.lx-front .lx-tag { bottom:-84px; } .lx-front .lx-tag::after { bottom:100%; margin-bottom:8px; }
+.lx-back .lx-tag { top:-84px; color:var(--purple); } .lx-back .lx-tag::after { top:100%; margin-top:8px; background:var(--purple); }
+.split .lx-tag { opacity:1; transition-delay:.3s; }
+.focus .lx-tag { opacity:0; transition-delay:0s; }
+.lx-front { overflow:visible; background:none; box-shadow:none; }
+/* front: Anna's hotel card from the phone (324 × 440 there), drawn larger */
+.lx-card { position:absolute; left:0; top:0; width:324px; height:440px; transform:scale(1.42); transform-origin:0 0; }
+.lx-card .swipe-card { box-shadow:0 18px 50px rgba(23,23,40,.16); }
+/* back: the same business, as an agent meets it */
+.lx-back { padding:34px 34px 36px; display:flex; flex-direction:column; }
+.node-head { display:flex; align-items:center; gap:12px; font-size:26px; font-weight:700; letter-spacing:-.02em; }
+.node-head svg { flex:none; width:36px; height:36px; }
+.node-head svg path:first-child { fill:var(--purple); }
+.node-chip { align-self:flex-start; margin:12px 0 0 48px; padding:5px 12px; border-radius:14px; background:var(--purple-soft); color:var(--purple);
+             font:500 14px/1.2 var(--mono); }
+.node-rows { list-style:none; margin:30px 0 0; padding:0; display:grid; gap:18px; }
+.node-rows li { display:flex; align-items:center; gap:14px; font-size:21px; font-weight:550; letter-spacing:-.01em;
+                opacity:0; transform:translateY(8px); transition:opacity .4s ease, transform .5s var(--ease); }
+.node-rows li i { flex:none; width:38px; height:38px; border-radius:11px; display:grid; place-items:center; }
+.node-rows li svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.node-rows .p { color:var(--purple); background:var(--purple-soft); }
+.node-rows .b { color:var(--blue); background:var(--blue-soft); }
+.node-rows .k { color:var(--pink); background:var(--pink-soft); }
+.node-rows li.no { color:var(--muted); }
+/* the agent layer is filled while it slides out, so the camera only moves onto a finished layer */
+.split .node-rows li { opacity:1; transform:none; transition-delay:calc(.35s + var(--i) * .12s); }
+.node-punch { margin-top:auto; font-size:34px; font-weight:700; line-height:1.12; letter-spacing:-.03em; opacity:0; transition:opacity .6s ease; }
+.node-punch span { color:var(--purple); }
+.split .node-punch { opacity:1; transition-delay:.9s; }
+.jump .lx, .jump .lx * { transition-delay:0s !important; }
+
 </style>
 </head>
 <body>
@@ -772,6 +831,32 @@ html #try .try-row .qr { margin-top: 0; }
   <div class="words" id="count"><span>Too many</span><small>tabs. Still no room.</small></div>
   <div class="words" id="intro">Meet Tuttie.<br><span class="intro-sub">Your agent, in your wallet.</span></div>
   <div class="words" id="ask">Quiet. Dog-friendly.<br>After midnight.<br>Under CHF 160.</div>
+  <div id="layers" aria-label="The hotel card for people, and behind it a signed layer for agents">
+    <div class="lx lx-back">
+      <span class="lx-tag">APS · for agents</span>
+      <div class="node-head"><svg viewBox="0 0 24 24"><use href="#mshield"/></svg>Gästehaus am Rhein</div>
+      <span class="node-chip">agent · signed</span>
+      <ul class="node-rows">
+        <li style="--i:0"><i class="p"><svg viewBox="0 0 24 24"><path d="M12 3l7 2.7v5.6c0 4.3-2.9 8-7 9.7-4.1-1.7-7-5.4-7-9.7V5.7zM8.8 12.2l2.3 2.3 4.2-4.6"/></svg></i>Verified identity</li>
+        <li style="--i:1"><i class="b"><svg viewBox="0 0 24 24"><path d="M3.5 12.5l8-8h8v8l-8 8zM15.5 8.5h.01"/></svg></i>Anna’s own prices and rules</li>
+        <li style="--i:2"><i class="b"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H9l-5 4zM8.5 11h.01M12 11h.01M15.5 11h.01"/></svg></i>Her agent answers, signed</li>
+        <li style="--i:3" class="no"><i class="k"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></i>Forged seals never reach you</li>
+      </ul>
+      <div class="node-punch">We only connect.<br><span>The business answers.</span></div>
+    </div>
+    <div class="lx lx-front">
+      <span class="lx-tag">For people</span>
+      <div class="lx-card">
+        <article class="swipe-card">
+          <div class="swipe-photo"><img src="hotels/ch.basel.gaestehaus-am-rhein/1.jpg" alt=""><div class="hotel-bars"><i></i><i class="on"></i></div></div>
+          <div class="swipe-top"><span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i></span><span class="rating">★ 4.8</span></div>
+          <div class="swipe-name">Gästehaus am Rhein</div>
+          <div class="swipe-foot"><ul class="feature-icons" data-f="dog quiet late small station" data-ok="1 1 1 1 0"></ul>
+            <div class="swipe-price"><s>CHF 135</s><b>CHF 128</b></div></div>
+        </article>
+      </div>
+    </div>
+  </div>
   <div class="words" id="knows">Hotels answer.<br><span class="dim">On their terms.</span></div>
   <div class="words" id="market"><b>A reverse marketplace.</b>
   <div class="rm s1" id="rmPitch" aria-hidden="true"><svg viewBox="0 0 300 200"><defs><filter id="rmShadow" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#17171d" flood-opacity=".16"/></filter></defs><circle class="rm-ring rm-ask" cx="46" cy="40" r="7" style="transform-origin:46px 40px;animation-delay:-11.0s"/><g class="rm-biz rm-yes" style="transform-origin:46px 40px;--ax:60.7px;--ay:35.0px;--gx:68.5px;--gy:39.5px;--d:0.8s"><circle class="rm-dot" cx="46" cy="40" r="7"/><path class="rm-ok" d="M43.4 40.2l1.9 1.9 3.4-3.7"/></g><g class="rm-biz rm-yes" style="transform-origin:112px 20px;--ax:16.5px;--ay:34.8px;--gx:20.4px;--gy:43.0px;--d:6.8s"><circle class="rm-dot" cx="112" cy="20" r="7"/><path class="rm-ok" d="M109.4 20.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="214" cy="28" r="7" style="transform-origin:214px 28px;animation-delay:-4.4s"/><g class="rm-biz rm-yes" style="transform-origin:214px 28px;--ax:-30.8px;--ay:34.6px;--gx:-36.8px;--gy:41.4px;--d:12.8s"><circle class="rm-dot" cx="214" cy="28" r="7"/><path class="rm-ok" d="M211.4 28.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="270" cy="80" r="7" style="transform-origin:270px 80px;animation-delay:-8.8s"/><g class="rm-biz rm-no" style="transform-origin:270px 80px;--ax:-70.7px;--ay:11.8px;--gx:-79.6px;--gy:13.3px;--d:2.8s"><circle class="rm-dot" cx="270" cy="80" r="7"/></g><g class="rm-biz rm-no" style="transform-origin:252px 160px;--ax:-58.9px;--ay:-34.6px;--gx:-66.7px;--gy:-39.2px;--d:8.8s"><circle class="rm-dot" cx="252" cy="160" r="7"/></g><circle class="rm-ring rm-ask" cx="160" cy="182" r="7" style="transform-origin:160px 182px;animation-delay:-2.2s"/><g class="rm-biz rm-yes" style="transform-origin:160px 182px;--ax:-3.9px;--ay:-32.4px;--gx:-5.0px;--gy:-41.3px;--d:4.8s"><circle class="rm-dot" cx="160" cy="182" r="7"/><path class="rm-ok" d="M157.4 182.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="62" cy="154" r="7" style="transform-origin:62px 154px;animation-delay:-6.6s"/><g class="rm-biz rm-no" style="transform-origin:62px 154px;--ax:45.4px;--ay:-27.8px;--gx:53.1px;--gy:-32.6px;--d:14.8s"><circle class="rm-dot" cx="62" cy="154" r="7"/></g><g class="rm-biz rm-yes" style="transform-origin:24px 100px;--ax:76.0px;--ay:0.0px;--gx:85.0px;--gy:0.0px;--d:10.8s"><circle class="rm-dot" cx="24" cy="100" r="7"/><path class="rm-ok" d="M21.4 100.2l1.9 1.9 3.4-3.7"/></g><g class="rm-you"><rect x="137" y="87" width="26" height="26" rx="7"/></g><g class="rm-card"><rect class="rm-cbg" x="120" y="81" width="60" height="38" rx="7"/><g class="rm-look"><g class="rm-blink"><rect x="134.5" y="93" width="9.5" height="12.5" rx="2.6"/><rect class="rm-cl" x="136.4" y="94.9" width="2.6" height="2.6" rx=".5"/><rect x="156" y="93" width="9.5" height="12.5" rx="2.6"/><rect class="rm-cl" x="157.9" y="94.9" width="2.6" height="2.6" rx=".5"/></g></g></g></svg></div><p class="rm-cap"><span class="c1">Before: you search, shop by shop.</span><span class="c2">Now: offers come to you.</span></p>
@@ -950,8 +1035,18 @@ const SHOTS = [
   ],
   [
     "swipe",
-    16,
-    "I still choose. A hotel that misses what matters to me: pass. Anna's guesthouse fits: keep it. The agent has done the legwork; this decision is mine."
+    8,
+    "I still choose. A hotel that misses what matters to me: pass."
+  ],
+  [
+    "like",
+    8,
+    "Anna's guesthouse fits: keep it. The agent has done the legwork; this decision is mine."
+  ],
+  [
+    "agents",
+    14,
+    "Anna's card is what people see. Behind it, her business has a second layer, for agents. A verified identity. Anna's own prices and rules. Her agent answers, and signs what it says. Forged seals never reach you. We only connect. The business answers."
   ],
   [
     "approve",
@@ -964,7 +1059,7 @@ const SHOTS = [
     "This is our vision for the next five years: a business speaks through its own agent. Its owner sets the rules. The customer chooses."
   ]
 ];
-const TARGET = SHOTS.reduce((sum, shot) => sum + shot[1], 0); // 114 seconds; optional rehearsed live handoff adds up to 30 seconds
+const TARGET = SHOTS.reduce((sum, shot) => sum + shot[1], 0); // 132 seconds; optional rehearsed live handoff adds up to 30 seconds
 const STEPS = SHOTS.map(s => s[0]);
 const TOTAL = 180;
 const SPEED = Number(new URLSearchParams(location.search).get("speed")) || 1;   // ?speed=10 rehearses the auto run faster
@@ -1063,24 +1158,32 @@ function phone(name, fwd) {
   else line(tool, ...T[last]);
   if (after("approve") || (at("approve") && !fwd)) stage.classList.add("booked");
 
+  // layers: Anna's page shows on the phone; agents: it lifts out, splits into its two layers, then the camera settles on the agent layer
+  if (at("agents")) {
+    if (fwd) { later(() => stage.classList.add("split"), 800); later(() => stage.classList.add("focus"), 2300); }
+    else stage.classList.add("split", "focus");
+  }
+
   // the status line under the card, as the wallet's statusLine() reads it
-  const STATUS = { context: "Comparing hotel offers…", web: "Asked 7 hotels…", fake: "3 offers in", negotiate: "Bargaining…",
-                   swipe: "Swipe right to like", approve: "Waiting for you", live: "Ready for the live demo" };
+  const STATUS = { agents: "Checking the seal…", context: "Comparing hotel offers…", web: "Asked 7 hotels…", fake: "3 offers in", negotiate: "Bargaining…",
+                   swipe: "Swipe right to like", like: "Swipe right to like", approve: "Waiting for you", live: "Ready for the live demo" };
   $("#cstatus").textContent = STATUS[name] || "Listening…";
 
   // Let the agreed price stand; the phone still shows its bargaining trail.
   $("#dealN").textContent = "128";
 
   // swipe: pass on the loud chain hotel, like the guesthouse
+  // one click per swipe: the click onto "swipe" passes on the chain hotel, the click onto "like" keeps the guesthouse
   if (at("swipe") && fwd) {
     $("#deckCount").textContent = "1 of 2";
-    const L = 700, R = 3300;
-    later(() => stage.classList.add("lean-l"), L + HAND.touch);
-    later(() => { stage.classList.add("sw1"); $("#deckCount").textContent = "2 of 2"; }, L + HAND.swipe);
-    later(() => stage.classList.add("lean-r"), R + HAND.touch);
-    later(() => stage.classList.add("sw2"), R + HAND.swipe);
+    later(() => stage.classList.add("lean-l"), 200 + HAND.touch);
+    later(() => { stage.classList.add("sw1"); $("#deckCount").textContent = "2 of 2"; }, 200 + HAND.swipe);
+  } else if (at("swipe")) { stage.classList.add("sw1"); $("#deckCount").textContent = "2 of 2"; }
+  else if (at("like") && fwd) {
+    stage.classList.add("sw1"); $("#deckCount").textContent = "2 of 2";
+    later(() => stage.classList.add("lean-r"), HAND.touch - 300);
+    later(() => stage.classList.add("sw2"), HAND.swipe - 300);
   } else if (after("swipe")) stage.classList.add("sw1", "sw2");
-  else if (at("swipe")) stage.classList.add("sw1", "sw2");
 
   // approve: tap, confirming, approved, booked
   if (at("approve") && fwd) {
@@ -1120,6 +1223,7 @@ function go(i, fromAuto = false) {
   STEPS.forEach((n, k) => { if (k > i) delete startedAt[n]; else if (k === i) startedAt[n] = fwd ? now : now - 1e5; else if (!fwd || startedAt[n] === undefined) startedAt[n] = now - 1e5; });
   const keep = ["notes", "auto"].filter(c => stage.classList.contains(c));
   stage.className = [...STEPS.slice(0, i + 1).map(n => "has-" + n), "at-" + name, fwd ? "fwd" : "jump", ...keep].join(" ");
+  if (name === "like") stage.classList.add("at-swipe");   // the like is the second half of the swipe scene
   $("#notes").innerHTML = SHOTS[i][2] ? `<b>${i}</b>${SHOTS[i][2]}` : "";
   history.replaceState(null, "", "#" + i);
   phone(name, fwd);
@@ -1130,6 +1234,7 @@ function go(i, fromAuto = false) {
   if (i < idx("wallet")) face.sleep(1);
   else if (name === "wallet") { if (fwd) { face.sleep(1); later(() => sfx.press(), 460); later(() => sfx.press(), 845); later(() => sfx.wake(), 1700); later(() => face.wake("happiness", 500), 1700); later(() => face.set("neutral", 700), 2900); } else face.wake("neutral", 1); }
   else if (name === "ask") { face.wake("surprise", fwd ? 350 : 1); face.hold = true; face.lookAt(0, -.3); later(() => { face.set("neutral", 500); face.hold = false; }, fwd ? 3200 : 0); }
+  else if (name === "agents") { face.wake("neutral", fwd ? 300 : 1); face.hold = true; face.lookAt(-1.6, 0, 400); }
   else if (name === "context") { face.wake("neutral", 300); face.hold = false; }
   else if (name === "web") { face.wake("neutral", 300); face.hold = true; const scan = k => { face.lookAt(Math.cos(k) * 2, Math.sin(k) * .9, 380); later(() => scan(k + 1.3), 520); }; later(() => scan(0), 900); }
   else if (name === "fake") {
@@ -1140,8 +1245,12 @@ function go(i, fromAuto = false) {
   else if (name === "negotiate") { face.wake("neutral", 1); face.hold = true; face.lookAt(0, .8, 400); later(() => { face.set("happiness", 500); face.lookAt(0, 0, 400); face.hold = false; }, fwd ? 5600 : 0); }
   else if (name === "swipe") {
     face.wake("neutral", 1); face.hold = true;
-    if (fwd) { later(() => face.lookAt(-2, .4, 400), 1160); later(() => face.lookAt(0, .4, 400), 2750); later(() => face.lookAt(2, .4, 400), 3760);
-               later(() => { face.lookAt(0, 0, 400); face.set("happiness", 500); face.hold = false; }, 5350); }
+    if (fwd) { later(() => face.lookAt(-2, .4, 400), 500); later(() => face.lookAt(0, .4, 400), 1600); }
+    else face.lookAt(0, .4, 1);
+  }
+  else if (name === "like") {
+    face.wake("neutral", 1); face.hold = true;
+    if (fwd) { face.lookAt(2, .4, 300); later(() => { face.lookAt(0, 0, 400); face.set("happiness", 500); face.hold = false; }, 1300); }
     else { face.set("happiness", 1); face.hold = false; }
   }
   else if (name === "approve") { face.wake("neutral", 1); later(() => face.set("happiness", 400), fwd ? 4700 : 0); }

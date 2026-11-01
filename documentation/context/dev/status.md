@@ -6,15 +6,23 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (QR page: APS and two-layer web sections ported from `qr-aps`; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
+Last updated: 2026-11-01 (QR page: two-layer web vision and stacked-card diagram; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
+- **QR page web vision (1 Nov)**: "One web. Two layers." now explicitly describes our vision
+  of a new agent layer while existing websites stay the same. Replaced the flow diagram with
+  two offset cards: a website in front and an illustrative agent code layer behind. Uses the
+  existing guesthouse photo, purple accents and an updated screen-reader description.
 - **QR page APS and agent web (1 Nov)**: ported the sections from `qr-aps` into the current
   `code/apps/qr/` site. "A fair chance." replaces the business heading and 7 / 220 room cards.
   "One web. Two layers." includes the responsive diagram and a nested APS explanation with
   a smaller heading and divider. Adapted to the current purple accents and no-eyebrow design;
   retained the 5 % fee, reverse marketplace, source figures, bank cards and story demo.
+- **Demo user is Handan (1 Nov)**: Tuttie works for Handan, the presenter on stage. The
+  `GUEST_NAME` default and the user context (`data/users/alex-muster.json`) now say Handan, so
+  greetings and bookings use that name. The agent id `ch.tuttie.alex-muster` and the file name stay,
+  so the registry is not re-signed. Live only after merge and a restart (not during the pitch).
 - **Design rules (1 Nov)**: black/white with blue #2f6fe0, purple #7a5af8, pink #e5489b accents, no
   orange, no italic, no small labels above headings, no URL text, pill buttons; the top seal tier is
   purple. Wallet, owner (now light), QR page and `/pitch/` follow them. The QR page has
@@ -126,7 +134,7 @@ Last updated: 2026-11-01 (QR page: APS and two-layer web sections ported from `q
   - Note: the LLM behaviour eval used overnight (real Haiku, 24 scenarios) lives outside the repo
     (`/home/baselhack/overnight/eval`). Left open: 24-hour times on screen, long answers outside
     the pitch path, re-dating after the cards.
-- **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Alex! Enjoy Basel."; the model is told when no deals exist yet.
+- **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Handan! Enjoy Basel."; the model is told when no deals exist yet.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
   eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for

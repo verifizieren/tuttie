@@ -1,4 +1,4 @@
-TUTTIE — 1:54 walkthrough; optional live handoff up to 0:30; total 2:24, hard limit 3:00.
+TUTTIE — 2:08 walkthrough; optional live handoff up to 0:30; total 2:38, hard limit 3:00.
 
 Phone scenes are an illustration of the prototype; hotels and personal context are demo data. No audio autoplays.
 
@@ -21,15 +21,27 @@ Anna runs a seven-room guesthouse. It is quiet, dogs stay free, and a door code 
 
 [Sources] Fictional Anna, seven rooms, pricing and arrival/dog policy: repo demo data. The owner controls the prices and limits.
 
-1:10–1:26 | SWIPE
-I still choose. A hotel that misses what matters to me: pass. Anna's guesthouse fits: keep it. The agent has done the legwork; this decision is mine.
+1:10–1:18 | SWIPE
+I still choose. A hotel that misses what matters to me: pass.
 
-1:26–1:40 | APPROVE
+ACTION: click on "pass": the chain hotel's card swipes left.
+
+1:18–1:26 | LIKE
+Anna's guesthouse fits: keep it. The agent has done the legwork; this decision is mine.
+
+ACTION: click on "keep it": Anna's card swipes right, out of the phone.
+
+1:26–1:40 | AGENTS
+Anna's card is what people see. Behind it, her business has a second layer, for agents. A verified identity. Anna's own prices and rules. Her agent answers, and signs what it says. Forged seals never reach you. We only connect. The business answers.
+
+ACTION: one click after the swipe; the phone moves left, the liked card grows on the right, splits into its two layers and settles on the agent layer by itself.
+
+1:40–1:54 | APPROVE
 The approval names the room, the date, the extras and the amount. I approve 128 francs. These are demo hotels. The signed booking workflow runs in the prototype.
 
 OPTIONAL LIVE HANDOFF, UP TO 30s: L opens the actual wallet. Use a prepared request that has passed rehearsal. Show the chosen offer and its room/date/extras/total, then the approval. Use a demo booking only; no real reservation. Return and advance to the QR. If the app or network is not ready, skip the live handoff; never present the animated phone as the live app.
 
-1:40–1:54 | TRY
+1:54–2:08 | TRY
 This is our vision for the next five years: a business speaks through its own agent. Its owner sets the rules. The customer chooses.
 
 CONTROLS

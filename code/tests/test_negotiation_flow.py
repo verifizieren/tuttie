@@ -66,7 +66,7 @@ class Recorder(httpx.AsyncBaseTransport):
 
 def user_context(limit: float = 200) -> Context:
     return (Context().add("date", "2026-11-14", "public").add("requirements", ["quiet"], "negotiation")
-            .add("max_price_chf", limit, "private").add("guest_name", "Alex Muster", "private"))
+            .add("max_price_chf", limit, "private").add("guest_name", "Handan", "private"))
 
 
 async def world(recorder: Recorder, http: httpx.AsyncClient) -> tuple[Toolbox, Market]:
@@ -126,7 +126,7 @@ def test_tuttie_bargains_with_every_offering_hotel_in_parallel():
     assert elapsed < 2 * HOTEL_DELAY + 1.0
     # The private budget limit and the guest's name never reached a hotel.
     sent = "\n".join(recorder.sent_to_hotels)
-    assert "max_price_chf" not in sent and "Alex Muster" not in sent
+    assert "max_price_chf" not in sent and "Handan" not in sent
     # Every round is on Tuttie's timeline, without any limit.
     rounds = [e["summary"] for e in toolbox.bus.history if "round" in e["summary"]]
     assert rounds and not any("floor" in line or "limit" in line for line in rounds)

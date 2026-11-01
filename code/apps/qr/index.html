@@ -132,25 +132,26 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .tech b { display: block; font-size: 15px; font-weight: 600; }
 .tech span { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--muted); }
 
-/* ---------- Two connected layers of the web ---------- */
-.web-diagram { margin: 26px 0 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
-               background: var(--panel2); box-shadow: var(--shadow); }
-.web-layer { padding: 18px 16px; }
-.web-layer-label { margin-bottom: 16px; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.web-layer-agents { background: var(--tint-purple); }
-.web-layer-agents .web-layer-label { color: var(--accent-text); }
-.web-path, .web-links { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); align-items: center; }
-.web-node { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center;
-            font-size: 13px; font-weight: 600; line-height: 1.3; }
-.web-node svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.web-node-agent svg { color: var(--accent-text); }
-.web-exchange { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 500; }
-.web-exchange svg { width: 54px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.web-layer-agents .web-exchange { color: var(--accent-text); }
-.web-links { padding: 0 16px; }
-.web-link { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--muted); text-align: center; font-size: 10px; line-height: 1.3; }
-.web-link::before, .web-link::after { content: ""; height: 13px; border-left: 1px dashed var(--line2); }
-.web-link:last-child { grid-column: 3; }
+/* ---------- A familiar website in front of a new agent layer ---------- */
+.web-diagram { position: relative; margin: 32px 0 0; padding: 88px 32px 0 0; }
+.web-card { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+.web-card-bar { min-height: 36px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+                border-bottom: 1px solid var(--line); font-size: 11px; line-height: 1.3; }
+.web-card-bar b { font-weight: 600; }
+.web-agent-card { position: absolute; inset: 0 0 88px 32px; background: var(--tint-purple); border-color: rgba(122,90,248,.25); color: var(--accent-text); }
+.web-agent-card .web-card-bar { border-color: rgba(122,90,248,.15); }
+.web-code-mark { font-family: var(--mono); font-size: 13px; }
+.web-code { margin: 0; padding: 10px 14px; font: 12px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.web-code-key { color: #4e399c; }
+.web-site-card { position: relative; z-index: 1; background: var(--panel2); }
+.web-site-card .web-card-bar { justify-content: space-between; color: var(--muted); }
+.web-browser-dots { display: flex; gap: 4px; }
+.web-browser-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--line2); }
+.web-site-content { padding: 14px; }
+.web-site-content img { display: block; width: 100%; height: 92px; object-fit: cover; border-radius: 9px; }
+.web-site-title { display: block; margin-top: 12px; font-size: 20px; font-weight: 700; line-height: 1.15; letter-spacing: -.025em; }
+.web-site-content p { margin: 6px 0 12px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.web-site-button { display: inline-block; padding: 8px 12px; border-radius: 999px; background: var(--text); color: #fff; font-size: 11px; font-weight: 600; }
 .aps-subsection { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
 .aps-subsection .h3 { margin: 0 0 10px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .aps-subsection .sub { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
@@ -728,31 +729,30 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 <section class="block" id="web-layers" aria-labelledby="web-layers-title" style="padding-top:20px">
   <div class="wrap">
     <h2 class="rv block-h" id="web-layers-title">One web.<br>Two layers.</h2>
-    <p class="lead rv">Websites stay for people.<br>An agent layer works alongside them.</p>
-    <figure class="web-diagram rv" role="img" aria-label="Two connected layers of the web. In the website layer, you browse a business's website. Below, your agent exchanges signed requests and offers with the same business's agent through APS. You control your agent and approve its actions.">
-      <div class="web-layer" aria-hidden="true">
-        <div class="web-layer-label">Websites</div>
-        <div class="web-path">
-          <div class="web-node"><svg viewBox="0 0 28 28"><circle cx="14" cy="8" r="4"/><path d="M5 25v-3a9 9 0 0 1 18 0v3"/></svg><span>You</span></div>
-          <div class="web-exchange"><span>Browse</span><svg viewBox="0 0 54 12"><path d="M2 6h48m-5-4 5 4-5 4"/></svg></div>
-          <div class="web-node"><svg viewBox="0 0 28 28"><rect x="2" y="4" width="24" height="20" rx="4"/><path d="M2 10h24M7 7h.01M11 7h.01M7 15h14M7 19h8"/></svg><span>Website</span></div>
-        </div>
+    <p class="lead rv">We envision a web with a new agent layer.<br>The websites you know stay the same.</p>
+    <figure class="web-diagram rv" role="img" aria-label="Our vision of the web, illustrated by two overlapping cards. An unchanged website for people sits in front. Behind it, a code card represents a new agent layer for signed offers and agent-to-agent exchanges.">
+      <div class="web-card web-agent-card" aria-hidden="true">
+        <div class="web-card-bar"><span class="web-code-mark">&lt;/&gt;</span><b>New agent layer</b></div>
+        <pre class="web-code"><code>{
+  <span class="web-code-key">"offers"</span>: "signed",
+  <span class="web-code-key">"actions"</span>: [
+    "ask", "negotiate", "book"
+  ]
+}</code></pre>
       </div>
-      <div class="web-links" aria-hidden="true">
-        <div class="web-link">You decide</div><div class="web-link">Same business</div>
-      </div>
-      <div class="web-layer web-layer-agents" aria-hidden="true">
-        <div class="web-layer-label">Agent layer</div>
-        <div class="web-path">
-          <div class="web-node web-node-agent"><svg viewBox="0 0 28 28"><rect x="2" y="4" width="24" height="20" rx="7"/><path d="M10 12v4M18 12v4" stroke-width="3"/></svg><span>Your agent</span></div>
-          <div class="web-exchange"><span>APS</span><svg viewBox="0 0 54 12"><path d="M3 6h48M8 2 3 6l5 4m38-8 5 4-5 4"/></svg></div>
-          <div class="web-node web-node-agent"><svg viewBox="0 0 28 28"><use href="#shield-line" x="1" y="1" width="26" height="26"/></svg><span>Business agent</span></div>
+      <div class="web-card web-site-card" aria-hidden="true">
+        <div class="web-card-bar"><span class="web-browser-dots"><i></i><i></i><i></i></span><b>Existing website</b></div>
+        <div class="web-site-content">
+          <img src="img/gaestehaus.jpg" alt="" loading="lazy" width="400" height="160">
+          <b class="web-site-title">Stay by the Rhine.</b>
+          <p>A quiet place in Basel.</p>
+          <span class="web-site-button">Explore rooms</span>
         </div>
       </div>
     </figure>
     <div class="tech rv">
       <div><b>Websites · for people</b><span>Browse, read and discover. The sites you know stay as they are.</span></div>
-      <div><b>Agents · for agents</b><span>Businesses share signed facts and offers. Your agent asks, compares and negotiates directly with theirs.</span></div>
+      <div><b>Agents · a new layer</b><span>A new layer would let your agent discover signed offers and negotiate directly with businesses' agents.</span></div>
     </div>
 
     <section class="aps-subsection" id="aps" aria-labelledby="aps-title">
