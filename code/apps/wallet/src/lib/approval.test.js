@@ -81,3 +81,12 @@ test("a decision that gets no answer stops waiting and can be tried again", asyn
     globalThis.fetch = saved;
   }
 });
+
+test("a sheet that is finishing stays until it is done, a newer approval comes after it", async () => {
+  const { sheetOf } = await import("./approval.js");
+  const a1 = { id: "a1" }, a2 = { id: "a2" };
+  assert.equal(sheetOf(a2, a1), a1);    // the city tax waits behind the booking's checkmark
+  assert.equal(sheetOf(a2, null), a2);
+  assert.equal(sheetOf(null, a1), a1);
+  assert.equal(sheetOf(null, null), null);
+});
