@@ -134,13 +134,13 @@ def drop_notes(text: str) -> str:
 
 
 def without_budget(text: str, amounts: set[int]) -> str:
-    """The answer without the user's private budget amount in budget phrases ("your CHF 160
-    budget" -> "your budget", "within your CHF 160" -> "within your budget"): others hear Tuttie.
-    Other prices stay; `amounts` empty (the user asked about the budget) leaves the text as it is."""
+    """The answer without the user's private budget amount in phrases about *their* budget ("your
+    CHF 160 budget" -> "your budget", "within your CHF 160" -> "within your budget"): others hear
+    Tuttie. Prices and hotel facts stay; `amounts` empty (the user asked) leaves the text as is."""
     for n in amounts:
-        chf = rf"CHF\s?{n}(?:\.-|\.00)?(?!\d)"
-        text = re.sub(rf"\byour {chf} (budget|limit|maximum)\b", r"your \1", text, flags=re.IGNORECASE)
-        text = re.sub(rf"\b(budget|limit|maximum) of {chf}", r"\1", text, flags=re.IGNORECASE)
+        chf = rf"CHF\s?{n}(?:\.-|\.00)?(?![\d.,]\d|\d)"
+        text = re.sub(rf"\b(your) {chf} (budget|limit|maximum|cap)\b", r"\1 \2", text, flags=re.IGNORECASE)
+        text = re.sub(rf"\b(your) (budget|limit|maximum|cap) of {chf}", r"\1 \2", text, flags=re.IGNORECASE)
         text = re.sub(rf"\b(within|under|over|above|below) your {chf}(?! \w)", r"\1 your budget", text,
                       flags=re.IGNORECASE)
     return text
@@ -246,7 +246,8 @@ class Assistant:
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
                 answer = drop_notes(answer) or fallback_answer(said_goodbye)
-                asked = re.search(r"budget|limit|maximum|how much can i", text, re.IGNORECASE)
+                asked = re.search(r"budget(?! rooms)|limit|maximum|\bmax\b|spend|how much (?:can|did) i|ausgeben|wie viel",
+                                  text, re.IGNORECASE)
                 private = getattr(self.toolbox, "private_amounts", None)
                 answer = without_budget(answer, set() if asked or private is None else private())
                 self.bus.emit("answer", "verified", answer, detail={"mood": mood})
