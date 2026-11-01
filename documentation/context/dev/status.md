@@ -6,24 +6,10 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (the keynote deck is built at `code/apps/presentation/`, served at `/presentation/`; the demo runner in `code/demo/` is still open).
+Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view and the wallet's swipe deck are done; presentation site and demo runner are open).
 
 ## Done
 
-- **Keynote deck** (`code/apps/presentation/`, branch `feat/keynote`): the three-minute pitch
-  as a static page (HTML, CSS, ES modules, no build, no CDN at runtime), served by the
-  assistant at `/presentation/` (on the server once merged to `main`). Black stage, at
-  most three words per frame, one clicker (PageDown/PageUp). Beats 0-8: Anna's guesthouse,
-  the cheap listing, Tuttie's eyes, the live demo, the honesty line, 2000 website → 2033
-  signature, Anna's owner view in a laptop frame (optional, `?owner=0` skips it), closing
-  lines and the QR code to the wallet. In beat 4 the phone frame shows the real wallet
-  (`/wallet/` in an iframe, no microphone permission); `demo.js` supplies input and timing
-  only (tap the Tuttie card, type the request, swipe the hotel cards, tap Approve), each click
-  waits for the wallet. Fallback: `media/fallback.webm`, a recording of a real run, plays in
-  the same phone. Keys: → / Space / PageDown next, ← / PageUp back, Home / End, B or . black,
-  F fullscreen, N presenter view (current and next line, cue, clock, time against plan),
-  V fallback recording, L live/recording, R reset (fresh conversation via `POST /reset`,
-  wallet reloaded); `?step=n` for rehearsal. Spoken lines: `SPEAKER-NOTES.md`.
 - **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
   timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
   silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
@@ -270,11 +256,9 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** voice and the keynote deck (`code/apps/presentation/`) are done; next
-   rehearse the deck on the stage hardware (projector, clicker, network), sign in the owner
-   view for beat 7, re-record the fallback once the "adobe" seal issuer is renamed; confirm
-   voice on a real iPhone. The demo runner (`code/demo/`) is only needed if the deck's
-   `demo.js` is not enough.
+1. **dev member 1:** voice is done; next the demo runner (`code/demo/`) and the presentation
+   site (`code/apps/presentation/`), whichever the pitch needs first; confirm voice on a real
+   iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
 3. **dev member 2:** **Confirmed live** (real LLM, `demo_headless.py`, 2026-10-31): the pitch
@@ -332,11 +316,8 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
-Other open items: the demo runner (`code/demo/`); for the keynote deck: beat 7 (owner view)
-needs `OWNER_TOKEN` in `code/.env` and one sign-in inside the laptop frame before the pitch
-(otherwise open the deck with `?owner=0`), the fallback recording shows the "adobe" seal issuer
-(re-record after the rename), and a rehearsal on the stage hardware; voice confirmed on a real
-iPhone, a
+Other open items: the demo runner (`code/demo/`), the presentation site and QR code
+(`code/apps/presentation/`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -355,8 +336,7 @@ profiles in the readme.
 - **Commits:** small, one concern each, clear messages; no AI co-author lines. Pull and
   rebase before pushing (teammates push too); never force-push `main`.
 - **Layout (BaselHack template):** code in `code/`, docs in `documentation/`, presentation
-  files in `assets/`. The keynote deck is code served by the assistant, so it lives in
-  `code/apps/presentation/`.
+  files in `assets/`.
 - **Wallet look:** calm and minimal. Seal tiers shown only by colour (no gold/blue/broken
   words); no glow borders; the eyes have only a faint halo; text input is always a
   deliberate choice and never opens the keyboard by itself.
@@ -614,11 +594,6 @@ Why things are the way they are, so nobody has to rediscover them:
   marketplace 4010, weather and trains 4011-4012, assistant and apps 4040, wallet dev server
   4041, LiveKit media TCP 4042 / UDP 4043, TURN relay TCP 4044 (owner dev server also 4042:
   use it locally only).
-- **Keynote deck:** https://web4.mendes.dev/presentation/ once on `main` (locally
-  <http://localhost:4040/presentation/>), served from disk: no build, no restart for deck
-  changes. It must be opened on the same origin as `/wallet/`, or `demo.js` cannot drive the
-  wallet. Open it in a desktop browser, press F for fullscreen and N for the presenter view on
-  the second screen.
 - **Service:** `systemctl --user restart tuttie` deploys Python changes (`run.sh` also
   rebuilds the wallet); logs: `journalctl --user -u tuttie -f`. Do not start `./run.sh` by
   hand on the server, the ports would clash.
