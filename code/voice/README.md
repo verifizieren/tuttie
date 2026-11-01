@@ -18,8 +18,11 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
   to the user's Tuttie, exactly like typing; Tuttie's answers are spoken.
 - Concise by design: no greeting; a filler that fits the request ("Let me take a look." for a
   task, "Hmm, let me think." for a question) only when Tuttie starts a tool for it (its first
-  tool event on the timeline), never for small talk or quick answers; then Tuttie's answer;
-  the only update in between is "Please confirm with Face ID."
+  tool event on the timeline), never for small talk, quick answers or a spoken card swipe
+  ("next" moves the card at once); then Tuttie's answer; the only update in between is "Please
+  confirm with Face ID.", once per approval (a booking and the city tax are two prompts).
+- While the Face ID sheet is up, a spoken line is not queued behind the running turn: the agent
+  says "Please approve or decline on your phone first." (at most every 5 s).
 - The user can speak and interrupt at any time, also while Tuttie works or speaks (a new
   message waits for the current one). Robust in a noisy room: English only (speech-to-text,
   voice and Tuttie's answers); the phone's noise suppression, echo cancellation and voice
@@ -35,14 +38,21 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
 - Tuttie writes for the ear (`assistant/agent.py`): one to three short sentences, no lists,
   markdown or ids (booking ids and receipt numbers stay in the wallet), numbers as people say
   them. `spoken()` in `voice/agent.py` makes the rest sayable: amounts in francs ("CHF 128" is
-  spoken as "128 francs"), degrees, percent, 24-hour times as people say them ("18:00" is "6
-  pm", "00:52" is "12:52 am", also "midnight", "noon"; "8:30 pm" and durations stay), and of
+  spoken as "128 francs", "CHF 1'280" and "CHF 1 280" as one amount), degrees, percent, 24-hour
+  times as people say them ("18:00" is "6 pm", "00:52" and "for 00:52" are "12:52 am", also
+  "midnight", "noon"; "8:30 pm" and durations like "takes 01:15" stay); node, approval, offer,
+  request and mandate ids and web addresses are never read aloud (the screen keeps them); of
   notes in square brackets only citations, labels like [confirmed] and ids are dropped: any
   other note is spoken without its brackets (the wallet shows the same text).
 - Never silent when the words do not reach Tuttie: long dictation is cut to 2000 characters
   (at a word); if `/voice/say` answers 429 (too many turns) the agent says "One moment
   please.", on any other refusal or a connection error "Sorry, that did not go through. Could
-  you say it again?".
+  you say it again?". Spoken turns have their own budget (20 a minute per browser), so room
+  noise never blocks the wallet's typed turns or swipes; exact card commands while cards can
+  be swiped count only towards 30 a minute.
+- Never mute for good: when its timeline stream (`/voice/events`) ends, the agent follows it
+  again (0.5 s, doubling up to 10 s; it stops on 404/409) and forgets pending approvals, so a
+  decision missed while the stream was down never blocks what the user says.
 - Rooms are protected: anyone can ask for rooms, but above 1000 only unused ones are forgotten
   (conversation gone, or unused for 2 min); a room the agent follows never goes
   (`VoiceRooms` in `assistant/voice.py`).
