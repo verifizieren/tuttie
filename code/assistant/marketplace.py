@@ -23,6 +23,7 @@ import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
 from aps.envelope import parse_timestamp
+from assistant.cards import MAX_ABOUT_CHARS, MAX_NAME_CHARS, clean_text, profile_of  # noqa: F401
 from assistant.events import EventBus
 from marketplace.client import new_request_id, post_request, sign_request
 from marketplace.messages import Request
@@ -37,8 +38,6 @@ OFFER_WAIT_S = 45      # longest wait for the interested agents' offers (it stop
 POLL_S = 0.5
 CARD_TIMEOUT_S = 5
 MAX_CARD_AGE_S = 300   # as in marketplace/market.py: a node signs its agent card on every GET
-MAX_NAME_CHARS = 60    # an agent's name from its card: one short line
-MAX_ABOUT_CHARS = 500  # a profile's "about" from the card
 
 
 # A price in a requirement ("max CHF 160", "160 francs", "budget 160", "under 160.-"): the LLM
@@ -57,18 +56,12 @@ def card_fields(card: dict) -> tuple[str | None, dict]:
     """The agent's name and the profile from a signed agent card, only if of the right type.
 
     The card is signed by a verified business, but it is still the business's own text: the name
-    must be one short line (it reaches the wallet and the LLM) and the profile keeps only the
-    fields Tuttie uses (size, about) when they are strings.
+    must be one short line (it reaches the wallet and the LLM) and the profile is cleaned like
+    the one in the hotel's get_policies (cards.profile_of).
     """
     persona = card.get("persona")
     name = persona.get("name") if isinstance(persona, dict) else None
-    if isinstance(name, str):
-        name = " ".join("".join(c if c.isprintable() else " " for c in name).split())[:MAX_NAME_CHARS].strip()
-    profile = card.get("profile")
-    profile = profile if isinstance(profile, dict) else {}
-    return (name if isinstance(name, str) and name else None,
-            {"size": profile.get("size") if isinstance(profile.get("size"), str) else None,
-             "about": profile["about"][:MAX_ABOUT_CHARS] if isinstance(profile.get("about"), str) else None})
+    return clean_text(name, MAX_NAME_CHARS), profile_of(card)
 
 
 def shortlist(offers: list[dict], budget_chf: float | None, now: datetime, size: int = SHORTLIST_SIZE) -> list[dict]:

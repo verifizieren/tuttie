@@ -17,6 +17,9 @@ import re
 MAX_CARDS = 5
 PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)")
 MAX_FEATURES = 5
+MAX_NAME_CHARS = 60    # a business's agent name: one short line
+MAX_SIZE_CHARS = 20    # a profile's size ("small", "medium", "large")
+MAX_ABOUT_CHARS = 500  # a profile's "about"
 WALK_M_PER_MIN = 80
 NEAR_STATION_M = 1000
 NEEDS = {  # feature key -> words in the user's requirements that make it matter most
@@ -64,10 +67,23 @@ def features(facts: dict) -> list[dict]:
     return found
 
 
+def clean_text(value, limit: int) -> str | None:
+    """A business's text as one short line: strings only, control and format characters (newlines,
+    RTL overrides) replaced by spaces, at most `limit` characters; None if nothing is left."""
+    if not isinstance(value, str):
+        return None
+    text = " ".join("".join(c if c.isprintable() else " " for c in value).split())[:limit].strip()
+    return text or None
+
+
 def profile_of(data: dict) -> dict:
-    """data["profile"] if it is a dict (a business's signed text may hold anything), else {}."""
+    """The profile in a business's signed data (agent card or get_policies), cleaned: only `size`
+    and `about`, as short strings; {} if there is no profile dict."""
     profile = data.get("profile")
-    return profile if isinstance(profile, dict) else {}
+    if not isinstance(profile, dict):
+        return {}
+    return {"size": clean_text(profile.get("size"), MAX_SIZE_CHARS),
+            "about": clean_text(profile.get("about"), MAX_ABOUT_CHARS)}
 
 
 def own_photos(node_id: str, photos) -> list[str]:
@@ -93,7 +109,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
     wanted = {key for key, words in NEEDS.items() if any(w in needs for w in words)}
     # What the user asked for first, then the rest in a fixed order (sort is stable).
     ordered = sorted(features(facts), key=lambda f: f["key"] not in wanted)
-    profile = profile_of(facts) or profile_of(item)
+    profile = profile_of(facts) or profile_of(item)  # both cleaned the same way
     price = offer["price_chf"]
     final = agreed_chf if agreed_chf is not None else price  # what the user would pay
     return {
