@@ -304,7 +304,12 @@ export function applyEvent(state, event) {
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
-      return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: approvalOf(event, detail) };
+      // A booking under way means the hotel was chosen, also when another tab (or the voice)
+      // chose it: these cards are done here too, so a swipe here never starts a second booking.
+      const chosen = state.cards && !state.picked
+        ? { picked: state.cards.some(c => c.node_id === event.node_id) ? [event.node_id] : [] } : {};
+      return { ...progress(state, "tool", "Waiting for your approval", false, at), ...chosen, phase: "approval",
+               approval: approvalOf(event, detail) };
     }
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";

@@ -180,3 +180,13 @@ test('the cards go away once a hotel is liked or a booking is under way', () => 
   assert.equal(choosing({ ...cards, booking: { id: 'BK-1' } }), false);
   assert.equal(choosing({ ...cards, phase: 'booking' }), false);  // approved, the hotel is booking it
 });
+
+test('a booking decided in another tab keeps the cards away here too (no second swipe)', () => {
+  let s = { ...EMPTY, turns: [{ id: 't1', said: 'room', answer: 'Here they are' }] };
+  s = applyEvent(s, { step: 5, kind: 'marketplace', detail: { phase: 'cards', cards: [{ node_id: 'h1' }, { node_id: 'h2' }] } });
+  assert.equal(choosing(s), true);
+  s = applyEvent(s, { step: 6, kind: 'approval', status: 'pending', node_id: 'h1', node_name: 'Rheinblick', detail: { approval_id: 'a1' } });
+  s = applyEvent(s, { step: 7, kind: 'approval', status: 'declined', node_id: 'h1', detail: { approval_id: 'a1' } });
+  assert.equal(choosing(s), false);
+  assert.deepEqual(s.picked, ['h1']);
+});
