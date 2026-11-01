@@ -100,6 +100,7 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .composer button { border-radius: 22px; padding: 0 16px; font-size: 15px; }
 
 @media (prefers-reduced-motion: reduce) {
+  .faceid-glyph:not(.faceid-done) .faceid-frame, .faceid-glyph:not(.faceid-done) .faceid-face { animation: none; }
   .card, .agent canvas, .head, .controls { transition-duration: .01s !important; }
 }
 
@@ -339,8 +340,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
    the whole glyph turns green. */
 .faceid-glyph { width: 56px; height: 56px; overflow: visible; color: #fff; transition: color .35s var(--ease) .15s; }
 .faceid-glyph path { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
-.faceid-frame { transform-origin: 30px 30px; animation: frame-pulse 1.1s ease-in-out infinite; }
-.faceid-face { transform-origin: 30px 30px; animation: face-turn 1.1s ease-in-out infinite; }
+.faceid-frame { transform-box: view-box; transform-origin: 30px 30px; animation: frame-pulse 1.1s ease-in-out infinite; }
+.faceid-face { transform-box: view-box; transform-origin: 30px 30px; animation: face-turn 1.1s ease-in-out infinite; }
 @keyframes frame-pulse { 50% { transform: scale(.9); } }
 @keyframes face-turn { 25% { transform: translateX(-2.5px) scaleX(.93); } 75% { transform: translateX(2.5px) scaleX(.93); } }
 .faceid-done { color: var(--green); }
