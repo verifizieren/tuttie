@@ -160,6 +160,11 @@ export const plainMarkdown = text => String(text ?? "")
   .replace(/(^|[^\w])_(?=\S)([^_\n]*?\S)_(?!\w)/g, "$1$2")
   .replace(/`([^`\n]+)`/g, "$1");
 
+/** The hotel cards are swiped only while the user still chooses: not once a hotel was liked, and
+ *  not once a booking is under way (the user named a hotel instead of swiping): then the
+ *  approval and the booked block take their place. */
+export const choosing = state => Boolean(state.cards && !state.picked && !state.approval && !state.booking);
+
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
 

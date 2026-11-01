@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, cleanAnswer, deckStart, plainMarkdown, EMPTY, startTurn, withDeck } from './activity.js';
+import { applyEvent, choosing, cleanAnswer, deckStart, plainMarkdown, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -170,4 +170,12 @@ test('the note under the cards shows simple markdown as plain text', () => {
   assert.equal(plainMarkdown('*Rheinblick* or _Spalenhof_, use `book`'), 'Rheinblick or Spalenhof, use book');
   assert.equal(plainMarkdown('room_type double_flex stays, 2 * 3 too'), 'room_type double_flex stays, 2 * 3 too');
   assert.equal(plainMarkdown(cleanAnswer('Take **Hotel 1** [3]')), 'Take Hotel 1');
+});
+
+test('the cards go away once a hotel is liked or a booking is under way', () => {
+  const cards = { ...EMPTY, cards: [{ node_id: 'h' }] };
+  assert.equal(choosing(cards), true);
+  assert.equal(choosing({ ...cards, picked: ['h'] }), false);
+  assert.equal(choosing({ ...cards, approval: { id: 'a' } }), false);  // booked by voice, not swiped
+  assert.equal(choosing({ ...cards, booking: { id: 'BK-1' } }), false);
 });

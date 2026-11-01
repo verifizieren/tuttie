@@ -623,6 +623,15 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
+- **Choosing a hotel is guided:** after the cards, Tuttie says how many hotels it found and which
+  it would pick and why; the voice then adds "It's your choice: swipe right on the ones you like,
+  or just tell me" (`HANDOFF`, once per cards turn); a swiped pick is acknowledged ("Nice pick.
+  Let me book …", `pick_ack` on the wallet's turn event) before the Face ID prompt. The cards go
+  away once a hotel is liked or a booking is under way (`choosing()` in lib/activity.js), so
+  booking by voice while the cards are up also leads to the approval and the booked block.
+- **Approval sheet finishes before it goes:** the decided approval stays on screen until the
+  checkmark (or X) was shown ~1.4 s, then the sheet slides down (App `finishing`, sheet
+  `onDecide`/`onFinished`), even though the server stopped waiting for it.
 - **Face ID glyph in the approval sheet** (`ApprovalSheet.jsx` `FaceId`, `wallet.css`): rounded
   corner brackets around a simple face (eyes, L-shaped nose, smile) like the iPhone's; while
   scanning the face turns a little and the brackets pulse; on approval the face fades and a
