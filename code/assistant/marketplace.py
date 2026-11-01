@@ -62,6 +62,17 @@ def shortlist(offers: list[dict], budget_chf: float | None, now: datetime, size:
     return sorted(fitting, key=lambda o: (o["offer"]["price_chf"], TIER_ORDER[o["trust_tier"]]))[:size]
 
 
+def market_reason(response: httpx.Response) -> str:
+    """The reason in a market refusal, or a short generic one (busy, or a body that is not JSON)."""
+    if response.status_code == 429:
+        return "the market is busy right now, try again in a minute"
+    try:
+        reason = response.json().get("reason")
+    except (ValueError, AttributeError):
+        reason = None
+    return reason if isinstance(reason, str) and reason else f"HTTP {response.status_code}"
+
+
 class MarketDesk:
     """Posts Tuttie's requests and turns the market's offers into a shortlist."""
 
@@ -95,9 +106,12 @@ class MarketDesk:
         try:
             posting = await post_request(self.http, self.market_url, envelope)
         except httpx.HTTPStatusError as error:
-            reason = error.response.json().get("reason", str(error)) if error.response.content else str(error)
+            reason = market_reason(error.response)
             self.bus.emit("marketplace", "broken", f"The market refused the request: {reason}")
             return {"error": f"market refused the request: {reason}"}
+        except (httpx.HTTPError, ValueError) as error:  # unreachable, or an answer that is not JSON
+            self.bus.emit("marketplace", "broken", f"The market did not answer: {type(error).__name__}")
+            return {"error": "the market is not reachable right now, try again in a minute"}
 
         public = request.model_dump(mode="json")
         interested = [n for n, i in posting["invited"].items() if i.get("status") == "interested"]
