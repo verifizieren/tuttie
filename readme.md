@@ -1,7 +1,7 @@
 # Tuttie: your agent in your wallet
 
 BaselHack 2026, Adobe challenge. **Live: <https://web4.mendes.dev>** (open it on your phone and
-add it to the home screen).
+add it to the home screen). The page the pitch's QR code opens: <https://web4.mendes.dev/presentation/>.
 
 Tuttie lives in your phone's wallet. You say what you need, businesses' agents come to you
 with signed offers, your agent picks the best few and negotiates for you, and you approve
