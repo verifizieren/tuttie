@@ -104,7 +104,7 @@ def test_spoken_turns_count_towards_the_browsers_turn_limit(monkeypatch):
 
     monkeypatch.setattr(voice, "API_KEY", "key")
     monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests-secret-for-tests")
-    monkeypatch.setattr(voice, "TURNS_PER_SESSION_PER_MIN", 2)
+    monkeypatch.setattr(voice, "VOICE_TURNS_PER_SESSION_PER_MIN", 2)
     monkeypatch.setattr(conv_module.Conversation, "start", lambda self, *a, **k: "t1")  # no LLM call
     agent = {"Authorization": "Bearer secret-for-tests-secret-for-tests"}
     with TestClient(app) as client:

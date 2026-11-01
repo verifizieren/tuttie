@@ -114,13 +114,20 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
 // Notes the model put in square brackets, cleaned the same way as the voice (voice/agent.py
 // spoken(); shared cases in code/tests/fixtures/answer_notes.json). Only what carries nothing to
 // say goes: citations ([3], [3, 4]), a few labels ([confirmed]), booking and receipt ids, node
-// ids. Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
+// ids, approval, offer and mandate ids (also alone in parentheses: "Rheinblick (ch.basel.x)").
+// Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
 // Markdown links keep their text. All patterns run in linear time.
 const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
 const NOTE = /\[([^[\]\n]{0,60})\]/g;
 const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
 const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
-const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rheinblick, not booking.com
+const NODE_ID_TOKEN = "[a-z]{2}(?:\\.[a-z0-9-]{1,40}){2,}";  // ch.basel.hotel-rheinblick, not booking.com
+const NODE_ID = new RegExp(`^${NODE_ID_TOKEN}$`);
+// Approval, mandate and offer ids (assistant/approvals.py, aps/mandate.py, node/agent.py).
+const REF_TOKEN = "(?:ap|md)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-[0-9a-f]{6}";
+const REF = new RegExp(`^(?:${REF_TOKEN})$`);
+const INTERNAL = `(?:${NODE_ID_TOKEN}|${REF_TOKEN})`;
+const PAREN_IDS = new RegExp(`\\(\\s*${INTERNAL}(?:\\s*[,;]\\s*${INTERNAL})*\\s*\\)`, "g");  // "(ch.basel.x)"
 const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
 const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
 const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
@@ -139,13 +146,13 @@ function link(all, label, target) {
 
 function note(all, inner, offset, text) {
   const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
-  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || /^ignored:/i.test(words)) return GONE;
+  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || REF.test(words) || /^ignored:/i.test(words)) return GONE;
   return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
 }
 
 export function withoutNotes(value) {
   const raw = String(value ?? "");
-  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link);
+  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link).replace(PAREN_IDS, GONE);
   for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
   text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
     .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")
