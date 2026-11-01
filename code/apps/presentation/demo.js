@@ -177,6 +177,10 @@ export function createDemo(iframe) {
     } catch (e) {
       warn(`reset: ${e?.message || e}`);
     }
+    // Let the wallet show the empty chat (and store it) first: reloaded earlier, it would bring
+    // the old request back from its local copy.
+    await waitFor(() => !$(".turn") && !$(".deck .swipe-card") && !$(".booking"), 2000);
+    await sleep(300);
     await new Promise(resolve => {
       iframe.addEventListener("load", resolve, { once: true });
       try { win().location.reload(); } catch { iframe.src = iframe.src; }
