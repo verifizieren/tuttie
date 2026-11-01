@@ -88,6 +88,10 @@ class MarketDesk:
         self.market_url = market_url.rstrip("/")
         self.agent_id = agent_id
         self.offer_wait_s = offer_wait_s
+        self.forget()
+
+    def forget(self) -> None:
+        """Drop the last posting and its offers (a conversation that starts over)."""
         self.last_request: dict | None = None    # the last posted request (public part)
         self.last_shortlist: list[dict] = []     # its shortlisted offers, with their signed envelopes
         self.last_offers: list[dict] = []        # every checked offer for it (the user may pick any)

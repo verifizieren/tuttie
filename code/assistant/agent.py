@@ -68,8 +68,8 @@ calendar (pass them as date, nights and guests). \
 When the user names no date, use the check-in date the calendar names, even when the arrival is \
 after midnight. If post_request refuses the date or the nights, tell the user and ask; never \
 post another date or length instead. Private items (e.g. the budget) go only into budget_chf: never into \
-requirements or messages to businesses, and never say the budget amount (others may hear it: say \
-"within" or "above your budget").
+requirements or messages to businesses, and never say the budget amount unless they ask for it (others may \
+hear it: say "within" or "above your budget").
 2. Call post_request with only public needs in requirements and tags (tags are places only). It \
 collects the signed offers, bargains (budget private) and returns cards with the agreed prices, \
 which the user swipes (right = like, left = pass). Then say in two short sentences how many \

@@ -237,7 +237,9 @@ def agreement_conflicts(deal: dict, booked_date: str, room_type: str, date: str,
 
 def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) -> list[str]:
     """Where a signed confirmation differs from what the user approved (empty: it matches)."""
-    differ = [] if round(confirmation.get("total_chf", -1), 2) == round(amount, 2) else ["total_chf"]
+    total = confirmation.get("total_chf")
+    numeric = isinstance(total, (int, float)) and not isinstance(total, bool)
+    differ = [] if numeric and round(total, 2) == round(amount, 2) else ["total_chf"]
     if terms is not None:  # room, night and rate were approved as plain text (plain_term)
         plain = {key: None if confirmation.get(key) is None else plain_term(confirmation[key])
                  for key in ("room_type", "date", "rate")}
@@ -356,6 +358,16 @@ def swipeable(history: list[dict]) -> bool:
     return shown_cards(history) is not None and not approval_open(history)
 
 
+# Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
+TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch"})
+
+
+def listed(value) -> str:
+    """A signed list of short words for the timeline; anything else is shown as "?"."""
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return ", ".join(value)
+    return "?"
+
 class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
@@ -380,6 +392,8 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        if market := getattr(self, "market", None):
+            market.forget()  # the old posting's offers are not this conversation's deals any more
         self.new_turn()
 
     def new_turn(self) -> None:
@@ -724,7 +738,8 @@ class Toolbox:
             if agreement is None:
                 # The user chose it anyway: booking does not need a deal, only the phone's approval.
                 return {"error": f"no signed agreement with {node_id}: book it without use_agreement, with "
-                                 "date and room_type from call_tool get_availability (cheapest fitting rate); "
+                                 "date (the posted night) and room_type from call_tool get_availability (cheapest "
+                                 "fitting rate), after ask_agent for one commitment for the special needs; "
                                  "do not ask the user"}
             deal = agreement["payload"]
             posted = self.market.last_request["constraints"]["date"] if self.market.last_request else None
@@ -787,7 +802,8 @@ class Toolbox:
             # Card prices of other hotels are not what booking them costs (a flex offer vs the
             # best rate plus extras): the next one is offered by name; its phone sheet shows the total.
             return {"declined": True, "source_step": step,
-                    "note": "say it was declined; offer at most one other liked hotel, by name only, no price"}
+                    "note": "say it was declined; offer at most one other hotel, and only one the user's "
+                            "message named as liked (by name, no price); if it named none, just stop"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
@@ -796,22 +812,26 @@ class Toolbox:
         result = await self.verified_mcp(node_id, "book", {"call": call}, "a2t", "book")
         if not isinstance(result, Verified):
             return result
-        confirmation = result.payload
+        # The hotel's signed fields are data: never Tuttie's own keys (what it booked, what the
+        # mandate paid, what differs from the approval, its instructions to the LLM).
+        confirmation = {k: v for k, v in result.payload.items() if k not in TUTTIE_KEYS}
         if confirmation.get("status") == "confirmed" and booked_other_terms(confirmation, amount, terms):
             # The hotel signed a booking that is not what the user approved: say so, never hide it.
             confirmation = {**confirmation, "mismatch": booked_other_terms(confirmation, amount, terms)}
         if confirmation.get("status") == "confirmed":
-            text = f"book: confirmed {confirmation['booking_id']}, CHF {confirmation['total_chf']:g}"
+            total = confirmation.get("total_chf")
+            text = f"book: confirmed {confirmation.get('booking_id')}, CHF " + (
+                f"{total:g}" if isinstance(total, (int, float)) and not isinstance(total, bool) else "?")
             if confirmation.get("rate"):
                 text += f", {confirmation.get('room_type')} ({confirmation['rate']})"
             if confirmation.get("mismatch"):
-                text += f"; differs from what you approved: {', '.join(confirmation['mismatch'])}"
+                text += f"; differs from what you approved: {listed(confirmation['mismatch'])}"
             if confirmation.get("checked"):
-                text += f" (checked: {', '.join(confirmation['checked'])})"
+                text += f" (checked: {listed(confirmation['checked'])})"
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
-        answer = {"node_id": node_id, "source_step": step, **confirmation}
+        answer = {**confirmation, "node_id": node_id, "source_step": step}
         if confirmation.get("status") == "confirmed":
             # Charges the user already allowed with a mandate are paid right away, without asking.
             for charge in await self.load_charges(node_id):

@@ -42,5 +42,5 @@ class UserContext:
         return {source: self.data.get(source, []) for source, _ in SOURCES} | {
             "rule": "Use these without asking. If the user wants a hotel or something booked, call "
                     "post_request next, in this same turn, with what these give (one guest unless "
-                    "they say otherwise): do not ask whether to search. Never put private items into "
+                    "they or the calendar say otherwise): do not ask whether to search. Never put private items into "
                     "a posting, a message or a requirement; a private budget only goes into budget_chf."}
