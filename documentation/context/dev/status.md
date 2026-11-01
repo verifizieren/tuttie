@@ -10,6 +10,7 @@ Last updated: 2026-11-01 (the presentation QR page exists on branch `presentatio
 
 ## Done
 
+- **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Alex! Enjoy Basel."; the model is told when no deals exist yet.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
   eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for
