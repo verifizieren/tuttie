@@ -335,6 +335,9 @@ def summarize(tool: str, payload: dict) -> str:
     return tool
 
 
+# Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
+TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges"})
+
 class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
@@ -359,6 +362,8 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        if market := getattr(self, "market", None):
+            market.forget()  # the old posting's offers are not this conversation's deals any more
         self.new_turn()
 
     def new_turn(self) -> None:
@@ -793,7 +798,10 @@ class Toolbox:
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
-        answer = {"node_id": node_id, "source_step": step, **confirmation}
+        # The hotel's signed fields are data: never Tuttie's own keys (what it booked, what the
+        # mandate paid, its instructions to the LLM), which are set here only.
+        answer = {k: v for k, v in confirmation.items() if k not in TUTTIE_KEYS}
+        answer.update(node_id=node_id, source_step=step)
         if confirmation.get("status") == "confirmed":
             # Charges the user already allowed with a mandate are paid right away, without asking.
             for charge in await self.load_charges(node_id):
