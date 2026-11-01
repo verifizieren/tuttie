@@ -97,8 +97,13 @@ class Market:
 
     # --- postings ---------------------------------------------------------------------
 
-    async def post_request(self, envelope: dict, now: datetime | None = None) -> dict:
-        """Accept a signed Request from a user agent and wake the matching businesses."""
+    async def post_request(self, envelope: dict, now: datetime | None = None, keyed: bool = False) -> dict:
+        """Accept a signed Request from a user agent and wake the matching businesses.
+
+        `keyed`: it came with this deployment's agent key (aps/agent_key.py), so from its own
+        Tuttie: the demo signing keys are public, so only keyless postings meet the cap and an
+        outsider's burst can never lock the real wallet users out.
+        """
         requester_id = envelope.get("node_id") if isinstance(envelope, dict) else None
         record, verdict = await self.record(requester_id)
         if record.get("kind") != "user-agent":
@@ -115,7 +120,8 @@ class Market:
             raise MarketError("request has already expired")
         if request.request_id in self.postings:
             raise MarketError("request_id already posted", 409)
-        self.throttle(record["node_id"])
+        if not keyed:
+            self.throttle(record["node_id"])
 
         posting = Posting(
             request_id=request.request_id,

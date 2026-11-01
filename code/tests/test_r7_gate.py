@@ -281,6 +281,7 @@ def test_a_market_timeout_is_not_reported_as_unreachable():
         raise httpx.ReadTimeout("slow", request=request)
     error = find_with(slow)["error"]
     assert "still waking" in error and "do not post again" in error and "not reachable" not in error
+    assert "ask again" in error  # no offers arrive later on their own
 
 
 def test_an_unreachable_market_says_so():
