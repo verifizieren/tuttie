@@ -6,24 +6,15 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch) and `/keynote2/` (live demo); the demo runner is open).
+Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
 - **Design rules (1 Nov)**: black/white with blue #2f6fe0, purple #7a5af8, pink #e5489b accents, no
   orange, no italic, no small labels above headings, no URL text, pill buttons; the top seal tier is
-  purple. Wallet, owner (now light), QR page, `/keynote1/` and `/keynote2/` follow them. The QR page has
+  purple. Wallet, owner (now light), QR page and `/keynote1/` follow them. The QR page has
   a story-style demo (tap left/right), one number per scroll, source logos and a reverse-marketplace section.
-  Open: keynote2's fallback recording still shows the old dark wallet (needs a real re-recording).
-- **Keynote pitch deck** (merged 1 Nov, still the dark design): a static deck
-  in `code/apps/keynote2/`, served at `/keynote2/` by the assistant's static mount (no build). Black
-  stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
-  view (N). A clicker (PageDown/PageUp) drives the real wallet in a phone frame through
-  `demo.js`, which supplies input and timing only (same backend, same verification). Fallback
-  recording of a real run in `media/fallback.webm` + `.mp4` (V plays it in the phone, L
-  switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
-  skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
-  page in `code/apps/presentation/`. Details: `code/apps/keynote2/README.md`.
+- **Keynote 2 removed (1 Nov)**: the live-demo deck (`code/apps/keynote2/`) is gone; the pitch uses `/keynote1/`.
 - **QR page speed (1 Nov)**: the two faces painted 60 frames a second even off screen (724 blurred
   draws in 3 s while reading the business part); now they paint only while visible. Fonts no longer
   block the first paint; two invisible nested backdrop blurs removed. Look unchanged (pixel compare).
@@ -508,16 +499,11 @@ Build order from [goals.md](goals.md):
 4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
-**Before the pitch (keynote deck, `code/apps/keynote2/`):**
+**Before the pitch:**
 - Rehearse on the stage hardware (laptop, projector, clicker) at least once.
-- If no offers arrive on stage, press V: the fallback recording plays in the same phone.
 - Do not restart the live service (`tuttie`) during the pitch: sessions are in memory.
-- Re-record `media/fallback.webm` + `.mp4` after any seal or issuer rename, so the recording
-  matches the live wallet.
 - Rehearsals: at most ~4 runs a minute back to back (the `/chat` rate limit is about 10
   requests a minute per browser).
-- Tuttie may speak answers aloud from the deck's wallet where the voice worker runs: mute the
-  laptop or test it beforehand.
 
 **Review of owner view and voice (dev member 2, 2026-10-31, commits 8763423..6819267):** all
 299 tests green, owner view's JS tests and build green, the pitch story still runs live
