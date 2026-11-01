@@ -1,15 +1,15 @@
 // Tuttie's eyes for the deck: two rounded rectangles that blink gently every ~4 s.
 //
-// Proportions follow the wallet's face (apps/wallet/src/lib/face.js, a port of pycozmo's
-// procedural face, https://github.com/zayfod/pycozmo, MIT License, Copyright (c) 2019-2020):
-// in a 2:1 face box each eye is 17.5% wide and 50% high, centred at 34% and 66%, with corner
-// radii of 23% of its width. No code is copied; only the geometry is matched so the deck's
-// eyes land exactly on the wallet's Tuttie card.
+// Proportions follow the wallet's open, listening face (apps/wallet/src/lib/face.js, a port of
+// pycozmo's procedural face, https://github.com/zayfod/pycozmo, MIT License, Copyright (c)
+// 2019-2020): in its 2:1 face box each eye is about 19% wide and 58% high, centred at 30% and
+// 70%, with corners of 6.4 of pycozmo's 128x64 units. No code is copied; only the geometry is
+// matched (and measured on the live wallet), so the deck's eyes are the same pair, only bigger.
 
-/** Open-eye geometry in the face box, in percent. */
-export const OPEN = { left: [34, 50], right: [66, 50], w: 17.5, h: 50, radius: "23% / 16%" };
-/** The wallet's sleeping eyes (closed bars) in the same box, measured from the live wallet. */
-export const ASLEEP = { left: [30.1, 68.6], right: [70.2, 68.6], w: 21.9, h: 7.9, radius: "2px" };
+/** The wallet's open eyes (its "listening" look) in a 2:1 face box, in percent. */
+export const WALLET_OPEN = { left: [30, 49], right: [70, 49], w: 18.8, h: 58, radius: "27% / 17%" };
+/** The deck's big eyes: the same shape as on the wallet's open card. */
+export const OPEN = WALLET_OPEN;
 
 /** Inline style for one eye in a pose. */
 export function eyeStyle(pose, side) {

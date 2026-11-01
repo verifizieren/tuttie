@@ -13,7 +13,7 @@
   --ink: #f5f5f7;
   --ink-2: #86868b;
   --accent: #d97757;
-  --eye: #f6d6c8;
+  --eye: #f6d3c2;       /* the wallet's eye colour (lib/face.js) */
   --gold: #e3b341;
   --red: #ff453a;
   --ease: cubic-bezier(.22, 1, .36, 1);
@@ -143,15 +143,10 @@ body.idle { cursor: none; }
   opacity: 1;
   transition: opacity 1200ms var(--ease) var(--out);
 }
-#face.moving, #face.moving .eye {
-  transition-property: left, top, width, height, border-radius, opacity;
-  transition-duration: 900ms;
-  transition-timing-function: var(--ease);
-}
-#face.moving.gone {
+/* On the wallet's eyes (deck.js faceIntoPhone moves them frame by frame): crossfade into them. */
+#face.gone {
   opacity: 0;
-  transition: left 900ms var(--ease), top 900ms var(--ease), width 900ms var(--ease),
-              height 900ms var(--ease), opacity 400ms ease 850ms;
+  transition: opacity 350ms ease;
 }
 
 /* ---------- 4 · the phone ---------- */

@@ -3,7 +3,7 @@
 // · F fullscreen · N presenter view · V fallback recording · L live/fallback · R reset.
 
 import { activeBeats, flatten } from "./beats.js";
-import { createFace, eyeStyle, OPEN, ASLEEP } from "./eyes.js";
+import { createFace, eyeStyle, OPEN, WALLET_OPEN } from "./eyes.js";
 
 const params = new URLSearchParams(location.search);
 const beats = activeBeats(location.search);
@@ -72,14 +72,27 @@ function walletInsets() {
 }
 wallet.addEventListener("load", () => { walletInsets(); forwardKeys(wallet); keepFocus(); });
 
-/** The Tuttie card's eye canvas inside the wallet, in wallet CSS px (measured, else typical). */
-function cardRect() {
+/** The Tuttie card's face canvas inside the wallet, or null (not loaded, another origin). */
+function walletCanvas() {
+  try { return wallet.contentDocument?.querySelector(".card.agent canvas") || null; } catch { return null; }
+}
+
+/** Hide (or show again) the wallet's own eyes while the deck's eyes fly in, so only one pair of
+ *  eyes is ever on screen. A style in the wallet's document: the wallet's code is untouched. */
+function hideWalletEyes(hidden) {
   try {
-    const el = wallet.contentDocument.querySelector(".card.agent canvas");
-    const r = el?.getBoundingClientRect();
-    if (r && r.width > 0) return { x: r.left, y: r.top, w: r.width, h: r.height };
-  } catch { /* not same origin */ }
-  return { x: 30.3, y: 274.5, w: 329.4, h: 164.7 };
+    const doc = wallet.contentDocument;
+    if (!doc) return;
+    if (!doc.getElementById("deck-handoff")) {
+      const style = doc.createElement("style");
+      style.id = "deck-handoff";
+      // At once both ways: no ghost of the closed card while hiding, and on landing the wallet's
+      // eyes are fully there under the deck's fading ones (two half-faded pairs would dim).
+      style.textContent = "html.deck-handoff .card.agent canvas { opacity: 0 !important; }";
+      doc.head.append(style);
+    }
+    doc.documentElement.classList.toggle("deck-handoff", hidden);
+  } catch { /* another origin: nothing to hide */ }
 }
 
 // ---------- demo driver (demo.js, optional) ----------
@@ -155,31 +168,128 @@ async function showFallback(on, restart = false) {
 const bigFace = createFace(faceBox);
 /** Tuttie's eyes, large and centred (beat 3). */
 const FACE_HOME = { x: 440, y: 248, w: 1040, h: 520 };
+const MOVE_MS = 1500;           // the eyes' flight into the phone
+const SETTLE_MS = 900;          // at most this long on the wallet's eyes, waiting for them to be fully open
+const FADE_MS = 350;            // the deck's eyes fade off the wallet's own (deck.css #face.gone)
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+/** The faint halo around the wallet's eyes (lib/face.js shadow), sized to an eye of `w` px. */
+const halo = w => `0 0 ${Math.max(2, w * 0.12).toFixed(1)}px rgba(217, 119, 87, .35)`;
 
 function placeFace(rect, pose) {
   Object.assign(faceBox.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
-  bigFace.eyes.forEach((eye, i) => Object.assign(eye.style, eyeStyle(pose, i ? "right" : "left")));
+  bigFace.eyes.forEach((eye, i) => Object.assign(eye.style, eyeStyle(pose, i ? "right" : "left"),
+                                                 { boxShadow: halo(rect.w * pose.w / 100) }));
 }
 
-let faceMove = 0;               // the queued frame of faceIntoPhone, cancelled by faceHome
+/** The two eyes of a pose in a rect, as stage px rects [left, right]. */
+function eyeRects(rect, pose) {
+  return ["left", "right"].map(side => {
+    const [cx, cy] = pose[side];
+    const w = rect.w * pose.w / 100, h = rect.h * pose.h / 100;
+    return { x: rect.x + rect.w * cx / 100 - w / 2, y: rect.y + rect.h * cy / 100 - h / 2, w, h };
+  });
+}
+
+/** Wallet CSS px → stage px (the phone is scaled and sits at PHONE on the stage). */
+function toStage(r) {
+  const s = PHONE.scale;
+  return { x: PHONE.x + (PHONE.frame + r.x) * s, y: PHONE.y + (PHONE.frame + r.y) * s, w: r.w * s, h: r.h * s };
+}
+
+// The wallet's eyes are read off its canvas (a small copy, so reading is cheap), so the deck's
+// eyes land on what the wallet really draws: its gaze, its expression, a blink.
+const sample = Object.assign(document.createElement("canvas"), { width: 256, height: 128 });
+const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
+
+/** Where the wallet draws its eyes now, in stage px: { eyes: [left, right], open } where `open`
+ *  says they are fully open (not asleep, not mid-blink, not the glad half-closed waking look).
+ *  Null when the canvas is not there. If the read eyes are not fully open, the open pose of
+ *  the wallet's face (eyes.js WALLET_OPEN) in the canvas is returned instead. */
+function walletEyes() {
+  const canvas = walletCanvas();
+  const r = canvas?.getBoundingClientRect();
+  if (!r || r.width < 1) return null;
+  const box = toStage({ x: r.left, y: r.top, w: r.width, h: r.height });
+  let found = null;
+  try {
+    sampleCtx.clearRect(0, 0, 256, 128);
+    sampleCtx.drawImage(canvas, 0, 0, 256, 128);
+    const data = sampleCtx.getImageData(0, 0, 256, 128).data;
+    found = [[0, 128], [128, 256]].map(([x0, x1]) => {
+      let left = 1e9, top = 1e9, right = -1, bottom = -1;
+      for (let y = 0; y < 128; y++) {
+        for (let x = x0; x < x1; x++) {
+          if (data[(y * 256 + x) * 4 + 3] < 160) continue;  // the eye itself, not its halo
+          if (x < left) left = x; if (x > right) right = x;
+          if (y < top) top = y; if (y > bottom) bottom = y;
+        }
+      }
+      if (right < 0) return null;
+      return { x: box.x + box.w * left / 256, y: box.y + box.h * top / 128,
+               w: box.w * (right - left + 1) / 256, h: box.h * (bottom - top + 1) / 128 };
+    });
+  } catch { /* a tainted or lost canvas: use the open pose */ }
+  const open = Boolean(found?.[0] && found[1] && found.every(e => e.h > box.h * 0.45));
+  return { eyes: open ? found : eyeRects(box, WALLET_OPEN), open };
+}
+
+let faceMove = 0;               // the running frame of faceIntoPhone, cancelled by faceHome
+let moveGeneration = 0;
 function faceHome(shown) {
   cancelAnimationFrame(faceMove);
-  faceBox.classList.remove("moving", "gone");
+  moveGeneration++;
+  faceBox.classList.remove("gone");
   placeFace(FACE_HOME, OPEN);
   faceBox.classList.toggle("shown", shown);
+  hideWalletEyes(false);
 }
 
-/** Magic move: the eyes travel into the phone and fall asleep on the wallet's Tuttie card, then
- *  hand over to the real wallet underneath. */
+const ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const mix = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t });
+
+/** Magic move: while the wallet opens its Tuttie card (demo step "open"), the big eyes shrink
+ *  into the phone and land on the open card's awake eyes, then hand over to them, so it reads
+ *  as one pair of eyes. The wallet's own eyes stay hidden until then. Each frame aims at where
+ *  the wallet draws its eyes now; on arrival the deck's eyes follow them until they are fully
+ *  open (at most SETTLE_MS), the wallet's eyes appear under them and the deck's fade away. */
 function faceIntoPhone() {
-  const r = cardRect();
-  const s = PHONE.scale, ox = PHONE.x + PHONE.frame * s, oy = PHONE.y + PHONE.frame * s;
-  faceBox.getBoundingClientRect();  // commit the start pose before transitioning
-  faceBox.classList.add("moving");
-  faceMove = requestAnimationFrame(() => {
-    placeFace({ x: ox + r.x * s, y: oy + r.y * s, w: r.w * s, h: r.h * s }, ASLEEP);
-    faceBox.classList.add("gone");
+  cancelAnimationFrame(faceMove);
+  const mine = ++moveGeneration;
+  hideWalletEyes(true);
+  const from = eyeRects(FACE_HOME, OPEN);
+  // The face box becomes the whole stage, so each eye is placed in stage px (as % of 1920x1080).
+  Object.assign(faceBox.style, { left: "0px", top: "0px", width: "1920px", height: "1080px" });
+  const put = rects => bigFace.eyes.forEach((eye, i) => {
+    const e = rects[i];
+    Object.assign(eye.style, {
+      left: `${e.x / 19.2}%`, top: `${e.y / 10.8}%`, width: `${e.w / 19.2}%`, height: `${e.h / 10.8}%`,
+      borderRadius: OPEN.radius, boxShadow: halo(e.w),
+    });
   });
+  put(from);
+  const start = performance.now();
+  const moveMs = reducedMotion.matches ? 1 : MOVE_MS;
+  let landed = 0, fading = 0;
+  const frame = now => {
+    if (mine !== moveGeneration) return;
+    const target = walletEyes();
+    const t = Math.min(1, (now - start) / moveMs);
+    if (target) put(from.map((e, i) => mix(e, target.eyes[i], ease(t))));
+    if (t >= 1 && !landed) landed = now;
+    // Arrived: wait (briefly) for the wallet's eyes to be fully open, then crossfade.
+    if (landed && !fading && (target?.open || now - landed > SETTLE_MS || !target)) {
+      fading = now;
+      hideWalletEyes(false);
+      faceBox.classList.add("gone");
+    }
+    if (fading && now - fading > FADE_MS + 50) {
+      faceBox.classList.remove("shown");
+      return;
+    }
+    faceMove = requestAnimationFrame(frame);
+  };
+  faceMove = requestAnimationFrame(frame);
 }
 
 // ---------- the step machine ----------
@@ -210,7 +320,8 @@ function render(previous, forward) {
     for (let i = 0; i < 4; i++) el.classList.toggle(`step-${i}`, i === index);
     for (const item of el.querySelectorAll(".s")) item.classList.toggle("on", isOn(item, index, beat));
   }
-  // The eyes: centred in beat 3, moving into the phone on the way to beat 4, hidden otherwise.
+  // The eyes: centred in beat 3, moving into the phone (onto the opening wallet card) on the way
+  // to beat 4, hidden otherwise.
   if (beat.id === "tuttie") faceHome(true);
   else if (beat.id === "demo" && prevBeat?.id === "tuttie" && forward) faceIntoPhone();
   else if (prevBeat?.id !== beat.id) { faceBox.classList.remove("shown"); }
@@ -227,7 +338,10 @@ function go(target, { step = false } = {}) {
   if (startedAt && !(beat.id in entered)) entered[beat.id] = (Date.now() - startedAt) / 1000;
   render(previous, forward);
   keepFocus();
-  if (step && forward && s.demo) runDemo(s.demo);   // only a single click forward drives the wallet
+  // Only a single click forward drives the wallet. Entering the demo beat opens the Tuttie card
+  // (demo step "open"), so the eyes moving in land on its awake eyes.
+  if (step && forward && beat.id === "demo" && flat[pos].index === 0) runDemo("open");
+  if (step && forward && s.demo) runDemo(s.demo);
   if (phone.classList.contains("fallback")) {
     if (beat.id !== "demo") video.pause();
     else video.play().catch(() => {});  // back in the demo beat: the recording goes on
