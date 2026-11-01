@@ -294,3 +294,37 @@ def test_an_unreachable_market_says_so():
 def test_a_malformed_market_answer_is_a_calm_tool_error(body):
     error = find_with(lambda _: httpx.Response(201, text=body))["error"]
     assert "could not read" in error
+
+
+def test_tuttie_s_own_postings_carry_the_deployment_key_and_are_never_locked_out(monkeypatch):
+    """The demo keys are public, so anyone can sign postings as Tuttie: a burst from outside must
+    not lock the real wallet users out. Postings with the deployment's X-Agent-Web-Key (only the
+    services of this deployment have it) skip the per-requester cap; others still meet it."""
+    monkeypatch.setenv("AGENT_WEB_KEY", "s3cret")
+    monkeypatch.setattr(market_module, "POSTINGS_PER_MIN", 1)
+    world = World()
+    with TestClient(create_market_app(world.http)) as client:
+        def post(i, headers):
+            req = request(request_id=f"rq-key-{i}", tags=["basel"], budget=None,
+                          expires=datetime.now(timezone.utc) + timedelta(hours=2))
+            return client.post("/postings", headers=headers,
+                               json=tuttie_envelope(req, timestamp=stamp(datetime.now(timezone.utc)))).status_code
+        assert [post(1, {}), post(2, {})] == [201, 429]          # the outsider's burst is capped
+        assert [post(3, {"X-Agent-Web-Key": "s3cret"}), post(4, {"X-Agent-Web-Key": "s3cret"})] == [201, 201]
+        assert post(5, {"X-Agent-Web-Key": "wrong"}) == 429
+
+
+def test_tuttie_sends_the_deployment_key_with_its_postings(monkeypatch):
+    from marketplace.client import post_request
+    monkeypatch.setenv("AGENT_WEB_KEY", "s3cret")
+    seen = []
+
+    def handler(req):
+        seen.append(req.headers.get("X-Agent-Web-Key"))
+        return httpx.Response(201, json={"request_id": "rq-1", "invited": {}, "skipped": {}})
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            await post_request(http, "http://market", {"node_id": "x"})
+    asyncio.run(run())
+    assert seen == ["s3cret"]
