@@ -270,8 +270,10 @@ class TuttieFace {
       lctx.fillStyle = this.color;
       eyePath(lctx, p, e);
       lctx.fill();
-      lctx.globalCompositeOperation = "source-atop";
-      drawCatchlight(lctx);
+      if (!this.asleep) {  // closed eyes show no catchlight (it would peek out under the lid)
+        lctx.globalCompositeOperation = "source-atop";
+        drawCatchlight(lctx);
+      }
       lctx.globalCompositeOperation = "destination-out";
       cutLid(lctx, p, e + 13, -EYE_H / 2, 0);
       cutLid(lctx, p, e + 16, EYE_H / 2 + 1, 180);
