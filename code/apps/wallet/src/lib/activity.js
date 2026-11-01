@@ -96,14 +96,14 @@ const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
 const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
 const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rheinblick, not booking.com
 const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
-const URL = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
+const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
 const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
-const IGNORED = /(?<![ \t])[ \t]*\bignored:.*$/i;     // "Ignored: <business>" to the line's end
+const IGNORED_LINE = /^[ \t*_#>-]*ignored:/i;  // a line about a business Tuttie ignored
 
 function link(all, label, target) {
   const text = label.trim();
   if (text && !CITATION.test(text)) return text;
-  return !target.trim() || URL.test(target) ? GONE : `(${target})`;
+  return !target.trim() || WEB_ADDRESS.test(target) ? GONE : `(${target})`;
 }
 
 function note(all, inner, offset, text) {
@@ -113,16 +113,18 @@ function note(all, inner, offset, text) {
 }
 
 export function withoutNotes(value) {
-  let text = String(value ?? "").replace(LINK, link);
+  const raw = String(value ?? "").replace(/\r\n?/g, "\n");
+  let text = raw.replace(LINK, link);
   for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
-  text = text.replace(/[ \t]?\u0000+(?=[.,;:!?]|$)/gm, "").replace(/^\u0000+[ \t]?/gm, "")
-    .replace(/[ \t]?\u0000+[ \t]?/g, " ");
-  // A line left with only a bullet or bold marks ("- ", "**") was all "Ignored: ...": dropped.
-  return text.split("\n").map(line => [line, line.replace(IGNORED, "")])
-    .filter(([line, cut]) => cut.replace(/[ \t\-*_#>]/g, "") || !line.trim()).map(([, cut]) => cut).join("\n");
+  text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
+    .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")
+    .replace(/[ \t]?\u0000[ \t]?/g, " ");
+  text = text.split("\n").filter(line => !IGNORED_LINE.test(line)).join("\n");
+  // A non-empty answer never cleans to nothing: then its words stay, without brackets.
+  return !text.trim() && raw.trim() ? raw.replace(/[[\]]/g, "") : text;
 }
 
-/** Tuttie's answer without bracketed notes or "Ignored: ..." parts (see above). */
+/** Tuttie's answer without bracketed notes or lines starting with "Ignored:" (see above). */
 export const cleanAnswer = text => withoutNotes(text).trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
