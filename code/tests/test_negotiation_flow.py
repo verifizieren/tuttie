@@ -53,11 +53,15 @@ class Recorder(httpx.AsyncBaseTransport):
     def __init__(self):
         self.transports: dict[int, httpx.AsyncBaseTransport] = {}
         self.sent_to_hotels: list[str] = []
+        self.answers: list[tuple[str, int]] = []  # (path, HTTP status) of every hotel call
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         if request.url.port not in (4000, 4010):
             self.sent_to_hotels.append((await request.aread()).decode())
-        return await self.transports[request.url.port].handle_async_request(request)
+        response = await self.transports[request.url.port].handle_async_request(request)
+        if request.url.port not in (4000, 4010):
+            self.answers.append((request.url.path, response.status_code))
+        return response
 
 
 def user_context(limit: float = 200) -> Context:
@@ -146,6 +150,10 @@ def test_subagent_memory_records_every_round():
     assert kinds[-1] == "agreement"
     assert "max_price_chf" not in json.dumps(subagent.memory.context)  # the subagent only got shareable context
     assert outcome.status == "agreed" and outcome.price_chf <= 175
+    # The negotiation closed its session with the hotel (frees the hotel's slot) and its memory.
+    assert subagent.memory.status == "closed" and subagent.remote_session is None
+    closes = [status for path, status in recorder.answers if path.endswith("/close")]
+    assert closes == [200]
 
 
 def test_a_forged_hotel_is_refused_before_any_bargaining():

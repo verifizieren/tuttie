@@ -53,6 +53,10 @@ class ScriptedPool:
     def __init__(self, replies, open_ok=True):
         self.toolbox, self.open_ok = ScriptedToolbox(list(replies)), open_ok
         self.memories = SessionStore("tuttie")
+        self.closed = []
+
+    async def close(self, subagent):
+        self.closed.append(subagent.id)
 
     def spawn(self, node_id, task, context):
         return ScriptedSubagent(self.toolbox, self.memories.open(node_id, task, context.share("negotiation")),

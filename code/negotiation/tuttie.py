@@ -110,13 +110,22 @@ class TuttieNegotiator:
         offer = Offer.model_validate(message(offer_envelope["payload"]))
         limit = float(context.items[BUDGET_LIMIT].value) if BUDGET_LIMIT in context.items else offer.price_chf
         outcome = Outcome(node_id, offer.offer_id, "walked_away", offer.price_chf)
-        own, last = opening_price(offer.price_chf, limit), None
+        own = opening_price(offer.price_chf, limit)
         if own is None:  # walk away before talking: no counter could stay below the budget
             outcome.reason = "the offer is far above the budget"
             return outcome
 
         subagent = self.pool.spawn(node_id, f"negotiate {offer.offer_id}", context)
         outcome.subagent_id = subagent.id
+        try:
+            return await self.bargain(subagent, node_id, offer, offer_envelope, limit, own, outcome)
+        finally:
+            await self.pool.close(subagent)  # free the hotel's session slot, whatever happened
+
+    async def bargain(self, subagent, node_id: str, offer: Offer, offer_envelope: dict, limit: float,
+                      own: float, outcome: Outcome) -> Outcome:
+        """The rounds of one negotiation, through `subagent` (negotiate opens and closes it)."""
+        last = None
         opened = await subagent.open()
         if subagent.remote_session is None:
             outcome.status, outcome.reason = "refused", opened.get("reason", "session refused")
