@@ -18,7 +18,9 @@ import inspect
 import json
 import re
 from dataclasses import dataclass
+from datetime import date as Date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -44,6 +46,37 @@ NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 READ_TOOLS = {"get_availability", "get_policies", "get_forecast", "get_connections"}  # the last two: services/server.py
 # Node replies must be this fresh, so an old signed reply (e.g. an outdated price) cannot be replayed.
 MAX_REPLY_AGE_S = 300
+MAX_GUESTS = 10  # what a business node takes (node/server.py)
+SWISS_TIME = ZoneInfo("Europe/Zurich")
+
+
+def swiss_today() -> Date:
+    """Today's date in Switzerland, where the user lives (the same day today_note gives the LLM)."""
+    return datetime.now(SWISS_TIME).date()
+
+
+def stay_error(day, guests, nights) -> str | None:
+    """Why a hotel request cannot be posted as asked, or None. The error tells the LLM to ask the
+    user, so a past night, a wrong party size or a longer stay is never silently changed."""
+    try:
+        night = Date.fromisoformat(day) if isinstance(day, str) and len(day) == 10 else None
+    except ValueError:
+        night = None
+    if night is None:
+        return "date must be YYYY-MM-DD"
+    today = swiss_today()
+    if night < today:
+        return (f"{day} is in the past (today is {today}). Do not post it: tell the user and ask "
+                "which night they mean.")
+    if isinstance(guests, bool) or not isinstance(guests, int) or not 1 <= guests <= MAX_GUESTS:
+        return f"guests must be a whole number from 1 to {MAX_GUESTS}: ask the user how many people are coming"
+    if isinstance(nights, bool) or not isinstance(nights, int) or nights < 1:
+        return "nights must be a whole number of at least 1"
+    if nights > 1:
+        return (f"Hotels on the agent web take one night per booking so far, so {nights} nights cannot be "
+                "booked here. Tell the user honestly and ask whether to book just the first night "
+                f"({day}); if yes, post again with nights=1.")
+    return None
 
 
 def function(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:
@@ -71,8 +104,12 @@ SCHEMAS = [
         "send signed offers; returns the shortlist (verified, within budget, cheapest first). "
         "Use this first when the user looks for a hotel.",
         {
-            "date": {"type": "string", "description": "YYYY-MM-DD"},
-            "guests": {"type": "integer"},
+            "date": {"type": "string",
+                     "description": "YYYY-MM-DD, the check-in night: the one the user names, else the calendar's"},
+            "guests": {"type": "integer",
+                       "description": "how many people: the number the user names, else the calendar's, else 1"},
+            "nights": {"type": "integer",
+                       "description": "how many nights: the number the user names, else the calendar's, else 1"},
             "requirements": {"type": "array", "items": {"type": "string"},
                              "description": "public needs, e.g. [\"quiet\", \"dog\", \"arrival around 01:00\"]"},
             # Only the city: an area tag left out every hotel outside it (the train to Basel SBB once
@@ -372,13 +409,17 @@ class Toolbox:
         """The user's calendar, mail, messages and preferences (assistant/context.py)."""
         return await self.user.recall(self.bus)
 
-    async def post_request(self, **request) -> dict:
+    async def post_request(self, date: str, guests: int = 1, nights: int = 1, **request) -> dict:
         """Post the request on the market (MarketDesk.find), bargain with the hotels, then show
         them as cards with the agreed prices.
 
+        A past night, a bad party size or more than one night is refused before anything is
+        posted, so the LLM asks the user instead of booking something else silently.
         The wallet lets the user swipe through the cards; Tuttie then books the best liked deal.
         """
-        result = await self.market.find(**request)
+        if problem := stay_error(date, guests, nights):
+            return {"error": problem}
+        result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
         self.agreements.clear()
