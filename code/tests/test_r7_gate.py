@@ -220,7 +220,7 @@ def registry_over_http(monkeypatch):
     monkeypatch.setattr(hotel.httpx, "AsyncClient", client)
 
 
-@pytest.mark.parametrize("node_id", ["../search", "ch.basel/../../search", "", None, 42, "x" * 200])
+@pytest.mark.parametrize("node_id", ["../search", "ch.basel/../../search", "..", "", None, 42, "x" * 200, "ch.tuttie.alex-muster\n"])
 def test_registry_lookup_refuses_ids_that_are_not_node_ids(registry_over_http, node_id):
     assert asyncio.run(hotel.registry_lookup(node_id)) is None
 
