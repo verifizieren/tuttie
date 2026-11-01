@@ -147,8 +147,9 @@ export default function App() {
   // A new conversation from the dock: the current one goes into the history.
   async function newChat() {
     setShowHistory(false);
-    if (approval) return setNotice(DECIDE_FIRST);  // the user must decide the waiting approval first
-    if (finishing) return setNotice(DECISION_ON_ITS_WAY);  // never a new chat under a sheet that is still finishing
+    // Never a new chat under the sheet: a decision on its way finishes first, a waiting one needs the user.
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);
+    if (approval) return setNotice(DECIDE_FIRST);
     try {
       await actions.newConversation(agent);
       setError("");
@@ -173,8 +174,8 @@ export default function App() {
 
   // The dock's History button always shows the list, also from inside a past chat.
   function openHistory() {
-    if (approval) return setNotice(DECIDE_FIRST);  // the sheet covers the card: never open the history under it
-    if (finishing) return setNotice(DECISION_ON_ITS_WAY);
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);  // the sheet covers the card: never open the history under it
+    if (approval) return setNotice(DECIDE_FIRST);
     setHistoryChat({ id: null, error: "", resuming: false });
     setShowHistory(true);
   }
