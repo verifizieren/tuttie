@@ -46,7 +46,7 @@ em, i, cite, address, dfn, var { font-style: normal; }
        background: rgba(242,242,247,.8); border-bottom: 1px solid rgba(23,23,29,.06);
        backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); pointer-events: none; }
 .top b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
-.top a { pointer-events: auto; font-size: 14px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 16px;
+.top a { pointer-events: auto; display: inline-flex; align-items: center; min-height: 40px; font-size: 15px; font-weight: 600; text-decoration: none; padding: 0 16px; border-radius: 999px; cursor: pointer;
          background: rgba(255,255,255,.75); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
 .in-demo .top { opacity: 0; }
@@ -99,9 +99,6 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .shops { display: flex; gap: 14px; }
 .shops svg { width: 70px; height: 70px; }
 .shops .no { opacity: .28; }
-.dots { display: grid; grid-template-columns: repeat(20, 1fr); gap: 5px; width: 100%; max-width: 330px; }
-.dots i { aspect-ratio: 1; border-radius: 50%; background: #dcdce3; transition: background .4s; }
-.dots i.lit { background: var(--accent); }
 .ring { width: 96px; height: 96px; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 10; }
 .ring .bg { stroke: #e2e2e8; }
@@ -130,14 +127,6 @@ section.block { padding: 90px 0; }
 .lead { margin: 26px 0 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
 .lead b { color: var(--text); font-weight: 600; }
 
-.flow { margin-top: 44px; position: relative; display: grid; gap: 0; }
-.step { position: relative; display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 0 0 26px; }
-.step::before { content: ""; position: absolute; left: 16px; top: 34px; bottom: 0; width: 1px; background: var(--line2); }
-.step:last-child::before { display: none; }
-.step .n { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 15px; font-weight: 700;
-           color: var(--accent-text); background: var(--tint-purple); }
-.step b { display: block; font-size: 17px; font-weight: 650; margin-top: 6px; }
-.step span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.45; color: var(--muted); }
 
 .seals { margin-top: 18px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow); }
 .seal { display: flex; align-items: center; gap: 14px; padding: 14px 16px; position: relative; }
@@ -146,8 +135,6 @@ section.block { padding: 90px 0; }
 .seal b { display: block; font-size: 15px; font-weight: 600; }
 .seal span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
 .seal.forged b { color: var(--red); }
-.h3 { margin: 56px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
-.sub { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
 
 /* ---------- Reverse marketplace: one dot asks three, three answer one ---------- */
 .rev h2 { margin: 0 0 30px; font-size: clamp(34px, 10vw, 46px); line-height: 1.04; font-weight: 800; letter-spacing: -.035em; }
@@ -386,7 +373,7 @@ section.block { padding: 90px 0; }
         box-shadow: 0 16px 40px rgba(23,23,29,.35); opacity: 0; transform: translateY(10px) scale(.98); transition: opacity .45s var(--ease), transform .55s var(--ease); }
 .call.show { opacity: 1; transform: none; }
 .call .ci { float: left; width: 26px; height: 26px; margin: 2px 12px 0 0; fill: none; stroke: #b9a8ff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.call span { clear: none; }
+.call .ci ~ span { margin-left: 38px; }
 .call small { display: block; font-family: var(--mono); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: #b9a8ff; margin-bottom: 4px; }
 .call b { display: block; font-size: 22px; font-weight: 650; line-height: 1.3; }
 .call span { display: block; font-size: 18px; line-height: 1.35; color: #b4b3c0; margin-top: 2px; }
@@ -405,11 +392,13 @@ section.block { padding: 90px 0; }
 .close h2 span { color: var(--muted); }
 .close .year { margin: 34px 0 0; font-size: 19px; line-height: 1.5; color: var(--muted); }
 .close .year b { color: var(--purple); font-weight: 650; }
-.go { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 40px 0 0; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 650;
-      text-decoration: none; color: #fff; background: var(--text); }
-.go:active { transform: scale(.98); }
-.go svg { width: 18px; height: 18px; }
-.hint { margin-top: 12px; font-size: 13px; color: var(--dim); }
+/* Watch it again: a pill that fits its label. */
+.again { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; margin: 40px auto 0; padding: 0 24px; border-radius: 999px;
+         font-size: 17px; font-weight: 650; text-decoration: none; color: #fff; background: var(--text); cursor: pointer;
+         box-shadow: 0 8px 24px rgba(23,23,29,.16); transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+.again:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(23,23,29,.2); }
+.again:active { transform: scale(.97); }
+.again svg { width: 18px; height: 18px; }
 .honest { margin: 44px 0 0; padding: 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; line-height: 1.5; color: var(--muted); text-align: left; }
 .honest b { color: var(--text); font-weight: 600; }
 footer { padding: 30px 0 calc(40px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.7; color: var(--dim); }
@@ -485,7 +474,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .steps { list-style: none; }
 /* Replay: on the phone itself, never over the caption or its progress bars. */
 .replay { position: absolute; left: 50%; top: 60%; right: auto; bottom: auto; z-index: 9; transform: translateX(-50%);
-          padding: 14px 28px; border-radius: 30px; font-size: 22px; font-weight: 650; color: #fff; background: var(--text); border: 0;
+          padding: 14px 28px; border-radius: 999px; font-size: 22px; font-weight: 650; color: #fff; background: var(--text); border: 0;
           box-shadow: 0 12px 40px rgba(23,23,29,.3); }
 .cap h3 { padding-right: 0; }
 .cap p { min-height: 2.8em; }
@@ -493,9 +482,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .chips { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
 .chips span { padding: 7px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
 .chips span:last-child { color: var(--accent-text); border-color: rgba(122,90,248,.45); }
-.step { grid-template-columns: 34px 1fr; align-items: center; padding-bottom: 18px; }
-.step::before { top: 34px; }
-.step b { margin-top: 0; }
 .seal b span { color: var(--muted); font-weight: 500; }
 .seals { margin-top: 30px; }
 .biz-h { margin: 12px 0 0; font-size: clamp(32px, 9.5vw, 44px); line-height: 1.05; font-weight: 800; letter-spacing: -.035em; }
@@ -536,7 +522,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   <symbol id="f-cancel" viewBox="0 0 24 24"><path d="M5 6h14v13H5zM5 10h14M9 4v4M15 4v4M9.5 14.5l1.8 1.8 3.4-3.6"/></symbol>
 </svg>
 
-<div class="top"><b>Tuttie</b><a href="#demo">Watch the demo</a></div>
+<div class="top"><b>Tuttie</b><a href="#demo" id="watch">Watch the demo</a></div>
 <button class="totop" id="totop" type="button" aria-label="Back to top"><svg viewBox="0 0 24 24"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></button>
 
 <!-- ============ Hero ============ -->
@@ -706,7 +692,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   <div class="wrap">
     <h2 class="rv">Signed businesses reach you.<br><span>Fakes never do.</span></h2>
     <p class="year rv">In 2000 you needed a website.<br><b>In 2033 you need a signature.</b></p>
-    <a class="go rv" href="#demo" id="again">Watch it again
+    <a class="again rv" href="#demo" id="again">Watch it again
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></a>
     <p class="honest rv">Hotels and register: <b>demo data</b>.<br>Signatures: <b>real</b>, really checked.</p>
   </div>
@@ -991,12 +977,14 @@ function tickDemo(dt) {
   for (const t of typers) if (clock >= t.start && clock < (t.until ?? Infinity)) t.el.textContent = t.text.slice(0, Math.ceil(t.text.length * clamp((clock - t.start) / t.dur)));
   render();
 }
-// "Watch it again": land where the phone is docked, so the demo plays right away.
-$("#again").addEventListener("click", e => {
+// "Watch the demo" / "Watch it again": land where the phone is docked, so the demo plays right away.
+const toDemo = e => {
   e.preventDefault();
   const d = $("#demo");
-  scrollTo({ top: d.offsetTop + (d.offsetHeight - innerHeight) * .36, behavior: "smooth" });
-});
+  scrollTo({ top: d.offsetTop + (d.offsetHeight - innerHeight) * .36, behavior: reduced ? "auto" : "smooth" });
+};
+$("#again").addEventListener("click", toDemo);
+$("#watch").addEventListener("click", toDemo);
 $("#replay").addEventListener("click", e => { e.stopPropagation(); restart(); playing = true; });
 // Like a story: tap the right side for the next part, the left side for the previous one,
 // press and hold to pause. Arrow keys on desktop (Space pauses). Scrolling still works: a touch
