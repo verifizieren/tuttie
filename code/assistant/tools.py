@@ -23,7 +23,7 @@ from pathlib import Path
 import httpx
 
 from aps import agent_key, evaluate_record, load_signing_key, verify_envelope
-from aps.approval import booking_terms, payment_charge
+from aps.approval import booking_terms, payment_charge, plain_term
 from aps.call import sign_call
 from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
 from aps.delegation import verify_delegation
@@ -201,11 +201,13 @@ def agreement_conflicts(deal: dict, booked_date: str, room_type: str, date: str,
 def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) -> list[str]:
     """Where a signed confirmation differs from what the user approved (empty: it matches)."""
     differ = [] if round(confirmation.get("total_chf", -1), 2) == round(amount, 2) else ["total_chf"]
-    if terms is not None:
-        differ += [key for key in ("room_type", "date", "rate", "offer_id")
-                   if key in terms and confirmation.get(key) != terms[key]]
+    if terms is not None:  # room, night and rate were approved as plain text (plain_term)
+        plain = {key: None if confirmation.get(key) is None else plain_term(confirmation[key])
+                 for key in ("room_type", "date", "rate")}
+        plain["offer_id"] = confirmation.get("offer_id")
+        differ += [key for key in ("room_type", "date", "rate", "offer_id") if key in terms and plain[key] != terms[key]]
         extras = confirmation.get("extras", [])  # no extras listed: nothing was included
-        if "includes" in terms and (not isinstance(extras, list) or sorted(map(str, extras)) != sorted(map(str, terms["includes"]))):
+        if "includes" in terms and (not isinstance(extras, list) or sorted(map(plain_term, extras)) != sorted(terms["includes"])):
             differ.append("includes")  # an approved extra dropped (or one added) is not what the user approved
     return differ
 

@@ -13,6 +13,7 @@ from nacl.signing import SigningKey
 from aps.envelope import sign_bytes, utc_now, verify_bytes
 
 DECISIONS = {"approved", "declined"}
+TERM_MAX = 120  # longest room type, night or rate shown on the phone (and signed)
 FIELDS = ("approval_id", "action", "payee_node_id", "amount_chf", "decision", "decided_at")
 
 
@@ -47,14 +48,26 @@ def verify_decision(decision: dict, public_key: str) -> bool:
     return verify_bytes(public_key, body, decision.get("signature", ""))
 
 
+def plain_term(value) -> str:
+    """One booking term as short plain text: a hotel's signed facts may hold anything (an
+    object, a number, a very long text), but the phone shows and the user signs plain text."""
+    text = value if isinstance(value, str) else ("" if value is None else str(value))
+    text = " ".join(text.split())  # no line breaks or runs of spaces
+    return text if len(text) <= TERM_MAX else text[:TERM_MAX - 1] + "…"
+
+
 def booking_terms(room_type: str, date: str, rate: str | None, includes: list[str],
                   offer_id: str | None = None) -> dict:
     """The terms a booking approval is for, built the same way by the user's agent (before
     asking) and by the hotel (before booking), so both can compare them field by field.
 
     `offer_id` is set when the booking redeems a negotiated Agreement for that offer.
+    Room type, night and rate (and every included item) become short plain text (plain_term),
+    the same on both sides.
     """
-    terms = {"room_type": room_type, "date": date, "rate": rate, "includes": list(includes)}
+    terms = {"room_type": plain_term(room_type), "date": plain_term(date),
+             "rate": None if rate is None else plain_term(rate),
+             "includes": [plain_term(item) for item in includes]}
     if offer_id is not None:
         terms["offer_id"] = offer_id
     return terms

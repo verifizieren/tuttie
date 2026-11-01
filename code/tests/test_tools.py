@@ -158,6 +158,10 @@ def test_a_confirmation_for_other_terms_than_approved_is_flagged():
     assert booked_other_terms(same, 172, terms) == []
     flexible = {**same, "room_type": "double-flex", "rate": "flexible", "total_chf": 205}
     assert booked_other_terms(flexible, 172, terms) == ["total_chf", "room_type", "rate"]
+    from aps.approval import booking_terms
+    odd = booking_terms("double", "2026-11-14", {"x": 1}, [])  # a hotel's rate in an odd shape
+    assert booked_other_terms({"total_chf": 172, "room_type": "double", "date": "2026-11-14", "rate": {"x": 1}},
+                              172, odd) == []
 
 
 def test_book_declined_never_calls_the_node():
