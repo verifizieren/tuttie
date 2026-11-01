@@ -2,8 +2,8 @@
 
 BaselHack 2026, Adobe challenge. **Live: <https://web4.mendes.dev>** (open it on your phone and
 add it to the home screen). The page the pitch's QR code opens: <https://web4.mendes.dev/presentation/>.
-The pitch deck itself (clicker-driven, real wallet in a phone frame): <https://web4.mendes.dev/keynote/>,
-see `code/apps/keynote/README.md`.
+Two pitch decks: `/keynote1/` (the illustrated pitch, `code/apps/keynote1/`) and `/keynote2/`
+(clicker-driven, real wallet in a phone frame, `code/apps/keynote2/README.md`).
 
 Tuttie lives in your phone's wallet. You say what you need, businesses' agents come to you
 with signed offers, your agent picks the best few and negotiates for you, and you approve

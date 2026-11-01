@@ -6,24 +6,24 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; keynote deck at `/keynote/` merged; the demo runner is open).
+Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch) and `/keynote2/` (live demo); the demo runner is open).
 
 ## Done
 
 - **Keynote pitch deck** (merged 1 Nov, still the dark design): a static deck
-  in `code/apps/keynote/`, served at `/keynote/` by the assistant's static mount (no build). Black
+  in `code/apps/keynote2/`, served at `/keynote2/` by the assistant's static mount (no build). Black
   stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
   view (N). A clicker (PageDown/PageUp) drives the real wallet in a phone frame through
   `demo.js`, which supplies input and timing only (same backend, same verification). Fallback
   recording of a real run in `media/fallback.webm` + `.mp4` (V plays it in the phone, L
   switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
   skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
-  page in `code/apps/presentation/`. Details: `code/apps/keynote/README.md`.
+  page in `code/apps/presentation/`. Details: `code/apps/keynote2/README.md`.
 - **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie
   card, black glossy eyes with a catchlight, idle glances, ZKB and UBS bank cards) on a full light theme
   (page #f2f2f7, white panels, ink #17171d, Approve = dark button); a closed card rests awake with a
   neutral face, typing still closes the eyes; status bar `default`, `CACHE` v4. The QR page
-  (`apps/presentation`) and Sebastian's pitch deck (`assets/pitch-deck`) use the same light design.
+  (`apps/presentation`) and Sebastian's pitch deck (`code/apps/keynote1`, served at `/keynote1/`) use the same light design.
 - **Round 11 (owner view)**: `?node=` is used only for the page's own host or localhost (the owner
   token never goes to a linked server); a deploy without an available room is refused, a left-out
   `facts.negotiation` keeps the live floor (the owner view sends `null` to end bargaining); public
@@ -493,7 +493,7 @@ Build order from [goals.md](goals.md):
 4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
 
-**Before the pitch (keynote deck, `code/apps/keynote/`):**
+**Before the pitch (keynote deck, `code/apps/keynote2/`):**
 - Rehearse on the stage hardware (laptop, projector, clicker) at least once.
 - If no offers arrive on stage, press V: the fallback recording plays in the same phone.
 - Do not restart the live service (`tuttie`) during the pitch: sessions are in memory.
@@ -870,4 +870,4 @@ Why things are the way they are, so nobody has to rediscover them:
 
 ## Presentation
 
-- `assets/pitch-deck/` contains the offline eight-scene illustrated pitch, timed to 1:54, with speaker notes, research and photo credits. The optional live wallet handoff requires rehearsal; the phone animation uses demo data.
+- `code/apps/keynote1/` (moved from `assets/pitch-deck/`, served at `/keynote1/`) contains the offline eight-scene illustrated pitch, timed to 1:54, with speaker notes, research and photo credits. The optional live wallet handoff requires rehearsal; the phone animation uses demo data.
