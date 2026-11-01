@@ -2,7 +2,7 @@
 // deck's iframe (same origin: /presentation/ next to /wallet/).
 //
 // It only supplies input and timing, the way a person holding the phone would: it taps the
-// Tuttie card, types the request into the wallet's own text field and sends it, swipes the
+// Tuttie card, sends the request to Tuttie as the wallet does (POST /chat), swipes the
 // hotel cards with the wallet's own gestures (pointer events inside the iframe), and taps
 // Approve in the wallet's approval sheet. Everything shown in the phone (offers, the refused
 // forged business, bargaining, the approval, the signed booking) is the real wallet reacting to
@@ -19,8 +19,6 @@ export const REQUEST =
   "A quiet room in Basel on 14 November. I arrive after midnight with my dog, under 160 francs.";
 export const LIKED_HOTEL = /Gästehaus/i;       // Anna's Gästehaus am Rhein: liked, the others passed
 
-const TYPE_MS = 22;          // per character: the request appears in the field as if typed
-const OPEN_GUARD_MS = 750;   // the wallet ignores dock taps right after opening (App.jsx OPEN_GUARD_MS 700)
 const SWIPE_MS = 260;        // a quick, visible drag of a hotel card
 const SWIPE_PX = 170;        // well past the wallet's decide distance (Deck.jsx DECIDE_PX 90)
 const BETWEEN_CARDS_MS = 700;
@@ -79,33 +77,23 @@ export function createDemo(iframe) {
     return Boolean(await waitFor(() => $(".app.open"), 3000));
   }
 
-  /** Type into a React-controlled input: the native setter plus an input event per character. */
-  async function typeInto(input, text) {
-    const setValue = Object.getOwnPropertyDescriptor(win().HTMLInputElement.prototype, "value").set;
-    for (let i = 1; i <= text.length; i++) {
-      setValue.call(input, text.slice(0, i));
-      input.dispatchEvent(new (win().Event)("input", { bubbles: true }));
-      await sleep(TYPE_MS);
-    }
-  }
-
-  /** The wallet's own input path: the dock's keyboard, the text field, Send. */
+  /** Send the request the way the wallet itself does (POST /chat, its conversation id from
+   *  GET /history, the session cookie shared with the wallet), without the text field: in the
+   *  wallet's typing mode Tuttie's eyes close, and here they should stay awake and show her
+   *  thinking. The server opens the turn with a "turn" event, which the wallet shows like one
+   *  it sent itself (as it does for a spoken request). */
   async function ask() {
     if (!(await openTuttie())) return warn("ask: the Tuttie card did not open");
-    if (!$(".composer input")) {
-      await sleep(OPEN_GUARD_MS);
-      const keyboard = await waitFor(() => $('.dock button[aria-label="Type instead"]'), 5000);
-      if (!keyboard) return warn("ask: no keyboard button in the dock");
-      keyboard.click();
-    }
-    const input = await waitFor(() => $(".composer input"), 5000);
-    if (!input) return warn("ask: the text field did not appear");
-    await typeInto(input, REQUEST);
-    await sleep(250);
-    const form = input.closest("form");
-    const send = form?.querySelector('button[type="submit"]');
-    if (send) send.click(); else form?.requestSubmit();
-    input.blur();  // close the (virtual) keyboard, as after sending on a phone
+    const history = await fetch("/history", { cache: "no-store" });
+    const conversationId = history.headers.get("X-Conversation-ID");
+    if (!history.ok || !conversationId) return warn("ask: no conversation to send to");
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: REQUEST, conversation_id: conversationId }),
+    });
+    // Refused (409 another chat, 429 too many requests): say so in the console, never throw.
+    if (!response.ok) warn(`ask: the request was not taken (HTTP ${response.status})`);
   }
 
   /** Drag the top hotel card sideways with a few pointer moves and let go (Deck.jsx handlers). */
@@ -161,6 +149,7 @@ export function createDemo(iframe) {
   };
 
   const steps = [
+    // Run by the deck on entering the demo beat, while the eyes move into the phone.
     { id: "open", label: "Open Tuttie", run: safe(async () => { if (!(await openTuttie())) warn("open: card did not open"); }) },
     { id: "ask", label: "Send the request", run: safe(ask) },
     { id: "forged", label: "Forged seal: never asked", run: async () => {} },  // a cue for the side word only
