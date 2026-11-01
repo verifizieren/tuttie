@@ -40,7 +40,7 @@ EVENT = "posting.created"
 # Every posting wakes every subscribed hotel (two paid LLM calls each), and the demo keys are
 # public: so postings are limited per requester. All wallet users share Tuttie's agent id, so the
 # limit leaves room for a full room scanning the QR code at once.
-POSTINGS_PER_MIN = 120
+POSTINGS_PER_MIN = 10  # keyless postings a minute per requester: only outsiders (Tuttie sends the agent key)
 MAX_OPEN_POSTINGS = 500  # postings kept in memory; the oldest is dropped beyond this
 
 

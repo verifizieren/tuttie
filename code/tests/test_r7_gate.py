@@ -114,8 +114,11 @@ def test_a_burst_of_signed_postings_is_throttled_before_it_wakes_hotels(monkeypa
     assert all(r.status == 429 and r.retry_after >= 1 for r in refusals)
 
 
-def test_the_default_limit_leaves_room_for_a_full_room_at_the_pitch():
-    assert market_module.POSTINGS_PER_MIN >= 100
+def test_keyless_postings_get_only_a_small_budget():
+    """Wallet users post through Tuttie with the deployment key (never capped), so the cap only
+    meets keyless postings, i.e. outsiders holding the public demo key: each posting wakes every
+    hotel (paid LLM calls), so their budget is small."""
+    assert 1 <= market_module.POSTINGS_PER_MIN <= 10
 
 
 def test_only_the_newest_postings_are_kept(monkeypatch):
