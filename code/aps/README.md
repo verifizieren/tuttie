@@ -25,7 +25,7 @@ Which signature proves what:
 | Envelope | a node or agent | it said exactly this, at this time |
 | Delegation | the user | this agent may act for me within these scopes |
 | Signed call | the user's agent | this agent asks for exactly this action, once |
-| Approval | the user | I agree to this action, this payee, this amount |
+| Approval | the user | I agree to this action, this payee, this amount (the gate takes it for 900 s after `decided_at`) |
 | Mandate | the user | small payments to this payee for this purpose are fine up to this total |
 | Agreement (envelope) | the business | this negotiated price holds, once |
 
