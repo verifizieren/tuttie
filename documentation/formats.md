@@ -180,7 +180,7 @@ first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a d
 `POST /voice/token` answers 429 (`Retry-After: 60`) after 10 new rooms a minute for one
 conversation or 300 for one client address; a room is never handed out twice.
 `POST /chat` answers 429 (`Retry-After` in seconds, a `detail` sentence for the user) after
-10 turns a minute for one browser or 120 for one client address; spoken turns (`POST
+10 turns a minute for one browser or 600 for one client address; spoken turns (`POST
 /voice/say`) count towards the browser's 10. A browser whose conversation was dropped from
 memory gets a new id for its next one, so an old id is a 409.
 Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does

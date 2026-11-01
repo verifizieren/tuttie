@@ -7,7 +7,7 @@ pushed out of the store; so turns are limited per session and per client address
 from collections import deque
 
 TURNS_PER_SESSION_PER_MIN = 10  # a person types or speaks a few requests a minute at most
-TURNS_PER_CLIENT_PER_MIN = 120  # a venue's Wi-Fi shares one address: generous, but bounded
+TURNS_PER_CLIENT_PER_MIN = 600  # the venue Wi-Fi shares one address with the presenter: generous
 MAX_KEYS = 5000  # above this, keys with nothing in the last minute are forgotten
 
 

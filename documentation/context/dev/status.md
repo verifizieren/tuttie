@@ -103,7 +103,7 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   with history only above 400, the fewest turns first. A browser whose conversation was dropped
   gets a new id for its next one (no longer the same HMAC), so a late "book" for the old chat
   is a 409. `POST /chat` (and spoken turns, `POST /voice/say`): at most 10 turns a minute per
-  browser and 120 per client address, else 429 with `Retry-After` (the wallet shows the
+  browser and 600 per client address, else 429 with `Retry-After` (the wallet shows the
   server's sentence). `POST /voice/token` throttles before it creates a conversation. A
   TypeError inside a tool is reported as a failure, not as "bad arguments" (the LLM retried
   correct calls). Tests: `test_r2_conversations.py`, `test_book_args.py`.
