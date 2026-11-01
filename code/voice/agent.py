@@ -84,10 +84,18 @@ NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
 CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
 LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
 NODE_ID = re.compile(r"[a-z]{2}(?:\.[a-z0-9-]+){2,}")          # ch.basel.hotel-rheinblick, not booking.com
-ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b", re.IGNORECASE)
+ID_TOKEN = r"\b(?:BK|RC)-[0-9A-F]{6}\b"  # booking and receipt ids (node/server.py): one pattern for all uses
+ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?" + ID_TOKEN, re.IGNORECASE)
+BARE_ID = re.compile(r"[ \t]?" + ID_TOKEN, re.IGNORECASE)
 URL = re.compile(r"\s*(?:https?://|www\.)\S*\s*", re.IGNORECASE)
 GONE = "\x00"   # where a note was taken out: the spaces around it are tidied there only
-IGNORED_LINE = re.compile(r"^[ \t*_#>-]*ignored:", re.IGNORECASE)  # a line about a business Tuttie ignored
+# "Ignored: <business>." when it starts a line (also as "1.", "•", "- **Ignored:**") or a sentence:
+# dropped up to the end of its sentence. A lowercase "was ignored: ..." inside a sentence stays.
+IGNORED_LINE = re.compile(r"^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)[ \t]*|$)",
+                          re.MULTILINE)
+IGNORED_SENTENCE = re.compile(r"(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)", re.MULTILINE)
+LINES = re.compile(r"\r\n?|\n|\u2028|\u2029")  # line breaks, split the same way as the wallet
+EMPTY_ANSWER = "Done."  # an answer that cleans to nothing
 # 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration; a
 # trailing "hrs"/"Uhr" is part of the time: "18:00", "00:52", "14:00 hrs" yes; "8:30 pm",
 # "1:30 hours", "18:00:30" no.
@@ -117,20 +125,22 @@ def without_notes(raw: str) -> str:
     """Links and bracketed notes cleaned (see above), lines starting with "Ignored:" dropped, and
     the spaces tidied only where something was taken out. Same rules as the wallet's
     withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
-    text = LINK.sub(link, raw)
+    text = LINK.sub(link, re.sub(r"\r\n?", "\n", raw))
     for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
         text = NOTE.sub(note, text)
     text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
     text = re.sub(r"[ \t]?\x00(?=[.,;:!?)\]'\"’]|$)", "", text, flags=re.MULTILINE)
     text = re.sub(r"^\x00[ \t]?", "", text, flags=re.MULTILINE)
     text = re.sub(r"[ \t]?\x00[ \t]?", " ", text)
-    text = "\n".join(line for line in text.splitlines() if not IGNORED_LINE.match(line))
-    if not text.strip() and raw.strip():
-        return raw.replace("[", "").replace("]", "")
-    return text
+    lines = LINES.split(text)
+    text = "\n".join(cut for line in lines if (cut := IGNORED_SENTENCE.sub("", IGNORED_LINE.sub("", line))).strip(" \t-*_#>•")
+                     or not line.strip())
+    # A non-empty answer never cleans to nothing (nor to raw links or forged names): a neutral line.
+    return EMPTY_ANSWER if not text.strip() and raw.strip() else text
 
 
-DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts|for|in|about|around|approx\.?)\s+$", re.IGNORECASE)
+DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts|for|in)(?:\s+(?:about|around|approx\.?))?\s+$",
+                            re.IGNORECASE)
 
 
 def clock(match: re.Match) -> str:
@@ -149,7 +159,8 @@ def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
     text = without_notes(answer)
-    text = re.sub(r"[ \t]?\b(?:BK|RC)-[0-9A-F]{6}\b", "", text)  # ids are never spoken: the wallet shows them
+    text = BARE_ID.sub("", text)  # ids are never spoken: the wallet shows them
+    text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
@@ -157,7 +168,7 @@ def spoken(answer: str) -> str:
     text = re.sub(r"(\d)\s?%", r"\1 percent", text)
     text = re.sub(r"[*_`#]", "", text)
     text = re.sub(r"[\U0001F000-\U0001FFFF☀-➿]", "", text)
-    return " ".join(line.strip() for line in text.splitlines() if line.strip()).strip()
+    return " ".join(line.strip() for line in LINES.split(text) if line.strip()).strip()
 
 
 def meaningful(text: str) -> bool:
@@ -268,7 +279,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
     cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
     def say(text: str) -> None:
-        if voice_on(room):
+        if text.strip() and voice_on(room):
             session.say(text)
 
     async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:

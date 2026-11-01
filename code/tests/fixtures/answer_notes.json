@@ -51,8 +51,8 @@
   },
   {
     "in": "Booked Rheinblick for CHF 128. Ignored: Scam Hotel, forged seal.",
-    "screen": "Booked Rheinblick for CHF 128. Ignored: Scam Hotel, forged seal.",
-    "spoken": "Booked Rheinblick for 128 francs. Ignored: Scam Hotel, forged seal."
+    "screen": "Booked Rheinblick for CHF 128.",
+    "spoken": "Booked Rheinblick for 128 francs."
   },
   {
     "in": "Rates [1](https://rheinblick.ch/rates) start at CHF 180.",
@@ -86,8 +86,8 @@
   },
   {
     "in": "Rheinblick, CHF 128. Ignored: Scam Hotel. Want me to book it?",
-    "screen": "Rheinblick, CHF 128. Ignored: Scam Hotel. Want me to book it?",
-    "spoken": "Rheinblick, 128 francs. Ignored: Scam Hotel. Want me to book it?"
+    "screen": "Rheinblick, CHF 128. Want me to book it?",
+    "spoken": "Rheinblick, 128 francs. Want me to book it?"
   },
   {
     "in": "The scam hotel was ignored: its seal failed.",
@@ -96,8 +96,8 @@
   },
   {
     "in": "Ignored: Scam Hotel [forged].",
-    "screen": "Ignored: Scam Hotel forged.",
-    "spoken": "Ignored: Scam Hotel forged."
+    "screen": "Done.",
+    "spoken": "Done."
   },
   {
     "in": "Scam Hotel (ignored: forged seal) is out.",
@@ -123,5 +123,40 @@
     "in": "The train takes 01:15 hrs, leaves 08:15hrs, check-in 14:00  Uhr.",
     "screen": "The train takes 01:15 hrs, leaves 08:15hrs, check-in 14:00  Uhr.",
     "spoken": "The train takes 01:15 hrs, leaves 8:15 am, check-in 2 pm."
+  },
+  {
+    "in": "Ignored: Scam Hotel",
+    "screen": "Done.",
+    "spoken": "Done."
+  },
+  {
+    "in": "Rooms are ready.\n1. Ignored: Scam Hotel\n• Ignored: Fake Inn\n- **Ignored:** Bait Rooms",
+    "screen": "Rooms are ready.",
+    "spoken": "Rooms are ready."
+  },
+  {
+    "in": "Ignored: Scam Hotel. Booked Rheinblick.",
+    "screen": "Booked Rheinblick.",
+    "spoken": "Booked Rheinblick."
+  },
+  {
+    "in": "[3](https://rheinblick.ch/rates)",
+    "screen": "Done.",
+    "spoken": "Done."
+  },
+  {
+    "in": "Booking (BK-89A674) confirmed [bk-89a674].",
+    "screen": "Booking (BK-89A674) confirmed.",
+    "spoken": "Booking confirmed."
+  },
+  {
+    "in": "Arrive around 18:00, it takes about 01:15 hrs.",
+    "screen": "Arrive around 18:00, it takes about 01:15 hrs.",
+    "spoken": "Arrive around 6 pm, it takes about 01:15 hrs."
+  },
+  {
+    "in": "Booked. Ignored: Scam",
+    "screen": "Booked.",
+    "spoken": "Booked."
   }
 ]
