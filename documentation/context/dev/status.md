@@ -6,7 +6,7 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view and the wallet's swipe deck are done; presentation site and demo runner are open).
+Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
 
 ## Done
 
@@ -97,6 +97,13 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   refuses any user info. Tuttie accepts an agreement only at a real price (finite, above zero,
   not a bool) and only if it is a valid `Agreement`; a counter without a real price ends the
   negotiation.
+- **Presentation QR page** (branch `presentation-site`, not merged or deployed yet): a
+  static, phone-first page in `code/apps/presentation/`, served at `/presentation/` (e.g.
+  <https://web4.mendes.dev/presentation/>) by the assistant's static mount of `code/apps/`; no
+  build step. Hero with the Tuttie card, the pitch numbers with sources, the idea, the business
+  case, a self-playing demo of the wallet in a phone, and links to the live wallet and the repo.
+  It replaces the `assets/qr-landing` idea on the unmerged branch `pitch-deck-and-qr`. Details:
+  `code/apps/presentation/README.md`.
 - **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
   timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
   silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
@@ -363,8 +370,8 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** voice is done; next the demo runner (`code/demo/`) and the presentation
-   site (`code/apps/presentation/`), whichever the pitch needs first; confirm voice on a real
+1. **dev member 1:** voice is done; next the demo runner (`code/demo/`); the presentation QR page
+   (`code/apps/presentation/`) is on branch `presentation-site`, to merge; confirm voice on a real
    iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
@@ -423,8 +430,8 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
-Other open items: the demo runner (`code/demo/`), the presentation site and QR code
-(`code/apps/presentation/`), voice confirmed on a real iPhone, a
+Other open items: the demo runner (`code/demo/`), merging the presentation QR page
+(`code/apps/presentation/`, branch `presentation-site`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 

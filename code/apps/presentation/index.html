@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08080b">
+<meta name="description" content="Tuttie: your agent in your wallet. Businesses' agents come to you with signed offers, fakes never reach you.">
+<title>Tuttie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* The page the pitch's QR code opens (issues #1, #6): the numbers, the concept, the business
+   case, then an Apple-style scroll into a demo of the wallet that plays by itself.
+   Phone first. Colours and fonts are the brand's (apps/shared/tuttie.css); the demo mock reuses
+   the wallet's own look (apps/wallet/src/wallet.css) at the wallet's native size, scaled down. */
+:root {
+  --bg: #08080b; --panel: #111117; --panel2: #16161e; --line: #23232d; --line2: #2e2e3b;
+  --text: #ecebf4; --muted: #8d8c9e; --dim: #5d5c6d;
+  --accent: #d97757; --accent-text: #ffb596; --peach: #f6d3c2;
+  --gold: #e8b746; --blue: #3d8bff; --grey: #a3a3b0; --red: #ff6b6b; --green: #34c77b;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --gut: 20px;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+body { margin: 0; color: var(--text); background: var(--bg); font-family: Inter, -apple-system, system-ui, sans-serif;
+       -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; }
+.wrap { max-width: 520px; margin: 0 auto; padding: 0 var(--gut); }
+.kicker { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.src { font-size: 11px; color: var(--dim); line-height: 1.4; }
+
+/* Reveal on scroll: a soft rise, once. */
+.rv { opacity: 0; transform: translateY(22px); transition: opacity .9s var(--ease), transform .9s var(--ease); }
+.rv.in { opacity: 1; transform: none; }
+
+/* ---------- Top bar ---------- */
+.top { transition: opacity .4s; position: fixed; top: 0; left: 0; right: 0; z-index: 20; padding: calc(10px + env(safe-area-inset-top)) var(--gut) 10px;
+       display: flex; justify-content: space-between; align-items: center;
+       background: linear-gradient(to bottom, rgba(8,8,11,.85), rgba(8,8,11,0)); pointer-events: none; }
+.top b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.top a { pointer-events: auto; font-size: 14px; font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 16px;
+         background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+.in-demo .top { opacity: 0; }
+
+/* ---------- Hero: the Tuttie card, asleep, then awake ---------- */
+.hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 80px 0 40px; position: relative;
+        background: radial-gradient(600px 420px at 50% 30%, rgba(217,119,87,.12), transparent 70%); }
+.tcard { position: relative; width: 100%; aspect-ratio: 1.586; border-radius: 22px; background: #0c0c10; overflow: hidden;
+         box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.7); }
+.tcard canvas { position: absolute; left: 0; top: 50%; width: 100%; aspect-ratio: 2 / 1; transform: translateY(-50%) scale(.92); display: block; }
+.tcard .lbl { position: absolute; top: 16px; left: 20px; font-size: 13px; font-weight: 600; color: rgba(236,235,244,.38); }
+.hero h1 { margin: 34px 0 12px; font-size: clamp(38px, 11vw, 52px); line-height: 1.02; font-weight: 800; letter-spacing: -.035em; }
+.hero h1 em { font-style: normal; color: var(--peach); }
+.hero p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
+.cue { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+       display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+.cue i { width: 1px; height: 28px; background: linear-gradient(var(--dim), transparent); animation: cue 2s ease-in-out infinite; }
+@keyframes cue { 0%, 100% { transform: scaleY(.4); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
+
+/* ---------- Numbers: one figure per screen, pinned while you scroll ---------- */
+.nums { position: relative; height: 420svh; }
+.pin { position: sticky; top: 0; height: 100svh; overflow: hidden; display: flex; align-items: center; }
+.fig { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 70px var(--gut) 60px;
+       max-width: 520px; margin: 0 auto; opacity: 0; transform: translateY(46px); transition: opacity .7s var(--ease), transform .8s var(--ease);
+       pointer-events: none; }
+.fig.on { opacity: 1; transform: none; }
+.fig.past { opacity: 0; transform: translateY(-46px); }
+.fig .big { font-size: clamp(88px, 30vw, 150px); line-height: .9; font-weight: 800; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.fig .big small { font-size: .42em; letter-spacing: -.03em; color: var(--muted); font-weight: 700; margin-left: .06em; }
+.fig .big.accent { color: var(--peach); }
+.fig p { margin: 18px 0 10px; font-size: 21px; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; }
+.fig p span { color: var(--muted); font-weight: 500; }
+.viz { margin: 0 0 26px; height: 96px; display: flex; align-items: flex-end; }
+.shops { display: flex; gap: 14px; }
+.shops svg { width: 70px; height: 70px; }
+.shops .no { opacity: .28; }
+.dots { display: grid; grid-template-columns: repeat(20, 1fr); gap: 5px; width: 100%; max-width: 330px; }
+.dots i { aspect-ratio: 1; border-radius: 50%; background: #23232d; transition: background .4s; }
+.dots i.lit { background: var(--accent); }
+.ring { width: 96px; height: 96px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 10; }
+.ring .bg { stroke: #23232d; }
+.ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease); }
+.spark { width: 100%; max-width: 330px; height: 96px; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1.6s var(--ease); }
+.fig.on .spark path { stroke-dashoffset: 0; }
+.ticks { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; z-index: 2; }
+.ticks i { width: 4px; height: 18px; border-radius: 2px; background: #2a2a33; transition: background .4s, height .4s; }
+.ticks i.on { background: var(--accent); height: 30px; }
+
+/* ---------- The idea ---------- */
+section.block { padding: 90px 0; }
+.turn h2 { margin: 12px 0 28px; font-size: clamp(34px, 10vw, 46px); line-height: 1.04; font-weight: 800; letter-spacing: -.035em; }
+.three { display: grid; gap: 4px; font-size: clamp(30px, 9vw, 40px); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.three span { color: var(--dim); transition: color .6s; }
+.three span.in { color: var(--text); }
+.three .one { margin-top: 10px; color: var(--peach) !important; }
+.lead { margin: 26px 0 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
+.lead b { color: var(--text); font-weight: 600; }
+
+.flow { margin-top: 44px; position: relative; display: grid; gap: 0; }
+.step { position: relative; display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 0 0 26px; }
+.step::before { content: ""; position: absolute; left: 16px; top: 34px; bottom: 0; width: 1px; background: var(--line2); }
+.step:last-child::before { display: none; }
+.step .n { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 15px; font-weight: 700;
+           color: var(--accent); background: rgba(217,119,87,.14); }
+.step b { display: block; font-size: 17px; font-weight: 650; margin-top: 6px; }
+.step span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.45; color: var(--muted); }
+
+.seals { margin-top: 18px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
+.seal { display: flex; align-items: center; gap: 14px; padding: 14px 16px; position: relative; }
+.seal + .seal::before { content: ""; position: absolute; top: 0; left: 52px; right: 0; height: 1px; background: var(--line); }
+.seal svg { flex: none; width: 24px; height: 24px; }
+.seal b { display: block; font-size: 15px; font-weight: 600; }
+.seal span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.seal.forged b { color: var(--red); }
+.h3 { margin: 56px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.sub { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
+
+/* ---------- Business case ---------- */
+.vs { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vs div { padding: 16px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); }
+.vs div.anna { border-color: rgba(232,183,70,.45); background: linear-gradient(180deg, rgba(232,183,70,.08), transparent 70%), var(--panel2); }
+.vs b { display: block; font-size: 40px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+.vs span { display: block; margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.vs em { display: block; font-style: normal; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.bill { margin-top: 30px; padding: 18px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); }
+.bill h4 { margin: 0 0 14px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.barrow { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; font-size: 14px; }
+.barrow + .barrow { margin-top: 16px; }
+.bar { grid-column: 1 / -1; height: 14px; border-radius: 7px; background: #23232d; overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; width: 0; transition: width 1.4s var(--ease); }
+.bar .keep { background: var(--green); }
+.bar .fee { background: var(--red); opacity: .85; }
+.bill.in .bar .keep.a { width: 83.5%; } .bill.in .bar .fee.a { width: 16.5%; }
+.bill.in .bar .keep.b { width: 100%; }
+.barrow strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.barrow .lost { color: var(--red); }
+.model { margin-top: 18px; display: grid; gap: 10px; }
+.model > div { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); }
+.model svg { width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: rgba(217,119,87,.14); stroke: var(--accent); fill: none;
+             stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.model b { display: block; font-size: 15px; font-weight: 650; }
+.model span { display: block; margin-top: 3px; font-size: 14px; line-height: 1.4; color: var(--muted); }
+
+/* ---------- Demo: scroll into the phone, then it plays ---------- */
+.demo { position: relative; height: 330svh; }
+.demo .pin { flex-direction: column; justify-content: flex-start; align-items: center; }
+.intro { position: absolute; top: 15svh; left: 0; right: 0; text-align: center; padding: 0 var(--gut); z-index: 1; will-change: opacity, transform; }
+.intro h2 { margin: 10px 0 0; font-size: clamp(36px, 11vw, 54px); line-height: 1.02; font-weight: 800; letter-spacing: -.04em; }
+.cap { position: relative; z-index: 3; width: 100%; max-width: 460px; padding: calc(14px + env(safe-area-inset-top)) var(--gut) 0; opacity: 0;
+       transition: opacity .5s var(--ease); }
+.cap.show { opacity: 1; }
+.bars { display: flex; gap: 4px; margin-bottom: 12px; }
+.bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
+.bars i b { display: block; height: 100%; width: 0; background: var(--text); }
+.cap h3 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.015em; min-height: 24px; }
+.cap p { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 4.2em; }
+.cap h3, .cap p { transition: opacity .35s; }
+.cap.swap h3, .cap.swap p { opacity: 0; }
+.stagebox { position: absolute; left: 0; right: 0; bottom: 0; top: 0; pointer-events: none; }
+.phone { position: absolute; left: 50%; top: 0; width: 406px; height: 860px; margin-left: -203px; transform-origin: 50% 0;
+         border-radius: 60px; padding: 8px; background: #1b1b20;
+         box-shadow: inset 0 0 0 2px #3a3a42, inset 0 0 0 5px #0d0d10, 0 40px 100px rgba(0,0,0,.8), 0 0 0 1px #000;
+         will-change: transform; pointer-events: auto; }
+.paused-tag { position: absolute; left: 50%; top: 50%; z-index: 8; transform: translate(-50%, -50%); padding: 14px 26px; border-radius: 30px;
+              font-size: 26px; font-weight: 650; color: #fff; background: rgba(0,0,0,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+              white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.phone.paused .paused-tag { opacity: 1; }
+.cap h3 { padding-right: 84px; }
+.replay { position: absolute; z-index: 4; right: var(--gut); top: calc(4px + env(safe-area-inset-top)); padding: 8px 14px; border-radius: 16px;
+          font: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+          opacity: 0; pointer-events: none; transition: opacity .4s; cursor: pointer; }
+.replay.show { opacity: 1; pointer-events: auto; }
+
+/* The wallet mock: native 390 x 844 (iPhone 14), same layout values as the wallet. */
+.screen { position: relative; width: 390px; height: 844px; border-radius: 52px; overflow: hidden; background: #000; color: var(--text);
+          --top: 59px; --bottom: 34px; --card-w: 358px; --card-h: 226px; --peek: 58px; --stack: 127px; --dock: 60px; }
+.island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 9; }
+.sbar { position: absolute; top: 0; left: 0; right: 0; height: 54px; padding: 18px 34px 0 40px; display: flex; justify-content: space-between;
+        font-size: 16px; font-weight: 600; z-index: 8; }
+.sbar svg { width: 64px; height: 14px; fill: #fff; }
+.whead { position: absolute; top: var(--top); left: 20px; height: 56px; display: flex; align-items: center; font-size: 34px; font-weight: 700;
+         letter-spacing: -.01em; transition: opacity .4s var(--ease), transform .5s var(--ease); }
+.s-open .whead { opacity: 0; transform: translateY(-14px); }
+.wc { position: absolute; left: 16px; right: 16px; top: calc(var(--stack) + var(--i) * var(--peek)); height: var(--card-h); border-radius: 16px; overflow: hidden;
+      box-shadow: 0 -1px 0 rgba(255,255,255,.12) inset, 0 -8px 24px rgba(0,0,0,.55);
+      transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
+.bank-blue { background: linear-gradient(135deg, #3a63e8, #1b2f8f 60%, #111c55); }
+.bank-black { background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
+.chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px; background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
+.s-open .bank { transform: translateY(900px); opacity: 0; }
+.agent { background: #0c0c10; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 -8px 24px rgba(0,0,0,.55); }
+.agent canvas { position: absolute; left: 0; width: 100%; aspect-ratio: 2 / 1; top: 50%; display: block; transform: translateY(-50%) scale(.92);
+                transition: top .7s var(--ease), transform .7s var(--ease); }
+.agent .alabel { position: absolute; top: 16px; left: 20px; font-size: 13px; font-weight: 600; color: rgba(236,235,244,.38); transition: opacity .3s; }
+.s-open .agent .alabel { opacity: 0; }
+.s-open .agent { top: var(--top); height: calc(844px - var(--top) - var(--bottom) - var(--dock)); border-radius: 32px; }
+.s-open .agent canvas { top: 42%; transform: translateY(-50%) scale(1); }
+.s-busy .agent canvas { top: 12%; transform: translateY(-50%) scale(.42); }
+.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1px rgba(255,181,150,.45); }
+.s-voice .edge { opacity: 1; animation: listen 3s ease-in-out infinite; }
+@keyframes listen { 50% { opacity: .45; } }
+.grab { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(255,255,255,.28); opacity: 0; transition: opacity .3s; }
+.s-open .grab { opacity: 1; }
+.tap { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255,255,255,.35); pointer-events: none;
+       opacity: 0; z-index: 7; }
+.tap.go { animation: tap .6s var(--ease); }
+@keyframes tap { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.3); } }
+.status { position: absolute; left: 24px; right: 24px; bottom: 22px; text-align: center; font-size: 15px; line-height: 1.45; font-weight: 500; color: var(--muted);
+          opacity: 0; transition: opacity .4s; }
+.s-open .status { opacity: 1; }
+.status.heard { color: var(--text); font-size: 17px; }
+.dock { position: absolute; left: 16px; right: 16px; bottom: var(--bottom); height: 52px; display: flex; justify-content: space-around; align-items: center;
+        opacity: 0; transform: translateY(12px); transition: opacity .35s var(--ease) .2s, transform .45s var(--ease) .2s; color: var(--muted); }
+.s-open .dock { opacity: 1; transform: none; }
+.dock svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.act { position: absolute; left: 0; right: 0; top: 19%; bottom: 60px; padding: 22px 16px 0; display: flex; flex-direction: column; gap: 12px;
+       opacity: 0; transition: opacity .4s var(--ease); overflow: hidden; }
+.s-open .act { opacity: 1; }
+.bubble { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45; }
+.bubble.user { align-self: flex-end; background: #2a2a2f; border-bottom-right-radius: 6px; min-height: 42px; }
+.bubble.tuttie { align-self: stretch; max-width: none; padding: 14px 16px; font-size: 16px; line-height: 1.5;
+                 background: linear-gradient(180deg, rgba(217,119,87,.13), rgba(217,119,87,.06)); border: 1px solid rgba(217,119,87,.28); border-bottom-left-radius: 6px; }
+.hide { display: none !important; }
+.fadein { animation: rise .45s var(--ease) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.steps { list-style: none; margin: 0; padding: 2px 4px; display: grid; gap: 10px; }
+.steps li { position: relative; display: flex; gap: 12px; font-size: 14px; line-height: 1.35; color: var(--muted); animation: rise .35s var(--ease) both; }
+.steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
+.steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
+.steps li.done .dot { background: #4a4a52; }
+.steps li.done.latest .dot { background: var(--green); }
+.steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px; background: var(--line2); }
+@keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
+
+/* Hotel cards (the wallet's swipe deck) */
+.deck { position: relative; height: 420px; flex: none; }
+.sw { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel2); border: 1px solid var(--line);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .7s var(--ease), opacity .7s var(--ease); }
+.sw.back { transform: scale(.95) translateY(10px); }
+.sw.left { transform: translateX(-140%) rotate(-16deg); opacity: 0; }
+.sw.right { transform: translateX(140%) rotate(16deg); opacity: 0; }
+.sw.lean-l { transform: translateX(-46px) rotate(-4deg); }
+.sw.lean-r { transform: translateX(46px) rotate(4deg); }
+.sw-photo { position: absolute; inset: 0 0 76px; }
+.sw-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sw-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.35), transparent 22%, transparent 62%, rgba(14,14,18,.96)); }
+.pbars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 4px; }
+.pbars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
+.pbars i:first-child { background: #fff; }
+.sw-top { position: absolute; top: 20px; left: 14px; right: 12px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+.marks { display: inline-flex; gap: 8px; }
+.marks i { position: relative; width: 22px; height: 22px; border-radius: 6px; }
+.marks svg { display: block; width: 100%; height: 100%; }
+.marks .ms { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; filter: drop-shadow(0 0 1.5px rgba(0,0,0,.8)); }
+.rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b; background: rgba(255,255,255,.92); }
+.sw-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+.sw-name small { display: block; font-size: 13px; font-weight: 500; color: rgba(236,235,244,.7); margin-top: 3px; }
+.sw-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; }
+.feats { display: flex; gap: 6px; }
+.feats i { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.feats svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.feats .y { color: var(--green); background: rgba(52,199,123,.14); }
+.feats .n { color: var(--red); background: rgba(255,95,95,.14); }
+.sw-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.sw-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
+.sw-price s, .sw-price small { font-size: 13px; color: var(--dim); }
+.stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px; font-size: 24px; font-weight: 800;
+         text-transform: uppercase; letter-spacing: .04em; opacity: 0; transition: opacity .25s; }
+.stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
+.stamp.pass { right: 18px; color: var(--red); transform: rotate(12deg); }
+.sw.lean-r .stamp.like, .sw.right .stamp.like, .sw.lean-l .stamp.pass, .sw.left .stamp.pass { opacity: 1; }
+.dcount { text-align: center; font-size: 12px; color: var(--dim); margin-top: -4px; }
+
+/* Approval sheet */
+.sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 6; padding: 18px 18px 20px; border-radius: 26px; background: #1c1c1f;
+         box-shadow: 0 -12px 40px rgba(0,0,0,.6); transform: translateY(115%); transition: transform .5s var(--ease); }
+.sheet.up { transform: none; }
+.sh-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.sh-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
+.sh-terms { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.slist { border-radius: 14px; background: #2a2a2e; overflow: hidden; margin-bottom: 16px; }
+.srow { display: flex; align-items: center; gap: 11px; padding: 10px 12px; position: relative; font-size: 14px; font-weight: 600; }
+.srow + .srow::before { content: ""; position: absolute; top: 0; left: 41px; right: 0; height: 1px; background: var(--line); }
+.ok { flex: none; width: 18px; height: 18px; }
+.ok circle { fill: var(--green); }
+.ok path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mandate { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 8px 12px; border-radius: 12px; background: #2a2a2e; font-size: 13px; color: var(--muted); }
+.mandate span { flex: 1; }
+.mandate i { position: relative; flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--green); }
+.mandate i::after { content: ""; position: absolute; top: 2px; left: 20px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
+.sh-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sh-btns span { padding: 15px; border-radius: 16px; font-size: 16px; font-weight: 600; text-align: center; }
+.sh-btns .approve { background: #fff; color: #08080b; }
+.sh-btns .decline { background: var(--panel2); border: 1px solid var(--line2); }
+.faceid { height: 92px; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.sheet.scan .sh-btns { display: none; } .sheet.scan .faceid { display: flex; }
+.fscan { position: relative; width: 52px; height: 52px; animation: scan 1s ease-in-out infinite; }
+.fscan i { position: absolute; width: 15px; height: 15px; border: 3px solid #fff; }
+.fscan i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 9px 0 0 0; }
+.fscan i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 9px 0 0; }
+.fscan i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 9px; }
+.fscan i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 9px 0; }
+@keyframes scan { 50% { transform: scale(.86); } }
+.fok { width: 52px; height: 52px; display: none; }
+.sheet.done .fscan { display: none; } .sheet.done .fok { display: block; }
+.fok circle { fill: var(--green); transform-origin: center; animation: pop .45s cubic-bezier(.34,1.4,.5,1) both; }
+.fok path { fill: none; stroke: #04140c; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s var(--ease) .2s forwards; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* Booking */
+.booking { padding: 14px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--green); }
+.bk-top { display: flex; align-items: center; gap: 10px; }
+.bk-hotel { flex: 1; font-size: 15px; font-weight: 600; }
+.bk-hotel small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.bk-total { font-size: 20px; font-weight: 700; }
+.bk-line { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+/* Callouts: what happens behind the screen. They sit on top of the mock, in a different
+   style (light, mono label), so they never read as part of the wallet. */
+.call { position: absolute; left: 16px; right: 16px; z-index: 7; padding: 16px 18px; border-radius: 20px; background: rgba(246,243,238,.97); color: #141418;
+        box-shadow: 0 16px 40px rgba(0,0,0,.55); opacity: 0; transform: translateY(10px) scale(.98); transition: opacity .45s var(--ease), transform .55s var(--ease); }
+.call.show { opacity: 1; transform: none; }
+.call small { display: block; font-family: var(--mono); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: #8a5a45; margin-bottom: 4px; }
+.call b { display: block; font-size: 22px; font-weight: 650; line-height: 1.3; }
+.call span { display: block; font-size: 18px; line-height: 1.35; color: #55545e; margin-top: 2px; }
+.call.red { background: #1c0f10; color: var(--text); border: 1px solid rgba(255,107,107,.55); }
+.call.red small { color: var(--red); }
+.call.red span { color: #c9a5a5; }
+.call .fake { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.05); }
+.call .fake b { font-size: 18px; flex: 1; text-decoration: line-through; text-decoration-color: rgba(255,107,107,.7); }
+.call .fake em { font-style: normal; font-size: 17px; color: var(--muted); }
+.call .x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 700; color: #fff; background: #ff453a; }
+.call.red.gone { opacity: 0; transform: scale(.9) translateY(-6px); filter: blur(6px); transition: opacity .8s, transform .8s, filter .8s; }
+
+/* ---------- Close ---------- */
+.close { padding: 110px 0 60px; text-align: center; background: radial-gradient(600px 400px at 50% 20%, rgba(217,119,87,.12), transparent 70%); }
+.close h2 { margin: 0; font-size: clamp(32px, 9.5vw, 44px); line-height: 1.08; font-weight: 800; letter-spacing: -.035em; }
+.close h2 span { color: var(--muted); }
+.close .year { margin: 34px 0 0; font-size: 19px; line-height: 1.5; color: var(--muted); }
+.close .year b { color: var(--peach); font-weight: 650; }
+.go { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 40px 0 0; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 650;
+      text-decoration: none; color: #08080b; background: #fff; }
+.go:active { transform: scale(.98); }
+.go svg { width: 18px; height: 18px; }
+.hint { margin-top: 12px; font-size: 13px; color: var(--dim); }
+.honest { margin: 44px 0 0; padding: 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); font-size: 14px; line-height: 1.5; color: var(--muted); text-align: left; }
+.honest b { color: var(--text); font-weight: 600; }
+footer { padding: 30px 0 calc(40px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.7; color: var(--dim); }
+footer a { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
+  .cue i, .edge, .steps li.active .dot, .fscan { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="swiss" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#ff1f1f"/><path d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z" fill="#fff"/></symbol>
+  <symbol id="generic" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3a3a3f"/><path d="M16 7l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10v-5z" fill="none" stroke="#fff" stroke-width="2"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.4 12.2l2.5 2.5 4.8-5.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="shop" viewBox="0 0 48 48"><path d="M8 20v20h32V20M5 20l4-11h30l4 11zM5 20c0 3 2.5 5 5.5 5s5.5-2 5.5-5c0 3 2.5 5 5.5 5h5c3 0 5.5-2 5.5-5 0 3 2.5 5 5.5 5S43 23 43 20M20 40V30h8v10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="f-dog" viewBox="0 0 24 24"><path d="M8 6.5 5 5.2 4 10.5l2.4.9M16 6.5l3-1.3 1 5.3-2.4.9M8 6.5h8l1.6 5v3.3a5.6 5.6 0 0 1-11.2 0v-3.3zM10 11.5h.01M14 11.5h.01M11 15.2h2l-1 1.2z"/></symbol>
+  <symbol id="f-quiet" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
+  <symbol id="f-late" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2"/></symbol>
+  <symbol id="f-small" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5M6 9.5V19h12V9.5M12 16.5s-2.6-1.6-2.6-3.2a1.4 1.4 0 0 1 2.6-.7 1.4 1.4 0 0 1 2.6.7c0 1.6-2.6 3.2-2.6 3.2z"/></symbol>
+  <symbol id="f-station" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2zM5 11h14M9 15h.01M15 15h.01M8 18l-2 2.5M16 18l2 2.5"/></symbol>
+  <symbol id="f-cancel" viewBox="0 0 24 24"><path d="M5 6h14v13H5zM5 10h14M9 4v4M15 4v4M9.5 14.5l1.8 1.8 3.4-3.6"/></symbol>
+</svg>
+
+<div class="top"><b>Tuttie</b><a href="#demo">Watch the demo</a></div>
+
+<!-- ============ Hero ============ -->
+<header class="hero">
+  <div class="wrap">
+    <div class="tcard rv"><canvas id="heroFace"></canvas><span class="lbl">Tuttie</span></div>
+    <h1 class="rv">Your agent lives in <em>your wallet.</em></h1>
+    <p class="rv">Say what you need. Businesses' agents come to you with signed offers. Tuttie drops the fakes, bargains for you, and you approve with one tap.</p>
+  </div>
+  <div class="cue">Scroll<i></i></div>
+</header>
+
+<!-- ============ Numbers ============ -->
+<section class="nums" id="nums" aria-label="The problem in numbers">
+  <div class="pin">
+    <div class="ticks" id="ticks"></div>
+    <div class="fig" data-n="2">
+      <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--peach)"><use href="#shop"/></svg></div>
+      <div class="big"><span class="count" data-to="2">0</span><small>in 3</small></div>
+      <p>Swiss firms under ten people have no website. <span>Nobody finds them, and no AI can either.</span></p>
+      <div class="src">localsearch &amp; HSLU, SME Digital Pulse 2025</div>
+    </div>
+    <div class="fig">
+      <div class="viz"><div class="dots" id="dots"></div></div>
+      <div class="big"><span class="count" data-to="3">0</span><small>%</small></div>
+      <p>of Swiss SMEs take bookings online. <span>The rest wait for the phone to ring.</span></p>
+      <div class="src">localsearch &amp; HSLU, SME Digital Pulse 2025</div>
+    </div>
+    <div class="fig">
+      <div class="viz"><svg class="ring" viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="fg" id="ring" cx="50" cy="50" r="42" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg></div>
+      <div class="big"><span class="count" data-to="29.6" data-dec="1">0</span><small>%</small></div>
+      <p>of European hotel bookings go through online agencies. <span>71% of those through a single group, at a commission of typically 15 to 18%.</span></p>
+      <div class="src">HOTREC European Hotel Distribution Study 2024 · Best Western FDD 2025</div>
+    </div>
+    <div class="fig">
+      <div class="viz"><svg class="spark" viewBox="0 0 330 96" preserveAspectRatio="none"><path d="M4 88 C 120 86, 200 80, 250 56 S 310 14, 326 6"/></svg></div>
+      <div class="big accent">+<span class="count" data-to="539">0</span><small>%</small></div>
+      <p>AI traffic to US travel sites, holiday season 2025. <span>People already let agents shop for them.</span></p>
+      <div class="src">Adobe Analytics, via Digital Commerce 360, Jan 2026 · curve illustrative</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ The idea ============ -->
+<section class="block turn">
+  <div class="wrap">
+    <div class="kicker rv">The idea</div>
+    <h2 class="rv">So we turned the web around.</h2>
+    <div class="three" id="three">
+      <span>A shopper.</span><span>A scam filter.</span><span>A shop window.</span><span class="one">One card.</span>
+    </div>
+    <p class="lead rv">Tuttie is <b>your</b> agent, in your phone's wallet. You don't search businesses. <b>Their agents come to you</b>, with offers they signed.</p>
+
+    <div class="flow">
+      <div class="step rv"><i class="n">1</i><div><b>You ask once</b><span>By voice or text. Tuttie knows your day, your dog and your budget, and keeps them to herself.</span></div></div>
+      <div class="step rv"><i class="n">2</i><div><b>Signed offers come to you</b><span>Only verified businesses are woken. Their agents answer with offers they signed, priced by the owner, never by an AI.</span></div></div>
+      <div class="step rv"><i class="n">3</i><div><b>Fakes never reach you</b><span>A seal that doesn't verify is dropped before anyone is asked. Scams aren't blocked one by one; they can't sign.</span></div></div>
+      <div class="step rv"><i class="n">4</i><div><b>Tuttie bargains, you tap</b><span>She negotiates within limits nobody else sees, shows you the best few, and books only with your signature.</span></div></div>
+    </div>
+
+    <div class="h3 rv">Seals show who vouches</div>
+    <p class="sub rv">Who sent an offer, and who stands behind them. Tuttie checks it on every message.</p>
+    <div class="seals rv">
+      <div class="seal"><svg style="fill:var(--gold)"><use href="#shield"/></svg><div><b>An official register vouches</b><span>The commercial register knows this business.</span></div></div>
+      <div class="seal"><svg style="fill:var(--blue)"><use href="#shield"/></svg><div><b>A platform vouches</b><span>A company that checked the business.</span></div></div>
+      <div class="seal"><svg style="fill:#5d5c6d"><use href="#shield"/></svg><div><b>Unsigned</b><span>Never woken for a request, never books or pays.</span></div></div>
+      <div class="seal forged"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ff453a"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><div><b>Forged</b><span>Dropped. You never see it.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Business case ============ -->
+<section class="block" style="padding-top:30px">
+  <div class="wrap">
+    <div class="kicker rv">The business case</div>
+    <h2 class="rv" style="margin:12px 0 0;font-size:clamp(32px,9.5vw,44px);line-height:1.05;font-weight:800;letter-spacing:-.035em">Small wins on fit,<br>not on ad budget.</h2>
+    <div class="vs rv">
+      <div class="anna"><em>Gästehaus am Rhein</em><b>7</b><span>rooms. Owner Anna, no marketing team. Her agent answers every request, day and night.</span></div>
+      <div><em>Alpina Grand</em><b>220</b><span>rooms, a chain branch. Same request, same rules, same seal check.</span></div>
+    </div>
+    <p class="lead rv">About <b>92%</b> of Swiss hotels are independent, like Anna's. <span class="src">(Horwath HTL 2021)</span></p>
+
+    <div class="bill rv" id="bill">
+      <h4>One night at Anna's, CHF 135</h4>
+      <div class="barrow"><span>Through an agency today</span><strong class="lost">− CHF 20 to 24</strong>
+        <div class="bar"><i class="keep a"></i><i class="fee a"></i></div></div>
+      <div class="barrow"><span>Through Tuttie, signed directly</span><strong>Anna keeps the price</strong>
+        <div class="bar"><i class="keep b"></i></div></div>
+      <p class="src" style="margin:12px 0 0">At a typical 15 to 18% commission. Anna is a demo persona; the hotels in the demo are demo data.</p>
+    </div>
+
+    <div class="h3 rv">Who pays</div>
+    <div class="model">
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM4 11h16M8 15h3"/></svg><div><b>A small fee per signed booking</b><span>Paid to the marketplace host only when a deal is approved and signed. No ads, no ranking to buy.</span></div></div>
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 15.6 7 18.2l1-5.5-4-3.9 5.5-.8z"/></svg><div><b>The agent, as a service</b><span>The host runs each business's agent. Owners set prices and limits in plain language, no website needed.</span></div></div>
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.6 12l2.4 2.4 4.4-4.8"/></svg><div><b>Registers and platforms vouch</b><span>They sign seals instead of owning the customer. Trust becomes the product.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Demo: scroll into the phone ============ -->
+<section class="demo" id="demo" aria-label="Demo">
+  <div class="pin">
+    <div class="intro" id="intro"><div class="kicker">The demo</div><h2>One request.<br>Watch.</h2></div>
+    <div class="cap" id="cap">
+      <div class="bars" id="bars"></div>
+      <h3 id="capT">&nbsp;</h3>
+      <p id="capP">&nbsp;</p>
+    </div>
+    <div class="stagebox" id="stagebox">
+      <div class="phone" id="phone">
+        <div class="screen" id="screen">
+          <div class="island"></div>
+          <div class="sbar"><span>23:52</span><svg viewBox="0 0 64 14"><rect x="0" y="9" width="3" height="5" rx="1"/><rect x="5" y="6" width="3" height="8" rx="1"/><rect x="10" y="3" width="3" height="11" rx="1"/><rect x="15" y="0" width="3" height="14" rx="1"/><rect x="36" y="1" width="24" height="12" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="38" y="3" width="17" height="8" rx="2"/><rect x="61" y="5" width="2" height="4" rx="1" fill-opacity=".45"/></svg></div>
+          <div class="whead">Wallet</div>
+          <div class="wc bank bank-blue" style="--i:0"><span class="chip"></span></div>
+          <div class="wc bank bank-black" style="--i:1"><span class="chip"></span></div>
+          <div class="wc agent" id="agent" style="--i:2">
+            <canvas id="demoFace"></canvas><span class="alabel">Tuttie</span><div class="edge"></div><div class="grab"></div>
+            <div class="act" id="act">
+              <div class="bubble user hide" id="ask"></div>
+              <ul class="steps hide" id="steps"></ul>
+              <div class="deck hide" id="deck">
+                <div class="sw back" id="cardA">
+                  <div class="sw-photo"><img src="img/gaestehaus.jpg" alt=""><div class="pbars"><i></i><i></i><i></i></div></div>
+                  <div class="sw-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span><span class="rating">★ 4.8</span></div>
+                  <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
+                  <div class="sw-name">Gästehaus am Rhein<small>Kleinbasel · 7 rooms · by the Rhine</small></div>
+                  <div class="sw-foot"><div class="feats"><i class="y"><svg><use href="#f-dog"/></svg></i><i class="y"><svg><use href="#f-quiet"/></svg></i><i class="y"><svg><use href="#f-late"/></svg></i><i class="y"><svg><use href="#f-small"/></svg></i><i class="n"><svg><use href="#f-station"/></svg></i></div>
+                    <div class="sw-price"><s>CHF 135</s><b>CHF 128</b></div></div>
+                </div>
+                <div class="sw" id="cardB">
+                  <div class="sw-photo"><img src="img/alpina.jpg" alt=""><div class="pbars"><i></i><i></i><i></i></div></div>
+                  <div class="sw-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i><i><svg><use href="#generic"/></svg><svg class="ms" style="fill:var(--blue)"><use href="#shield"/></svg></i></span><span class="rating">★ 4.2</span></div>
+                  <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
+                  <div class="sw-name">Alpina Grand Basel<small>Near Basel SBB · 220 rooms</small></div>
+                  <div class="sw-foot"><div class="feats"><i class="y"><svg><use href="#f-dog"/></svg></i><i class="n"><svg><use href="#f-quiet"/></svg></i><i class="y"><svg><use href="#f-late"/></svg></i><i class="y"><svg><use href="#f-station"/></svg></i><i class="y"><svg><use href="#f-cancel"/></svg></i></div>
+                    <div class="sw-price"><b>CHF 240</b><small>over budget</small></div></div>
+                </div>
+              </div>
+              <div class="dcount hide" id="dcount">1 of 2</div>
+              <div class="booking hide" id="booking">
+                <div class="bk-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>
+                  <span class="bk-hotel">Gästehaus am Rhein<small>Tonight · double room · with your dog</small></span><span class="bk-total">CHF 128</span></div>
+                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Booked and signed by the hotel</div>
+                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>City tax paid with your mandate</div>
+              </div>
+              <div class="bubble tuttie hide" id="reply"></div>
+            </div>
+            <div class="status" id="status">Listening…</div>
+          </div>
+          <div class="dock"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4"/></svg><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg></div>
+          <div class="tap" id="tap"></div>
+          <div class="paused-tag">Paused · tap to play</div>
+
+          <div class="sheet" id="sheet">
+            <div class="sh-hotel"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>Gästehaus am Rhein</div>
+            <div class="sh-amount">CHF 128</div>
+            <div class="sh-terms">Tonight · double room · arrival after midnight · dog welcome</div>
+            <div class="slist">
+              <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Registered in the commercial register</div>
+              <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>The hotel signed the agreed price</div>
+            </div>
+            <div class="mandate"><span>Also pay city tax (CHF 4)</span><i></i></div>
+            <div class="sh-btns"><span class="decline">Decline</span><span class="approve">Approve</span></div>
+            <div class="faceid"><div class="fscan"><i></i><i></i><i></i><i></i></div><svg class="fok" viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg><span id="fidText">Face ID</span></div>
+          </div>
+
+          <div class="call" id="cBudget" style="top:96px"><small>Stays on your phone</small><b>Budget CHF 160 is private</b><span>The request goes out signed. Your budget never leaves Tuttie.</span></div>
+          <div class="call red" id="cForged" style="top:430px"><small>Behind the screen · seal check failed</small><b>Refused before anyone asked it</b>
+            <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
+          <div class="call" id="cBargain" style="top:470px"><small>Behind the screen</small><b>Limits compared in code</b><span>Your budget and the hotel's floor price stay private. No AI ever sees both.</span></div>
+          <div class="call" id="cSigned" style="top:110px"><small>Behind the screen · your key</small><b>Signed for exactly CHF 128</b><span>The hotel books only with your signature, for this price, this room.</span></div>
+        </div>
+      </div>
+    </div>
+    <button class="replay" id="replay" type="button">Replay</button>
+  </div>
+</section>
+
+<!-- ============ Close ============ -->
+<section class="close">
+  <div class="wrap">
+    <h2 class="rv">Signed businesses reach you.<br><span>Fakes never do.</span></h2>
+    <p class="year rv">In 2000 you needed a website.<br><b>In 2033 you need a signature.</b></p>
+    <a class="go rv" href="https://web4.mendes.dev/wallet/">Wake yours
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <div class="hint rv">Try: "Quiet room in Basel tonight, after midnight, with my dog, under CHF 160."</div>
+    <p class="honest rv">Honest about the demo: the hotels, their agents and the register are <b>demo data</b>. The demo above is an animation of the wallet; the real one is one tap away. The signatures are <b>real</b> and really checked, Tuttie and the hotels' agents run on a real language model, and prices, bargaining moves and totals are computed in code from signed messages, never by AI.</p>
+  </div>
+  <footer>
+    Built in one weekend at <b>BaselHack 2026</b><br>
+    Adobe challenge · The Post-Website Business<br>
+    Jonas · Stan · Sebastian · Thomas · Max · Chris<br>
+    <a href="https://github.com/verifizieren/tuttie">github.com/verifizieren/tuttie</a>
+  </footer>
+</section>
+
+<script type="module">
+import TuttieFace from "./face.js";
+
+const $ = s => document.querySelector(s);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => 1 - Math.pow(1 - t, 3);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------- Hero: Tuttie wakes up ----------
+const hero = new TuttieFace($("#heroFace"));
+hero.sleep(0);
+setTimeout(() => { hero.wake("happiness", 700); setTimeout(() => hero.set("neutral", 800), 1600); }, 1100);
+
+// ---------- Reveal on scroll ----------
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }),
+  { rootMargin: "0px 0px -12% 0px" });
+document.querySelectorAll(".rv, .bill").forEach(el => io.observe(el));
+// "A shopper. A scam filter. A shop window. One card." light up one after the other.
+const three = [...document.querySelectorAll("#three span")];
+new IntersectionObserver((es, o) => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  three.forEach((s, i) => setTimeout(() => s.classList.add("in"), reduced ? 0 : 450 * i));
+  o.disconnect();
+}), { rootMargin: "0px 0px -25% 0px" }).observe($("#three"));
+
+// ---------- Numbers: pinned, one figure per step of scroll ----------
+const figs = [...document.querySelectorAll(".fig")];
+$("#ticks").innerHTML = figs.map(() => "<i></i>").join("");
+const ticks = [...document.querySelectorAll("#ticks i")];
+$("#dots").innerHTML = Array.from({ length: 100 }, () => "<i></i>").join("");
+const dots = [...document.querySelectorAll("#dots i")];
+let figIndex = -1;
+function countUp(el) {
+  const to = +el.dataset.to, dec = +(el.dataset.dec || 0), t0 = performance.now(), dur = reduced ? 1 : 1200;
+  const step = now => { const t = clamp((now - t0) / dur); el.textContent = (to * ease(t)).toFixed(dec); if (t < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function showFig(i) {
+  if (i === figIndex) return;
+  figIndex = i;
+  figs.forEach((f, k) => { f.classList.toggle("on", k === i); f.classList.toggle("past", k < i); });
+  ticks.forEach((t, k) => t.classList.toggle("on", k === i));
+  const f = figs[i]; if (!f) return;
+  f.querySelectorAll(".count").forEach(countUp);
+  dots.forEach((d, k) => d.classList.toggle("lit", i === 1 && k < 3));
+  $("#ring").style.strokeDashoffset = i === 2 ? 263.9 * (1 - .296) : 263.9;
+}
+function onNums() {
+  const r = $("#nums").getBoundingClientRect();
+  if (r.top > innerHeight * .35) return;  // not on screen yet: the first count-up waits for it
+  const p = clamp(-r.top / (r.height - innerHeight));
+  showFig(Math.min(figs.length - 1, Math.floor(p * figs.length * .999)));
+}
+
+// ---------- Demo: the wallet mock and its timeline ----------
+const screen = $("#screen"), face = new TuttieFace($("#demoFace"));
+face.sleep(0);
+const CAPS = [
+  ["Tuttie lives in your wallet", "Your agent, next to your cards. Asleep until you need her."],
+  ["You ask once", "By voice or text. She knows your train arrives late and that you travel with a dog."],
+  ["Businesses come to you", "A signed request goes out. Only verified hotel agents are woken, and each answers with a signed offer."],
+  ["Fakes never reach you", "A hotel with a forged seal is refused before anyone asks it. Your wallet never even shows it."],
+  ["Tuttie bargains for you", "One subagent per hotel, in parallel. Gästehaus am Rhein comes down from CHF 135 to 128."],
+  ["You pick, with a swipe", "The best offers as cards, with the agreed price. Too loud and over budget: pass. Anna's: like."],
+  ["One tap, signed with your key", "Exactly this hotel, exactly this price. Nothing is booked without it."],
+  ["Booked. Every step signed.", "The hotel checks your signature and confirms with its own. Seven rooms just beat 220."],
+];
+const ASK = "Quiet room in Basel tonight, after midnight, with my dog, under 160. Get me a good price.";
+const REPLY = "Booked: Gästehaus am Rhein tonight for CHF 128, dog welcome. The door code comes after midnight.";
+const STEP_LINES = {
+  ctx: "Your train arrives at Basel SBB at 00:52",
+  post: "Posted a signed request · budget kept private",
+  ask: "Asked 3 hotels",
+  barg: "Bargaining with Gästehaus am Rhein · CHF 135 → 131",
+  deal: "Agreed with Gästehaus am Rhein · CHF 128",
+};
+const DURATION = 39000;
+const capAt = [0, 2600, 7000, 11000, 15000, 19500, 26500, 32500];
+
+// Pause-safe typing: rendered from the timeline clock each frame.
+const typers = [
+  { el: $("#status"), text: ASK, start: 3300, dur: 2600, until: 6700 },
+  { el: $("#reply"), text: REPLY, start: 34200, dur: 2600 },
+];
+
+function setStep(key, state) {
+  const ul = $("#steps");
+  let li = ul.querySelector(`[data-k="${key}"]`);
+  if (!li) { li = document.createElement("li"); li.dataset.k = key; li.innerHTML = `<i class="dot"></i><span>${STEP_LINES[key]}</span>`; ul.append(li); }
+  ul.querySelectorAll("li").forEach(x => x.classList.remove("latest"));
+  li.className = state; if (state === "done") li.classList.add("latest");
+  return li;
+}
+const show = (id, on = true) => { const el = $(id); el.classList.toggle("hide", !on); if (on) { el.classList.remove("fadein"); void el.offsetWidth; el.classList.add("fadein"); } };
+const call = (id, on) => $(id).classList.toggle("show", on);
+const cls = (c, on) => screen.classList.toggle(c, on);
+function tapAt(x, y) { const t = $("#tap"); t.style.left = x + "px"; t.style.top = y + "px"; t.classList.remove("go"); void t.offsetWidth; t.classList.add("go"); }
+
+const EVENTS = [
+  [1700, () => tapAt(195, 355)],
+  [1900, () => { cls("s-open", true); cls("s-voice", true); face.wake("happiness", 500); }],
+  [2700, () => face.set("listening", 500)],
+  [3200, () => $("#status").classList.add("heard")],
+  [3700, () => call("#cBudget", true)],
+  [6400, () => call("#cBudget", false)],
+  [6700, () => { cls("s-voice", false); cls("s-busy", true); face.set("attentive", 400); $("#status").classList.remove("heard"); $("#status").textContent = "Working…"; }],
+  [7300, () => { $("#ask").textContent = ASK; show("#ask"); show("#steps"); setStep("ctx", "active"); }],
+  [8300, () => { setStep("ctx", "done"); setStep("post", "active"); }],
+  [9200, () => { setStep("post", "done"); setStep("ask", "active"); }],
+  [10900, () => { call("#cForged", true); face.set("suspicion", 350); }],
+  [13300, () => $("#cForged").classList.add("gone")],
+  [14200, () => { call("#cForged", false); setStep("ask", "done"); face.set("attentive", 400); }],
+  [15000, () => { setStep("barg", "active"); call("#cBargain", true); }],
+  [17000, () => { $(`#steps [data-k="barg"] span`).textContent = "Bargaining with Gästehaus am Rhein · CHF 135 → 131 → 130"; }],
+  [18300, () => { call("#cBargain", false); setStep("barg", "done"); setStep("deal", "done"); face.set("happiness", 400); }],
+  [19500, () => { show("#steps", false); show("#ask", false); show("#deck"); show("#dcount"); $("#status").textContent = ""; face.set("neutral", 400); }],
+  [21300, () => $("#cardB").classList.add("lean-l")],
+  [22300, () => { $("#cardB").classList.replace("lean-l", "left"); $("#cardA").classList.remove("back"); $("#dcount").textContent = "2 of 2"; }],
+  [24000, () => $("#cardA").classList.add("lean-r")],
+  [25000, () => { $("#cardA").classList.replace("lean-r", "right"); face.set("happiness", 400); }],
+  [26300, () => { show("#deck", false); show("#dcount", false); $("#sheet").classList.add("up"); }],
+  [28300, () => tapAt(285, 800)],
+  [28500, () => { $("#sheet").classList.add("scan"); }],
+  [29600, () => { $("#sheet").classList.add("done"); $("#fidText").textContent = "Approved"; }],
+  [29900, () => call("#cSigned", true)],
+  [32300, () => { call("#cSigned", false); $("#sheet").classList.remove("up"); }],
+  [32700, () => { show("#booking"); $("#status").textContent = ""; face.set("happiness", 500); }],
+  [34200, () => show("#reply")],
+  [37400, () => { cls("s-open", false); cls("s-busy", false); face.sleep(900); }],
+];
+
+function resetDemo() {
+  screen.className = "screen";
+  ["#ask", "#steps", "#deck", "#dcount", "#booking", "#reply"].forEach(id => $(id).classList.add("hide"));
+  $("#steps").innerHTML = ""; $("#ask").textContent = ""; $("#reply").textContent = "";
+  $("#cardA").className = "sw back"; $("#cardB").className = "sw"; $("#dcount").textContent = "1 of 2";
+  $("#sheet").className = "sheet"; $("#fidText").textContent = "Face ID"; $("#status").textContent = "Listening…"; $("#status").classList.remove("heard");
+  document.querySelectorAll(".call").forEach(c => c.classList.remove("show", "gone"));
+  face.sleep(0);
+}
+
+$("#bars").innerHTML = CAPS.map(() => "<i><b></b></i>").join("");
+const barFills = [...document.querySelectorAll("#bars b")];
+let clock = 0, playing = false, fired = 0, capIndex = -1, last = 0, finished = false;
+let capTimer = 0;
+function setCaption(i) {
+  if (i === capIndex) return;
+  capIndex = i;
+  const cap = $("#cap");
+  cap.classList.add("swap");
+  clearTimeout(capTimer);
+  capTimer = setTimeout(() => { $("#capT").textContent = CAPS[i][0]; $("#capP").textContent = CAPS[i][1]; cap.classList.remove("swap"); }, capIndex === 0 && clock < 50 ? 0 : 220);
+}
+function restart() { resetDemo(); tapPaused = false; $("#phone").classList.remove("paused"); clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
+function tickDemo(dt) {
+  if (!playing || finished) return;
+  clock += dt;
+  while (fired < EVENTS.length && EVENTS[fired][0] <= clock) EVENTS[fired++][1]();
+  for (const t of typers) if (clock >= t.start && clock < (t.until ?? Infinity)) t.el.textContent = t.text.slice(0, Math.ceil(t.text.length * clamp((clock - t.start) / t.dur)));
+  let ci = 0; capAt.forEach((a, i) => { if (clock >= a) ci = i; });
+  setCaption(ci);
+  barFills.forEach((b, i) => {
+    const a = capAt[i], z = capAt[i + 1] ?? DURATION;
+    b.style.width = `${clamp((clock - a) / (z - a)) * 100}%`;
+  });
+  if (clock >= DURATION) { finished = true; $("#replay").classList.add("show"); }
+}
+$("#replay").addEventListener("click", () => { restart(); playing = true; });
+// Tap the phone to pause and resume; a tap pause sticks until the next tap (scrolling back
+// into view resumes only an automatic pause).
+let tapPaused = false;
+$("#phone").addEventListener("click", () => {
+  if (!started || finished) return;
+  playing = !playing; tapPaused = !playing;
+  $("#phone").classList.toggle("paused", tapPaused);
+});
+
+// ---------- Scroll into the demo ----------
+let started = false, fit = 1;
+let capH = 120, pinH = innerHeight, laidW = 0, laidH = 0;
+// Sized from the pinned stage (100svh), not innerHeight: on iOS the toolbar collapsing grows
+// innerHeight but not the stage, which would push the phone's bottom out of view.
+function layoutPhone() {
+  const pin = $("#demo .pin");
+  if (innerWidth === laidW && Math.abs(pin.clientHeight - laidH) < 120 && laidW) return;  // toolbar show/hide: keep the phone still
+  laidW = innerWidth; laidH = pinH = pin.clientHeight;
+  capH = $("#cap").offsetHeight + 8;
+  fit = Math.min((pinH - capH - 12) / 860, (innerWidth - 24) / 406, 1);
+}
+function onDemo() {
+  const r = $("#demo").getBoundingClientRect();
+  const p = clamp(-r.top / (r.height - innerHeight));
+  const enter = clamp((innerHeight - r.top) / innerHeight);  // 0..1 while the section scrolls into view
+  const z = ease(clamp(p / .32));                             // the zoom: phone rises, turns flat and docks
+  const s = lerp(fit * .62, fit, z);
+  const y = lerp(pinH * .55, capH + (pinH - capH - 860 * fit) / 2, z);
+  const rx = reduced ? 0 : lerp(28, 0, z);
+  $("#phone").style.transform = `translateY(${y}px) perspective(1600px) rotateX(${rx}deg) scale(${s})`;
+  $("#phone").style.opacity = String(clamp(enter * 1.6));
+  const intro = $("#intro");
+  intro.style.opacity = String(1 - clamp(z * 2.2));
+  intro.style.transform = `translateY(${-z * 60}px) scale(${1 - z * .08})`;
+  const docked = z > .985, visible = r.bottom > innerHeight * .4 && r.top < innerHeight * .4;
+  $("#cap").classList.toggle("show", z > .9);
+  document.body.classList.toggle("in-demo", r.top <= 0 && r.bottom > innerHeight * .5);
+  if (docked && visible && !started) { started = true; restart(); playing = true; }
+  if (started && (!visible || !docked)) playing = false;
+  else if (started && visible && docked && !finished && !tapPaused) playing = true;
+  if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); }
+}
+
+// ---------- One loop for scroll and the demo clock ----------
+let dirty = true;
+addEventListener("scroll", () => { dirty = true; }, { passive: true });
+addEventListener("resize", () => { layoutPhone(); dirty = true; });
+layoutPhone();
+function loop(now) {
+  const dt = last ? Math.min(100, now - last) : 0; last = now;
+  if (dirty) { dirty = false; onNums(); onDemo(); }
+  tickDemo(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
