@@ -17,6 +17,7 @@ answers. All logic, tools and signatures stay in the assistant.
 import asyncio
 import hmac
 import os
+import re
 import secrets
 import time
 from collections import Counter, deque
@@ -31,7 +32,7 @@ from pydantic import BaseModel
 
 from assistant.card_commands import card_choice
 from assistant.inputs import UserText
-from assistant.throttle import TURNS_PER_SESSION_PER_MIN
+from assistant.throttle import TURNS_PER_SESSION_PER_MIN, address_key
 
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
@@ -46,7 +47,8 @@ VOICE_ROOM_GRACE_S = 120
 VOICE_TURNS_PER_SESSION_PER_MIN = 2 * TURNS_PER_SESSION_PER_MIN
 # Exact card commands ("next", "like") move a card without the LLM, so they do not count as
 # turns; their own cap stops a flood (without cards on screen they fall through to the LLM).
-CARD_COMMANDS_PER_SESSION_PER_MIN = 30  # a new room is kept this long before it is used (the wallet joins within seconds)
+CARD_COMMANDS_PER_SESSION_PER_MIN = 30
+DIAGS_PER_CLIENT_PER_MIN = 10  # /voice/diag is open to anyone: a few reports a minute per address  # a new room is kept this long before it is used (the wallet joins within seconds)
 
 router = APIRouter()
 
@@ -266,13 +268,18 @@ async def voice_events(room: str, request: Request) -> StreamingResponse:
 
 
 DIAG_MAX_BYTES = 2000
+CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")  # line breaks and terminal escapes: one clean log line
 
 
 @router.post("/voice/diag", status_code=204)
 async def voice_diag(request: Request) -> Response:
-    """Log a wallet's voice connection report (lib/iceReport.js), cut to DIAG_MAX_BYTES."""
+    """Log a wallet's voice connection report (lib/iceReport.js) as one line, cut to
+    DIAG_MAX_BYTES, at most DIAGS_PER_CLIENT_PER_MIN a minute per address (more are dropped)."""
+    client = address_key(request.client.host if request.client else "unknown")
+    if request.app.state.turn_throttle.wait({("diag", client): DIAGS_PER_CLIENT_PER_MIN}, time.monotonic()):
+        return Response(status_code=204)
     body = (await request.body())[:DIAG_MAX_BYTES].decode(errors="replace")
-    print(f"voice diag: {body}", flush=True)
+    print(f"voice diag: {CONTROL.sub(' ', body)}", flush=True)
     return Response(status_code=204)
 
 
