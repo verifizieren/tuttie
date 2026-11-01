@@ -91,19 +91,24 @@ def offer_url_allowed(offer_url: str, request_id: str, market: str) -> bool:
     """Whether `offer_url` is the market's own offer door for this request.
 
     The node signs and POSTs an offer to it, so it must never be an arbitrary address (SSRF):
-    same scheme, host (any loopback name counts as one) and port as `market`, and exactly the
-    path /postings/{request_id}/offers.
+    same scheme, host (any loopback name counts as one) and effective port (443 for https) as
+    `market`, no user info at all, and exactly the path /postings/{request_id}/offers.
     """
     try:
         url, allowed = urlsplit(offer_url), urlsplit(market)
-        same_port = (url.port or 80) == (allowed.port or 80)
+        same_port = effective_port(url) == effective_port(allowed)
     except ValueError:
         return False
     host, allowed_host = url.hostname or "", allowed.hostname or ""
     same_host = host == allowed_host or (host in LOOPBACK and allowed_host in LOOPBACK)
     expected_path = f"{allowed.path.rstrip('/')}/postings/{request_id}/offers"
     return (url.scheme == allowed.scheme and same_host and same_port and url.path == expected_path
-            and not url.query and not url.fragment and not url.username)
+            and not url.query and not url.fragment and "@" not in url.netloc)
+
+
+def effective_port(url) -> int | None:
+    """The port a split URL really uses: the explicit one, else its scheme's default."""
+    return url.port or {"http": 80, "https": 443}.get(url.scheme)
 
 
 async def requester_problem(posting, lookup, authorities: dict, now=None) -> str | None:

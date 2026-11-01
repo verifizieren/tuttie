@@ -210,6 +210,12 @@ def test_offer_url_must_be_the_markets_offer_door():
     assert not offer_url_allowed("http://localhost:4010/postings/rq-1/offers?x=1", "rq-1", market)
     assert not offer_url_allowed("http://[bad/postings/rq-1/offers", "rq-1", market)
     assert not offer_url_allowed("http://localhost:99999/postings/rq-1/offers", "rq-1", market)
+    # Red team R4: the port compared is the effective one (443 for https), not "port or 80".
+    assert not offer_url_allowed("https://market.example:80/postings/rq-1/offers", "rq-1", "https://market.example")
+    assert offer_url_allowed("https://market.example:443/postings/rq-1/offers", "rq-1", "https://market.example")
+    # Red team R5: no user info at all, not even a password alone or an empty one.
+    assert not offer_url_allowed("http://:x@localhost:4010/postings/rq-1/offers", "rq-1", market)
+    assert not offer_url_allowed("http://@localhost:4010/postings/rq-1/offers", "rq-1", market)
 
 
 from datetime import datetime, timedelta, timezone  # noqa: E402
