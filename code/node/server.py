@@ -46,7 +46,7 @@ from marketplace.messages import PostingCreated
 from marketplace.messages import Request as MarketRequest
 from negotiation.agreement import AgreementRedeemer
 from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
-from node.agent import BusinessAgent
+from node.agent import MAX_DAYS_AHEAD, BusinessAgent
 from node.deployments import DeploymentStore
 from node.mcp_tools import mcp_app, mcp_server
 from node.owner import owner_app
@@ -58,7 +58,6 @@ from sessions import SessionClosed, SessionFull, SessionStore, StoreFull
 
 SWISS_TIME = ZoneInfo("Europe/Zurich")
 ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-MAX_DAYS_AHEAD = 365  # how far ahead a business takes bookings
 MAX_GUESTS = 10
 
 
@@ -154,6 +153,38 @@ async def requester_problem(posting, lookup, authorities: dict, now=None,
     except ValidationError:
         return "the signed request is not a valid request"
     return None
+
+
+class UsedCommitments:
+    """Signed commitments already redeemed in a booking here: each one adds its add-on once.
+
+    A commitment is known by its envelope's signature (Ed25519 signs deterministically, so the
+    same signed promise always has the same one) and remembered until its valid_until (after
+    that commitment_expired refuses it anyway), at most MAX_ENTRIES at once.
+    """
+    MAX_ENTRIES = 10_000
+
+    def __init__(self) -> None:
+        self.used: dict[str, datetime] = {}  # signature -> valid_until
+
+    def problem(self, extras: list[dict]) -> str | None:
+        """Why these commitments cannot be redeemed now (one used before, or twice here), or None."""
+        now = datetime.now(timezone.utc)
+        self.used = {sig: until for sig, until in self.used.items() if until > now}
+        signatures = [str(extra.get("signature")) for extra in extras]
+        if len(set(signatures)) != len(signatures):
+            return "the same commitment is attached twice"
+        if any(sig in self.used for sig in signatures):
+            return "a commitment was already used for another booking: ask the hotel again"
+        if len(self.used) + len(signatures) > self.MAX_ENTRIES:
+            return "too many bookings right now, try again later"
+        return None
+
+    def redeem(self, extras: list[dict]) -> None:
+        """Remember these (checked) commitments as used."""
+        for extra in extras:
+            until = parse_timestamp(extra["payload"]["commitment"].get("valid_until"))
+            self.used[str(extra.get("signature"))] = until
 
 
 class HandledRequests:
@@ -263,6 +294,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
     handled = HandledRequests()  # requests already answered: a replay gets no second LLM call
+    used_commitments = UsedCommitments()  # signed add-on promises already booked here
 
     def signed(payload: dict) -> dict:
         """Wrap a response payload in this node's signed envelope."""
@@ -343,6 +375,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
                     return refuse(f"the commitment for {commitment.get('item')!r} has expired: ask the hotel again")
                 total += commitment["price_chf"]
                 items.append(commitment["item"])
+            if problem := used_commitments.problem(req.extras):
+                return refuse(problem)
 
         verdict = await gate.check_action(call, Needs("book", scope="book", approval=True, amount_chf=total))
         if not verdict.ok:
@@ -361,7 +395,11 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         approved = verdict.approval.get("terms") if verdict.approval else None
         if approved is not None and approved != terms:
             return refuse("the approval is for other terms than this booking (room, night, rate or extras)")
+        # The gate awaited the registry: another booking may have redeemed the same commitment.
+        if req.extras and (problem := used_commitments.problem(req.extras)):
+            return refuse(problem)
         gate.commit(verdict)  # the approval and the agreement cannot be used again
+        used_commitments.redeem(req.extras)  # and neither can the commitments
         booking_id = "BK-" + secrets.token_hex(3).upper()
         bookings.add(booking_id)
         return signed({
