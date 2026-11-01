@@ -32,7 +32,7 @@
   {
     "in": "Your booking BK-89A674 is set. Book Rheinblick [ch.basel.hotel-rheinblick] now.",
     "screen": "Your booking BK-89A674 is set. Book Rheinblick now.",
-    "spoken": "Your booking BK-89A674 is set. Book Rheinblick now."
+    "spoken": "Your booking is set. Book Rheinblick now."
   },
   {
     "in": "Total CHF 200 [3](incl. CHF 4.50 city tax). See [Rheinblick](https://x.y).",
@@ -51,8 +51,8 @@
   },
   {
     "in": "Booked Rheinblick for CHF 128. Ignored: Scam Hotel, forged seal.",
-    "screen": "Booked Rheinblick for CHF 128.",
-    "spoken": "Booked Rheinblick for 128 francs."
+    "screen": "Booked Rheinblick for CHF 128. Ignored: Scam Hotel, forged seal.",
+    "spoken": "Booked Rheinblick for 128 francs. Ignored: Scam Hotel, forged seal."
   },
   {
     "in": "Rates [1](https://rheinblick.ch/rates) start at CHF 180.",
@@ -83,5 +83,45 @@
     "in": "There is a .50 fee , as usual.",
     "screen": "There is a .50 fee , as usual.",
     "spoken": "There is a .50 fee , as usual."
+  },
+  {
+    "in": "Rheinblick, CHF 128. Ignored: Scam Hotel. Want me to book it?",
+    "screen": "Rheinblick, CHF 128. Ignored: Scam Hotel. Want me to book it?",
+    "spoken": "Rheinblick, 128 francs. Ignored: Scam Hotel. Want me to book it?"
+  },
+  {
+    "in": "The scam hotel was ignored: its seal failed.",
+    "screen": "The scam hotel was ignored: its seal failed.",
+    "spoken": "The scam hotel was ignored: its seal failed."
+  },
+  {
+    "in": "Ignored: Scam Hotel [forged].",
+    "screen": "Ignored: Scam Hotel forged.",
+    "spoken": "Ignored: Scam Hotel forged."
+  },
+  {
+    "in": "Scam Hotel (ignored: forged seal) is out.",
+    "screen": "Scam Hotel (ignored: forged seal) is out.",
+    "spoken": "Scam Hotel (ignored: forged seal) is out."
+  },
+  {
+    "in": "Booked.\r\nIgnored: Scam",
+    "screen": "Booked.",
+    "spoken": "Booked."
+  },
+  {
+    "in": "Fine [3] [4]. Also [3][confirmed] done.",
+    "screen": "Fine. Also done.",
+    "spoken": "Fine. Also done."
+  },
+  {
+    "in": "(CHF 128 [3]) and Rheinblick [3]'s view.",
+    "screen": "(CHF 128) and Rheinblick's view.",
+    "spoken": "(128 francs) and Rheinblick's view."
+  },
+  {
+    "in": "The train takes 01:15 hrs, leaves 08:15hrs, check-in 14:00  Uhr.",
+    "screen": "The train takes 01:15 hrs, leaves 08:15hrs, check-in 14:00  Uhr.",
+    "spoken": "The train takes 01:15 hrs, leaves 8:15 am, check-in 2 pm."
   }
 ]
