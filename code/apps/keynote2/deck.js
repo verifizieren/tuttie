@@ -3,7 +3,7 @@
 // · F fullscreen · N presenter view · V fallback recording · L live/fallback · R reset.
 
 import { activeBeats, flatten } from "./beats.js";
-import { createFace, eyeStyle, OPEN, WALLET_OPEN } from "./eyes.js";
+import { createFace } from "./eyes.js";
 
 const params = new URLSearchParams(location.search);
 const beats = activeBeats(location.search);
@@ -50,7 +50,7 @@ export function sameOrigin(value, fallback) {
   }
 }
 
-// The deck lives next to the wallet (/keynote/ and /wallet/); ?wallet= may point to another
+// The deck lives next to the wallet (/keynote2/ and /wallet/); ?wallet= may point to another
 // path on the same origin, for layout checks.
 wallet.src = sameOrigin(params.get("wallet"), "/wallet/");
 
@@ -160,30 +160,19 @@ async function showFallback(on, restart = false) {
 
 // ---------- eyes ----------
 
+// One canvas with the wallet's face (eyes.js). Its layout size stays fixed (the face is drawn
+// for that size); it is only moved and scaled with a transform, like the wallet's own canvas.
 const bigFace = createFace(faceBox);
-/** Tuttie's eyes, large and centred (beat 3). */
-const FACE_HOME = { x: 440, y: 248, w: 1040, h: 520 };
+/** Tuttie's eyes, large, on the white card of beat 3 (the canvas is 2:1, as in the wallet). */
+const FACE_HOME = { x: 440, y: 280, w: 1040, h: 520 };
 const MOVE_MS = 1500;           // the eyes' flight into the phone
-const SETTLE_MS = 900;          // at most this long on the wallet's eyes, waiting for them to be fully open
 const FADE_MS = 350;            // the deck's eyes fade off the wallet's own (deck.css #face.gone)
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+Object.assign(faceBox.style, { left: "0px", top: "0px", width: `${FACE_HOME.w}px`, height: `${FACE_HOME.h}px` });
 
-/** The faint halo around the wallet's eyes (lib/face.js shadow), sized to an eye of `w` px. */
-const halo = w => `0 0 ${Math.max(2, w * 0.12).toFixed(1)}px rgba(217, 119, 87, .35)`;
-
-function placeFace(rect, pose) {
-  Object.assign(faceBox.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
-  bigFace.eyes.forEach((eye, i) => Object.assign(eye.style, eyeStyle(pose, i ? "right" : "left"),
-                                                 { boxShadow: halo(rect.w * pose.w / 100) }));
-}
-
-/** The two eyes of a pose in a rect, as stage px rects [left, right]. */
-function eyeRects(rect, pose) {
-  return ["left", "right"].map(side => {
-    const [cx, cy] = pose[side];
-    const w = rect.w * pose.w / 100, h = rect.h * pose.h / 100;
-    return { x: rect.x + rect.w * cx / 100 - w / 2, y: rect.y + rect.h * cy / 100 - h / 2, w, h };
-  });
+/** Put the face canvas on a stage rect (same 2:1 shape as FACE_HOME). */
+function placeFace(rect) {
+  faceBox.style.transform = `translate(${rect.x}px, ${rect.y}px) scale(${rect.w / FACE_HOME.w})`;
 }
 
 /** Wallet CSS px → stage px (the phone is scaled and sits at PHONE on the stage). */
@@ -192,41 +181,11 @@ function toStage(r) {
   return { x: PHONE.x + (PHONE.frame + r.x) * s, y: PHONE.y + (PHONE.frame + r.y) * s, w: r.w * s, h: r.h * s };
 }
 
-// The wallet's eyes are read off its canvas (a small copy, so reading is cheap), so the deck's
-// eyes land on what the wallet really draws: its gaze, its expression, a blink.
-const sample = Object.assign(document.createElement("canvas"), { width: 256, height: 128 });
-const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
-
-/** Where the wallet draws its eyes now, in stage px: { eyes: [left, right], open } where `open`
- *  says they are fully open (not asleep, not mid-blink, not the glad half-closed waking look).
- *  Null when the canvas is not there. If the read eyes are not fully open, the open pose of
- *  the wallet's face (eyes.js WALLET_OPEN) in the canvas is returned instead. */
-function walletEyes() {
-  const canvas = walletCanvas();
-  const r = canvas?.getBoundingClientRect();
-  if (!r || r.width < 1) return null;
-  const box = toStage({ x: r.left, y: r.top, w: r.width, h: r.height });
-  let found = null;
-  try {
-    sampleCtx.clearRect(0, 0, 256, 128);
-    sampleCtx.drawImage(canvas, 0, 0, 256, 128);
-    const data = sampleCtx.getImageData(0, 0, 256, 128).data;
-    found = [[0, 128], [128, 256]].map(([x0, x1]) => {
-      let left = 1e9, top = 1e9, right = -1, bottom = -1;
-      for (let y = 0; y < 128; y++) {
-        for (let x = x0; x < x1; x++) {
-          if (data[(y * 256 + x) * 4 + 3] < 160) continue;  // the eye itself, not its halo
-          if (x < left) left = x; if (x > right) right = x;
-          if (y < top) top = y; if (y > bottom) bottom = y;
-        }
-      }
-      if (right < 0) return null;
-      return { x: box.x + box.w * left / 256, y: box.y + box.h * top / 128,
-               w: box.w * (right - left + 1) / 256, h: box.h * (bottom - top + 1) / 128 };
-    });
-  } catch { /* a tainted or lost canvas: use the open pose */ }
-  const open = Boolean(found?.[0] && found[1] && found.every(e => e.h > box.h * 0.45));
-  return { eyes: open ? found : eyeRects(box, WALLET_OPEN), open };
+/** Where the wallet's face canvas is now, in stage px, or null (not loaded yet). Both canvases
+ *  draw the same face in the same 2:1 box, so landing canvas on canvas lands eyes on eyes. */
+function walletFaceRect() {
+  const r = walletCanvas()?.getBoundingClientRect();
+  return r && r.width >= 1 ? toStage({ x: r.left, y: r.top, w: r.width, h: r.height }) : null;
 }
 
 let faceMove = 0;               // the running frame of faceIntoPhone, cancelled by faceHome
@@ -235,7 +194,7 @@ function faceHome(shown) {
   cancelAnimationFrame(faceMove);
   moveGeneration++;
   faceBox.classList.remove("gone");
-  placeFace(FACE_HOME, OPEN);
+  placeFace(FACE_HOME);
   faceBox.classList.toggle("shown", shown);
   hideWalletEyes(false);
 }
@@ -244,36 +203,25 @@ const ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const mix = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t });
 
 /** Magic move: while the wallet opens its Tuttie card (demo step "open"), the big eyes shrink
- *  into the phone and land on the open card's awake eyes, then hand over to them, so it reads
- *  as one pair of eyes. The wallet's own eyes stay hidden until then. Each frame aims at where
- *  the wallet draws its eyes now; on arrival the deck's eyes follow them until they are fully
- *  open (at most SETTLE_MS), the wallet's eyes appear under them and the deck's fade away. */
+ *  into the phone and land on the open card's eyes, then hand over to them, so it reads as one
+ *  pair of eyes. The wallet's own eyes stay hidden until then. Each frame aims at where the
+ *  wallet's face canvas is now (it moves while the card opens); on arrival the wallet's eyes
+ *  appear under the deck's and the deck's fade away. */
 function faceIntoPhone() {
   cancelAnimationFrame(faceMove);
   const mine = ++moveGeneration;
   hideWalletEyes(true);
-  const from = eyeRects(FACE_HOME, OPEN);
-  // The face box becomes the whole stage, so each eye is placed in stage px (as % of 1920x1080).
-  Object.assign(faceBox.style, { left: "0px", top: "0px", width: "1920px", height: "1080px" });
-  const put = rects => bigFace.eyes.forEach((eye, i) => {
-    const e = rects[i];
-    Object.assign(eye.style, {
-      left: `${e.x / 19.2}%`, top: `${e.y / 10.8}%`, width: `${e.w / 19.2}%`, height: `${e.h / 10.8}%`,
-      borderRadius: OPEN.radius, boxShadow: halo(e.w),
-    });
-  });
-  put(from);
+  bigFace.lookAt(0, 0, 400);    // look ahead while flying, as the wallet's face rests
+  const from = { ...FACE_HOME };
   const start = performance.now();
   const moveMs = reducedMotion.matches ? 1 : MOVE_MS;
-  let landed = 0, fading = 0;
+  let fading = 0;
   const frame = now => {
     if (mine !== moveGeneration) return;
-    const target = walletEyes();
+    const target = walletFaceRect();
     const t = Math.min(1, (now - start) / moveMs);
-    if (target) put(from.map((e, i) => mix(e, target.eyes[i], ease(t))));
-    if (t >= 1 && !landed) landed = now;
-    // Arrived: wait (briefly) for the wallet's eyes to be fully open, then crossfade.
-    if (landed && !fading && (target?.open || now - landed > SETTLE_MS || !target)) {
+    if (target) placeFace(mix(from, target, ease(t)));
+    if (t >= 1 && !fading) {
       fading = now;
       hideWalletEyes(false);
       faceBox.classList.add("gone");
@@ -464,7 +412,7 @@ channel?.addEventListener("message", ({ data }) => {
   if (data?.type === "key") key({ key: data.key });
 });
 
-// Start: black, eyes waiting at home. ?step=n opens a given step (for rehearsal and screenshots).
+// Start: the empty first beat, eyes waiting at home. ?step=n opens a given step (for rehearsal and screenshots).
 faceHome(false);
 claim();
 go(Number(params.get("step")) || 0);

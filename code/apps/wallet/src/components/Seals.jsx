@@ -1,5 +1,5 @@
 // APS seals the way the wallet shows them: who vouches for a business, with the issuer's mark.
-// Gold = the Swiss commercial register (flag, name and the business's UID), blue = Adobe (logo
+// Gold tier (drawn in purple) = the Swiss commercial register (flag, name and UID), blue = Adobe (logo
 // and name). Only seals the assistant verified are shown as seals; a forged one is shown as
 // forged. The UID is signed into every seal, so it is shown only inside a valid gold seal. A
 // shield marks every verified signature, so the seals read as marks of authenticity.
