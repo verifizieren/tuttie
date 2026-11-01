@@ -53,11 +53,6 @@ export function sameOrigin(value, fallback) {
 // The deck lives next to the wallet (/presentation/ and /wallet/); ?wallet= may point to another
 // path on the same origin, for layout checks.
 wallet.src = sameOrigin(params.get("wallet"), "/wallet/");
-const owner = document.getElementById("owner");   // gone when the owner beat is switched off
-if (owner) {
-  owner.src = sameOrigin(params.get("ownerview"), "/owner/");
-  owner.addEventListener("load", () => { forwardKeys(owner); keepFocus(); });
-}
 
 /** Give the wallet the insets of a home-screen app on an iPhone, so the status bar is clear. */
 function walletInsets() {

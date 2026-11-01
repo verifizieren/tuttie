@@ -275,7 +275,7 @@ body.idle { cursor: none; }
   background: #000;
   box-shadow: inset 0 0 0 2px #2b2b2e;
 }
-#owner {
+#owner-shot {
   display: block;
   width: 1280px; height: 800px;
   border: 0;
