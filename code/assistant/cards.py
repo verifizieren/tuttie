@@ -35,9 +35,12 @@ def needs_text(requirements: list[str]) -> str:
 
 def number(value) -> float | int | None:
     """value if it is a finite number (not a bool), else None: signed hotel data may hold anything."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return value
+    try:
+        return value if math.isfinite(value) else None
+    except OverflowError:  # an int too big for a float (e.g. 400 digits)
+        return None
 
 
 def features(facts: dict) -> list[dict]:
