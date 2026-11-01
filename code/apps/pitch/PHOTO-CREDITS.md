@@ -18,3 +18,7 @@ Trademarks of their owners, shown on the illustrated bank cards (drawn white on 
 
 - `img/ubs-logo.svg`: UBS logo, https://en.wikipedia.org/wiki/File:UBS_Logo.svg
 - `img/zkb-logo.svg`: Zürcher Kantonalbank logo, https://commons.wikimedia.org/wiki/File:Zürcher_Kantonalbank_logo.svg
+
+## Lock screen
+
+`img/lockscreen.jpg`: a team member's own iPhone lock screen (assets/Homescree.jpeg), padlock and status icons removed.

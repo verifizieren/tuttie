@@ -612,6 +612,11 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
 #float.land { animation: land .8s var(--ease) .85s; }
 @keyframes land { 0%, 100% { transform: none; } 40% { transform: scale(1.012); } 70% { transform: scale(.996); } }
 @media (prefers-reduced-motion: reduce) { #float.land, .ripple.go { animation: none !important; } }
+/* Lock screen: a real iOS lock screen photo (assets/Homescree.jpeg, padlock and status icons removed). */
+.ls .wp { background: #12121c url(img/lockscreen.jpg) center / cover no-repeat; }
+.ls .date, .ls .time, .ls .widgets, .ls .bt { display: none; }
+#stage:not(.has-wallet) .sbar { color: #fff; }
+#stage:not(.has-wallet) .sbar b em { border-color: rgba(255,255,255,.6); }
 </style>
 </head>
 <body>
