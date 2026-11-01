@@ -77,7 +77,7 @@ HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 def francs(match: re.Match) -> str:
     """An amount as it is said: "CHF 128" is "128 francs", "CHF 1" is "1 franc"."""
-    amount = re.sub(r"['’]", "", match.group(1) or match.group(2))  # Swiss thousands: "1'280" is said 1280
+    amount = re.sub(r"['’ \u00a0\u202f]", "", match.group(1) or match.group(2))  # thousands: "1'280" is said 1280
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
@@ -91,14 +91,23 @@ LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
 NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
 CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
 LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
-NODE_ID_TOKEN = r"[a-z]{2}(?:\.[a-z0-9-]{1,40}){2,}"  # ch.basel.hotel-rheinblick, not booking.com
-NODE_ID = re.compile(NODE_ID_TOKEN)
-# Approval, mandate and offer ids (assistant/approvals.py, aps/mandate.py, node/agent.py).
-REF_TOKEN = r"(?:ap|md)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-[0-9a-f]{6}"
-REF = re.compile(REF_TOKEN)
+# Node ids have one shape (data/nodes/*.json): ch.<area>.<name>, e.g. ch.basel.hotel-rheinblick or
+# ch.legal.advisor; hosts and dotted words (de.sbb.ch, en.wikipedia.org, ok.so.basically) stay.
+NODE_ID_TOKEN = r"ch\.[a-z]{2,20}\.[a-z0-9]{1,30}(?:-[a-z0-9]{1,30}){0,6}"
+NODE_ID = re.compile(NODE_ID_TOKEN, re.IGNORECASE)
+# Approval, mandate, request and offer ids (assistant/approvals.py, aps/mandate.py,
+# marketplace/client.py, node/agent.py), in any case; an offer's hex tail has a digit ("of-a-decade" stays).
+REF_TOKEN = r"(?:ap|md|rq)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-(?=[a-f]*\d)[0-9a-f]{6}"
+REF = re.compile(REF_TOKEN, re.IGNORECASE)
 INTERNAL = rf"(?:{NODE_ID_TOKEN}|{REF_TOKEN})"
-PAREN_IDS = re.compile(rf"\(\s*{INTERNAL}(?:\s*[,;]\s*{INTERNAL})*\s*\)")  # "(ch.basel.x)", "(ap-…, of-…)"
-BARE_INTERNAL = re.compile(rf"[ \t]?(?<![\w.@/-]){INTERNAL}(?![\w-]|\.[a-z0-9])")  # spoken only: never read aloud
+IDS = rf"{INTERNAL}(?:\s*[,;]\s*{INTERNAL})*"
+PAREN_IDS = re.compile(rf"\(\s*{IDS}\s*\)", re.IGNORECASE)  # "(ch.basel.x)", "(ap-…, of-…)": all of it goes
+LEAD_IDS = re.compile(rf"(?<=\()\s*{IDS}\s*[,;]\s*", re.IGNORECASE)  # "(ch.basel.x, CHF 128)": "(CHF 128)"
+TRAIL_IDS = re.compile(rf"(?<=\S)\s*[,;]\s*{IDS}\s*(?=\))", re.IGNORECASE)  # "(CHF 128, ch.basel.x)": "(CHF 128)"
+# (TRAIL_IDS starts after a non-space, so a long run of spaces stays linear.)
+# Spoken only: bare ids and web addresses are never read aloud (the screen keeps them).
+BARE_INTERNAL = re.compile(rf"[ \t]?(?<![\w.@/-]){INTERNAL}(?![\w-]|\.[a-z0-9])", re.IGNORECASE)
+BARE_URL = re.compile(r"[ \t]?(?:https?://|www\.)[^\s()\[\]<>]*[^\s()\[\]<>.,;:!?'\"]", re.IGNORECASE)
 ID_TOKEN = r"\b(?:BK|RC)-[0-9A-F]{6}\b"  # booking and receipt ids (node/server.py): one pattern for all uses
 ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?" + ID_TOKEN, re.IGNORECASE)
 BARE_ID = re.compile(r"[ \t]?" + ID_TOKEN, re.IGNORECASE)
@@ -130,7 +139,7 @@ def note(match: re.Match) -> str:
     """A bracketed note: dropped if it says nothing, else its words without the brackets."""
     inner = re.sub(r"^[\s,;]+|[\s,;]+$", "", ID.sub("", match.group(1)))
     if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
-            or REF.fullmatch(inner)            or inner.lower().startswith("ignored:")):
+            or REF.fullmatch(inner) or inner.lower().startswith("ignored:")):
         return GONE
     glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
     return (" " if glued else "") + inner
@@ -141,6 +150,7 @@ def without_notes(raw: str) -> str:
     the spaces tidied only where something was taken out. Same rules as the wallet's
     withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
     text = PAREN_IDS.sub(GONE, LINK.sub(link, re.sub(r"\r\n?", "\n", raw)))
+    text = TRAIL_IDS.sub("", LEAD_IDS.sub("", text))
     for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
         text = NOTE.sub(note, text)
     text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
@@ -180,10 +190,11 @@ def spoken(answer: str) -> str:
     (6 pm), no bracketed notes, no markdown, no emoji."""
     text = without_notes(answer)
     text = BARE_ID.sub("", text)  # ids are never spoken: the wallet shows them
-    text = BARE_INTERNAL.sub("", text)  # nor node, approval, offer or mandate ids
+    text = BARE_INTERNAL.sub("", text)  # nor node, approval, offer, request or mandate ids
+    text = BARE_URL.sub("", text)  # nor web addresses
     text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
-    amount = r"(\d{1,3}(?:['’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # "1'280" (Swiss thousands) too
+    amount = r"(\d{1,3}(?:['’ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # "1'280", "1 280" too
     text = re.sub(rf"\bCHF\s?{amount}|{amount}\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
@@ -331,6 +342,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
     When the timeline stream ends (the assistant restarted, a dropped connection) it connects
     again after RECONNECT_S[0] s, doubling up to RECONNECT_S[1] s while it keeps failing; it stops
     for good when the room is unknown (404) or its conversation is no longer active (409).
+    Pending approvals are forgotten on every (re)connect and when it stops.
     """
     said: set[str] = set()
     pending: set[str] = getattr(agent, "pending_approvals", set())  # shared with the agent's turns
@@ -378,10 +390,14 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
 
     delay = RECONNECT_S[0]
     while True:
+        # A new stream replays no history: a decision made while it was down would never arrive,
+        # so nothing counts as pending from before (at worst a spoken line queues, never mute).
+        pending.clear()
         try:
             async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
                 if stream.status_code in (404, 409):
                     print(f"voice: /voice/events answered {stream.status_code}, room {room.name} stops", flush=True)
+                    pending.clear()  # no timeline any more: never block what the user says
                     return
                 if not stream.is_success:
                     print(f"voice: /voice/events answered {stream.status_code}", flush=True)

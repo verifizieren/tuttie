@@ -121,13 +121,18 @@ const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
 const NOTE = /\[([^[\]\n]{0,60})\]/g;
 const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
 const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
-const NODE_ID_TOKEN = "[a-z]{2}(?:\\.[a-z0-9-]{1,40}){2,}";  // ch.basel.hotel-rheinblick, not booking.com
-const NODE_ID = new RegExp(`^${NODE_ID_TOKEN}$`);
-// Approval, mandate and offer ids (assistant/approvals.py, aps/mandate.py, node/agent.py).
-const REF_TOKEN = "(?:ap|md)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-[0-9a-f]{6}";
-const REF = new RegExp(`^(?:${REF_TOKEN})$`);
+// Node ids have one shape (data/nodes/*.json): ch.<area>.<name>; hosts like de.sbb.ch stay.
+const NODE_ID_TOKEN = "ch\\.[a-z]{2,20}\\.[a-z0-9]{1,30}(?:-[a-z0-9]{1,30}){0,6}";
+const NODE_ID = new RegExp(`^${NODE_ID_TOKEN}$`, "i");
+// Approval, mandate, request and offer ids (assistant/approvals.py, aps/mandate.py,
+// marketplace/client.py, node/agent.py), in any case; an offer's hex tail has a digit.
+const REF_TOKEN = "(?:ap|md|rq)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-(?=[a-f]*\\d)[0-9a-f]{6}";
+const REF = new RegExp(`^(?:${REF_TOKEN})$`, "i");
 const INTERNAL = `(?:${NODE_ID_TOKEN}|${REF_TOKEN})`;
-const PAREN_IDS = new RegExp(`\\(\\s*${INTERNAL}(?:\\s*[,;]\\s*${INTERNAL})*\\s*\\)`, "g");  // "(ch.basel.x)"
+const IDS = `${INTERNAL}(?:\\s*[,;]\\s*${INTERNAL})*`;
+const PAREN_IDS = new RegExp(`\\(\\s*${IDS}\\s*\\)`, "gi");               // "(ch.basel.x)": all of it goes
+const LEAD_IDS = new RegExp(`(?<=\\()\\s*${IDS}\\s*[,;]\\s*`, "gi");        // "(ch.basel.x, CHF 128)": "(CHF 128)"
+const TRAIL_IDS = new RegExp(`(?<=\\S)\\s*[,;]\\s*${IDS}\\s*(?=\\))`, "gi"); // "(CHF 128, ch.basel.x)": "(CHF 128)"
 const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
 const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
 const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
@@ -152,7 +157,8 @@ function note(all, inner, offset, text) {
 
 export function withoutNotes(value) {
   const raw = String(value ?? "");
-  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link).replace(PAREN_IDS, GONE);
+  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link).replace(PAREN_IDS, GONE)
+    .replace(LEAD_IDS, "").replace(TRAIL_IDS, "");
   for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
   text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
     .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")

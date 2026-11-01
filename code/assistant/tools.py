@@ -335,6 +335,27 @@ def summarize(tool: str, payload: dict) -> str:
     return tool
 
 
+
+def shown_cards(history: list[dict]) -> dict | None:
+    """The marketplace event that put the hotel cards on screen, if they are still the latest
+    (a newer posted request hides them), else None."""
+    latest = next((e for e in reversed(history)
+                   if e["kind"] == "marketplace" and (e.get("detail") or {}).get("phase") in {"posted", "cards"}), None)
+    return latest if latest and latest["detail"].get("phase") == "cards" else None
+
+
+def approval_open(history: list[dict]) -> bool:
+    """A payment approval waits on the phone (the latest approval event is pending)."""
+    latest = next((e for e in reversed(history) if e["kind"] == "approval"), None)
+    return bool(latest and latest["status"] == "pending")
+
+
+def swipeable(history: list[dict]) -> bool:
+    """A card command would move a card now (swipe_card sends it, no LLM): cards on screen and
+    no approval open."""
+    return shown_cards(history) is not None and not approval_open(history)
+
+
 class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
@@ -393,12 +414,10 @@ class Toolbox:
     async def swipe_card(self, verdict: str) -> dict:
         if verdict not in {"like", "pass"}:
             return {"error": "verdict must be like or pass"}
-        cards = next((e for e in reversed(self.bus.history)
-                      if e["kind"] == "marketplace" and e["detail"].get("phase") in {"posted", "cards"}), None)
-        pending_approval = next((e for e in reversed(self.bus.history) if e["kind"] == "approval"), None)
-        if pending_approval and pending_approval["status"] == "pending":
+        cards = shown_cards(self.bus.history)
+        if approval_open(self.bus.history):
             return {"error": "A payment approval is open. Use its approve/decline controls; do not swipe it."}
-        if not cards or cards["detail"].get("phase") != "cards":
+        if cards is None:
             return {"error": "There are no hotel cards to swipe. Ask for hotels first."}
         self.bus.emit("wallet", "verified", f"{verdict.title()} the visible hotel",
                       detail={"action": "swipe", "verdict": verdict, "cards_step": cards["step"]})
