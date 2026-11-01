@@ -2,6 +2,7 @@
 // problem), and while typing the text field. Listening and thinking show in Tuttie's eyes,
 // not here; typing is chosen with the keyboard in the dock.
 import { useEffect, useRef, useState } from "react";
+import { sendGuard } from "../lib/sendGuard.js";
 
 /**
  * @param mode    "closed" | "voice" | "typing"
@@ -11,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 export default function AgentControls({ mode, status, onSend }) {
   const input = useRef(null);
   const [text, setText] = useState("");
+  const guard = useRef(sendGuard());
 
   // The keyboard opens only when the user chose to type, never on its own.
   useEffect(() => {
@@ -23,9 +25,13 @@ export default function AgentControls({ mode, status, onSend }) {
   async function submit(e) {
     e.preventDefault();
     const sent = text.trim();
-    if (!sent) return;
+    if (!sent || !guard.current.begin(sent)) return;  // a double tap sends once
     setText("");
-    if (await onSend(sent) === false) setText(current => current || sent);
+    try {
+      if (await onSend(sent) === false) setText(current => current || sent);
+    } finally {
+      guard.current.end(sent);
+    }
   }
 
   return (
