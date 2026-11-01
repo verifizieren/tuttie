@@ -359,6 +359,11 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        self.new_turn()
+
+    def new_turn(self) -> None:
+        """A new user message: the next negotiate call may bargain again (e.g. "try for less")."""
+        self.bargained: dict | None = None  # this turn's negotiation: request_id, budget, outcomes
 
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a tool by name with the LLM's arguments; arguments that do not fit the tool are an error for the LLM."""
@@ -422,6 +427,7 @@ class Toolbox:
         result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
+        self.bargained = None
         self.agreements.clear()
         self.availability.clear()
         self.commitments.clear()
@@ -466,6 +472,17 @@ class Toolbox:
             chosen = self.market.last_shortlist
         if not chosen:
             return {"error": "post a request first: there is no shortlist to negotiate"}
+        request_id = self.market.last_request["request_id"]
+        names = {o["node_id"]: o["name"] for o in chosen}
+        done = self.bargained
+        if (done and done["request_id"] == request_id and budget_chf in (None, done["budget"])
+                and names.keys() <= done["outcomes"].keys()):
+            # The model often calls negotiate right after post_request, which already bargained:
+            # a second round would only replay the same haggling. A new user message resets this.
+            repeat = self.negotiation_result([done["outcomes"][n] for n in names], names)
+            repeat["note"] = ("Already negotiated for this request in this turn (post_request did it): "
+                              "these are its signed agreements. Do not negotiate again; use them.")
+            return repeat
         needs = self.market.last_request["constraints"]
         context = Context().add("date", needs["date"], "public").add("requirements", needs["requirements"], "negotiation")
         if budget_chf is not None:
@@ -474,11 +491,22 @@ class Toolbox:
         outcomes = await negotiator.negotiate_all(chosen, context)
         winner = best(outcomes)
         self.agreements.update({o.node_id: o.agreement for o in outcomes if o.status == "agreed"})
-        names = {o["node_id"]: o["name"] for o in chosen}
+        same = done and done["request_id"] == request_id and done["budget"] == budget_chf
+        earlier = done["outcomes"] if same else {}
+        self.bargained = {"request_id": request_id, "budget": budget_chf,
+                          "outcomes": {**earlier, **{o.node_id: o for o in outcomes}}}
         summary = (f"Best agreement: {names[winner.node_id]} at CHF {winner.price_chf:g} "
                    f"(offered CHF {winner.offer_price_chf:g})") if winner else "No hotel agreed within the budget"
         self.bus.emit("marketplace", "verified" if winner else "declined", summary,
                       detail={"phase": "agreement", "agreement": winner.agreement if winner else None})
+        return self.negotiation_result(outcomes, names)
+
+    @staticmethod
+    def negotiation_result(outcomes: list, names: dict[str, str]) -> dict:
+        """What negotiate returns to the LLM: each hotel's outcome and the cheapest agreement."""
+        from negotiation.tuttie import best
+
+        winner = best(outcomes)
         return {
             "outcomes": [{"node_id": o.node_id, "hotel": names[o.node_id], "status": o.status,
                           "agreement": o.agreement["payload"] if o.agreement else None, "offered_chf": o.offer_price_chf,

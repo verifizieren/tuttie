@@ -169,6 +169,8 @@ class Assistant:
     async def _turn(self, text: str, first_tool: str | None) -> str:
         """One user message: the tool loop (called with the lock held)."""
         self.messages.append({"role": "user", "content": text})
+        if new_turn := getattr(self.toolbox, "new_turn", None):
+            new_turn()  # a new message may ask to bargain again
         # Exact card commands do not need an LLM guess. Ambiguous phrases still use it.
         if first_tool is None and (verdict := card_choice(text)):
             result = await self.toolbox.swipe_card(verdict)
