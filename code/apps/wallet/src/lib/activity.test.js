@@ -234,3 +234,8 @@ test('normal hotel cards keep every field', () => {
                                                     detail: { phase: 'cards', cards: [card] } });
   assert.deepEqual(s.cards[0], card);
 });
+
+test('a price in brackets is kept, a citation goes', () => {
+  assert.equal(cleanAnswer('Booked for CHF [128] tonight.'), 'Booked for CHF 128 tonight.');
+  assert.equal(cleanAnswer('Total [1,280] for ten nights [3, 4].'), 'Total 1,280 for ten nights.');
+});

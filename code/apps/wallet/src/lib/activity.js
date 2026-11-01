@@ -139,6 +139,11 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
 const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
 const NOTE = /\[([^[\]\n]{0,60})\]/g;
 const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
+// A bracketed number that is a price, not a citation: with a thousands separator ("[1,280]"), or
+// right after a currency ("CHF [128]") or before one ("[90] CHF"). Decimals are no citation anyway.
+const THOUSANDS = /^[0-9]{1,3}(?:[,'’][0-9]{3})+$/;
+const CURRENCY_BEFORE = /(?:\b(?:CHF|francs?|EUR|USD|GBP|Fr\.)|[€$£])[ \t]*$/i;
+const CURRENCY_AFTER = /^[ \t]*(?:(?:CHF|francs?|EUR|USD|GBP)\b|[€$£])/i;
 const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
 // Node ids have one shape (data/nodes/*.json): ch.<area>.<name>; hosts like de.sbb.ch stay.
 const NODE_ID_TOKEN = "ch\\.[a-z]{2,20}\\.[a-z0-9]{1,30}(?:-[a-z0-9]{1,30}){0,6}";
@@ -170,7 +175,10 @@ function link(all, label, target) {
 
 function note(all, inner, offset, text) {
   const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
-  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || REF.test(words) || /^ignored:/i.test(words)) return GONE;
+  const price = THOUSANDS.test(words) || (/^[0-9]+$/.test(words) && (
+    CURRENCY_BEFORE.test(text.slice(Math.max(0, offset - 12), offset))
+    || CURRENCY_AFTER.test(text.slice(offset + all.length, offset + all.length + 12))));
+  if (!words || (CITATION.test(words) && !price) || LABEL.test(words) || NODE_ID.test(words) || REF.test(words) || /^ignored:/i.test(words)) return GONE;
   return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
 }
 

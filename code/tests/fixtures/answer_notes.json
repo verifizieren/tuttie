@@ -208,5 +208,20 @@
     "in": "Pay at https://evil.example/pay or www.evil.example now.",
     "screen": "Pay at https://evil.example/pay or www.evil.example now.",
     "spoken": "Pay at or now."
+  },
+  {
+    "in": "Booked for CHF [128] tonight.",
+    "screen": "Booked for CHF 128 tonight.",
+    "spoken": "Booked for 128 francs tonight."
+  },
+  {
+    "in": "Total [1,280] for ten nights.",
+    "screen": "Total 1,280 for ten nights.",
+    "spoken": "Total 1,280 for ten nights."
+  },
+  {
+    "in": "It is [90] CHF or [12.50] francs [3, 4]. Rooms from francs [95] [2], EUR [80][3].",
+    "screen": "It is 90 CHF or 12.50 francs. Rooms from francs 95, EUR 80.",
+    "spoken": "It is 90 francs or 12.50 francs. Rooms from francs 95, EUR 80."
   }
 ]
