@@ -14,7 +14,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import SESSION_COOKIE, app  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for, voice_on, without_notes  # noqa: E402
+from voice.agent import UPDATES, filler_kind, meaningful, pick_ack, spoken, update_for, voice_on, without_notes  # noqa: E402
 
 
 def configure(monkeypatch):
@@ -50,6 +50,8 @@ class Participant:
 
 
 class Room:
+    name = "tuttie-test"
+
     def __init__(self, *attrs):
         self.remote_participants = {str(i): Participant(a) for i, a in enumerate(attrs)}
 
@@ -215,3 +217,47 @@ def test_answer_notes_shared_with_the_wallet():
         # The same "screen" column the wallet's cleanAnswer is tested against (activity.test.js):
         # the voice and the screen clean notes with the same rules.
         assert without_notes(case["in"]).strip() == case["screen"], case["in"]
+
+
+def test_a_swiped_pick_is_acknowledged_but_speech_and_questions_are_not():
+    turn = lambda said, source: {"kind": "turn", "detail": {"said": said, "source": source}}
+    assert pick_ack(turn("Book Gästehaus am Rhein", "text")) == "Nice pick. Let me book Gästehaus am Rhein."
+    assert pick_ack(turn("Book Gästehaus am Rhein", "voice")) is None  # said aloud: Tuttie's own filler
+    assert pick_ack(turn("What about breakfast?", "text")) is None
+    assert pick_ack({"kind": "answer", "summary": "Book it"}) is None
+
+
+def test_after_the_cards_the_voice_hands_the_choice_to_the_user():
+    from contextlib import asynccontextmanager
+    from voice.agent import HANDOFF, follow
+
+    events = [{"kind": "marketplace", "detail": {"phase": "cards"}},
+              {"kind": "answer", "summary": "Two hotels; I'd pick Gästehaus am Rhein."},
+              {"kind": "answer", "summary": "Sure."}]
+
+    class Stream:
+        async def aiter_lines(self):
+            for event in events:
+                yield "data: " + json.dumps(event)
+
+    class Http:
+        @asynccontextmanager
+        async def stream(self, *args, **kwargs):
+            yield Stream()
+
+    class Session:
+        def __init__(self):
+            self.lines = []
+
+        def say(self, text):
+            self.lines.append(text)
+
+    class Agent:
+        asked = None
+
+        def filler(self):
+            return None
+
+    session = Session()
+    asyncio.run(follow(session, Agent(), Http(), Room("on")))
+    assert session.lines == ["Two hotels; I'd pick Gästehaus am Rhein.", HANDOFF, "Sure."]  # once, after the cards

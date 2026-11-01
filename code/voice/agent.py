@@ -60,6 +60,8 @@ QUESTION_WORDS = ("what", "how", "why", "when", "where", "who", "which", "can", 
 ENDPOINTING = {"min_delay": .3, "max_delay": 2.0}
 # The only update in between: the user has to act. The answers themselves come from Tuttie.
 UPDATES = {"approval": "Please confirm with Face ID."}
+# After Tuttie recommends a hotel, the choice goes to the user (said once, after the answer).
+HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 
 def francs(match: re.Match) -> str:
@@ -169,6 +171,19 @@ def filler_kind(text: str) -> str:
     return "question" if lowered.endswith("?") or first in QUESTION_WORDS else "other"
 
 
+PICKED = re.compile(r"^Book (.+?)\.?$")  # what the wallet shows when the user swiped a hotel to book
+
+
+def pick_ack(event: dict) -> str | None:
+    """A short line when the user picked a hotel on the cards (a turn the wallet started, not
+    speech): "Nice pick. Let me book Gästehaus am Rhein." Else None."""
+    detail = event.get("detail") or {}
+    if event.get("kind") != "turn" or detail.get("source") == "voice":
+        return None
+    match = PICKED.match((detail.get("said") or "").strip())
+    return f"Nice pick. Let me book {match.group(1)}." if match else None
+
+
 def update_for(event: dict, said: set[str]) -> str | None:
     """The short line to speak for a timeline event, once per turn, or None."""
     detail = event.get("detail") or {}
@@ -218,6 +233,7 @@ def voice_on(room: rtc.Room) -> bool:
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
     """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
     said: set[str] = set()
+    cards = False  # this turn showed the hotel cards: the answer hands the choice to the user
 
     def say(text: str) -> None:
         if voice_on(room):
@@ -230,10 +246,19 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
             if not line.startswith("data:"):
                 continue
             event = json.loads(line[5:])
+            if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
+                cards = True
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
                 agent.asked = None  # answered without (or after) a tool: no filler any more
                 say(spoken(event["summary"]))
+                if cards:
+                    say(HANDOFF)
+                    cards = False
+                continue
+            if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
+                agent.asked = None
+                say(ack)
                 continue
             # The first tool for the request gets a filler; opening the turn, thinking and closing the
             # card do not (a goodbye follows).
