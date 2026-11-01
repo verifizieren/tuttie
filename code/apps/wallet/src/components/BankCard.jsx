@@ -1,6 +1,6 @@
 // Swiss bank cards in the wallet stack. They stay intentionally free of personal details.
 
-/** Contact lines of an EMV chip, drawn over the gold chip. */
+/** Contact lines of an EMV chip, drawn over the metal chip. */
 function Chip() {
   return (
     <span className="chip">
