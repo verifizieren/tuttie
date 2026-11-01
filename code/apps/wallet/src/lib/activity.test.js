@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, cleanAnswer, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
+import { applyEvent, choosing, cleanAnswer, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -135,4 +135,12 @@ test('runs of "[" are fast', () => {
 
 test('the indentation of untouched lines is kept', () => {
   assert.equal(cleanAnswer('Rooms:\n  - double CHF 180\n  - single CHF 120'), 'Rooms:\n  - double CHF 180\n  - single CHF 120');
+});
+
+test('the cards go away once a hotel is liked or a booking is under way', () => {
+  const cards = { ...EMPTY, cards: [{ node_id: 'h' }] };
+  assert.equal(choosing(cards), true);
+  assert.equal(choosing({ ...cards, picked: ['h'] }), false);
+  assert.equal(choosing({ ...cards, approval: { id: 'a' } }), false);  // booked by voice, not swiped
+  assert.equal(choosing({ ...cards, booking: { id: 'BK-1' } }), false);
 });

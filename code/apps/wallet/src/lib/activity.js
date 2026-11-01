@@ -127,6 +127,11 @@ export function withoutNotes(value) {
 /** Tuttie's answer without bracketed notes or lines starting with "Ignored:" (see above). */
 export const cleanAnswer = text => withoutNotes(text).trim();
 
+/** The hotel cards are swiped only while the user still chooses: not once a hotel was liked, and
+ *  not once a booking is under way (the user named a hotel instead of swiping): then the
+ *  approval and the booked block take their place. */
+export const choosing = state => Boolean(state.cards && !state.picked && !state.approval && !state.booking);
+
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
 
