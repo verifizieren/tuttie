@@ -332,3 +332,20 @@ def test_tuttie_sends_the_deployment_key_with_its_postings(monkeypatch):
             await post_request(http, "http://market", {"node_id": "x"})
     asyncio.run(run())
     assert seen == ["s3cret"]
+
+
+def test_an_approval_from_before_the_node_started_does_not_book_again_after_a_restart(tmp_path):
+    """Used approvals and nonces live in memory: after a restart, an approval decided (and used)
+    before it must not book again, even inside the 900 s window."""
+    before_restart = approval(datetime.now(timezone.utc) - timedelta(seconds=120))
+    assert book(before_restart, tmp_path)["status"] == "refused"
+
+
+def test_a_call_signed_before_the_node_started_is_refused(tmp_path):
+    from aps.gate import ActionGate
+    gate = ActionGate("ch.x", "k", "u", {}, lambda node: None)
+    started = gate.started_at
+    assert gate.made_before_start(stamp(started - timedelta(seconds=60)), started + timedelta(seconds=5))
+    assert not gate.made_before_start(stamp(started), started + timedelta(seconds=5))
+    # a test (or a replayed check) running with a clock before the start never trips it
+    assert not gate.made_before_start(stamp(started - timedelta(hours=2)), started - timedelta(hours=1))
