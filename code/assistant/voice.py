@@ -29,6 +29,7 @@ from fastapi.responses import Response, StreamingResponse
 from livekit import api
 from pydantic import BaseModel
 
+from assistant.card_commands import card_choice
 from assistant.inputs import UserText
 from assistant.throttle import TURNS_PER_SESSION_PER_MIN
 
@@ -39,7 +40,13 @@ TOKEN_TTL_S = 2 * 60 * 60
 ROOMS_PER_CONVERSATION_PER_MIN = 10  # a flaky phone retries after 2, 4, 8 ... s; a loop gets 429
 ROOMS_PER_CLIENT_PER_MIN = 300  # per client address a minute: a venue's Wi-Fi shares one, and every page load asks
 MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; unused ones are forgotten
-VOICE_ROOM_GRACE_S = 120  # a new room is kept this long before it is used (the wallet joins within seconds)
+VOICE_ROOM_GRACE_S = 120
+# Spoken turns share the browser's turn count with typed ones (key ("session", id)), but may
+# fill it further: fragments from the room count as turns too. A flood still stops at this.
+VOICE_TURNS_PER_SESSION_PER_MIN = 2 * TURNS_PER_SESSION_PER_MIN
+# Exact card commands ("next", "like") move a card without the LLM, so they do not count as
+# turns; their own cap stops a flood (without cards on screen they fall through to the LLM).
+CARD_COMMANDS_PER_SESSION_PER_MIN = 30  # a new room is kept this long before it is used (the wallet joins within seconds)
 
 router = APIRouter()
 
@@ -212,13 +219,18 @@ class Said(BaseModel):
 async def voice_say(said: Said, request: Request) -> dict:
     """What the user said, as a new turn in the room's conversation (like typing it).
 
-    Spoken turns count towards the browser's TURNS_PER_SESSION_PER_MIN, like typed ones (429).
+    Spoken turns count towards the browser's turn count like typed ones, up to
+    VOICE_TURNS_PER_SESSION_PER_MIN (429); exact card commands count only towards
+    CARD_COMMANDS_PER_SESSION_PER_MIN.
     """
     conv = room_conversation(request, said.room)
     session_id = request.app.state.voice_rooms[said.room][0]
     request.app.state.voice_rooms.touch(said.room, time.monotonic())
-    wait = request.app.state.turn_throttle.wait({("session", session_id): TURNS_PER_SESSION_PER_MIN},
-                                                time.monotonic())
+    if card_choice(said.text):
+        limits = {("card", session_id): CARD_COMMANDS_PER_SESSION_PER_MIN}
+    else:
+        limits = {("session", session_id): VOICE_TURNS_PER_SESSION_PER_MIN}
+    wait = request.app.state.turn_throttle.wait(limits, time.monotonic())
     if wait:
         raise HTTPException(status_code=429, detail="too many turns", headers={"Retry-After": str(wait)})
     turn_id = conv.start(said.text, source="voice")
