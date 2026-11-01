@@ -801,6 +801,8 @@ class Toolbox:
                     answer.setdefault("charges_paid", []).append(paid)
                 else:
                     answer.setdefault("open_charges", []).append(charge)
+            # The user's message also named hotels for a decline; after a booking they are moot.
+            answer["note"] = "booked: say it is booked and the total; do not offer other hotels"
         return answer
 
     async def mandate_offer(self, node_id: str) -> dict | None:
