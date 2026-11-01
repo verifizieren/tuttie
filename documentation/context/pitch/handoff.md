@@ -49,7 +49,7 @@ Where the pitch work stands, so anyone (teammate or AI agent) can pick it up. La
 | 1 | Answer the open decisions above | pitch team | 15 min together |
 | 2 | Wallet human layer: request, offers with seal colours, the refused forged business, winner, signed approval | dev member 1 | status.md step 3 (in progress) |
 | 3 | Seal verdicts computed by the services and shown in the wallet, never hard-coded; without them, drop "The signatures are real" | dev | storyline.md, missing work |
-| 4 | Presentation page `code/apps/presentation/`: camera, tab field, face hand-off, QR | pitch + dev | storyline.md zoom system |
+| 4 | Presentation page `code/apps/qr/`: camera, tab field, face hand-off, QR | pitch + dev | storyline.md zoom system |
 | 5 | Juror build for the QR (no shared `/reset`, no user key) | dev | — |
 | 6 | Fallback recordings per beat after code freeze, offline build on the stage laptop | dev + Thomas | step 2-4 done |
 | 7 | Repo hygiene the jury sees: `license.txt`, team profiles in the readme, readme tested on a clean machine | everyone | — |

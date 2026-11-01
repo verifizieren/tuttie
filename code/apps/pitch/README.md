@@ -2,7 +2,7 @@
 
 Eight scenes, 1:54 of narration. An optional rehearsed live handoff adds up to 30 seconds; the pitch stays below the three-minute limit.
 
-Lives in `code/apps/keynote1/`. Tuttie serves it at `/keynote1/` (static, from disk, no restart needed). It also opens directly from `index.html` in Chrome or Safari (file://), or locally with `python3 -m http.server 4048` from `code/apps` and `/keynote1/`. The hotel photos are relative (`hotels/…`), so both ways work. The illustrated walkthrough works offline and is silent. The QR and live wallet require a connection. No URL is shown on any slide: the QR encodes the link, and L opens the wallet next to the deck (`../wallet/`; from file:// the public site).
+Lives in `code/apps/pitch/`. Tuttie serves it at `/pitch/` (static, from disk, no restart needed). It also opens directly from `index.html` in Chrome or Safari (file://), or locally with `python3 -m http.server 4048` from `code/apps` and `/pitch/`. The hotel photos are relative (`hotels/…`), so both ways work. The illustrated walkthrough works offline and is silent. The QR and live wallet require a connection. No URL is shown on any slide: the QR encodes the link, and L opens the wallet next to the deck (`../wallet/`; from file:// the public site).
 
 Controls: Space/→ next; ← back; F fullscreen; T start/pause clock; R reset; N speaker notes/clock; A auto-play; Home/End first/last scene; L open the actual wallet. `?theme=dark` previews the alternate background.
 

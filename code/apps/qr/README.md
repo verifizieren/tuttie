@@ -1,8 +1,8 @@
 # Presentation site (QR page, issues #1, #6)
 
 The page the pitch's QR code opens. Phone first, static, no build: served by the assistant at
-`/presentation/` (it serves `code/apps/` as static files). Locally: `python3 -m http.server` in
-`code/apps` and open `/presentation/` (the eyes are an ES module, so `file://` does not work).
+`/qr/` (it serves `code/apps/` as static files). Locally: `python3 -m http.server` in
+`code/apps` and open `/qr/` (the eyes are an ES module, so `file://` does not work).
 
 What it shows, top to bottom (little text on purpose):
 

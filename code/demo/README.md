@@ -1,6 +1,6 @@
 # Demo (issues #3, #2)
 
-The pitch uses the illustrated deck in `code/apps/keynote1/`; the live wallet is shown by hand.
+The pitch uses the illustrated deck in `code/apps/pitch/`; the live wallet is shown by hand.
 This folder has no runner of its own.
 
 Runs the stage demo: the storyline as a list of steps (user line, expected agent action,

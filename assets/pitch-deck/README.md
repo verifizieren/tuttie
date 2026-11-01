@@ -1,3 +1,3 @@
 # Pitch deck
 
-The pitch deck now lives in `code/apps/keynote1/` and is served at `/keynote1/`.
+The pitch deck now lives in `code/apps/pitch/` and is served at `/pitch/`.

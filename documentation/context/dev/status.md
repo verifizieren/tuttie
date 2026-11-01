@@ -6,15 +6,15 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/keynote1/` (Sebastian's pitch); the demo runner is open).
+Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
 - **Design rules (1 Nov)**: black/white with blue #2f6fe0, purple #7a5af8, pink #e5489b accents, no
   orange, no italic, no small labels above headings, no URL text, pill buttons; the top seal tier is
-  purple. Wallet, owner (now light), QR page and `/keynote1/` follow them. The QR page has
+  purple. Wallet, owner (now light), QR page and `/pitch/` follow them. The QR page has
   a story-style demo (tap left/right), one number per scroll, source logos and a reverse-marketplace section.
-- **Keynote 2 removed (1 Nov)**: the live-demo deck (`code/apps/keynote2/`) is gone; the pitch uses `/keynote1/`.
+- **Keynote 2 removed (1 Nov)**: the live-demo deck (`code/apps/keynote2/`) is gone; the pitch uses `/pitch/`.
 - **QR page speed (1 Nov)**: the two faces painted 60 frames a second even off screen (724 blurred
   draws in 3 s while reading the business part); now they paint only while visible. Fonts no longer
   block the first paint; two invisible nested backdrop blurs removed. Look unchanged (pixel compare).
@@ -24,12 +24,12 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
   signed (seals, offers and agreements, delegation, approval, mandate, prices from signed data);
   the agency bar is set against Tuttie's 5 % commission per signed booking (CHF 6.75 on 135); "fakes never
   reach you" became "forged seals"; 7 vs 220 says why the small one won; a callout marks the
-  read context as demo data. Details: `code/apps/presentation/README.md`.
+  read context as demo data. Details: `code/apps/qr/README.md`.
 - **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie
   card, black glossy eyes with a catchlight, idle glances, ZKB and UBS bank cards) on a full light theme
   (page #f2f2f7, white panels, ink #17171d, Approve = dark button); a closed card rests awake with a
   neutral face, typing still closes the eyes; status bar `default`, `CACHE` v4. The QR page
-  (`apps/presentation`) and Sebastian's pitch deck (`code/apps/keynote1`, served at `/keynote1/`) use the same light design.
+  (`apps/qr`) and Sebastian's pitch deck (`code/apps/pitch`, served at `/pitch/`) use the same light design.
 - **Round 11 (owner view)**: `?node=` is used only for the page's own host or localhost (the owner
   token never goes to a linked server); a deploy without an available room is refused, a left-out
   `facts.negotiation` keeps the live floor (the owner view sends `null` to end bargaining); public
@@ -210,12 +210,12 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
   not a bool) and only if it is a valid `Agreement`; a counter without a real price ends the
   negotiation.
 - **Presentation QR page** (branch `presentation-site`, not merged or deployed yet): a
-  static, phone-first page in `code/apps/presentation/`, served at `/presentation/` (e.g.
-  <https://web4.mendes.dev/presentation/>) by the assistant's static mount of `code/apps/`; no
+  static, phone-first page in `code/apps/qr/`, served at `/qr/` (e.g.
+  <https://web4.mendes.dev/qr/>) by the assistant's static mount of `code/apps/`; no
   build step. Hero with the Tuttie card, the pitch numbers with sources, the idea, the business
   case, a self-playing demo of the wallet in a phone, and links to the live wallet and the repo.
   It replaces the `assets/qr-landing` idea on the unmerged branch `pitch-deck-and-qr`. Details:
-  `code/apps/presentation/README.md`.
+  `code/apps/qr/README.md`.
 - **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
   timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
   silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
@@ -483,7 +483,7 @@ Build order from [goals.md](goals.md):
 ### Where to start next
 
 1. **dev member 1:** voice is done; next the demo runner (`code/demo/`); the presentation QR page
-   (`code/apps/presentation/`) is on branch `presentation-site`, to merge; confirm voice on a real
+   (`code/apps/qr/`) is on branch `presentation-site`, to merge; confirm voice on a real
    iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
@@ -549,7 +549,7 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
 Other open items: the demo runner (`code/demo/`), merging the presentation QR page
-(`code/apps/presentation/`, branch `presentation-site`), voice confirmed on a real iPhone, a
+(`code/apps/qr/`, branch `presentation-site`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -871,4 +871,4 @@ Why things are the way they are, so nobody has to rediscover them:
 
 ## Presentation
 
-- `code/apps/keynote1/` (moved from `assets/pitch-deck/`, served at `/keynote1/`) contains the offline eight-scene illustrated pitch, timed to 1:54, with speaker notes, research and photo credits. The optional live wallet handoff requires rehearsal; the phone animation uses demo data.
+- `code/apps/pitch/` (moved from `assets/pitch-deck/`, served at `/pitch/`) contains the offline eight-scene illustrated pitch, timed to 1:54, with speaker notes, research and photo credits. The optional live wallet handoff requires rehearsal; the phone animation uses demo data.

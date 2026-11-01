@@ -1,8 +1,8 @@
 # Tuttie: your agent in your wallet
 
 BaselHack 2026, Adobe challenge. **Live: <https://web4.mendes.dev>** (open it on your phone and
-add it to the home screen). The page the pitch's QR code opens: <https://web4.mendes.dev/presentation/>.
-The pitch deck: `/keynote1/` (the illustrated pitch, `code/apps/keynote1/`).
+add it to the home screen). The page the pitch's QR code opens: <https://web4.mendes.dev/qr/>.
+The pitch deck: `/pitch/` (the illustrated pitch, `code/apps/pitch/`).
 
 Tuttie lives in your phone's wallet. You say what you need, businesses' agents come to you
 with signed offers, your agent picks the best few and negotiates for you, and you approve
@@ -26,7 +26,7 @@ This repo follows the BaselHack template:
 
 | Folder | Contents |
 | --- | --- |
-| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `negotiation/` (bargaining), `sessions/` (agent memory), `services/` (weather, trains), `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `presentation/`, `keynote1/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
+| `code/` | all source code: `aps/` (signing), `registry/`, `node/` (business agents), `assistant/` (user's agent), `marketplace/`, `negotiation/` (bargaining), `sessions/` (agent memory), `services/` (weather, trains), `voice/`, `demo/`, `apps/` (`wallet/` React PWA, `owner/`, `qr/`, `pitch/`, `shared/`), `scripts/`, `tests/`, demo `data/` and `keys/` |
 | `documentation/` | concept, architecture, formats, team context |
 | `assets/` | presentation material |
 

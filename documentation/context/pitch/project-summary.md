@@ -77,7 +77,7 @@ prices, approvals with a Face ID-style confirmation, the signed booking. Voice i
 (self-hosted LiveKit, ElevenLabs). The owner view lets a business change prices, extras,
 negotiation limits and its agent, deployed as versions.
 
-The presentation QR page (`code/apps/presentation/`) shows the numbers, the idea, the business
+The presentation QR page (`code/apps/qr/`) shows the numbers, the idea, the business
 case and a self-playing demo of the wallet; it is on branch `presentation-site`, not merged yet.
 
 Not yet: the demo runner (`code/demo/`); voice confirmed on a real iPhone. See [status.md](../dev/status.md).

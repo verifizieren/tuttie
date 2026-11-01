@@ -7,7 +7,7 @@ can work in parallel without stepping on each other. Contracts live in
 ## Components
 
 ```
-            presentation QR page (apps/presentation)     owner view (apps/owner)
+            presentation QR page (apps/qr)     owner view (apps/owner)
                          | links to the wallet                   | edits agent presence
                          v                                       v
   phone: wallet (apps/wallet) + voice (code/voice)        business nodes (code/node)
@@ -36,8 +36,8 @@ can work in parallel without stepping on each other. Contracts live in
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | done, connected: card stack, Tuttie's face (eyes driven by its presence), voice mode, text fallback, the run under the eyes (posting, offers, bargaining), swipe deck of hotel cards, approval sheet with Face ID-style confirmation, booking card, history of conversations | `POST /chat`, `GET /events` (SSE), approvals API, conversations API, voice token |
 | Voice agent | `code/voice/` | #2, #3 | done, live: self-hosted LiveKit (signaling proxied by the assistant at `/rtc`, media TCP 4042 / UDP 4043, TURN relay coturn on TCP 4044 for phones), ElevenLabs speech-to-text and voice, `voice/agent.py` passes what the user says to Tuttie and speaks the answers | `POST /voice/say`, `GET /voice/events`, `POST /voice/token` |
 | Owner view | `code/apps/owner/` (React + Vite) | #5 | done: one page per business (rooms, extras, private negotiation limits, agent); edits are a draft, reviewed and deployed as a new numbered version the node uses at once | `GET /owner/overview`, `GET /owner/versions`, `POST /owner/deploy` on the node (`node/owner.py`), behind `OWNER_TOKEN` |
-| Presentation site and QR | `code/apps/presentation/` | #1, #6 | QR page done: static, phone-first, no build, served at `/presentation/` by the assistant's static mount; numbers, idea, business case, a self-playing demo of the wallet | links into the live wallet and the repo |
-| Keynote 1 (pitch deck) | `code/apps/keynote1/` | #3 | done: Sebastian's illustrated pitch, static, served at `/keynote1/` and openable from file:// | none |
+| Presentation site and QR | `code/apps/qr/` | #1, #6 | QR page done: static, phone-first, no build, served at `/qr/` by the assistant's static mount; numbers, idea, business case, a self-playing demo of the wallet | links into the live wallet and the repo |
+| Keynote 1 (pitch deck) | `code/apps/pitch/` | #3 | done: Sebastian's illustrated pitch, static, served at `/pitch/` and openable from file:// | none |
 | Demo | `code/demo/` | #3, #2 | `code/demo/` itself has only its README; `scripts/demo_headless.py` runs the full flow in one process | drives the user's agent and the apps |
 | Shared UI pieces | `code/apps/shared/` | — | brand stylesheet, seal badges | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
