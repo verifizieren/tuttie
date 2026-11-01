@@ -18,9 +18,11 @@ The server and the agents never see unchecked owner input.
 
 from typing import Annotated, Literal
 
+import json
+
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictBool, StrictInt, StringConstraints, ValidationError
 
-from node.agent import DEFAULT_WAKES_ON
+from node.agent import DEFAULT_WAKES_ON, public_facts
 
 POSTING_EVENTS = ["posting.created", "posting.updated"]
 STANDARD_ROOM = "double"  # the room the negotiation floor is set for (negotiation/rules.py)
@@ -28,6 +30,9 @@ STANDARD_ROOM = "double"  # the room the negotiation floor is set for (negotiati
 PERSONA_FIELDS = ("name", "role", "tone", "priorities")
 EDITABLE_FACTS = ("profile", "address", "distance_to_basel_sbb_m", "how_to_get_there", "quiet", "quiet_note",
                   "facilities", "rooms", "policies", "charges", "add_ons", "negotiation")
+# The public facts go into every prompt of the hotel's agent: a cap keeps a deploy from
+# bloating them (the committed hotels use about 2000 characters).
+MAX_PUBLIC_FACTS = 8000
 
 
 def blank_to_none(value):
@@ -153,6 +158,10 @@ def cross_checks(settings: Settings) -> list[dict]:
             errors.append({"path": "facts.negotiation.floor_chf",
                            "message": f"the lowest price cannot be above the {standard.room_type} room's price "
                                       f"(CHF {standard.price_chf})"})
+    size = len(json.dumps(public_facts(facts.model_dump(exclude_none=True)), indent=2, ensure_ascii=False))
+    if size > MAX_PUBLIC_FACTS:
+        errors.append({"path": "facts", "message": f"too much text for the agent ({size} characters, "
+                                                   f"at most {MAX_PUBLIC_FACTS}): shorten notes or lists"})
     persona = settings.persona
     if persona and any(getattr(persona, field) for field in PERSONA_FIELDS):
         for field in ("name", "role"):
