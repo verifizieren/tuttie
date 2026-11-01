@@ -558,6 +558,10 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
+- **Face ID glyph in the approval sheet** (`ApprovalSheet.jsx` `FaceId`, `wallet.css`): rounded
+  corner brackets around a simple face (eyes, L-shaped nose, smile) like the iPhone's; while
+  scanning the face turns a little and the brackets pulse; on approval the face fades and a
+  checkmark is drawn inside the brackets as the glyph turns green. A decline keeps the grey X.
 - **Answers are written to be heard** (`assistant/agent.py`): one to three short sentences, no
   lists, markdown, emoji or square brackets, no ids or codes (node ids, booking ids, receipt
   numbers: the wallet shows them), numbers as people say them ("CHF 128", "6 pm", "14
