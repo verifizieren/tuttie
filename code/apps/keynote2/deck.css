@@ -317,22 +317,17 @@ body.idle { cursor: none; }
 
 .wake .hero {
   position: absolute;
-  left: var(--margin); top: 400px;
+  left: var(--margin); top: 456px;         /* centred on the QR code */
   font-size: 200px;
-}
-.wake .url {
-  position: absolute;
-  left: calc(var(--margin) + 4px); top: 648px;
-  font-size: 40px;
-  font-weight: 450;
-  letter-spacing: -0.01em;
-  color: var(--ink-2);
 }
 .wake .qr {
   position: absolute;
   left: 1368px; top: 376px;               /* centred on the text block, right margin 192 */
   width: 360px; height: 360px;
-  border-radius: 16px;
+  padding: 24px;                          /* a wider quiet zone around the code */
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .05);
   image-rendering: pixelated;
 }
 
