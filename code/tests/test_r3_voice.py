@@ -1,8 +1,10 @@
 """Round 3 attacker: voice doors (assistant/voice.py) and the voice agent (voice/agent.py)."""
 
+import asyncio
 import inspect
 import os
 
+import httpx
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("OPENAI_API_KEY", "test")
@@ -38,6 +40,62 @@ def test_agent_secret_is_compared_in_constant_time():
     """agent_only compares the bearer secret (the LiveKit API secret) with !=, not compare_digest."""
     source = inspect.getsource(voice.agent_only)
     assert "compare_digest" in source, source
+
+
+def utter(text: str, handler) -> tuple[list[httpx.Request], list[str]]:
+    """One finished user turn through the voice agent against a fake /voice/say: what was sent
+    and what the agent said itself. The turn always ends in StopResponse (Tuttie answers)."""
+    from livekit.agents import StopResponse
+    from voice.agent import Tuttie
+
+    seen, said = [], []
+
+    def recording(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return handler(request)
+
+    class Msg:
+        text_content = text
+
+    async def run():
+        async with httpx.AsyncClient(base_url="http://a", transport=httpx.MockTransport(recording)) as http:
+            agent = Tuttie("tuttie-x", http)
+            agent.speak = said.append
+            try:
+                await agent.on_user_turn_completed(None, Msg())
+            except StopResponse:
+                return
+            raise AssertionError("the turn must end in StopResponse")
+    asyncio.run(run())
+    return seen, said
+
+
+def test_a_long_utterance_is_not_silently_dropped():
+    """/voice/say refuses text over MAX_MESSAGE_CHARS (2000) with 422; the voice agent ignored the
+    status, so a long dictated request vanished without a word. Now it is cut to fit, and a
+    refusal is spoken."""
+    import json
+
+    from assistant.inputs import MAX_MESSAGE_CHARS
+
+    long = "please book the hotel " * 120  # ~2600 chars, a long dictated request
+    seen, said = utter(long, lambda request: httpx.Response(202, json={"accepted": True}))
+    sent = json.loads(seen[0].content)["text"]
+    assert len(sent) <= MAX_MESSAGE_CHARS and long.startswith(sent) and long[len(sent)] == " " and said == []  # whole words
+    seen, said = utter(long, lambda request: httpx.Response(422, json={"detail": "too long"}))
+    assert seen and said == ["Sorry, that did not go through. Could you say it again?"]
+
+
+def test_too_many_turns_and_a_dead_assistant_are_spoken():
+    """429 (too many turns a minute) gets "One moment please."; a transport error does not raise
+    out of the turn, the user hears a short line."""
+    _, said = utter("book me a hotel please", lambda request: httpx.Response(429))
+    assert said == ["One moment please."]
+
+    def down(request):
+        raise httpx.ConnectError("refused")
+    _, said = utter("book me a hotel please", down)
+    assert said == ["Sorry, that did not go through. Could you say it again?"]
 
 
 def test_rooms_of_a_gone_conversation_go_first_and_the_grace_period_ends(monkeypatch):

@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 
 from assistant.card_commands import card_choice
+from assistant.inputs import MAX_MESSAGE_CHARS
 
 import httpx
 from dotenv import load_dotenv
@@ -60,6 +61,9 @@ QUESTION_WORDS = ("what", "how", "why", "when", "where", "who", "which", "can", 
 ENDPOINTING = {"min_delay": .3, "max_delay": 2.0}
 # The only update in between: the user has to act. The answers themselves come from Tuttie.
 UPDATES = {"approval": "Please confirm with Face ID."}
+# When what the user said did not reach Tuttie: never silence.
+BUSY = "One moment please."  # too many turns a minute (429): the user can say it again shortly
+NOT_PASSED = "Sorry, that did not go through. Could you say it again?"
 
 
 def francs(match: re.Match) -> str:
@@ -150,6 +154,15 @@ def meaningful(text: str) -> bool:
     return card_choice(text) is not None or len(words) >= MIN_WORDS
 
 
+def fitted(text: str) -> str:
+    """Long dictation cut to what Tuttie takes (MAX_MESSAGE_CHARS), at a word boundary."""
+    if len(text) <= MAX_MESSAGE_CHARS:
+        return text
+    cut = text[:MAX_MESSAGE_CHARS]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > MAX_MESSAGE_CHARS // 2 else cut).rstrip()
+
+
 def filler_kind(text: str) -> str:
     """What kind of request it is, for a filler that fits: a task, a question or anything else."""
     lowered = text.lower().strip()
@@ -184,8 +197,27 @@ class Tuttie(Agent):
         if meaningful(text):  # noise and stray words are not requests
             self.turns += 1
             self.asked = text
-            await self.http.post("/voice/say", json={"room": self.room, "text": text})
+            if trouble := await self.pass_on(fitted(text)):
+                self.asked = None  # no filler for a request Tuttie never got
+                self.speak(trouble)
         raise StopResponse()  # Tuttie answers through the timeline, spoken by follow()
+
+    async def pass_on(self, text: str) -> str | None:
+        """Send the user's words to Tuttie (POST /voice/say); None if it took them, else the line
+        to speak instead (too many turns: BUSY; refused or unreachable: NOT_PASSED)."""
+        try:
+            response = await self.http.post("/voice/say", json={"room": self.room, "text": text})
+        except httpx.HTTPError as error:
+            print(f"voice: /voice/say failed: {type(error).__name__}", flush=True)
+            return NOT_PASSED
+        if response.is_success:
+            return None
+        print(f"voice: /voice/say answered {response.status_code}", flush=True)
+        return BUSY if response.status_code == 429 else NOT_PASSED
+
+    def speak(self, text: str) -> None:
+        """Say a short line of the voice layer's own (not one of Tuttie's answers)."""
+        self.session.say(text)
 
     def filler(self) -> str | None:
         """A filler fitting the last request, once, when Tuttie starts a tool for it."""
