@@ -10,6 +10,16 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
 
 ## Done
 
+- **Red team round 3, approvals, booking and payments** (branch `wip/r3-pay`, not deployed):
+  an approval is signed before it leaves the pending list, so a failing mandate no longer loses
+  the decision (a CHF 0 charge used to 500 the approve call and hang the booking 300 s); a
+  decision landing at the timeout still counts; Tuttie handles a dropped approval. Charges are
+  CHF 1 or more and mandates are offered only above zero. `book` refuses an extra whose
+  commitment has expired or ends before the booked night. **Tell the team (formats.md):** a
+  `pay` approval now carries a signed `charge = {purpose, booking_id}` and the gate refuses an
+  approval for another charge or booking (book approvals unchanged). Tuttie flags a
+  confirmation whose extras differ from the approved `includes` (`mismatch: ["includes"]`).
+  Regression tests: `tests/test_r3_approvals.py`, `tests/test_r3_booking.py`.
 - **Red team round 2, hotel side** (branch `wip/r2-node`, not deployed): `/agent/invoke`
   answers only posting events, and `posting.updated` now gets the same checks as
   `posting.created` (valid posting, the market's offer door, a fresh request signed by a
