@@ -13,3 +13,11 @@ def test_finite_price_takes_only_real_positive_numbers():
 def test_chf_formats_any_value_without_raising():
     assert chf(128) == "128" and chf(12.5) == "12.5"
     assert chf(10 ** 400) == "?" and chf("x") == "?" and chf(None) == "?"
+
+
+def test_the_night_is_given_with_its_weekday_so_the_model_never_guesses_it():
+    """The model said "Friday 14 November" for 2026-11-14, a Saturday."""
+    from assistant.tools import night_said
+    assert night_said("2026-11-14") == "Saturday 14 November"
+    assert night_said("2026-11-01") == "Sunday 1 November"
+    assert night_said("not a date") is None and night_said(None) is None
