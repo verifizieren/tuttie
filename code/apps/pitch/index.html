@@ -1219,6 +1219,8 @@ function go(i, fromAuto = false) {
   i = Math.max(0, Math.min(STEPS.length - 1, i));
   const fwd = i === cur + 1 || (fromAuto && i > cur);
   timers.forEach(clearTimeout); timers = [];
+  sfx.stopClips();
+  if (fwd && i === 6) sfx.play("checkEmOut");  // #5 -> #6: the line starts as the slide changes
   cur = i;
   const name = STEPS[i], now = performance.now();
   STEPS.forEach((n, k) => { if (k > i) delete startedAt[n]; else if (k === i) startedAt[n] = fwd ? now : now - 1e5; else if (!fwd || startedAt[n] === undefined) startedAt[n] = now - 1e5; });
@@ -1261,6 +1263,7 @@ function go(i, fromAuto = false) {
     // Tuttie wakes next to the QR code, glances at it, then looks back at the room.
     tryFace.hold = true; tryFace.sleep(1);
     later(() => { tryFace.wake("happiness", 500); if (fwd) sfx.wake(); }, fwd ? 900 : 0);
+    if (fwd) later(() => sfx.play("seeYou"), 1650);  // right after the chirp
     later(() => tryFace.lookAt(1.7, .25, 450), fwd ? 1900 : 300);
     later(() => { tryFace.lookAt(0, 0, 500); tryFace.hold = false; }, fwd ? 3600 : 1800);
   }
@@ -1280,7 +1283,13 @@ const sfx = (() => {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .05);
   }
+  // Recorded lines (audio/): played as files; they need the same first key or click.
+  const clips = { checkEmOut: new Audio("audio/check-em-out.mp3"), seeYou: new Audio("audio/see-you.mp3") };
+  Object.values(clips).forEach(a => { a.preload = "auto"; });
+  function play(name) { const a = clips[name]; if (!a) return; try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) {} }
+  function stopClips() { Object.values(clips).forEach(a => { try { a.pause(); } catch (e) {} }); }
   return {
+    play, stopClips,
     // A short, solid click like a hardware button.
     press() { tone(1900, 0, .045, "triangle", .18, .5); tone(170, 0, .07, "sine", .25, .6); },
     // A cute rising three-note chirp: Tuttie is awake.
