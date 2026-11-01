@@ -159,7 +159,7 @@ section.block { padding: 90px 0; }
 .bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
 .bars i b { display: block; height: 100%; width: 0; background: var(--text); }
 .cap h3 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.015em; min-height: 24px; }
-.cap p { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 40px; }
+.cap p { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); min-height: 4.2em; }
 .cap h3, .cap p { transition: opacity .35s; }
 .cap.swap h3, .cap.swap p { opacity: 0; }
 .stagebox { position: absolute; left: 0; right: 0; bottom: 0; top: 0; pointer-events: none; }
@@ -349,6 +349,7 @@ footer a { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {
   .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
+  .cue i, .edge, .steps li.active .dot, .fscan { animation: none !important; }
 }
 </style>
 </head>
@@ -417,7 +418,7 @@ footer a { color: var(--muted); }
     <div class="three" id="three">
       <span>A shopper.</span><span>A scam filter.</span><span>A shop window.</span><span class="one">One card.</span>
     </div>
-    <p class="lead rv">Tuttie is <b>your</b> agent, in your phone's wallet. You don't search businesses. <b>Their agents come to you</b>, and every answer is signed.</p>
+    <p class="lead rv">Tuttie is <b>your</b> agent, in your phone's wallet. You don't search businesses. <b>Their agents come to you</b>, with offers they signed.</p>
 
     <div class="flow">
       <div class="step rv"><i class="n">1</i><div><b>You ask once</b><span>By voice or text. Tuttie knows your day, your dog and your budget, and keeps them to herself.</span></div></div>
@@ -426,12 +427,12 @@ footer a { color: var(--muted); }
       <div class="step rv"><i class="n">4</i><div><b>Tuttie bargains, you tap</b><span>She negotiates within limits nobody else sees, shows you the best few, and books only with your signature.</span></div></div>
     </div>
 
-    <div class="h3 rv">Every answer carries a seal</div>
-    <p class="sub rv">Who sent it, and who vouches for them. Checked on every message.</p>
+    <div class="h3 rv">Seals show who vouches</div>
+    <p class="sub rv">Who sent an offer, and who stands behind them. Tuttie checks it on every message.</p>
     <div class="seals rv">
       <div class="seal"><svg style="fill:var(--gold)"><use href="#shield"/></svg><div><b>An official register vouches</b><span>The commercial register knows this business.</span></div></div>
       <div class="seal"><svg style="fill:var(--blue)"><use href="#shield"/></svg><div><b>A platform vouches</b><span>A company that checked the business.</span></div></div>
-      <div class="seal"><svg style="fill:#5d5c6d"><use href="#shield"/></svg><div><b>Unsigned</b><span>Can talk, never books or pays.</span></div></div>
+      <div class="seal"><svg style="fill:#5d5c6d"><use href="#shield"/></svg><div><b>Unsigned</b><span>Never woken for a request, never books or pays.</span></div></div>
       <div class="seal forged"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ff453a"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><div><b>Forged</b><span>Dropped. You never see it.</span></div></div>
     </div>
   </div>
@@ -503,7 +504,7 @@ footer a { color: var(--muted); }
                   <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
                   <div class="sw-name">Alpina Grand Basel<small>Near Basel SBB · 220 rooms</small></div>
                   <div class="sw-foot"><div class="feats"><i class="y"><svg><use href="#f-dog"/></svg></i><i class="n"><svg><use href="#f-quiet"/></svg></i><i class="y"><svg><use href="#f-late"/></svg></i><i class="y"><svg><use href="#f-station"/></svg></i><i class="y"><svg><use href="#f-cancel"/></svg></i></div>
-                    <div class="sw-price"><b>CHF 225</b><small>over budget</small></div></div>
+                    <div class="sw-price"><b>CHF 240</b><small>over budget</small></div></div>
                 </div>
               </div>
               <div class="dcount hide" id="dcount">1 of 2</div>
@@ -558,7 +559,7 @@ footer a { color: var(--muted); }
     Built in one weekend at <b>BaselHack 2026</b><br>
     Adobe challenge · The Post-Website Business<br>
     Jonas · Stan · Sebastian · Thomas · Max · Chris<br>
-    <a href="https://github.com/verifizieren/baselhack2026">github.com/verifizieren/baselhack2026</a>
+    <a href="https://github.com/verifizieren/tuttie">github.com/verifizieren/tuttie</a>
   </footer>
 </section>
 
@@ -612,6 +613,7 @@ function showFig(i) {
 }
 function onNums() {
   const r = $("#nums").getBoundingClientRect();
+  if (r.top > innerHeight * .35) return;  // not on screen yet: the first count-up waits for it
   const p = clamp(-r.top / (r.height - innerHeight));
   showFig(Math.min(figs.length - 1, Math.floor(p * figs.length * .999)));
 }
@@ -632,9 +634,9 @@ const CAPS = [
 const ASK = "Quiet room in Basel tonight, after midnight, with my dog, under 160. Get me a good price.";
 const REPLY = "Booked: Gästehaus am Rhein tonight for CHF 128, dog welcome. The door code comes after midnight.";
 const STEP_LINES = {
-  ctx: "Your train arrives at Basel SBB at 23:40",
+  ctx: "Your train arrives at Basel SBB at 00:52",
   post: "Posted a signed request · budget kept private",
-  ask: "Asked 3 hotels · 1 refused, seal forged",
+  ask: "Asked 3 hotels",
   barg: "Bargaining with Gästehaus am Rhein · 135 → 130",
   deal: "Agreed with Gästehaus am Rhein · CHF 128",
 };
@@ -689,7 +691,7 @@ const EVENTS = [
   [29900, () => call("#cSigned", true)],
   [32300, () => { call("#cSigned", false); $("#sheet").classList.remove("up"); }],
   [32700, () => { show("#booking"); $("#status").textContent = ""; face.set("happiness", 500); }],
-  [34000, () => show("#reply")],
+  [34200, () => show("#reply")],
   [37400, () => { cls("s-open", false); cls("s-busy", false); face.sleep(900); }],
 ];
 
@@ -706,14 +708,16 @@ function resetDemo() {
 $("#bars").innerHTML = CAPS.map(() => "<i><b></b></i>").join("");
 const barFills = [...document.querySelectorAll("#bars b")];
 let clock = 0, playing = false, fired = 0, capIndex = -1, last = 0, finished = false;
+let capTimer = 0;
 function setCaption(i) {
   if (i === capIndex) return;
   capIndex = i;
   const cap = $("#cap");
   cap.classList.add("swap");
-  setTimeout(() => { $("#capT").textContent = CAPS[i][0]; $("#capP").textContent = CAPS[i][1]; cap.classList.remove("swap"); }, capIndex === 0 && clock < 50 ? 0 : 220);
+  clearTimeout(capTimer);
+  capTimer = setTimeout(() => { $("#capT").textContent = CAPS[i][0]; $("#capP").textContent = CAPS[i][1]; cap.classList.remove("swap"); }, capIndex === 0 && clock < 50 ? 0 : 220);
 }
-function restart() { resetDemo(); clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
+function restart() { resetDemo(); tapPaused = false; clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
 function tickDemo(dt) {
   if (!playing || finished) return;
   clock += dt;
@@ -728,15 +732,25 @@ function tickDemo(dt) {
   if (clock >= DURATION) { finished = true; $("#replay").classList.add("show"); }
 }
 $("#replay").addEventListener("click", () => { restart(); playing = true; });
-// Tap the phone to pause and resume.
-$("#phone").addEventListener("click", () => { if (started && !finished) playing = !playing; });
+// Tap the phone to pause and resume; a tap pause sticks until the next tap (scrolling back
+// into view resumes only an automatic pause).
+let tapPaused = false;
+$("#phone").addEventListener("click", () => {
+  if (!started || finished) return;
+  playing = !playing; tapPaused = !playing;
+});
 
 // ---------- Scroll into the demo ----------
 let started = false, fit = 1;
-let capH = 120;
+let capH = 120, pinH = innerHeight, laidW = 0, laidH = 0;
+// Sized from the pinned stage (100svh), not innerHeight: on iOS the toolbar collapsing grows
+// innerHeight but not the stage, which would push the phone's bottom out of view.
 function layoutPhone() {
+  const pin = $("#demo .pin");
+  if (innerWidth === laidW && Math.abs(pin.clientHeight - laidH) < 120 && laidW) return;  // toolbar show/hide: keep the phone still
+  laidW = innerWidth; laidH = pinH = pin.clientHeight;
   capH = $("#cap").offsetHeight + 8;
-  fit = Math.min((innerHeight - capH - 12) / 860, (innerWidth - 24) / 406, 1);
+  fit = Math.min((pinH - capH - 12) / 860, (innerWidth - 24) / 406, 1);
 }
 function onDemo() {
   const r = $("#demo").getBoundingClientRect();
@@ -744,8 +758,8 @@ function onDemo() {
   const enter = clamp((innerHeight - r.top) / innerHeight);  // 0..1 while the section scrolls into view
   const z = ease(clamp(p / .32));                             // the zoom: phone rises, turns flat and docks
   const s = lerp(fit * .62, fit, z);
-  const y = lerp(innerHeight * .55, capH + (innerHeight - capH - 860 * fit) / 2, z);
-  const rx = lerp(28, 0, z);
+  const y = lerp(pinH * .55, capH + (pinH - capH - 860 * fit) / 2, z);
+  const rx = reduced ? 0 : lerp(28, 0, z);
   $("#phone").style.transform = `translateY(${y}px) perspective(1600px) rotateX(${rx}deg) scale(${s})`;
   $("#phone").style.opacity = String(clamp(enter * 1.6));
   const intro = $("#intro");
@@ -755,14 +769,10 @@ function onDemo() {
   $("#cap").classList.toggle("show", z > .9);
   document.body.classList.toggle("in-demo", r.top <= 0 && r.bottom > innerHeight * .5);
   if (docked && visible && !started) { started = true; restart(); playing = true; }
-  if (started && !visible) playing = false;
-  else if (started && visible && docked && !finished && !pausedByTap()) playing = true;
+  if (started && (!visible || !docked)) playing = false;
+  else if (started && visible && docked && !finished && !tapPaused) playing = true;
   if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); }
 }
-// A tap pause sticks until the next tap; scrolling back into view only resumes an automatic pause.
-let tapPaused = false;
-$("#phone").addEventListener("click", () => { tapPaused = !playing; });
-const pausedByTap = () => tapPaused;
 
 // ---------- One loop for scroll and the demo clock ----------
 let dirty = true;
