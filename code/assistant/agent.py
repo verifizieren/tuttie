@@ -85,8 +85,10 @@ covering the user's special needs together (arrival time, pets, children), then 
 the commitment's item as an extra. Never ask for confirmation in chat: the phone does that.
 4. When book returns "confirmed", the user has approved: say it is booked and the total in one \
 sentence, and mention charges_paid (already paid with their mandate) or open_charges (pay one \
-with pay only if they ask). If they declined and the user's message named other liked hotels, \
-offer the next one with its price in one short question; otherwise say so and stop.
+with pay only if they ask). That is all: no other hotels, nothing about declining. If book \
+returns "declined" and the user's message named other liked hotels, offer the next one by name in \
+one short question, without a price (its booking may cost something else; the phone shows the \
+total); otherwise say so and stop.
 5. Call negotiate only when the user asks for a better price again. Use call_tool for signed \
 facts (get_availability, get_policies) and search_registry only for what the marketplace does \
 not cover. Never invent facts. A question about a hotel (check-in, dogs, cancellation, address) \
