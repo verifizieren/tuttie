@@ -48,7 +48,7 @@ export const BEATS = [
       { demo: "forged", cue: "Click on \"Forged seal\": side word Never asked. (red)",
         spoken: "[pause] Forged seal. Never asked." },
       { demo: "like", cue: "Click: swipe the cards, like Gästehaus am Rhein, pass the others.",
-        spoken: "[pause] Anna's agent offers 135. Tuttie bargains: 128. I still choose." },
+        spoken: "[pause] Anna's agent offered 135. Tuttie already bargained: 128. I still choose." },
       { demo: "approve", cue: "Click on \"One tap\": Approve is tapped, side word One tap. (accent)",
         spoken: "And nothing happens without me. One tap, signed with my key, for exactly that price." },
       { demo: "done", cue: "Click: hold on the booking card. Two seconds of silence.", spoken: "" },
