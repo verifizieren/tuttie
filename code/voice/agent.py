@@ -77,13 +77,21 @@ def francs(match: re.Match) -> str:
 # What the model may put in square brackets, cleaned the same way as the wallet's screen
 # (apps/wallet/src/lib/activity.js withoutNotes; shared cases in tests/fixtures/answer_notes.json).
 # Only what carries nothing to say goes: citations ([3], [3, 4]), a few labels ([confirmed]),
-# booking and receipt ids, node ids. Any other note may be a fact (a fee, "cancelled"), so it is
+# booking and receipt ids, node ids, approval, offer and mandate ids (also alone in parentheses:
+# "Rheinblick (ch.basel.hotel-rheinblick)"). Any other note may be a fact (a fee, "cancelled"), so it is
 # kept and only its brackets go. Markdown links keep their text.
 LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
 NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
 CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
 LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
-NODE_ID = re.compile(r"[a-z]{2}(?:\.[a-z0-9-]+){2,}")          # ch.basel.hotel-rheinblick, not booking.com
+NODE_ID_TOKEN = r"[a-z]{2}(?:\.[a-z0-9-]{1,40}){2,}"  # ch.basel.hotel-rheinblick, not booking.com
+NODE_ID = re.compile(NODE_ID_TOKEN)
+# Approval, mandate and offer ids (assistant/approvals.py, aps/mandate.py, node/agent.py).
+REF_TOKEN = r"(?:ap|md)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-[0-9a-f]{6}"
+REF = re.compile(REF_TOKEN)
+INTERNAL = rf"(?:{NODE_ID_TOKEN}|{REF_TOKEN})"
+PAREN_IDS = re.compile(rf"\(\s*{INTERNAL}(?:\s*[,;]\s*{INTERNAL})*\s*\)")  # "(ch.basel.x)", "(ap-…, of-…)"
+BARE_INTERNAL = re.compile(rf"[ \t]?(?<![\w.@/-]){INTERNAL}(?![\w-]|\.[a-z0-9])")  # spoken only: never read aloud
 ID_TOKEN = r"\b(?:BK|RC)-[0-9A-F]{6}\b"  # booking and receipt ids (node/server.py): one pattern for all uses
 ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?" + ID_TOKEN, re.IGNORECASE)
 BARE_ID = re.compile(r"[ \t]?" + ID_TOKEN, re.IGNORECASE)
@@ -115,7 +123,7 @@ def note(match: re.Match) -> str:
     """A bracketed note: dropped if it says nothing, else its words without the brackets."""
     inner = re.sub(r"^[\s,;]+|[\s,;]+$", "", ID.sub("", match.group(1)))
     if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
-            or inner.lower().startswith("ignored:")):
+            or REF.fullmatch(inner)            or inner.lower().startswith("ignored:")):
         return GONE
     glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
     return (" " if glued else "") + inner
@@ -125,7 +133,7 @@ def without_notes(raw: str) -> str:
     """Links and bracketed notes cleaned (see above), lines starting with "Ignored:" dropped, and
     the spaces tidied only where something was taken out. Same rules as the wallet's
     withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
-    text = LINK.sub(link, re.sub(r"\r\n?", "\n", raw))
+    text = PAREN_IDS.sub(GONE, LINK.sub(link, re.sub(r"\r\n?", "\n", raw)))
     for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
         text = NOTE.sub(note, text)
     text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
@@ -160,6 +168,7 @@ def spoken(answer: str) -> str:
     (6 pm), no bracketed notes, no markdown, no emoji."""
     text = without_notes(answer)
     text = BARE_ID.sub("", text)  # ids are never spoken: the wallet shows them
+    text = BARE_INTERNAL.sub("", text)  # nor node, approval, offer or mandate ids
     text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
