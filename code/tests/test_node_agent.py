@@ -6,6 +6,7 @@ tests pin down what the node's code does with whatever the model says.
 
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -144,8 +145,10 @@ def test_the_add_ons_a_request_needs_are_chosen_in_code_fewest_first():
 
 def offer_for(config: dict, room_type: str, requirements: list[str]) -> dict | None:
     """make_offer with the LLM's room choice already made."""
-    posting = {"request_id": "r1", "expires_at": "2026-11-14T12:00:00Z",
-               "request": {"payload": {"constraints": {"date": "2026-11-14", "requirements": requirements}}}}
+    soon = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    posting = {"request_id": "r1", "expires_at": soon,
+               "request": {"payload": {"constraints": {"date": "2099-11-14", "requirements": requirements},
+                                       "expires_at": soon}}}
     return asyncio.run(BusinessAgent(config).make_offer(posting, node.agent.OfferChoice(room_type=room_type)))
 
 

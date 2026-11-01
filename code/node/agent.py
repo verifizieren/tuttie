@@ -36,6 +36,7 @@ from anthropic import AnthropicError
 from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
 
+from aps.envelope import parse_timestamp
 from llm import LLM as ChatLLM
 from node.catalog import AVAILABLE, tools_for
 
@@ -45,6 +46,7 @@ LLM_ERRORS = (ValidationError, json.JSONDecodeError, OpenAIError, AnthropicError
 # Tools a business uses when its config has no "agent" section yet.
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
 DEFAULT_WAKES_ON = ["posting.created", "posting.updated"]
+OFFER_MAX_VALID_H = 24  # an offer never stays open longer than this
 COMMITMENT_DAYS = 30  # validity of a commitment when the arrival date is unknown
 # The company agents' decisions are small (interested?, which room and add-ons, a short answer),
 # so they use a fast model without reasoning (AGENT_LLM_MODEL, e.g. claude-haiku-5-5).
@@ -161,6 +163,29 @@ class WakeDecision(BaseModel):
     next_tool: str | None = None
     room_type: str | None = None
     add_ons: list[str] = []
+
+
+def offer_valid_until(request: dict, now: datetime | None = None) -> str | None:
+    """How long an offer for this signed request stays valid, or None if it cannot be made.
+
+    Taken from the signed request's expires_at (never from the unsigned posting around it),
+    capped at OFFER_MAX_VALID_H hours from now and at noon after the stay night. None when
+    the request has no readable expiry or it has already passed.
+    """
+    now = now or datetime.now(timezone.utc)
+    expires = parse_timestamp(request.get("expires_at"))
+    if expires is None:
+        return None
+    cap = now + timedelta(hours=OFFER_MAX_VALID_H)
+    try:
+        night = date.fromisoformat(request.get("constraints", {}).get("date", ""))
+        cap = min(cap, datetime.combine(night + timedelta(days=1), time(12), timezone.utc))
+    except (TypeError, ValueError, AttributeError):
+        pass
+    valid_until = min(expires, cap)
+    if valid_until <= now:
+        return None
+    return valid_until.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class BusinessAgent:
@@ -320,6 +345,9 @@ class BusinessAgent:
         if room is None or None in chosen:
             return None
         date_text = request.get("constraints", {}).get("date", "")
+        valid_until = offer_valid_until(request)
+        if valid_until is None:
+            return None
         return {
             "type": "offer",
             "request_id": posting["request_id"],
@@ -331,7 +359,7 @@ class BusinessAgent:
             "price_chf": room["price_chf"] + sum(a["price_chf"] for a in chosen),
             "includes": [a["item"] for a in chosen],
             "conditions": [room["rate"], *[c for a in chosen for c in a["conditions"]]],
-            "valid_until": posting["expires_at"],
+            "valid_until": valid_until,
         }
 
     def room_for(self, room_type: str, needs: set[str]) -> dict | None:

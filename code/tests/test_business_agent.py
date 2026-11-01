@@ -5,6 +5,7 @@ The LLM is replaced by a stub, so these run offline.
 
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -104,8 +105,11 @@ def test_wake_up_drops_a_tool_the_agent_does_not_have():
     assert result["next_tool"] is None and result["next_tool_available"] is False
 
 
-POSTING = {"request_id": "rq-test1", "expires_at": "2026-11-13T22:00:00Z", "offer_url": "http://market/x",
-           "request": {"payload": {"constraints": {"date": "2026-11-14", "requirements": ["dog", "late arrival"]}}}}
+SOON = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+# The posting's own expires_at is not signed: the offer's validity comes from the signed request.
+POSTING = {"request_id": "rq-test1", "expires_at": "2099-12-31T23:59:59Z", "offer_url": "http://market/x",
+           "request": {"payload": {"constraints": {"date": "2099-11-14", "requirements": ["dog", "late arrival"]},
+                                   "expires_at": SOON}}}
 
 
 def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
@@ -113,9 +117,9 @@ def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
     offer = asyncio.run(agent.make_offer(POSTING))
     assert offer["price_chf"] == 180 + 15 and offer["request_id"] == "rq-test1"
     assert offer["includes"] == ["late check-in after 22:00 with dog"]
-    assert offer["item"] == "double room 2026-11-14" and offer["valid_until"] == POSTING["expires_at"]
+    assert offer["item"] == "double room 2099-11-14" and offer["valid_until"] == SOON
     # The bookable terms travel as fields, so an agreement and the booking can be bound to them.
-    assert (offer["room_type"], offer["date"], offer["rate"]) == ("double", "2026-11-14", "best rate, non-refundable")
+    assert (offer["room_type"], offer["date"], offer["rate"]) == ("double", "2099-11-14", "best rate, non-refundable")
 
 
 @pytest.mark.parametrize("choice", [{"room_type": "double", "add_ons": ["free-spa"]}, {"add_ons": []}])
@@ -137,3 +141,19 @@ def test_a_new_posting_decides_and_chooses_the_offer_in_one_llm_call():
     agent.llm = None  # the offer needs no second call
     offer = asyncio.run(agent.make_offer(POSTING, choice))
     assert offer["price_chf"] == 180 + 15
+
+
+def test_offer_validity_comes_from_the_signed_request_and_is_capped():
+    """Red team R3: valid_until was the UNSIGNED posting's expires_at (e.g. 2099)."""
+    from node.agent import offer_valid_until
+    now = datetime(2026, 11, 1, 10, 0, tzinfo=timezone.utc)
+    request = {"constraints": {"date": "2026-11-13"}, "expires_at": "2026-11-01T12:00:00Z"}
+    assert offer_valid_until(request, now) == "2026-11-01T12:00:00Z"
+    far = {**request, "expires_at": "2099-12-31T23:59:59Z"}
+    assert offer_valid_until(far, now) == "2026-11-02T10:00:00Z"  # at most 24 h
+    tonight = {"constraints": {"date": "2026-11-01"}, "expires_at": "2099-12-31T23:59:59Z"}
+    assert offer_valid_until(tonight, now) == "2026-11-02T10:00:00Z"
+    assert offer_valid_until({"constraints": {"date": "2026-10-31"}, "expires_at": "2099-01-01T00:00:00Z"},
+                             now) == "2026-11-01T12:00:00Z"  # noon after the stay night
+    assert offer_valid_until({**request, "expires_at": "2026-11-01T09:00:00Z"}, now) is None  # expired
+    assert offer_valid_until({"constraints": {"date": "2026-11-13"}}, now) is None  # no signed expiry
