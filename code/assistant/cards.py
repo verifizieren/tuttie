@@ -86,6 +86,17 @@ def profile_of(data: dict) -> dict:
             "about": clean_text(profile.get("about"), MAX_ABOUT_CHARS)}
 
 
+def rating_of(facts: dict) -> dict | None:
+    """facts["rating"] as {score: number, reviews: int | None}, or None if it is not one."""
+    rating = facts.get("rating")
+    if not isinstance(rating, dict):
+        return None
+    score, reviews = rating.get("score"), rating.get("reviews")
+    if not isinstance(score, (int, float)) or isinstance(score, bool):
+        return None
+    return {"score": score, "reviews": reviews if isinstance(reviews, int) and not isinstance(reviews, bool) else None}
+
+
 def own_photos(node_id: str, photos) -> list[str]:
     """Only the hotel's own photos served with the wallet: `hotels/<node_id>/<file>.jpg|jpeg|png|webp`
     (optionally with a leading "/"). Anything else (other hosts, another hotel's folder, "..",
@@ -119,7 +130,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
         "size": profile.get("size"),
         "about": profile.get("about"),
         "agent": item.get("agent"),
-        "rating": facts.get("rating"),
+        "rating": rating_of(facts),
         "photos": own_photos(item["node_id"], facts.get("photos")),
         "offer_id": offer["offer_id"],
         "item": offer["item"],
