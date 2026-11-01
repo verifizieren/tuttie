@@ -133,6 +133,19 @@ def drop_notes(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+def without_budget(text: str, amounts: set[int]) -> str:
+    """The answer without the user's private budget amount in budget phrases ("your CHF 160
+    budget" -> "your budget", "within your CHF 160" -> "within your budget"): others hear Tuttie.
+    Other prices stay; `amounts` empty (the user asked about the budget) leaves the text as it is."""
+    for n in amounts:
+        chf = rf"CHF\s?{n}(?:\.-|\.00)?(?!\d)"
+        text = re.sub(rf"\byour {chf} (budget|limit|maximum)\b", r"your \1", text, flags=re.IGNORECASE)
+        text = re.sub(rf"\b(budget|limit|maximum) of {chf}", r"\1", text, flags=re.IGNORECASE)
+        text = re.sub(rf"\b(within|under|over|above|below) your {chf}(?! \w)", r"\1 your budget", text,
+                      flags=re.IGNORECASE)
+    return text
+
+
 def fallback_answer(said_goodbye: bool) -> str:
     """What Tuttie says when the model's final message was empty after cleaning: a short goodbye
     when end_conversation ran this turn (the model often writes only "Mood: happy" then)."""
@@ -233,6 +246,9 @@ class Assistant:
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
                 answer = drop_notes(answer) or fallback_answer(said_goodbye)
+                asked = re.search(r"budget|limit|maximum|how much can i", text, re.IGNORECASE)
+                private = getattr(self.toolbox, "private_amounts", None)
+                answer = without_budget(answer, set() if asked or private is None else private())
                 self.bus.emit("answer", "verified", answer, detail={"mood": mood})
                 return answer
             for call in message["tool_calls"]:
