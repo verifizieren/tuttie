@@ -415,6 +415,7 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        self.nudged: set[tuple[str, str]] = set()  # (node, room) told once that the card was another room
         if market := getattr(self, "market", None):
             market.forget()  # the old posting's offers are not this conversation's deals any more
         self.new_turn()
@@ -832,6 +833,14 @@ class Toolbox:
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
             return {"error": f"call get_availability on {node_id} for {date} first"}
+        card = next((o["offer"] for o in self.market.last_offers if o["node_id"] == node_id), None)
+        offered = offered_room(card) if card else None
+        listed = {r["room_type"] for r in availability["rooms"]}
+        if offered and offered != room_type and offered in listed and (node_id, room_type) not in self.nudged:
+            # Once: the liked card was for another room. Asked again for this room, it books.
+            self.nudged.add((node_id, room_type))
+            return {"error": f"the liked card of {record['name']} is the {offered} room ({card.get('rate') or 'its rate'}): "
+                             f"book room_type {offered!r}, unless the user asked for the {room_type} room (then call book again)"}
         room = next((r for r in availability["rooms"] if r["room_type"] == room_type), None)
         if room is None:
             return {"error": f"room_type must be one of {[r['room_type'] for r in availability['rooms']]}"}
