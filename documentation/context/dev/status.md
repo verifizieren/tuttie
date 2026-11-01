@@ -10,6 +10,19 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
 
 ## Done
 
+- **Wallet red-team round 2 holes closed** (branch `wip/r2-wallet`, not deployed): booking
+  terms (room, night, rate, included items) are short plain text before the user signs them
+  (`aps/approval.py` `plain_term`, max 120 chars, same on hotel and assistant side), so a
+  verified hotel's odd `rate` (an object) no longer reaches the phone; the wallet keeps only
+  plain text and numbers in an approval and its seals (`lib/activity.js` `approvalOf`,
+  `sealsOf`), and the approval sheet sits in an error boundary whose fallback still offers
+  Decline. A stored deck / pick / turns in the wrong shape is dropped on restore
+  (`validDeck`). "Tuttie is unreachable" from a failed send goes once the stream connects
+  again. A broken stream frame is ignored (`lib/stream.js` `parseFrame`). The note under the
+  hotel cards shows markdown as plain text (`plainMarkdown`). Hotel names in the book request
+  (`lib/picks.js`) are one short line without brackets or quotes. Open: landscape layout of
+  the hotel card (name overlaps the photo bars, "1 of 2" cut off).
+
 - **Red team round 3, approvals, booking and payments** (branch `wip/r3-pay`, not deployed):
   an approval is signed before it leaves the pending list, so a failing mandate no longer loses
   the decision (a CHF 0 charge used to 500 the approve call and hang the booking 300 s); a
