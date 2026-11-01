@@ -21,6 +21,7 @@ export const EMPTY = {
   deck: null,           // { step, index, liked: [node_id] }: how far the user swiped these cards (kept on reload)
   picked: null,         // node ids the user liked
   approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate, terms } while the user decides
+  decided: null,        // { id, status } of the last approval the server closed (approved, declined, expired)
   booking: null,        // the latest { id, hotel, total, date, room, rate, extras, checked, seals, uid, payments }; each stays in its turn
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
@@ -315,6 +316,8 @@ export function applyEvent(state, event) {
     const approved = event.status === "approved";
     const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
     return { ...progress(state, "tool", line, !approved, at), approval: null,
+             // the approval id is inside the signed decision (aps/approval.py sign_decision)
+             decided: { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) },
              phase: approved ? "booking" : "declined" };
   }
   return state;

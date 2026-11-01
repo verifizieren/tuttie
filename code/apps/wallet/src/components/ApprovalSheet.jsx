@@ -5,7 +5,10 @@
 // with the user's key, and the hotel only books with that signature and only for exactly this
 // amount. Declining is sent right away. While a decision travels the sheet names it
 // ("Declining…"), and the final mark shows what the server recorded. A failed send shows why
-// and leaves the buttons ready for another try; an approval that no longer waits (already
+// and leaves the buttons ready for another try, also when no answer came at all (after 15 s,
+// lib/api.js); the event stream is the other way the server's decision arrives: once it says
+// the approval was decided, the sheet finishes even if the answer to its own call never comes.
+// An approval that no longer waits (already
 // decided or expired) says so and the sheet goes. A booking may also offer a mandate for a
 // small charge that follows (the city tax): with the switch on, the user's key signs it too
 // and Tuttie pays that charge without asking again.
@@ -96,15 +99,23 @@ export function ApprovalFallback({ approval, onGone }) {
 // `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
 // booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
 // `onDecide(approval)` when the user decides: the wallet keeps the sheet while it finishes, even
-// once the server stopped waiting; `onFinished(id, decided)` after the final mark was shown and the
+// once the server stopped waiting; `recorded`: the decision the server streamed for this approval
+// (lib/approval.js serverDecision), which finishes a sheet still sending; `onFinished(id, decided)` after the final mark was shown and the
 // sheet left (decided), or after a failed send while the approval still waits (not decided).
-export default function ApprovalSheet({ approval, onGone, note = "", onDecide, onFinished }) {
+export default function ApprovalSheet({ approval, onGone, note = "", recorded = null, onDecide, onFinished }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
   const [leaving, setLeaving] = useState(false); // sliding away after the final mark
   const [decision, setDecision] = useState(null); // the chosen decision, then the recorded one
   const [error, setError] = useState("");
   const [allow, setAllow] = useState(true);      // sign the offered mandate as well
   const busy = useRef(false);                    // one decision in flight at a time (double taps)
+  const finished = useRef(false);                // the final mark is shown once: by the answer or the stream
+
+  // The server's decision arrived on the event stream while the sheet still waits for the answer
+  // to its call (which may never come): finish with what the server recorded.
+  useEffect(() => {
+    if (recorded && stage === "sending") finish(recorded);
+  }, [recorded, stage]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // An approval that no longer waits: say so briefly, then let the sheet go.
   useEffect(() => {
@@ -115,6 +126,20 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
 
   if (!approval) return null;
   const offer = approval.offerMandate;
+
+  // The final mark for the recorded decision, then the sheet slides away; only the first of the
+  // call's answer and the stream's event does this, a later one changes nothing.
+  async function finish(recordedAs) {
+    if (finished.current) return;
+    finished.current = true;
+    setError("");
+    setDecision(recordedAs);
+    setStage("done");
+    await wait(DONE_MS);  // the checkmark (or X) is seen in full
+    setLeaving(true);
+    await wait(LEAVE_MS);
+    onFinished?.(approval.id, true);
+  }
 
   async function choose(chosen) {
     if (busy.current) return;
@@ -129,13 +154,9 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
     setStage("sending");
     try {
       const result = await decide(approval.id, chosen, chosen === "approved" && Boolean(offer) && allow);
-      setDecision(recordedDecision(result, chosen));
-      setStage("done");
-      await wait(DONE_MS);  // the checkmark (or X) is seen in full
-      setLeaving(true);
-      await wait(LEAVE_MS);
-      onFinished?.(approval.id, true);
+      await finish(recordedDecision(result, chosen));
     } catch (e) {
+      if (finished.current) return;  // the stream already showed the decision: a late failure changes nothing
       const failure = failureOf(e);
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");

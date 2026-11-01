@@ -33,3 +33,51 @@ test("server errors and network errors can be retried", () => {
   assert.equal(network.gone, false);
   assert.match(network.message, /connection/);
 });
+
+// The server's decided event in its real shape (assistant/tools.py, the emit after approvals.wait):
+// detail = { decision: <the signed decision, aps/approval.py sign_decision> }; only the pending
+// event has detail.approval_id.
+const signedDecision = (id, decision) => ({ approval_id: id, decision, action: "book", amount_chf: 128,
+                                            decided_at: "2026-11-01T02:00:00Z", signature: "x" });
+const decidedEvent = (step, id, status) => ({ step, kind: "approval", status, turn: "t1",
+                                              detail: { decision: signedDecision(id, status) } });
+
+test("the decision the server streamed belongs to its own approval only", async () => {
+  const { applyEvent, startTurn, EMPTY } = await import("./activity.js");
+  const { serverDecision } = await import("./approval.js");
+  const pending = applyEvent(startTurn(EMPTY, "book"), { step: 1, kind: "approval", status: "pending", detail: { approval_id: "a1" } });
+  assert.equal(serverDecision(pending, "a1"), null);
+  const approved = applyEvent(pending, decidedEvent(2, "a1", "approved"));
+  assert.equal(serverDecision(approved, "a1"), "approved");
+  assert.equal(serverDecision(approved, "a2"), null);  // a late event never finishes a newer sheet
+  assert.equal(serverDecision(approved, ""), null);
+  const declined = applyEvent(pending, decidedEvent(2, "a1", "declined"));
+  assert.equal(serverDecision(declined, "a1"), "declined");
+  const expired = applyEvent(pending, { step: 2, kind: "approval", status: "expired", detail: {} });
+  assert.equal(serverDecision(expired, "a1"), null);  // not a decision: the sheet's own call says what happened
+  const odd = applyEvent(pending, { step: 2, kind: "approval", status: "approved", detail: { decision: { approval_id: { x: 1 } } } });
+  assert.equal(serverDecision(odd, "a1"), null);
+  const next = applyEvent(approved, { step: 3, kind: "approval", status: "pending", detail: { approval_id: "a2" } });
+  assert.equal(serverDecision(next, "a2"), null);
+});
+
+test("a decision that gets no answer stops waiting and can be tried again", async () => {
+  const { decide } = await import("./api.js");
+  const saved = globalThis.fetch;
+  let signal = null;
+  globalThis.fetch = (_path, init) => new Promise((_resolve, reject) => {
+    signal = init.signal;
+    init.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+  });
+  try {
+    const error = await decide("a1", "approved", false, 30).then(() => null, e => e);
+    assert.ok(error, "the call must not hang");
+    assert.equal(signal.aborted, true);
+    const failure = failureOf(error);
+    assert.equal(failure.gone, false);
+    assert.match(failure.message, /try again/);
+    assert.doesNotMatch(failure.message, /abort|connection/i);
+  } finally {
+    globalThis.fetch = saved;
+  }
+});

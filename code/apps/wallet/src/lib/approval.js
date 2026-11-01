@@ -17,9 +17,17 @@ export function recordedDecision(result, chosen) {
 /** Why sending a decision failed, for the sheet. `gone` means the approval no longer waits
  *  (already decided, expired or unknown: 404, 409, 410), so retrying makes no sense. */
 export function failureOf(error) {
+  if (error?.timeout) return { gone: false, message: "Tuttie has not answered yet. Please try again." };
   if ([404, 409, 410].includes(error?.status)) {
     return { gone: true, message: "This approval was already decided or has expired." };
   }
   if (error?.status) return { gone: false, message: "Your decision could not be saved. Please try again." };
   return { gone: false, message: "Your decision could not be sent. Check your connection and try again." };
+}
+
+/** The decision the server streamed for approval `id` (its "approval" event), or null: a decision
+ *  for another (older) approval, or an end that is not a decision (expired), never counts. */
+export function serverDecision(state, id) {
+  const decided = state?.decided;
+  return id && decided?.id === id && DECISIONS.includes(decided.status) ? decided.status : null;
 }

@@ -14,16 +14,28 @@ export function errorText(status, body) {
   return status ? "Tuttie ran into a problem. Please try again in a moment." : UNREACHABLE;
 }
 
-async function post(path, body) {
+/** How long the wallet waits for the answer to a decision before it offers another try. */
+export const DECIDE_TIMEOUT_MS = 15000;
+export const NO_ANSWER = "Tuttie has not answered yet. Please try again.";
+
+// With `timeoutMs`, a call that gets no answer by then is given up: it fails with `timeout`
+// (and no status), so the caller can offer another try instead of waiting forever.
+async function post(path, body, timeoutMs = 0) {
+  const abort = timeoutMs > 0 ? new AbortController() : null;
+  const timer = abort && setTimeout(() => abort.abort(), timeoutMs);
   let response;
   try {
     response = await fetch(path, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: abort?.signal,
     });
   } catch {
+    if (abort?.signal.aborted) throw Object.assign(new Error(NO_ANSWER), { timeout: true });
     throw new Error(UNREACHABLE);  // offline or the server is down: no status
+  } finally {
+    clearTimeout(timer);
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -41,9 +53,11 @@ export const sendChat = (message, firstTool = null, conversationId = null, said 
   post("/chat", { message, first_tool: firstTool, conversation_id: conversationId, said });
 
 /** The user's decision on a pending approval; the assistant signs it with the user's key.
- *  `allowMandate` also signs the mandate the approval offered (e.g. for the city tax). */
-export const decide = (approvalId, decision, allowMandate = false) =>
-  post(`/approvals/${approvalId}`, { decision, allow_mandate: allowMandate });
+ *  `allowMandate` also signs the mandate the approval offered (e.g. for the city tax). Without
+ *  an answer after `timeoutMs` the call fails with `timeout` (the server may still have decided:
+ *  its approval event then says so on the event stream). */
+export const decide = (approvalId, decision, allowMandate = false, timeoutMs = DECIDE_TIMEOUT_MS) =>
+  post(`/approvals/${approvalId}`, { decision, allow_mandate: allowMandate }, timeoutMs);
 
 /** Start over: a new conversation and an empty timeline. */
 export const resetConversation = () => post("/reset");

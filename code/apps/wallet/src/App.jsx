@@ -35,6 +35,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
+import { serverDecision } from "./lib/approval.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 import { bookingRequest } from "./lib/picks.js";
@@ -47,6 +48,7 @@ const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in 
 const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
 const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once more after this
 const DECIDE_FIRST = "Decide on the booking first";
+const DECISION_ON_ITS_WAY = "One moment, your decision is on its way";
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
 
@@ -145,7 +147,9 @@ export default function App() {
   // A new conversation from the dock: the current one goes into the history.
   async function newChat() {
     setShowHistory(false);
-    if (approval) return setNotice(DECIDE_FIRST);  // the user must decide the waiting approval first
+    // Never a new chat under the sheet: a decision on its way finishes first, a waiting one needs the user.
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);
+    if (approval) return setNotice(DECIDE_FIRST);
     try {
       await actions.newConversation(agent);
       setError("");
@@ -170,7 +174,8 @@ export default function App() {
 
   // The dock's History button always shows the list, also from inside a past chat.
   function openHistory() {
-    if (approval) return setNotice(DECIDE_FIRST);  // the sheet covers the card: never open the history under it
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);  // the sheet covers the card: never open the history under it
+    if (approval) return setNotice(DECIDE_FIRST);
     setHistoryChat({ id: null, error: "", resuming: false });
     setShowHistory(true);
   }
@@ -282,7 +287,7 @@ export default function App() {
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
         {sheetApproval && <Boundary key={approvalId} fallback={<ApprovalFallback approval={sheetApproval} onGone={() => { dropApproval(); sheetDone(); }} />}>
-          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice}
+          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice} recorded={serverDecision(agent, approvalId)}
                          onDecide={setFinishing} onFinished={sheetDone} />
         </Boundary>}
       </AgentCard>
