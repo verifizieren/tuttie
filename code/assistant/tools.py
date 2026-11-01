@@ -408,7 +408,7 @@ class Toolbox:
     async def end_conversation(self) -> dict:
         """Ask the wallet to close Tuttie's card (after the goodbye is said): a "close" event."""
         self.bus.emit("close", "verified", "Closing the card")
-        return {"closing": True, "note": "the card closes after your goodbye; keep it to a few words"}
+        return {"closing": True, "note": "now say a short goodbye (a few words)"}
 
     async def recall_context(self) -> dict:
         """The user's calendar, mail, messages and preferences (assistant/context.py)."""
