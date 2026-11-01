@@ -16,7 +16,7 @@ Messages API instead, without thinking, for the fastest replies (ClaudeLLM below
 import json
 import os
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, BadRequestError
 from openai import AsyncOpenAI
 
 CLAUDE_MAX_TOKENS = 4096    # Tuttie's answers are one to three sentences; tool calls are small
@@ -119,16 +119,24 @@ class LLM:
         return json.loads(response.output_text or "{}")
 
 
-def to_claude(messages: list[dict]) -> tuple[str, list[dict]]:
-    """Chat-style messages -> (system prompt, Messages API messages).
+CACHE = {"type": "ephemeral"}
 
-    Tool results become tool_result blocks, grouped into one user message per turn.
+
+def to_claude(messages: list[dict]) -> tuple[list[dict], list[dict], str]:
+    """Chat-style messages -> (system blocks, Messages API messages, notes).
+
+    Tool results become tool_result blocks, grouped into one user message per turn. The first
+    system message is the fixed prompt: it is marked for prompt caching (with the tools, which
+    the API renders before it). Later system messages are per-round notes (today's date, the
+    current deal data); they change every round, so they come back separately as `notes`, to be
+    sent after the chat, where they cannot break the cached prefix. The last chat message is
+    marked for caching too, so the next round of the same turn reuses the whole history.
     """
-    system, out = [], []
+    system, notes, out = [], [], []
     for message in messages:
         role, content = message["role"], message.get("content")
         if role == "system":
-            system.append(content)
+            (notes if system else system).append(content)
         elif role == "assistant":
             out.append({"role": "assistant", "content": message.get("provider_items") or content or "..."})
         elif role == "tool":
@@ -139,7 +147,23 @@ def to_claude(messages: list[dict]) -> tuple[str, list[dict]]:
                 out.append({"role": "user", "content": [block]})
         else:
             out.append({"role": "user", "content": content or ""})
-    return "\n\n".join(system), out
+    blocks = [{"type": "text", "text": system[0], "cache_control": CACHE}] if system and system[0] else []
+    if out and out[-1]["role"] == "user":
+        last = out[-1]
+        content = last["content"] if isinstance(last["content"], list) else [{"type": "text", "text": last["content"]}]
+        last["content"] = [*content[:-1], {**content[-1], "cache_control": CACHE}] if content else content
+    return blocks, out, "\n\n".join(n for n in notes if n)
+
+
+def with_notes(system: list[dict], chat: list[dict], notes: str, inline: bool) -> tuple[list[dict], list[dict]]:
+    """Place the per-round notes: as a system message after the chat (keeps the cached prefix),
+    or, `inline` (a model without mid-chat system messages, or a chat not ending with the user),
+    as a second, uncached system block after the cached prompt."""
+    if not notes:
+        return system, chat
+    if inline or not chat or chat[-1]["role"] != "user":
+        return [*system, {"type": "text", "text": notes}], chat
+    return system, [*chat, {"role": "system", "content": notes}]
 
 
 def to_claude_tool(schema: dict) -> dict:
@@ -159,14 +183,23 @@ class ClaudeLLM:
         effort = os.environ.get("LLM_REASONING_EFFORT", "")
         self.options = {"thinking": {"type": "disabled"},
                         "output_config": {"effort": effort if effort in CLAUDE_EFFORTS else "low"}}
+        self.inline_notes = False  # set once the model refuses a system message inside the chat
 
     async def complete(self, messages: list[dict], tools: list[dict], tool_choice: str | None = None) -> dict:
         """Return {"role", "content", "tool_calls"?, "reasoning": [], "provider_items"} like LLM.complete."""
-        system, chat = to_claude(messages)
+        system, chat, notes = to_claude(messages)
         forced = {"tool_choice": {"type": "tool", "name": tool_choice}} if tool_choice else {}
-        response = await self.client.messages.create(
-            model=self.model, max_tokens=CLAUDE_MAX_TOKENS, system=system, messages=chat,
-            tools=[to_claude_tool(t) for t in tools], **self.options, **forced)
+        request = {"model": self.model, "max_tokens": CLAUDE_MAX_TOKENS,
+                   "tools": [to_claude_tool(t) for t in tools], **self.options, **forced}
+        try:
+            system_, chat_ = with_notes(system, chat, notes, self.inline_notes)
+            response = await self.client.messages.create(system=system_, messages=chat_, **request)
+        except BadRequestError as error:
+            if self.inline_notes or "system" not in str(error):
+                raise
+            self.inline_notes = True  # this model refuses system messages inside the chat
+            system_, chat_ = with_notes(system, chat, notes, True)
+            response = await self.client.messages.create(system=system_, messages=chat_, **request)
         blocks = [block.model_dump(exclude_none=True) for block in response.content]
         # Text after the last tool call (final_text).
         tail = blocks[max((i + 1 for i, b in enumerate(blocks) if b["type"] == "tool_use"), default=0):]
