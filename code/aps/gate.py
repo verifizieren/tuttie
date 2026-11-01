@@ -54,12 +54,12 @@ For `pay` (the business computes what it charges):
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aps.approval import payment_charge, verify_decision
 from aps.call import CALL_MAX_AGE_S, NonceBook, call_body, verify_call
 from aps.delegation import verify_delegation
-from aps.envelope import is_fresh
+from aps.envelope import is_fresh, parse_timestamp
 from aps.mandate import mandate_refusal
 from aps.seals import evaluate_record
 
@@ -69,6 +69,7 @@ TRUSTED_TIERS = {"gold", "blue"}
 # older approval is refused: used approvals live in memory, so after a node restart an old one
 # would otherwise book again.
 APPROVAL_MAX_AGE_S = 900
+START_SLACK_S = 5  # stamps are whole seconds; a call signed just as the node started still counts
 
 
 @dataclass(frozen=True)
@@ -128,7 +129,18 @@ class ActionGate:
         self.agreements = agreements
         self.nonces = NonceBook(CALL_MAX_AGE_S)
         self.used_approvals: set[str] = set()
+        # Used nonces and approvals live in memory only: anything signed before this gate started
+        # (a restart) may have been used already, so it never acts (made_before_start).
+        self.started_at = datetime.now(timezone.utc)
         self.paid_with_mandate: dict[str, float] = {}  # mandate id -> CHF paid with it
+
+    def made_before_start(self, timestamp: str, now: datetime) -> bool:
+        """Whether `timestamp` is from before this gate started (with START_SLACK_S for the
+        second-truncated stamps). A clock before the start (tests) never counts."""
+        stamped = parse_timestamp(timestamp)
+        if stamped is None or now < self.started_at:
+            return False
+        return stamped < self.started_at - timedelta(seconds=START_SLACK_S)
 
     async def check_action(self, call: dict, needs: Needs, now: datetime | None = None) -> Verdict:
         """Run every check for this call; never raises for bad input, refuses instead."""
@@ -161,6 +173,8 @@ class ActionGate:
 
         if not is_fresh(body["timestamp"], CALL_MAX_AGE_S, now):
             raise Refused("the call is outdated (possible replay)")
+        if self.made_before_start(body["timestamp"], now):
+            raise Refused("the call was signed before this business restarted (possible replay); send a new one")
         if not verify_call(call, caller["public_key"], needs.tool, CALL_MAX_AGE_S, now):
             raise Refused("the call is not signed by the caller's key")
         verdict.checks.append("signature")
@@ -223,6 +237,8 @@ class ActionGate:
             raise Refused(f"approved CHF {approval['amount_chf']:g} does not match the total CHF {amount:g}")
         if needs.purpose is not None and approval.get("charge") != payment_charge(needs.purpose, needs.booking_id):
             raise Refused(f"the approval is not for the {needs.purpose} of this booking")
+        if self.made_before_start(approval["decided_at"], now):
+            raise Refused("the approval was decided before this business restarted; ask the user again")
         return approval, amount
 
     def commit(self, verdict: Verdict) -> None:
