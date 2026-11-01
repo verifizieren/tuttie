@@ -60,7 +60,8 @@ export function approvalOf(event, detail) {
  *  React's output breaks the whole chat view). Other fields stay as they came. */
 const number = value => (typeof value === "number" && Number.isFinite(value) ? value : null);
 export function cardOf(card) {
-  const score = number(card.rating?.score);
+  const rated = number(card.rating?.score);
+  const score = rated !== null && rated >= 0 && rated <= 5 ? rated : null;  // a score out of 5
   return {
     ...card,
     node_id: plain(card.node_id), name: plain(card.name), agent: plain(card.agent), about: plain(card.about),
