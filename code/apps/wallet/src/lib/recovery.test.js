@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BUSY_NOTE, clearsOnReconnect, newChatFailure, PICK_UNREACHABLE, OFFLINE_NOTE, shouldResend, voiceNote, voiceRetryDelay } from "./recovery.js";
+import { BUSY_NOTE, clearsOnReconnect, MIC_BLOCKED_NOTE, micRefused, newChatFailure, PICK_UNREACHABLE, OFFLINE_NOTE, shouldResend, voiceNote,
+         voiceRetryDelay } from "./recovery.js";
 
 test("voice retries back off from 2 s and stop growing at 30 s", () => {
   assert.deepEqual([1, 2, 3, 4, 5, 6, 20].map(voiceRetryDelay), [2000, 4000, 8000, 16000, 30000, 30000, 30000]);
@@ -9,6 +10,21 @@ test("voice retries back off from 2 s and stop growing at 30 s", () => {
 test("only a voice that cannot connect is named; text-only servers stay silent", () => {
   assert.equal(voiceNote("unavailable"), "Voice unavailable · tap to retry");
   for (const state of ["off", "connecting", "ready", "live", "disabled"]) assert.equal(voiceNote(state), "");
+});
+
+test("a blocked microphone is named first, except on a text-only server", () => {
+  assert.equal(MIC_BLOCKED_NOTE, "Microphone blocked — type instead");
+  for (const state of ["connecting", "ready", "live", "unavailable"]) assert.equal(voiceNote(state, true), MIC_BLOCKED_NOTE);
+  assert.equal(voiceNote("disabled", true), "");
+});
+
+test("only the browser's microphone refusals count as blocked", () => {
+  for (const name of ["NotAllowedError", "NotFoundError", "SecurityError", "PermissionDeniedError", "NotReadableError"]) {
+    assert.equal(micRefused({ name }), true, name);
+  }
+  for (const error of [new TypeError("Failed to fetch"), { name: "AbortError" }, null, undefined, "NotAllowedError"]) {
+    assert.equal(micRefused(error), false);
+  }
 });
 
 test("messages are sent again only when the server was not reached or failed", () => {

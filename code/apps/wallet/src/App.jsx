@@ -86,7 +86,7 @@ export default function App() {
   // What Tuttie is doing, and the eyes following it (lib/presence.js, lib/faceDirector.js).
   const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
   useFaceDirector(presence, face);
-  const { state: voice, unlockAudio, muted, toggleMute, retry: retryVoice } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
+  const { state: voice, unlockAudio, muted, micBlocked, toggleMute, retry: retryVoice } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
                                                                     presence.levels, agent.id);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
@@ -269,7 +269,7 @@ export default function App() {
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
       <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
-                                                     || (mode === "voice" && !quiet ? voiceNote(voice) : "")}
+                                                     || (mode === "voice" && !quiet ? voiceNote(voice, micBlocked) : "")}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
           <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} onDeck={actions.deck} reveal={reveal} />
@@ -287,7 +287,7 @@ export default function App() {
         </Boundary>}
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
-            muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
+            muted={muted || quiet} blocked={micBlocked && voice !== "disabled"} onMute={quiet ? () => setQuiet(false) : toggleMute} />
     </div>
     </PresenceProvider>
   );

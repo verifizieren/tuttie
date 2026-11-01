@@ -19,10 +19,25 @@ export function voiceRetryDelay(failures) {
   return Math.min(VOICE_RETRY_FIRST_MS * 2 ** Math.max(0, failures - 1), VOICE_RETRY_MAX_MS);
 }
 
+/** The line under Tuttie's eyes while the microphone cannot be used. */
+export const MIC_BLOCKED_NOTE = "Microphone blocked — type instead";
+
+// getUserMedia's refusals: no permission (or a dismissed prompt, an insecure page), no
+// microphone at all, or one held by another app. Older browsers use the Permission/Devices names.
+const MIC_ERRORS = new Set(["NotAllowedError", "PermissionDeniedError", "PermissionDismissedError", "SecurityError",
+                            "NotFoundError", "DevicesNotFoundError", "NotReadableError"]);
+
+/** True when an error from opening the microphone means it cannot be used (blocked, missing,
+ *  busy), not that the connection failed. */
+export const micRefused = error => MIC_ERRORS.has(error?.name);
+
 /** The line under Tuttie's eyes for the voice state, or "" when there is nothing to say.
- *  Only a voice that should work but cannot connect is named; a server without voice
- *  ("disabled") simply stays text-only. */
-export function voiceNote(state) {
+ *  A blocked microphone (`micBlocked`) is named first: typing still works. A voice that should
+ *  work but cannot connect is named too; a server without voice ("disabled") simply stays
+ *  text-only. */
+export function voiceNote(state, micBlocked = false) {
+  if (state === "disabled") return "";
+  if (micBlocked) return MIC_BLOCKED_NOTE;
   return state === "unavailable" ? "Voice unavailable · tap to retry" : "";
 }
 
