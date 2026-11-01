@@ -10,6 +10,15 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
 
 ## Done
 
+- **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
+  microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
+  eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for
+  it again (no prompt loop; `lib/recovery.js` `micRefused`, `hooks/useVoice.js` `micBlocked`).
+  A server restart that lost an unfinished chat (open question, approval or cards) archives it
+  to History and says "Tuttie restarted — please ask again" until the next message
+  (`lostOnRestart`). A booking approval puts the hotel cards away in every tab (it sets
+  `picked`), so a second tab can no longer swipe a second booking after a Decline.
+
 - **Wallet red-team round 2 holes closed** (branch `wip/r2-wallet`, not deployed): booking
   terms (room, night, rate, included items) are short plain text before the user signs them
   (`aps/approval.py` `plain_term`, max 120 chars, same on hotel and assistant side), so a
