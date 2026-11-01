@@ -27,7 +27,7 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
   owner page's direct node fetch then works only on the server itself). A booking without a deal for
   another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
-  keeps two sentences.
+  keeps two sentences. A booking is in the user's name unless said otherwise (Tuttie never asks for it).
   Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
   owner page's direct node fetch then works only on the server itself). A booking without a deal for
   another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
