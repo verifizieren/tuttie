@@ -1,5 +1,10 @@
 # Demo (issues #3, #2) — not started
 
+The stage demo currently runs from the pitch deck: `apps/presentation/demo.js` drives the real
+wallet inside the deck's phone frame with input and timing only (tap the Tuttie card, type the
+request, swipe the hotel cards, tap Approve), one step per clicker press. See
+`apps/presentation/README.md`. A runner here is only needed beyond that (e.g. voice input).
+
 Runs the stage demo: the storyline as a list of steps (user line, expected agent action,
 timing) that drives the real components, so the demo is predictable but nothing is faked.
 
