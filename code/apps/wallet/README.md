@@ -24,7 +24,10 @@ Live at <https://web4.mendes.dev/wallet/>.
 - **Approvals happen in the wallet:** a sheet shows hotel, seals and amount; approving runs a
   Face ID-style confirmation before the decision goes to `POST /approvals/{id}`, where the
   assistant signs it with the user's key. The sheet can also allow a small mandate, so the
-  city tax is paid right after the booking without a second prompt. The booking card shows
+  city tax is paid right after the booking without a second prompt. If the POST answer is
+  lost, the sheet finishes on the streamed decision (the approval id inside the signed
+  decision); `decide()` gives up after 15 s and offers another try. New chat and History wait
+  for a decision on its way instead of opening under the sheet. The booking card shows
   what Tuttie checked ("Checked by Tuttie") and the paid tax.
 - **Voice** (`hooks/useVoice.js`, server side in `code/voice/`): the wallet joins the
   conversation's LiveKit room with the microphone off; opening Tuttie's card switches it on.
