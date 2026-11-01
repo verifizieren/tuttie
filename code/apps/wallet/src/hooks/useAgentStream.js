@@ -43,6 +43,7 @@ export default function useAgentStream() {
   const [switching, setSwitching] = useState(true);
   const [connectionError, setConnectionError] = useState("");
   const [link, setLink] = useState("live");  // the event stream: live | reconnecting | offline
+  const [opened, setOpened] = useState(0);  // counts the stream's successful (re)connections
   const switchingRef = useRef(true);
   const stream = useRef(null);
   const activeId = useRef(null);
@@ -89,6 +90,7 @@ export default function useAgentStream() {
       if (stream.current !== source) return;
       retry.current.attempt = 0;
       setLink("live");
+      setOpened(n => n + 1);
     });
     // The browser's own retry would replay the timeline without noticing a reset or another
     // conversation: close it and reconnect through GET /history instead.
@@ -264,5 +266,5 @@ export default function useAgentStream() {
       resume: entry => switchTo(stateRef.current, entry.state),
     };
   }, [dispatch]);
-  return [state, actions, history, lastChange, switching, connectionError, link];
+  return [state, actions, history, lastChange, switching, connectionError, link, opened];
 }

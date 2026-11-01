@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BUSY_NOTE, newChatFailure, OFFLINE_NOTE, shouldResend, voiceNote, voiceRetryDelay } from "./recovery.js";
+import { BUSY_NOTE, clearsOnReconnect, newChatFailure, PICK_UNREACHABLE, OFFLINE_NOTE, shouldResend, voiceNote, voiceRetryDelay } from "./recovery.js";
 
 test("voice retries back off from 2 s and stop growing at 30 s", () => {
   assert.deepEqual([1, 2, 3, 4, 5, 6, 20].map(voiceRetryDelay), [2000, 4000, 8000, 16000, 30000, 30000, 30000]);
@@ -22,4 +22,11 @@ test("a busy Tuttie is a friendly note, other failures keep their reason", () =>
   assert.deepEqual(newChatFailure({ status: 409, message: "conversation is busy" }), { notice: BUSY_NOTE });
   assert.deepEqual(newChatFailure({ status: 500, message: "boom" }), { error: "boom" });
   assert.deepEqual(newChatFailure(new Error("Tuttie is unreachable right now")), { notice: OFFLINE_NOTE });
+});
+
+test("only an unreachable error goes by itself once the connection is back", () => {
+  assert.equal(clearsOnReconnect("Tuttie is unreachable right now"), true);
+  assert.equal(clearsOnReconnect(PICK_UNREACHABLE), true);
+  assert.equal(clearsOnReconnect("The chat changed elsewhere. Showing the current one, please say it again."), false);
+  assert.equal(clearsOnReconnect(""), false);
 });

@@ -38,7 +38,7 @@ import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 import { bookingRequest } from "./lib/picks.js";
-import { newChatFailure, shouldResend, voiceNote } from "./lib/recovery.js";
+import { clearsOnReconnect, newChatFailure, PICK_UNREACHABLE, shouldResend, voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -58,7 +58,7 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history, lastChange, switching, connectionError, link] = useAgentStream();
+  const [agent, actions, history, lastChange, switching, connectionError, link, opened] = useAgentStream();
   // An approval the server no longer knows (already decided or expired): the sheet said so and
   // went; the wallet stops waiting for it even if no event about it arrives.
   const [goneApproval, setGoneApproval] = useState(null);
@@ -110,6 +110,10 @@ export default function App() {
     const timer = setTimeout(() => setNotice(""), NOTICE_MS);
     return () => clearTimeout(timer);
   }, [notice]);
+  // "Tuttie is unreachable" from a failed send goes once the stream has connected again.
+  useEffect(() => {
+    if (opened) setError(e => (clearsOnReconnect(e) ? "" : e));
+  }, [opened]);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -242,7 +246,7 @@ export default function App() {
     const sent = await send(text, "book", shown, false, true);
     if (sent) return;
     actions.pick(null);
-    setError("Tuttie could not be reached — swipe again to book");
+    setError(PICK_UNREACHABLE);
   }
 
   // While a hotel card is dragged, Tuttie looks the same way (the face director follows `lean`).
