@@ -34,18 +34,29 @@ test("server errors and network errors can be retried", () => {
   assert.match(network.message, /connection/);
 });
 
+// The server's decided event in its real shape (assistant/tools.py, the emit after approvals.wait):
+// detail = { decision: <the signed decision, aps/approval.py sign_decision> }; only the pending
+// event has detail.approval_id.
+const signedDecision = (id, decision) => ({ approval_id: id, decision, action: "book", amount_chf: 128,
+                                            decided_at: "2026-11-01T02:00:00Z", signature: "x" });
+const decidedEvent = (step, id, status) => ({ step, kind: "approval", status, turn: "t1",
+                                              detail: { decision: signedDecision(id, status) } });
+
 test("the decision the server streamed belongs to its own approval only", async () => {
   const { applyEvent, startTurn, EMPTY } = await import("./activity.js");
   const { serverDecision } = await import("./approval.js");
   const pending = applyEvent(startTurn(EMPTY, "book"), { step: 1, kind: "approval", status: "pending", detail: { approval_id: "a1" } });
   assert.equal(serverDecision(pending, "a1"), null);
-  const approved = applyEvent(pending, { step: 2, kind: "approval", status: "approved", detail: { approval_id: "a1" } });
+  const approved = applyEvent(pending, decidedEvent(2, "a1", "approved"));
   assert.equal(serverDecision(approved, "a1"), "approved");
   assert.equal(serverDecision(approved, "a2"), null);  // a late event never finishes a newer sheet
-  const declined = applyEvent(pending, { step: 2, kind: "approval", status: "declined", detail: { approval_id: "a1" } });
+  assert.equal(serverDecision(approved, ""), null);
+  const declined = applyEvent(pending, decidedEvent(2, "a1", "declined"));
   assert.equal(serverDecision(declined, "a1"), "declined");
-  const expired = applyEvent(pending, { step: 2, kind: "approval", status: "expired", detail: { approval_id: "a1" } });
+  const expired = applyEvent(pending, { step: 2, kind: "approval", status: "expired", detail: {} });
   assert.equal(serverDecision(expired, "a1"), null);  // not a decision: the sheet's own call says what happened
+  const odd = applyEvent(pending, { step: 2, kind: "approval", status: "approved", detail: { decision: { approval_id: { x: 1 } } } });
+  assert.equal(serverDecision(odd, "a1"), null);
   const next = applyEvent(approved, { step: 3, kind: "approval", status: "pending", detail: { approval_id: "a2" } });
   assert.equal(serverDecision(next, "a2"), null);
 });
