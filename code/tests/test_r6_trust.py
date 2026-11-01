@@ -217,3 +217,65 @@ def test_rating_reaches_the_wallet_only_as_numbers(rating, shown):
     item = {"node_id": RHEIN, "name": "Hotel Rheinblick", "trust_tier": "gold",
             "offer": {"offer_id": "o1", "item": "double", "price_chf": 140, "includes": [], "conditions": []}}
     assert hotel_card(item, {"rating": rating}, [], None, True)["rating"] == shown
+
+
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), -1, 5.5])
+def test_rating_must_be_a_finite_score_from_0_to_5(score):
+    """A NaN, infinite or out-of-range score is no rating (NaN would break the cards frame)."""
+    item = {"node_id": RHEIN, "name": "Hotel Rheinblick", "trust_tier": "gold",
+            "offer": {"offer_id": "o1", "item": "double", "price_chf": 140, "includes": [], "conditions": []}}
+    assert hotel_card(item, {"rating": {"score": score, "reviews": 3}}, [], None, True)["rating"] is None
+
+
+@pytest.mark.parametrize("text", ['{"rating": {"score": NaN}}', '{"a": Infinity}', '{"a": -Infinity}',
+                                  '{"rating": {"score": 1e309}}'])
+def test_mcp_reply_with_nan_or_infinity_is_a_bad_reply(text):
+    """A business's MCP reply with NaN/Infinity is refused like a reply that is not JSON."""
+    from types import SimpleNamespace
+    from assistant.mcp_client import McpCallFailed, McpLink
+
+    class Fake:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call_tool(self, tool, args):
+            return SimpleNamespace(is_error=False, content=[SimpleNamespace(type="text", text=text)])
+
+    with pytest.raises(McpCallFailed):
+        asyncio.run(McpLink(lambda endpoint: Fake()).call("http://x", "get_policies", {}))
+
+
+def test_events_with_non_finite_numbers_stay_valid_json():
+    """A NaN/Infinity anywhere in an event never reaches the wallet or /history: it becomes None."""
+    from assistant.events import EventBus as Bus, sse
+    bus = Bus()
+    event = bus.emit("marketplace", "verified", "cards", detail={"cards": [{"rating": {"score": float("nan")}},
+                                                                            {"price": float("inf")}]})
+    strict = dict(parse_constant=lambda c: pytest.fail(f"{c} in an event"))
+    json.loads(json.dumps(bus.history), **strict)
+    assert event["detail"]["cards"][0]["rating"]["score"] is None
+    frame = sse("message", {"x": float("-inf")})
+    json.loads(frame.split("data: ", 1)[1], **strict)
+
+
+@pytest.mark.parametrize("facts", [
+    {"policies": {"dogs_allowed": True, "dog_fee_chf_per_night": "ten"}},
+    {"distance_to_basel_sbb_m": "near"},
+    {"distance_to_basel_sbb_m": float("nan")},
+    {"policies": {"late_arrival": 5, "cancellation": ["x"]}},
+    {"policies": "all fine", "amenities": ["wifi"]},
+])
+def test_odd_policies_do_not_break_the_cards(facts):
+    """Signed policies with the wrong types are left out of the features, never raised."""
+    from assistant.cards import features
+    for feature in features(facts):
+        assert isinstance(feature["label"], str)
+        assert "nan" not in feature["label"].lower()
+
+
+def test_offer_with_an_infinite_price_is_dropped():
+    """An offer whose price is not a finite number is shown as broken and ignored."""
+    assert run_check({}, offer_item(price=float("inf")))[0] is None
