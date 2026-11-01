@@ -3,9 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
-<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f2f2f7">
 <meta name="description" content="Tuttie: your agent in your wallet. Businesses' agents come to you with signed offers, fakes never reach you.">
 <title>Tuttie</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -527,39 +525,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .swiss-mark i:last-child { width: 4px; height: 13px; }
 /* Seal marks on light rows get a white rim instead of the dark one they need on photos. */
 .hotel .marks .ms, .booking .marks .ms, .sh-hotel .marks .ms { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
-
-/* ---------- Dark mode: follows the phone's setting ----------
-   The page swaps its colours; the Tuttie card and the wallet inside the phone stay light,
-   because that is how the wallet looks (the phone gets the light colours back below). */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0b0f; --panel: #17171d; --panel2: #17171d; --line: #26262e; --line2: #34343e; --soft: #22222a;
-    --text: #f2f2f7; --muted: #a3a2b0; --dim: #74737f;
-    --accent-text: #a48dff;
-    --tint-blue: rgba(47,111,224,.18); --tint-purple: rgba(122,90,248,.18); --tint-pink: rgba(229,72,155,.18);
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
-  }
-  .phone {
-    --bg: #f2f2f7; --panel: #fff; --panel2: #fff; --line: #e4e4ea; --line2: #d7d7df; --soft: #ececf1;
-    --text: #17171d; --muted: #5a5967; --dim: #8a8996; --accent-text: #6a4ae6;
-    --tint-blue: #eaf1fd; --tint-purple: #f1edfe; --tint-pink: #fdeaf4;
-    --shadow: 0 1px 2px rgba(23,23,29,.04), 0 8px 24px rgba(23,23,29,.06);
-    box-shadow: inset 0 0 0 2px #3a3a42, inset 0 0 0 5px #0d0d10, 0 18px 44px rgba(0,0,0,.5), 0 0 0 1px #2a2a30;
-  }
-  .top { background: rgba(11,11,15,.78); border-bottom-color: rgba(255,255,255,.07); }
-  .top a { background: rgba(34,34,42,.8); }
-  .totop { background: rgba(28,28,35,.92); }
-  .tcard { box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 70px rgba(0,0,0,.55); }
-  .ring .bg, .split .bar2 { stroke: #2a2a33; background: #2a2a33; }
-  .yoy i, .ticks i { background: #3a3a44; }
-  .three span { color: #3d3d47; }
-  .mk .ln { stroke: #3a3a44; }
-  .mk .biz { fill: var(--panel); }
-  .bars i { background: rgba(255,255,255,.16); }
-  .snav { background: var(--panel); }
-  .again { color: #17171d; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
-  .seal svg[style*="5d5c6d"] { fill: #8e8e9a !important; }  /* the grey seal, visible on dark */
-}
 </style>
 </head>
 <body>
