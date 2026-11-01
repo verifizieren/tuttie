@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 
 from assistant.card_commands import card_choice
+from speech import CLOCK, clock
 from assistant.inputs import MAX_MESSAGE_CHARS
 
 import httpx
@@ -130,11 +131,6 @@ IGNORED_LINE = re.compile(r"^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:
 IGNORED_SENTENCE = re.compile(r"(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)", re.MULTILINE)
 LINES = re.compile(r"\r\n?|\n|\u2028|\u2029")  # line breaks, split the same way as the wallet
 EMPTY_ANSWER = "Done."  # an answer that cleans to nothing
-# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration; a
-# trailing "hrs"/"Uhr" is part of the time: "18:00", "00:52", "14:00 hrs" yes; "8:30 pm",
-# "1:30 hours", "18:00:30" no.
-CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)(?:[ \t]*(?:hrs?|uhr)\b)?\b"
-                   r"(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))", re.IGNORECASE)
 
 
 def link(match: re.Match) -> str:
@@ -175,27 +171,6 @@ def without_notes(raw: str) -> str:
                      or not line.strip())
     # A non-empty answer never cleans to nothing (nor to raw links or forged names): a neutral line.
     return EMPTY_ANSWER if not text.strip() and raw.strip() else text
-
-
-# Before a time these words make it a length of time ("takes 01:15"); "for" and "in" only when
-# "hrs" follows ("for 01:15 hrs"), since "hold the room for 00:52" is a clock time.
-DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts)(?:\s+(?:about|around|approx\.?))?\s+$",
-                            re.IGNORECASE)
-MAYBE_DURATION_WORDS = re.compile(r"(?:^|\s)(?:for|in)(?:\s+(?:about|around|approx\.?))?\s+$", re.IGNORECASE)
-
-
-def clock(match: re.Match) -> str:
-    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight".
-    After "takes", "lasts" ... (and after "for", "in" with "hrs") it is a length of time and stays."""
-    before = match.string[max(0, match.start() - 12):match.start()]
-    if DURATION_WORDS.search(before) or (MAYBE_DURATION_WORDS.search(before)
-                                         and re.search(r"hrs?$", match.group(0), re.IGNORECASE)):
-        return match.group(0)
-    hour, minute = int(match.group(1)), int(match.group(2))
-    if minute == 0 and hour in (0, 12):
-        return "midnight" if hour == 0 else "noon"
-    said = str(hour % 12 or 12) + (f":{minute:02d}" if minute else "")
-    return f"{said} {'am' if hour < 12 else 'pm'}"
 
 
 def spoken(answer: str) -> str:
