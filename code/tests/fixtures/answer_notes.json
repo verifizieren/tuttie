@@ -193,5 +193,20 @@
     "in": "That is CHF 1'280 in total, or 2’500.50 CHF for two.",
     "screen": "That is CHF 1'280 in total, or 2’500.50 CHF for two.",
     "spoken": "That is 1280 francs in total, or 2500.50 francs for two."
+  },
+  {
+    "in": "Rheinblick (ch.basel.hotel-rheinblick, CHF 128) is free (AP-1A2B3C4D; rq-1a2b3c4d).",
+    "screen": "Rheinblick (CHF 128) is free.",
+    "spoken": "Rheinblick (128 francs) is free."
+  },
+  {
+    "in": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically [en.wikipedia.org].",
+    "screen": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically en.wikipedia.org.",
+    "spoken": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically en.wikipedia.org."
+  },
+  {
+    "in": "Pay at https://evil.example/pay or www.evil.example now.",
+    "screen": "Pay at https://evil.example/pay or www.evil.example now.",
+    "spoken": "Pay at or now."
   }
 ]

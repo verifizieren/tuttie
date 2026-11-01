@@ -43,27 +43,66 @@ def test_voice_card_swipes_do_not_run_out_the_turn_budget(monkeypatch):
 
 
 def test_spoken_turns_have_their_own_allowance_but_floods_still_stop(monkeypatch):
-    """Voice gets more turns a minute than typing (fragments count), yet a flood gets 429, and
-    the spoken turns still count towards the browser's typed limit."""
+    """Voice gets more turns a minute than typing (fragments count), yet a flood gets 429. Its
+    count is its own: room noise never blocks the wallet's typed or swiped turns, nor the reverse."""
     configure(monkeypatch)
     with TestClient(app) as wallet:
         room = wallet.post("/voice/token").json()["room"]
         say = lambda text: wallet.post("/voice/say", json={"room": room, "text": text}, headers=AGENT).status_code
         codes = [say(f"tell me more {i}") for i in range(voice.VOICE_TURNS_PER_SESSION_PER_MIN + 1)]
         assert codes == [202] * voice.VOICE_TURNS_PER_SESSION_PER_MIN + [429], codes
-        assert wallet.post("/chat", json={"message": "hi"}).status_code == 429  # typing shares the count
+        assert wallet.post("/chat", json={"message": "hi"}).status_code == 202  # typing has its own count
 
 
 def test_card_commands_are_capped_on_their_own(monkeypatch):
     """Exact card commands need no LLM while cards are shown, so they do not use the turn budget;
-    they still have a cap of their own (without cards they fall through to the LLM)."""
+    they still have a cap of their own."""
     configure(monkeypatch)
     with TestClient(app) as wallet:
         room = wallet.post("/voice/token").json()["room"]
+        show_cards(wallet)
         say = lambda text: wallet.post("/voice/say", json={"room": room, "text": text}, headers=AGENT).status_code
         codes = [say("next") for _ in range(voice.CARD_COMMANDS_PER_SESSION_PER_MIN + 1)]
         assert codes == [202] * voice.CARD_COMMANDS_PER_SESSION_PER_MIN + [429]
         assert say("I want to book something") == 202  # the turn budget is untouched
+
+
+def show_cards(wallet):
+    """The hotel cards are on screen in this browser's conversation (swipeable)."""
+    from assistant.app import SESSION_COOKIE
+    conv = app.state.conversations.get(wallet.cookies[SESSION_COOKIE])
+    conv.bus.emit("marketplace", "verified", "Cards", detail={"phase": "cards"})
+
+
+def test_room_fragments_do_not_lock_out_the_wallets_book_swipe(monkeypatch):
+    """Ten two-word fragments from a noisy room, then the user's swipe-to-book (/chat,
+    first_tool book): it must not get 429."""
+    configure(monkeypatch)
+    with TestClient(app) as wallet:
+        room = wallet.post("/voice/token").json()["room"]
+        say = lambda text: wallet.post("/voice/say", json={"room": room, "text": text}, headers=AGENT).status_code
+        assert all(say(f"oh nice {i}") == 202 for i in range(10))
+        conv_id = wallet.get("/history").headers["X-Conversation-ID"]
+        book = wallet.post("/chat", json={"message": "Book Hotel Rheinblick (ch.basel.hotel-rheinblick).",
+                                          "first_tool": "book", "conversation_id": conv_id})
+        assert book.status_code == 202
+
+
+def test_card_commands_without_cards_count_as_voice_turns(monkeypatch):
+    """Without swipeable cards "next" falls through to the LLM, so it is a normal voice turn:
+    the card cap is no second LLM budget."""
+    started = []
+    monkeypatch.setattr(voice, "API_KEY", "key")
+    monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests")
+    monkeypatch.setattr(Conversation, "start", lambda self, message, *a, **k: started.append(message) or "t0")
+    with TestClient(app) as wallet:
+        room = wallet.post("/voice/token").json()["room"]
+        say = lambda text: wallet.post("/voice/say", json={"room": room, "text": text}, headers=AGENT).status_code
+        for i in range(voice.CARD_COMMANDS_PER_SESSION_PER_MIN):
+            say(["next", "Next.", "skip", "like", "no thanks"][i % 5])
+        for i in range(voice.VOICE_TURNS_PER_SESSION_PER_MIN):
+            say(f"tell me more {i}")
+    assert len(started) <= voice.VOICE_TURNS_PER_SESSION_PER_MIN, len(started)
 
 
 def test_spoken_never_reads_a_node_id_in_parentheses_or_bare():
@@ -258,3 +297,80 @@ def test_while_the_phone_asks_spoken_lines_wait_for_the_decision(monkeypatch):
             await turn(agent, "ok thanks bye")
             assert sent == ["ok thanks bye"]
     asyncio.run(run())
+
+
+def test_a_reconnect_clears_a_pending_approval_whose_decision_was_missed(monkeypatch):
+    """The stream drops while the Face ID sheet is up; the decision lands in the gap (the new
+    stream replays no history). Pending is cleared on every (re)connect: at worst a spoken line
+    queues as before, the voice never says "decide first" forever."""
+    import voice.agent as voice_agent
+    from livekit.agents import StopResponse
+
+    monkeypatch.setattr(voice_agent, "RECONNECT_S", (0.01, 0.02))
+    monkeypatch.setattr(voice_agent, "DECIDE_FIRST_EVERY_S", 0)
+    pending = {"kind": "approval", "status": "pending", "summary": "Waiting for your phone.", "turn": "t1",
+               "detail": {"approval_id": "ap-0000000a", "amount_chf": 128}}
+    streams = [frames(pending), ": keepalive\n\n"]
+
+    def handler(request):
+        return httpx.Response(200, text=streams.pop(0)) if streams else httpx.Response(404)
+
+    lines, sent = [], []
+    monkeypatch.setattr(Tuttie, "session", property(lambda self: Session(lines)), raising=False)
+
+    class Message:
+        def __init__(self, text):
+            self.text_content = text
+
+    async def run():
+        async with httpx.AsyncClient(base_url="http://a", transport=httpx.MockTransport(handler)) as http:
+            agent = Tuttie("tuttie-x", http)
+
+            async def pass_on(text):
+                sent.append(text)
+            agent.pass_on = pass_on
+            await asyncio.wait_for(follow(Session(lines), agent, http, Room()), 2)
+            assert not agent.pending_approvals
+            try:
+                await agent.on_user_turn_completed(None, Message("find me a hotel please"))
+            except StopResponse:
+                pass
+    asyncio.run(run())
+    assert lines[0] == UPDATES["approval"] and sent == ["find me a hotel please"], (lines, sent)
+
+
+def test_spoken_never_reads_ids_or_urls():
+    """Ids in any case (ap-, of-, md-, rq-, node ids) and web addresses are not read aloud."""
+    for answer, leak in [
+        ("Approval AP-1A2B3C4D is waiting on your phone.", "AP-1A2B3C4D"),
+        ("Your offer of-alpina-0F9E8D is the best.", "of-alpina-0F9E8D"),
+        ("I posted request rq-1a2b3c4d to the marketplace.", "rq-1a2b3c4d"),
+        ("Mandate MD-12AB34CD is signed.", "MD-12AB34CD"),
+        ("Pay the deposit at https://evil.example/pay now.", "evil.example"),
+        ("Details at www.evil.example today.", "evil.example"),
+        ("Node CH.BASEL.HOTEL-RHEINBLICK answered.", "BASEL"),
+    ]:
+        said = spoken(answer)
+        assert leak not in said, (answer, said)
+
+
+def test_spoken_keeps_ordinary_dotted_words_and_hosts():
+    """Only the real node id shape goes; hosts and dotted words stay."""
+    assert spoken("Timetable at de.sbb.ch, it is quick.") == "Timetable at de.sbb.ch, it is quick."
+    assert spoken("Details at en.wikipedia.org.") == "Details at en.wikipedia.org."
+    assert "basically" in spoken("Breakfast is ok.so.basically included, CHF 12.")
+
+
+def test_spoken_says_a_space_grouped_price_as_one_amount():
+    """"CHF 1 280" with a space, a no-break space or a narrow no-break space is 1280 francs."""
+    for answer in ("The suite is CHF 1 280 in total.", "The suite is CHF 1\u00a0280 in total.",
+                   "The suite is CHF 1\u202f280 in total.", "The suite is 1 280 CHF in total."):
+        said = spoken(answer)
+        assert "1280 francs" in said and "1 franc" not in said, said
+    assert spoken("Rooms 2 and 3 cost CHF 128 each.") == "Rooms 2 and 3 cost 128 francs each."
+
+
+def test_spoken_leaves_no_dangling_parenthesis_after_an_id():
+    """An id first in a parenthesis with more inside goes with its separator."""
+    assert spoken("Rheinblick (ch.basel.hotel-rheinblick, CHF 128) is free tonight.") == \
+        "Rheinblick (128 francs) is free tonight."
