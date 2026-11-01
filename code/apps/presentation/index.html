@@ -92,7 +92,7 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .fig.past { opacity: 0; transform: translateY(-46px); }
 .fig .big { font-size: clamp(88px, 30vw, 150px); line-height: .9; font-weight: 800; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .fig .big small { font-size: .42em; letter-spacing: -.03em; color: var(--muted); font-weight: 700; margin-left: .06em; }
-.fig .big.accent { color: var(--pink); }
+.fig .big.accent { color: var(--pink); font-size: clamp(76px, 24vw, 140px); }
 .fig p { margin: 18px 0 10px; font-size: 21px; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; }
 .fig p span { color: var(--muted); font-weight: 500; }
 .viz { margin: 0 0 26px; height: 96px; display: flex; align-items: flex-end; }
@@ -401,7 +401,7 @@ section.block { padding: 90px 0; }
 .again svg { width: 18px; height: 18px; }
 .honest { margin: 44px 0 0; padding: 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 14px; line-height: 1.5; color: var(--muted); text-align: left; }
 .honest b { color: var(--text); font-weight: 600; }
-footer { padding: 30px 0 calc(40px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.7; color: var(--dim); }
+footer { padding: 30px 0 calc(84px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.7; color: var(--dim); }
 footer a { color: var(--muted); }
 footer .gh { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 14px; padding: 0 18px; border-radius: 999px;
              font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none; background: var(--panel); border: 1px solid var(--line2); }
@@ -480,9 +480,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .cap p { min-height: 2.8em; }
 
 .chips { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
-.chips span { padding: 7px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
-.chips span:last-child { color: var(--accent-text); border-color: rgba(122,90,248,.45); }
-.seal b span { color: var(--muted); font-weight: 500; }
+/* Plain labels, not buttons: no border, no pill, so they never look tappable. */
+.chips span { padding: 5px 10px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--soft); }
+.chips span:last-child { color: var(--accent-text); background: var(--tint-purple); }
+.seal b span { display: inline; margin: 0; font-size: 15px; color: var(--muted); font-weight: 500; }
 .seals { margin-top: 30px; }
 .biz-h { margin: 12px 0 0; font-size: clamp(32px, 9.5vw, 44px); line-height: 1.05; font-weight: 800; letter-spacing: -.035em; }
 .vs span { margin-top: 6px; }
