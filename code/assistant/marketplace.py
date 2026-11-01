@@ -78,12 +78,19 @@ def shortlist(offers: list[dict], budget_chf: float | None, now: datetime, size:
 def market_reason(response: httpx.Response) -> str:
     """The reason in a market refusal, or a short generic one (busy, or a body that is not JSON)."""
     if response.status_code == 429:
-        return "the market is busy right now, try again in a minute"
+        return "the market is busy right now; do not post again in this turn, tell the user to try again in a minute"
     try:
         reason = response.json().get("reason")
     except (ValueError, AttributeError):
         reason = None
     return reason if isinstance(reason, str) and reason else f"HTTP {response.status_code}"
+
+
+def well_formed(posting) -> bool:
+    """The market's answer to a posting has the shape find() reads: dicts of dicts."""
+    return (isinstance(posting, dict)
+            and all(isinstance(posting.get(k), dict) and all(isinstance(v, dict) for v in posting[k].values())
+                    for k in ("invited", "skipped")))
 
 
 class MarketDesk:
@@ -127,9 +134,19 @@ class MarketDesk:
             reason = market_reason(error.response)
             self.bus.emit("marketplace", "broken", f"The market refused the request: {reason}")
             return {"error": f"market refused the request: {reason}"}
-        except (httpx.HTTPError, ValueError) as error:  # unreachable, or an answer that is not JSON
+        except httpx.TimeoutException:  # the market answers after waking the hotels: the posting may exist
+            self.bus.emit("marketplace", "broken", "The market is still waking the hotels")
+            return {"error": "the market is still waking the hotels; do not post again in this turn, "
+                             "tell the user to wait a moment"}
+        except httpx.HTTPError as error:
             self.bus.emit("marketplace", "broken", f"The market did not answer: {type(error).__name__}")
-            return {"error": "the market is not reachable right now, try again in a minute"}
+            return {"error": "the market is not reachable right now; do not post again in this turn, "
+                             "tell the user to try again in a minute"}
+        except ValueError:  # not JSON
+            posting = None
+        if not well_formed(posting):
+            self.bus.emit("marketplace", "broken", "The market sent an answer Tuttie could not read")
+            return {"error": "the market sent an answer Tuttie could not read; do not post again in this turn"}
 
         public = request.model_dump(mode="json")
         interested = [n for n, i in posting["invited"].items() if i.get("status") == "interested"]

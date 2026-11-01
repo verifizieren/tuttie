@@ -256,3 +256,41 @@ def test_the_gate_refuses_a_lookup_that_answers_a_list():
     gate = ActionGate("n", "k", load_public_key("user"), {}, lookup)
     call = {"tool": "book", "args": {}, "agent_id": TUTTIE, "nonce": "n", "timestamp": "t", "signature": "s"}
     assert not asyncio.run(gate.check_action(call, Needs("book", scope="book"))).ok
+
+
+# --- 2b. Tuttie's tool errors say whether to post again -------------------------------------
+
+def find_with(handler) -> dict:
+    """MarketDesk.find against a market answering with `handler`."""
+    async def scenario():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            desk = MarketDesk(http, "http://reg", EventBus(), load_authorities(), market_url="http://market")
+            return await desk.find("2026-11-14", tags=["basel"])
+    return asyncio.run(scenario())
+
+
+def test_a_busy_market_tells_the_model_not_to_post_again_this_turn():
+    error = find_with(lambda _: httpx.Response(429, json={"refused": True, "reason": "x"}))["error"]
+    assert "busy" in error and "do not post again" in error
+
+
+def test_a_market_timeout_is_not_reported_as_unreachable():
+    """The market answers after waking the hotels; the posting may already exist, so posting again
+    would wake (and pay) every hotel twice."""
+    def slow(request):
+        raise httpx.ReadTimeout("slow", request=request)
+    error = find_with(slow)["error"]
+    assert "still waking" in error and "do not post again" in error and "not reachable" not in error
+
+
+def test_an_unreachable_market_says_so():
+    def down(request):
+        raise httpx.ConnectError("refused", request=request)
+    assert "not reachable" in find_with(down)["error"]
+
+
+@pytest.mark.parametrize("body", ["not json", "[1, 2]", '{"invited": [], "skipped": {}}',
+                                  '{"invited": {"a": 1}, "skipped": {}}'])
+def test_a_malformed_market_answer_is_a_calm_tool_error(body):
+    error = find_with(lambda _: httpx.Response(201, text=body))["error"]
+    assert "could not read" in error
