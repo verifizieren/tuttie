@@ -352,6 +352,17 @@ def night_said(date) -> str | None:
     return f"{day:%A} {day.day} {day:%B}"
 
 
+def offered_room(offer: dict) -> str | None:
+    """The room type a hotel's signed offer is for: its room_type, else the start of its item
+    ("double room 2026-11-14" -> "double"); None if it does not say."""
+    if isinstance(offer.get("room_type"), str) and offer["room_type"]:
+        return offer["room_type"]
+    item = offer.get("item")
+    if isinstance(item, str) and " room" in item:
+        return item.split(" room", 1)[0].strip() or None
+    return None
+
+
 def finite_price(value, free_ok: bool = False) -> bool:
     """A real price: a finite number above zero (`free_ok`: or zero, e.g. a free add-on), not a
     bool (signed hotel data may hold anything, and math on a 400-digit integer raises OverflowError)."""
@@ -489,6 +500,8 @@ class Toolbox:
         self.bus.emit("marketplace", "verified", f"{len(cards)} hotels to choose from",
                       detail={"phase": "cards", "cards": cards})
         result["cards"] = [{"node_id": c["node_id"], "name": c["name"], "price_chf": c["price_chf"],
+                            "room": offered_room(next((o["offer"] for o in self.market.last_offers
+                                                       if o["node_id"] == c["node_id"]), {})),
                             "agreed_chf": c["agreed_chf"],
                             "rating": c["rating"], "shortlisted": c["shortlisted"],
                             "yes": [f["label"] for f in c["features"] if f["ok"]],
@@ -776,6 +789,11 @@ class Toolbox:
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
             return {"error": f"call get_availability on {node_id} for {date} first"}
+        card = next((o["offer"] for o in self.market.last_offers if o["node_id"] == node_id), None)
+        if card is not None and (offered := offered_room(card)) and offered != room_type:
+            # The user liked the card, so the booking is for the card's room (its rate may differ).
+            return {"error": f"{record['name']}'s card offer is for the {offered} room: book room_type "
+                             f"{offered!r}, or tell the user that room differs from the card"}
         room = next((r for r in availability["rooms"] if r["room_type"] == room_type), None)
         if room is None:
             return {"error": f"room_type must be one of {[r['room_type'] for r in availability['rooms']]}"}
