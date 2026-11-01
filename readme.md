@@ -112,6 +112,8 @@ To keep everything running on a server, use the systemd user service in `deploy/
      ([`documentation/context/pitch/`](documentation/context/pitch/)); the demo is a run
      through the real app.
 
+## Team
+
 BaselHack 2026, Adobe challenge.
 
 - **Max:** dev
