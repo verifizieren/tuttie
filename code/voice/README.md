@@ -57,7 +57,7 @@ voice agent ◄─GET /voice/events── its timeline: speaks the answers and t
 - Rooms are protected: anyone can ask for rooms, but above 1000 only unused ones are forgotten
   (conversation gone, or unused for 2 min); a room the agent follows never goes
   (`VoiceRooms` in `assistant/voice.py`).
-- Voice: the demo server uses voice `eppqEXVumQ3CfdndcIBd` (`TUTTIE_VOICE_ID`; before: "Germain", XJeDCVLci9KGsGtVpFLM,
+- Voice: the demo server uses voice `yj30vwTGJxSHezdAGsv9` (`TUTTIE_VOICE_ID`; before: "Germain", XJeDCVLci9KGsGtVpFLM,
   a library voice, needs a paid plan); without it the free "Eric".
 - The wallet shows each spoken answer word by word in step with the voice (LiveKit
   "lk.transcription" streams), then the full formatted answer. After a typed message Tuttie
