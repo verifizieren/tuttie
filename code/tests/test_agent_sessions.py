@@ -51,38 +51,48 @@ def hotel(name: str) -> dict:
     return json.loads((DATA / "nodes" / name).read_text())
 
 
+def open_session(client: TestClient, **body) -> tuple[str, dict]:
+    """Open a session; its id and the opener's token header for every later call."""
+    opened = client.post("/agent/sessions", json=body).json()["payload"]
+    return opened["session_id"], {"X-Session-Token": opened["session_token"]}
+
+
 # ---------- Hotel side: one memory per session ----------
 
 def test_a_session_remembers_earlier_turns():
     cfg = hotel("hotel-rheinblick.json")
     client = TestClient(create_app(cfg))
-    opened = client.post("/agent/sessions", json={"peer": "tuttie/a", "context": {"date": "2026-11-14"}}).json()
-    session_id = opened["payload"]["session_id"]
-    first = client.post(f"/agent/sessions/{session_id}/messages", json={"message": "A room on 14 Nov?"}).json()
-    second = client.post(f"/agent/sessions/{session_id}/messages", json={"message": "And with a dog?"}).json()
+    session_id, mine = open_session(client, peer="tuttie/a", context={"date": "2026-11-14"})
+    first = client.post(f"/agent/sessions/{session_id}/messages", json={"message": "A room on 14 Nov?"},
+                        headers=mine).json()
+    second = client.post(f"/agent/sessions/{session_id}/messages", json={"message": "And with a dog?"},
+                         headers=mine).json()
     assert first["payload"]["answer"] == "seen 1 earlier turns"   # only the "opened" note
     assert second["payload"]["answer"] == "seen 3 earlier turns"  # opened, message, reply
     assert StubLLM.prompts[-1]["context"] == {"date": "2026-11-14"}
-    memory = client.get(f"/agent/sessions/{session_id}").json()
+    memory = client.get(f"/agent/sessions/{session_id}", headers=mine).json()
     assert verify_envelope(memory, REGISTRY[cfg["node_id"]]["public_key"], expected_node_id=cfg["node_id"])
     assert [t["kind"] for t in memory["payload"]["turns"]] == ["opened", "message", "reply", "message", "reply"]
 
 
 def test_parallel_sessions_with_one_hotel_do_not_mix():
     client = TestClient(create_app(hotel("guesthouse-am-rhein.json")))
-    a = client.post("/agent/sessions", json={"peer": "tuttie/a"}).json()["payload"]["session_id"]
-    b = client.post("/agent/sessions", json={"peer": "tuttie/b"}).json()["payload"]["session_id"]
-    client.post(f"/agent/sessions/{a}/messages", json={"message": "one"})
-    client.post(f"/agent/sessions/{a}/messages", json={"message": "two"})
-    reply_b = client.post(f"/agent/sessions/{b}/messages", json={"message": "first in b"}).json()
+    a, mine_a = open_session(client, peer="tuttie/a")
+    b, mine_b = open_session(client, peer="tuttie/b")
+    client.post(f"/agent/sessions/{a}/messages", json={"message": "one"}, headers=mine_a)
+    client.post(f"/agent/sessions/{a}/messages", json={"message": "two"}, headers=mine_a)
+    assert client.post(f"/agent/sessions/{b}/messages", json={"message": "a's token"},
+                       headers=mine_a).status_code == 403  # a's token does not open b
+    reply_b = client.post(f"/agent/sessions/{b}/messages", json={"message": "first in b"}, headers=mine_b).json()
     assert reply_b["payload"]["answer"] == "seen 1 earlier turns"
 
 
 def test_closed_and_unknown_sessions_are_refused():
     client = TestClient(create_app(hotel("hotel-alpina-grand.json")))
-    session_id = client.post("/agent/sessions", json={"peer": "tuttie/a"}).json()["payload"]["session_id"]
-    assert client.post(f"/agent/sessions/{session_id}/close").json()["payload"]["status"] == "closed"
-    assert client.post(f"/agent/sessions/{session_id}/messages", json={"message": "hi"}).status_code == 409
+    session_id, mine = open_session(client, peer="tuttie/a")
+    assert client.post(f"/agent/sessions/{session_id}/close", headers=mine).json()["payload"]["status"] == "closed"
+    assert client.post(f"/agent/sessions/{session_id}/messages", json={"message": "hi"},
+                       headers=mine).status_code == 409
     assert client.post("/agent/sessions/se-unknown/messages", json={"message": "hi"}).status_code == 404
 
 

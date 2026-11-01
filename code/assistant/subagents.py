@@ -29,6 +29,7 @@ class Subagent:
         self.memory = memory          # the subagent's own memory (Tuttie side)
         self.node_id = node_id
         self.remote_session: str | None = None  # the business's session id (its side of the memory)
+        self.session_token: str = ""  # the business's secret for this session; only the opener has it
 
     @property
     def id(self) -> str:
@@ -42,6 +43,7 @@ class Subagent:
             self.memory.add("system", "refused", result)
             return result
         self.remote_session = result.payload["session_id"]
+        self.session_token = str(result.payload.get("session_token", ""))
         self.memory.add("system", "opened", {"node_id": self.node_id, "remote_session": self.remote_session})
         self.toolbox.emit_verified("a2a", f"Subagent opened a session with {result.payload['agent']}", result)
         return result.payload
@@ -51,7 +53,8 @@ class Subagent:
         if self.remote_session is None:
             return {"error": "session is not open"}
         path = f"/agent/sessions/{self.remote_session}/messages"
-        result = await self.toolbox.verified_post(self.node_id, path, {"message": message}, "a2a", "session message")
+        result = await self.toolbox.verified_post(self.node_id, path, {"message": message}, "a2a", "session message",
+                                                  headers=self.token_header())
         self.memory.add("self", "message", {"text": message})
         if not isinstance(result, Verified):
             self.memory.add("system", "refused", result)
@@ -59,6 +62,10 @@ class Subagent:
         self.memory.add("peer", "reply", result.payload)
         self.toolbox.emit_verified("a2a", f"Q: {message}  A: {result.payload.get('answer', '')}", result)
         return result.payload
+
+    def token_header(self) -> dict:
+        """The header that proves to the business that this subagent opened the session."""
+        return {"X-Session-Token": self.session_token}
 
 
 class SubagentPool:

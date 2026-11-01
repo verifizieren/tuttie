@@ -15,6 +15,7 @@ signed offer to the posting's offer_url in the background (make_offer).
 import argparse
 import asyncio
 import copy
+import hmac
 import json
 import os
 import re
@@ -30,7 +31,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from dotenv import load_dotenv
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from apidocs import api_docs
 from aps import agent_key
@@ -52,7 +53,7 @@ from node.owner import owner_app
 from node.settings import POSTING_EVENTS
 from node.settings import apply as apply_settings
 from node.settings import validate as validate_settings
-from sessions import SessionClosed, SessionStore
+from sessions import SessionClosed, SessionFull, SessionStore, StoreFull
 
 
 SWISS_TIME = ZoneInfo("Europe/Zurich")
@@ -190,19 +191,36 @@ def agent_caller(request: Request) -> None:
         raise HTTPException(status_code=401, detail="this agent answers only its marketplace and known agents")
 
 
+MAX_MESSAGE_CHARS = 2000   # a question or session message
+MAX_NAME_CHARS = 200       # a session's peer and purpose
+MAX_CONTEXT_BYTES = 8000   # the shared context, as JSON
+SESSION_TOKEN_HEADER = "X-Session-Token"  # the opener's secret for every later call on its session
+
+
+def small_context(context: dict) -> dict:
+    """A shared context that fits a prompt: at most MAX_CONTEXT_BYTES as JSON (else 422)."""
+    if len(json.dumps(context, ensure_ascii=False, default=str).encode()) > MAX_CONTEXT_BYTES:
+        raise ValueError(f"context must be at most {MAX_CONTEXT_BYTES} bytes as JSON")
+    return context
+
+
 class AgentRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=MAX_MESSAGE_CHARS)
     context: dict = {}
+
+    _small = field_validator("context")(small_context)
 
 
 class SessionOpenRequest(BaseModel):
-    peer: str                      # who opens the session, e.g. a Tuttie subagent's id
-    purpose: str = "negotiation"
+    peer: str = Field(max_length=MAX_NAME_CHARS)  # who opens the session, e.g. a Tuttie subagent's id
+    purpose: str = Field("negotiation", max_length=MAX_NAME_CHARS)
     context: dict = {}             # what the peer chose to share (never its private context)
+
+    _small = field_validator("context")(small_context)
 
 
 class SessionMessageRequest(BaseModel):
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE_CHARS)
 
 
 class BookRequest(BaseModel):
@@ -435,42 +453,64 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         """The agent's signed card: persona, tools and the events it wakes on."""
         return signed(business_agent.card())
 
-    def find_session(session_id: str):
+    def find_session(session_id: str, request: Request):
+        """The session, for its opener only: 404 if unknown, 403 without the opener's token."""
         try:
-            return sessions.get(session_id)
+            session = sessions.get(session_id)
         except KeyError:
             raise HTTPException(status_code=404, detail="no such session") from None
+        token = request.headers.get(SESSION_TOKEN_HEADER) or ""
+        if not hmac.compare_digest(token.encode(), session.token.encode()):
+            raise HTTPException(status_code=403, detail="this session belongs to the agent that opened it")
+        return session
 
     @app.post("/agent/sessions", dependencies=[Depends(agent_caller)])
     def open_session(req: SessionOpenRequest) -> dict:
-        """Open an isolated conversation with its own memory (one per negotiation)."""
-        session = sessions.open(req.peer, req.purpose, req.context)
+        """Open an isolated conversation with its own memory (one per negotiation).
+
+        The answer carries a session_token: only the opener knows it, and every later call on
+        the session must send it (header X-Session-Token). When every session slot is busy, 429.
+        """
+        try:
+            session = sessions.open(req.peer, req.purpose, req.context)
+        except StoreFull:
+            raise HTTPException(status_code=429, detail="too many conversations right now, try again later") from None
         session.add("system", "opened", {"peer": req.peer, "purpose": req.purpose})
-        return signed({"session_id": session.id, "agent": business_agent.persona["name"], "purpose": req.purpose})
+        return signed({"session_id": session.id, "session_token": session.token,
+                       "agent": business_agent.persona["name"], "purpose": req.purpose})
 
     @app.post("/agent/sessions/{session_id}/messages", dependencies=[Depends(agent_caller)])
-    async def session_message(session_id: str, req: SessionMessageRequest) -> dict:
-        """Answer a message inside a session; the agent sees the session's history."""
-        session = find_session(session_id)
+    async def session_message(session_id: str, req: SessionMessageRequest, request: Request) -> dict:
+        """Answer a message inside a session; the agent sees the session's history.
+
+        A closed or full session answers 409 (also when it was closed during the answer).
+        """
+        session = find_session(session_id, request)
         async with session.lock:  # turns of one session stay in order; other sessions run in parallel
             try:
                 session.add("peer", "message", {"text": req.message})
+                reply = await business_agent.answer(req.message, session.context, history=session.transcript()[:-1])
+                session.add("self", "reply", reply)
+            except SessionFull:
+                raise HTTPException(status_code=409, detail="session is full: open a new one") from None
             except SessionClosed:
                 raise HTTPException(status_code=409, detail="session is closed") from None
-            reply = await business_agent.answer(req.message, session.context, history=session.transcript()[:-1])
-            session.add("self", "reply", reply)
         return signed({"session_id": session.id, "turn": len(session.turns), **reply})
 
     @app.get("/agent/sessions/{session_id}", dependencies=[Depends(agent_caller)])
-    def read_session(session_id: str) -> dict:
-        """The session's whole memory, signed (for audits and the timeline)."""
-        return signed(find_session(session_id).to_dict())
+    def read_session(session_id: str, request: Request) -> dict:
+        """The session's whole memory, signed (for audits and the timeline), for its opener only."""
+        return signed(find_session(session_id, request).to_dict())
 
     @app.post("/agent/sessions/{session_id}/close", dependencies=[Depends(agent_caller)])
-    def close_session(session_id: str) -> dict:
-        """End a session; its memory stays readable."""
-        find_session(session_id)
-        return signed({"session_id": session_id, "status": sessions.close(session_id).status})
+    async def close_session(session_id: str, request: Request) -> dict:
+        """End a session (after a reply being written, never during it); its memory stays
+        readable for a while, then it is freed (sessions/memory.py)."""
+        session = find_session(session_id, request)
+        async with session.lock:
+            if session.status == "open":
+                sessions.close(session_id)
+        return signed({"session_id": session_id, "status": session.status})
 
     @app.post("/agent/invoke", dependencies=[Depends(agent_caller)])
     async def agent_invoke(event: dict = Body(...)) -> dict:
