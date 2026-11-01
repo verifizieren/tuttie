@@ -41,10 +41,9 @@ export const BEATS = [
   {
     id: "demo", title: "Demo", from: 40, to: 115,
     steps: [
-      { cue: "Click: the eyes move into the phone. The wallet is live.", spoken: "" },
-      { demo: "open", cue: "Click: tap the Tuttie card, she wakes.", spoken: "Tuttie," },
+      { cue: "Click: the eyes move into the phone, the wallet opens and Tuttie is awake.", spoken: "" },
       { demo: "ask", cue: "Click as you start the sentence: the request is sent.",
-        spoken: "a quiet room in Basel on the fourteenth, I arrive after midnight with my dog, under one-sixty. [pause] She doesn't search. She posts my request, and only businesses with a valid seal are woken. Watch the cheap one." },
+        spoken: "Tuttie, a quiet room in Basel on the fourteenth, I arrive after midnight with my dog, under one-sixty. [pause] She doesn't search. She posts my request, and only businesses with a valid seal are woken. Watch the cheap one." },
       { demo: "forged", cue: "Click on \"Forged seal\": side word Never asked. (red)",
         spoken: "[pause] Forged seal. Never asked." },
       { demo: "like", cue: "Click: swipe the cards, like Gästehaus am Rhein, pass the others.",

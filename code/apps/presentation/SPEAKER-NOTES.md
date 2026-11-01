@@ -10,9 +10,8 @@ not at the screen. The same lines and cues are in the presenter view (press N).
 | 2 | 0:14-0:30 | black | Tonight more people won't search for her. Their AI will. And the AI sees what we all see: | → the cheap listing |
 | | | "Super quiet!!! CHF 99" (small, low) | page nine, behind a scam. Super quiet, CHF 99, pay by bank transfer. | → eyes |
 | 3 | 0:30-0:40 | Tuttie's eyes, large | So we turned the web around. This is Tuttie. She lives in my wallet, and she works only for me. | → the eyes move into the phone |
-| 4 | 0:40-1:55 | phone with the live wallet | (wallet is up, Tuttie asleep on her card) | → Tuttie wakes |
-| | | | Tuttie, | → request sent, as you start the sentence |
-| | | | a quiet room in Basel on the fourteenth, I arrive after midnight with my dog, under one-sixty. [pause] She doesn't search. She posts my request, and only businesses with a valid seal are woken. Watch the cheap one. | → on "Forged seal" |
+| 4 | 0:40-1:55 | phone with the live wallet | (the eyes move into the phone, the wallet opens, Tuttie awake) | → request sent, as you start the sentence |
+| | | | Tuttie, a quiet room in Basel on the fourteenth, I arrive after midnight with my dog, under one-sixty. [pause] She doesn't search. She posts my request, and only businesses with a valid seal are woken. Watch the cheap one. | → on "Forged seal" |
 | | | side word "Never asked." (red) | [pause] Forged seal. Never asked. | → swipe the cards |
 | | | | [pause] Anna's agent offered 135. Tuttie already bargained: 128. I still choose. | → on "One tap" |
 | | | side word "One tap." (accent) | And nothing happens without me. One tap, signed with my key, for exactly that price. | → hold on the booking |
@@ -32,6 +31,8 @@ not at the screen. The same lines and cues are in the presenter view (press N).
   WAITING). The offers take about 8-12 seconds after the request.
 - The wallet fails: press V, the recording of a real run plays in the same phone. V again (or L)
   goes back to live.
-- Beat 7 not ready: open the deck with `?owner=0`.
+- Beat 7 is a screenshot of the owner view; skip it with `?owner=0` if time is short.
+- Approval on the phone plays Face ID and a checkmark (~2 s) before the booking card: keep talking.
+- Rehearsals: the backend allows about 10 requests a minute per browser, so at most ~4 runs back to back.
 - B (or .) blacks the screen for a speaker moment; B again brings it back.
 - R resets everything for the next run-through (fresh conversation, wallet reloaded).
