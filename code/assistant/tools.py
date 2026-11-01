@@ -23,7 +23,7 @@ from pathlib import Path
 import httpx
 
 from aps import agent_key, evaluate_record, load_signing_key, verify_envelope
-from aps.approval import booking_terms
+from aps.approval import booking_terms, payment_charge
 from aps.call import sign_call
 from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
 from aps.delegation import verify_delegation
@@ -750,7 +750,8 @@ class Toolbox:
             how = "with your mandate, no phone needed"
         else:
             summary = f"Pay {record['name']}: {purpose} for {booking_id} = CHF {amount:g}"
-            approval = self.approvals.create("pay", record, amount, summary, verdict["seals"])
+            approval = self.approvals.create("pay", record, amount, summary, verdict["seals"],
+                                             charge=payment_charge(purpose, booking_id))
             self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                           {"approval_id": approval["id"], "amount_chf": amount})
             decision = await self.approvals.wait(approval["id"])

@@ -381,7 +381,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
             return refuse(f"the {purpose} for {booking_id} is already paid")
 
         verdict = await gate.check_action(call, Needs("pay", scope=None, approval=True, mandate=True,
-                                                      amount_chf=charge["price_chf"], purpose=purpose))
+                                                      amount_chf=charge["price_chf"], purpose=purpose,
+                                                      booking_id=booking_id))
         if not verdict.ok:
             return refuse(verdict.reason)
         # The gate awaited the registry, so another call for the same charge may have paid

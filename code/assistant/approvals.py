@@ -31,12 +31,13 @@ class ApprovalBook:
         self.mandates: dict[tuple[str, str], dict] = {}  # (payee node_id, purpose) -> signed mandate
 
     def create(self, action: str, record: dict, amount_chf: float, summary: str, seals: list[dict],
-               offer_mandate: dict | None = None, terms: dict | None = None) -> dict:
+               offer_mandate: dict | None = None, terms: dict | None = None, charge: dict | None = None) -> dict:
         """Register an approval request and return it (shown on the phone page).
 
         `offer_mandate` ({agent_id, purpose, max_chf}) asks the user whether a small charge of
         this business may be paid later without asking. `terms` (aps/approval.py,
-        booking_terms) are what a booking is for; the user's signature covers them.
+        booking_terms) are what a booking is for, `charge` (payment_charge) what a payment is
+        for; the user's signature covers them.
         """
         approval = {
             "id": "ap-" + secrets.token_hex(4),
@@ -48,6 +49,7 @@ class ApprovalBook:
             "seals": seals,
             "offer_mandate": offer_mandate,
             "terms": terms,
+            "charge": charge,
         }
         self.pending[approval["id"]] = approval
         self.futures[approval["id"]] = asyncio.get_running_loop().create_future()
