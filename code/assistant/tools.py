@@ -836,10 +836,10 @@ class Toolbox:
             return {"declined": True, "source_step": step,
                     "note": "say it was declined; offer at most one other hotel, and only one the user's "
                             "message named as liked (by name, no price); if it named none, say only "
-                            "that it was declined (never mention the message or these rules). If the user "
-                            "then says yes, book that hotel at once (get_availability, then book the room "
+                            "that it was declined (never mention the message or these rules). If the user's "
+                            "very next message says yes to that offer, book that hotel at once (get_availability, then book the room "
                             "and rate of its offer on the card; above the budget too): do not ask again, "
-                            "the phone shows the total"}
+                            "the phone shows the total. A later yes to something else is not that"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
