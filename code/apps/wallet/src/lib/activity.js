@@ -299,10 +299,15 @@ export function applyEvent(state, event) {
 export const withDeck = (state, { index, liked }) =>
   (state.cards ? { ...state, deck: { step: state.cardsStep, index, liked } } : state);
 
+/** A saved deck position in the shape the deck needs: a whole card index from 0 and the liked
+ *  hotels' node ids. A stored copy can be anything (an old version, a hand-edited browser). */
+export const validDeck = deck => Boolean(deck) && typeof deck === "object" && Number.isInteger(deck.index)
+  && deck.index >= 0 && Array.isArray(deck.liked) && deck.liked.every(id => typeof id === "string");
+
 /** Where the deck starts: the saved position if it belongs to these cards and some are left. */
 export function deckStart(state) {
   const deck = state.deck;
-  if (!deck || !state.cards || deck.step !== state.cardsStep || deck.index >= state.cards.length) return null;
+  if (!validDeck(deck) || !state.cards || deck.step !== state.cardsStep || deck.index >= state.cards.length) return null;
   return { index: deck.index, liked: deck.liked };
 }
 

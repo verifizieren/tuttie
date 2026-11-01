@@ -157,3 +157,10 @@ test('a normal approval keeps its amount, hotel, seals and terms', () => {
   assert.deepEqual(approval, { id: 'a1', amount: 172, hotel: 'Rheinblick', summary: 'Book', seals, uid: 'CHE-1', offerMandate: null,
     terms: { room_type: 'double', date: '2026-11-14', rate: 'flexible' } });
 });
+
+test('a deck position in the wrong shape never starts the deck', () => {
+  const state = { ...EMPTY, cards: [{ node_id: 'a' }, { node_id: 'b' }], cardsStep: 3 };
+  assert.deepEqual(deckStart({ ...state, deck: { step: 3, index: 1, liked: ['a'] } }), { index: 1, liked: ['a'] });
+  assert.equal(deckStart({ ...state, deck: { step: 3, index: 1 } }), null);
+  assert.equal(deckStart({ ...state, deck: { step: 3, index: -1, liked: [] } }), null);
+});
