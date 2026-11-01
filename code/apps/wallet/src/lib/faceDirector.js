@@ -7,7 +7,7 @@
 //   state  → a base expression plus a loop of looks, so the eyes are never frozen:
 //            searching scans left and right, thinking looks up and around, listening nods,
 //            waiting looks down at the approval sheet, watching follows the dragged card;
-//            asleep and typing close the eyes
+//            typing closes the eyes; a closed card (asleep) rests awake and neutral
 //   levels → setVoice: the eyes pulse with Tuttie's voice and open up while the user talks
 //   cue    → a short reaction (a glad blink at an agreement, a suspicious squint at a blocked
 //            scam), after which the state's loop goes on
@@ -77,7 +77,11 @@ export function createFaceDirector(face, timers = globalThis) {
     const f = get();
     if (!f) return;
     timers.clearTimeout(loopTimer);
-    if (state === "asleep" || state === "typing") return f.sleep();  // the eyes close while the user types
+    if (state === "typing") return f.sleep();  // the eyes close while the user types
+    if (state === "asleep") {  // the card rests in the stack: eyes open, calm, the face's own idle glances
+      if (f.asleep) f.wake("neutral");
+      return f.set("neutral", 500);
+    }
     if (f.asleep) {
       f.wake("happiness");
       delay = Math.max(delay, WAKE_MS);

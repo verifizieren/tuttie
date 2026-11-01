@@ -10,6 +10,11 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
 
 ## Done
 
+- **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie
+  card, black glossy eyes with a catchlight, idle glances, ZKB and UBS bank cards) on a full light theme
+  (page #f2f2f7, white panels, ink #17171d, Approve = dark button); a closed card rests awake with a
+  neutral face, typing still closes the eyes; status bar `default`, `CACHE` v4. The QR page
+  (`apps/presentation`) and Sebastian's pitch deck (`assets/pitch-deck`) use the same light design.
 - **Round 11 (owner view)**: `?node=` is used only for the page's own host or localhost (the owner
   token never goes to a linked server); a deploy without an available room is refused, a left-out
   `facts.negotiation` keeps the live floor (the owner view sends `null` to end bargaining); public

@@ -1,7 +1,7 @@
 // The wallet screen: two generic bank cards and the Tuttie card, which is the agent's face.
 //
 // The agent has three modes:
-//   closed  card in the stack, eyes closed (asleep)
+//   closed  card in the stack, eyes open with quiet idle glances and blinks
 //   voice   card open, eyes open; this is the main interface and stays on until the user
 //           swipes the card down or switches to typing; taps never send Tuttie away
 //   typing  card open with a text field; the eyes close while the user types

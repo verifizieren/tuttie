@@ -23,8 +23,10 @@ What it shows, top to bottom (short points only, little text on purpose):
 The page never links to the live wallet: people who scan the QR get the feeling, not the
 shared live system. The browser scrollbar is hidden.
 
-The demo here is a mock that copies the wallet's look (`apps/wallet/src/wallet.css`) at the
-wallet's native 390 x 844 size; the live product is the wallet itself. `face.js` is a copy of
+The page is light and calm like the wallet's light design (page #f2f2f7, white panels with
+hairline borders, dark text, accent #d97757; the Tuttie card is white with black eyes, the bank
+cards are UBS and ZKB as in `apps/wallet/src/components/BankCard.jsx`). The demo here is a mock
+that copies the wallet's look (`apps/wallet/src/wallet.css`) at the wallet's native 390 x 844 size; the live product is the wallet itself. `face.js` is a copy of
 `apps/wallet/src/lib/face.js`: keep it in sync. Photos: `img/` (copied from
 `apps/wallet/public/hotels`, credits in `apps/wallet/public/hotels/CREDITS.md`).
 
