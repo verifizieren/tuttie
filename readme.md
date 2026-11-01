@@ -112,21 +112,14 @@ To keep everything running on a server, use the systemd user service in `deploy/
      ([`documentation/context/pitch/`](documentation/context/pitch/)); the demo is a run
      through the real app.
 
-## Team
+BaselHack 2026, Adobe challenge.
 
-Every team member adds a short profile below. Copy the template, fill it in and keep it up
-to date when your responsibilities change.
-
-```markdown
-### Your Name
-- **Background:** what you study or work on, and what you bring to the team
-- **Team:** dev / research / pitch
-- **Working on:** areas and GitHub issues, e.g. wallet app (#2)
-- **Responsible for:** what you own and decide, and what others can ask you about
-- **Contact:** GitHub handle, how to reach you during the hackathon
-```
-
-<!-- Team profiles go here, one "### Name" block per person. -->
+- **Max:** dev
+- **Chris:** dev
+- **Jonas:** research
+- **Stan:** research
+- **Sebastian:** pitch
+- **Thomas:** pitch
 
 ## License
 
