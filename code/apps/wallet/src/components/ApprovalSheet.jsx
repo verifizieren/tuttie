@@ -14,6 +14,7 @@
 // and Tuttie pays that charge without asking again.
 import { useEffect, useRef, useState } from "react";
 import { decide } from "../lib/api.js";
+import { playAccepted, unlockSound } from "../lib/sounds.js";
 import { doneLabel, failureOf, finishesOn, recordedDecision, sendingLabel, tapAccepted } from "../lib/approval.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
@@ -156,6 +157,7 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
     setError("");
     setDecision(recordedAs);
     setStage("done");
+    if (recordedAs === "approved") playAccepted();  // the "accepted" chime with the checkmark
     await wait(DONE_MS);  // the checkmark (or X) is seen in full
     setLeaving(true);
     await wait(LEAVE_MS);
@@ -169,6 +171,7 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
     setDecision(chosen);
     onDecide?.(approval);
     if (chosen === "approved") {
+      unlockSound();  // still inside the tap: phones play the chime later only if a tap started audio
       setStage("scan");
       await wait(SCAN_MS);
     }
