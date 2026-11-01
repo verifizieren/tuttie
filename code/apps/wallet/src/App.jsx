@@ -58,7 +58,7 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history, lastChange, switching, connectionError, link, opened] = useAgentStream();
+  const [agent, actions, history, lastChange, switching, connectionError, link, opened, lost] = useAgentStream();
   // An approval the server no longer knows (already decided or expired): the sheet said so and
   // went; the wallet stops waiting for it even if no event about it arrives.
   const [goneApproval, setGoneApproval] = useState(null);
@@ -268,7 +268,7 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || lost || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
                                                      || (mode === "voice" && !quiet ? voiceNote(voice, micBlocked) : "")}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">

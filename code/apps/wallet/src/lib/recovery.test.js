@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BUSY_NOTE, clearsOnReconnect, MIC_BLOCKED_NOTE, micRefused, newChatFailure, PICK_UNREACHABLE, OFFLINE_NOTE, shouldResend, voiceNote,
+import { BUSY_NOTE, clearsOnReconnect, lostOnRestart, MIC_BLOCKED_NOTE, micRefused, newChatFailure, PICK_UNREACHABLE, OFFLINE_NOTE, shouldResend, voiceNote,
          voiceRetryDelay } from "./recovery.js";
 
 test("voice retries back off from 2 s and stop growing at 30 s", () => {
@@ -45,4 +45,18 @@ test("only an unreachable error goes by itself once the connection is back", () 
   assert.equal(clearsOnReconnect(PICK_UNREACHABLE), true);
   assert.equal(clearsOnReconnect("The chat changed elsewhere. Showing the current one, please say it again."), false);
   assert.equal(clearsOnReconnect(""), false);
+});
+
+test("a chat the server lost while it still waited is noticed; a finished or other-tab chat is not", () => {
+  const waiting = { id: "c1", turns: [{ id: "t1", said: "a room in Basel" }], cards: null, approval: null };
+  const answered = { ...waiting, turns: [{ id: "t1", said: "hi", answer: "Hello" }] };
+  assert.equal(lostOnRestart(waiting, "c1", "c2", []), true);
+  assert.equal(lostOnRestart(waiting, "c1", "c1", []), false);  // the same chat: only caught up
+  assert.equal(lostOnRestart(waiting, null, "c2", []), false);  // first load
+  assert.equal(lostOnRestart(answered, "c1", "c2", []), false);  // done: just put away
+  assert.equal(lostOnRestart({ ...answered, approval: { id: "a" } }, "c1", "c2", []), true);
+  assert.equal(lostOnRestart({ ...answered, cards: [{ node_id: "h" }], picked: null }, "c1", "c2", []), true);
+  assert.equal(lostOnRestart({ ...answered, cards: [{ node_id: "h" }], picked: ["h"] }, "c1", "c2", []), false);
+  assert.equal(lostOnRestart(waiting, "c1", "c2", [{ id: "c1" }]), false);  // another tab moved on and archived it
+  assert.equal(lostOnRestart({ id: "c1", turns: [] }, "c1", "c2", []), false);
 });

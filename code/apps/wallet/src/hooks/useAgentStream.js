@@ -2,13 +2,17 @@
 // preserves the old assistant; resuming history restores its signed offers and agreements.
 // The stream can drop (network, phone asleep, server restart): the wallet then says so, keeps
 // reconnecting and first catches up on what it missed from GET /history (lib/stream.js), so an
-// answer the server finished meanwhile still shows up.
+// answer the server finished meanwhile still shows up. If the server restarted meanwhile (it
+// keeps chats in memory) while the chat on screen still waited for something, that chat goes
+// into the history and a note says to ask again (lib/recovery.js lostOnRestart), never a
+// silently empty card.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { applyEvent, bindTurn, dropTurn, EMPTY, startTurn, withDeck } from "../lib/activity.js";
 import { catchUp, OFFLINE_AFTER, parseFrame, retryDelay } from "../lib/stream.js";
 import { newConversation, resumeConversation, UNREACHABLE } from "../lib/api.js";
 import { archive, CURRENT_KEY, HISTORY_KEY, loadCurrent, loadHistory, saveCurrent } from "../lib/history.js";
 import { restoreConversation } from "../lib/conversation.js";
+import { lostOnRestart, RESTART_NOTE } from "../lib/recovery.js";
 
 function reducer(state, action) {
   switch (action.type) {
@@ -42,6 +46,7 @@ export default function useAgentStream() {
   const [history, setHistory] = useState(loadHistory);
   const [switching, setSwitching] = useState(true);
   const [connectionError, setConnectionError] = useState("");
+  const [lost, setLost] = useState("");  // the server restarted and lost the chat on screen: ask again
   const [link, setLink] = useState("live");  // the event stream: live | reconnecting | offline
   const [opened, setOpened] = useState(0);  // counts the stream's successful (re)connections
   const switchingRef = useRef(true);
@@ -67,6 +72,7 @@ export default function useAgentStream() {
     }
     const current = stateRef.current;
     const saved = loadHistory();
+    if (lostOnRestart(current, activeId.current, id, saved)) setLost(RESTART_NOTE);
     // The chat on screen was left behind (e.g. by another tab, which archived it already).
     if (activeId.current && id !== activeId.current && current.turns.length && !saved.some(e => e.id === current.id)) {
       setHistory(archive(current));
@@ -218,6 +224,7 @@ export default function useAgentStream() {
         activeId.current = id;
         lastStep.current = events.at(-1)?.step || 0;
         setConnectionError("");
+        setLost("");
       } catch (error) {
         // The server may have switched even if its response was lost. Reconcile before
         // reconnecting, so the visible offer can never belong to a different chat.
@@ -244,7 +251,10 @@ export default function useAgentStream() {
       }
     }
     return {
-      say: said => dispatch({ type: "say", said }),
+      say: said => {
+        setLost("");
+        dispatch({ type: "say", said });
+      },
       // POST /chat accepted the message as this turn; make sure its answer can arrive.
       sent: (said, turnId) => {
         dispatch({ type: "bind", said, turnId });
@@ -267,5 +277,5 @@ export default function useAgentStream() {
       resume: entry => switchTo(stateRef.current, entry.state),
     };
   }, [dispatch]);
-  return [state, actions, history, lastChange, switching, connectionError, link, opened];
+  return [state, actions, history, lastChange, switching, connectionError, link, opened, lost];
 }

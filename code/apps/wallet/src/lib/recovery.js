@@ -1,6 +1,7 @@
 // How the wallet recovers from a failed request: when voice tries again, which messages are
 // sent again on their own, and the friendly words for a refusal that is not really an error.
 
+import { choosing } from "./activity.js";
 import { UNREACHABLE } from "./api.js";
 
 /** The error after a book choice that did not reach Tuttie (App.jsx pick). */
@@ -46,6 +47,20 @@ export function voiceNote(state, micBlocked = false) {
  *  an answer and is never repeated. */
 export function shouldResend(error) {
   return !error?.status || error.status >= 500;
+}
+
+/** The note after the server lost the chat on screen while it still waited for something. */
+export const RESTART_NOTE = "Tuttie restarted — please ask again (the earlier chat is in History)";
+
+/** True when the server now has another conversation (`id`) than the one on screen (`current`,
+ *  connected as `activeId`) and the one on screen was not done: a question without an answer,
+ *  an approval or hotel cards still waiting. That only happens when the server restarted (it
+ *  keeps chats in memory): another tab cannot switch chats while one is busy, and a chat it
+ *  left is already in the history (`saved`). A finished chat is simply put away, as before. */
+export function lostOnRestart(current, activeId, id, saved) {
+  if (!activeId || id === activeId || !current?.turns?.length) return false;
+  if (saved.some(e => e.id === current.id)) return false;
+  return current.turns.some(t => !t.answer) || Boolean(current.approval) || choosing(current);
 }
 
 /** Tuttie is still working on an answer (HTTP 409): a new chat has to wait for it. */
