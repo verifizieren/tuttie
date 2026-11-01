@@ -60,7 +60,8 @@ export function approvalOf(event, detail) {
  *  React's output breaks the whole chat view). Other fields stay as they came. */
 const number = value => (typeof value === "number" && Number.isFinite(value) ? value : null);
 export function cardOf(card) {
-  const score = number(card.rating?.score);
+  const rated = number(card.rating?.score);
+  const score = rated !== null && rated >= 0 && rated <= 5 ? rated : null;  // a score out of 5
   return {
     ...card,
     node_id: plain(card.node_id), name: plain(card.name), agent: plain(card.agent), about: plain(card.about),
@@ -318,7 +319,10 @@ export function applyEvent(state, event) {
   }
 
   // Negotiation rounds arrive as signed a2a replies whose payload is a counter or an agreement.
-  if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)) {
+  // A round whose price is not a number (a hotel's own reply) changes nothing: it would break
+  // the card that shows it.
+  if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)
+      && number(detail.payload.price_chf) !== null) {
     const h = hotel(state, event.node_id, event.node_name);
     const step = { price: detail.payload.price_chf, final: Boolean(detail.payload.final), type: detail.payload.type };
     const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter((p, i, all) => p != null && (i === 0 || p !== all[i - 1]))

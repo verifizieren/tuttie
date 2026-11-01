@@ -36,3 +36,21 @@ export function serverDecision(state, id) {
  *  to be seen) comes first; a newer approval (e.g. the city tax right after a booking) follows
  *  once that sheet is done. */
 export const sheetOf = (approval, finishing) => finishing || approval || null;
+
+/** How long a sheet that just slid in ignores finger taps (its entry slide is 0.45 s). */
+export const ARM_MS = 600;
+
+/** Whether a click on a sheet's buttons counts. A click from code or the keyboard (`detail` 0)
+ *  always does. A finger tap counts only if the finger came down on this sheet (`downAt`) once it
+ *  had been on screen for ARM_MS (`shownAt`): a tap aimed at a sheet that just went never decides
+ *  the one that took its place. */
+export function tapAccepted({ detail, shownAt, downAt }) {
+  if (!detail) return true;
+  return downAt != null && downAt - shownAt >= ARM_MS;
+}
+
+/** Whether the decision the server streamed (`recorded`) finishes the sheet now: only once the
+ *  user decided here (`decision`) and the call was sent, also when it then timed out (back to
+ *  "ask") or came back as no longer waiting ("gone"); the server's record decides the mark. */
+export const finishesOn = (recorded, stage, decision) =>
+  Boolean(recorded && decision && ["sending", "ask", "gone"].includes(stage));

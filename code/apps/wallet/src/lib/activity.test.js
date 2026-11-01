@@ -239,3 +239,25 @@ test('a price in brackets is kept, a citation goes', () => {
   assert.equal(cleanAnswer('Booked for CHF [128] tonight.'), 'Booked for CHF 128 tonight.');
   assert.equal(cleanAnswer('Total [1,280] for ten nights [3, 4].'), 'Total 1,280 for ten nights.');
 });
+
+test('an agreement after the cards never puts a non-number price on a card', () => {
+  const card = i => ({ node_id: `ch.h${i}`, name: `Hotel ${i}`, trust_tier: 'gold', price_chf: 150 + i, agreed_chf: 140 + i,
+                       rating: { score: 4.5 }, features: [], photos: [] });
+  let s = applyEvent(startTurn(EMPTY, 'hotel'), { step: 1, kind: 'marketplace', status: 'verified', summary: '', seals: [],
+                                                  detail: { phase: 'cards', cards: [card(1), card(2)] } });
+  for (const price of [{ x: 1 }, 'free', null, NaN]) {
+    const next = applyEvent(s, { step: 2, kind: 'a2a', status: 'verified', node_id: 'ch.h2', node_name: 'Hotel 2', summary: '', seals: [],
+                                 detail: { payload: { type: 'agreement', price_chf: price } } });
+    assert.equal(next.cards.find(c => c.node_id === 'ch.h2').agreed_chf, 142, String(price));
+  }
+  const good = applyEvent(s, { step: 2, kind: 'a2a', status: 'verified', node_id: 'ch.h2', node_name: 'Hotel 2', summary: '', seals: [],
+                               detail: { payload: { type: 'agreement', price_chf: 128 } } });
+  assert.equal(good.cards.find(c => c.node_id === 'ch.h2').agreed_chf, 128);
+});
+
+test('a card rating is a score from 0 to 5, anything else is not shown', async () => {
+  const { cardOf } = await import('./activity.js');
+  const base = { node_id: 'ch.a', name: 'A', price_chf: 150, rating: { score: 4.5 } };
+  for (const score of [1e300, -3, 5.01, -0.1]) assert.equal(cardOf({ ...base, rating: { score } }).rating, null, String(score));
+  for (const score of [0, 4.5, 5]) assert.equal(cardOf({ ...base, rating: { score } }).rating.score, score);
+});
