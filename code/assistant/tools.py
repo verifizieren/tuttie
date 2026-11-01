@@ -501,6 +501,8 @@ class Toolbox:
         """
         if problem := stay_error(date, guests, nights):
             return {"error": problem}
+        if isinstance(request.get("requirements"), list):
+            request["requirements"] = self.public_needs(request["requirements"])
         result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
@@ -756,12 +758,22 @@ class Toolbox:
                     continue
                 if isinstance(item.get("where"), str):
                     terms.add(item["where"].split(",")[0].strip().lower())
-                text = " ".join(str(item.get(k, "")) for k in ("what", "subject", "text"))
+                text = " ".join(str(item.get(k, "")) for k in ("what", "subject", "text", "snippet"))
+                terms |= {m.lower() for m in re.findall(r"\b[A-Z]{2,3} ?\d{1,4}\b(?! ?CHF)", text)
+                          if not m.startswith("CHF")}  # a train ("EC 52")
+                terms |= set(re.findall(r"\b\d{2}:\d{2}\b", str(item.get("snippet", ""))))  # its times
                 terms |= {m.lower() for m in re.findall(r"\bwith ([A-Z][a-z]+)", text)}
                 terms |= {m.lower() for m in re.findall(r"\b([A-Z][a-z]+) →", text)}
                 if isinstance(item.get("from"), str) and item["from"].isalpha() and item["from"].lower() != me:
                     terms.add(item["from"].lower())
         return {t for t in terms if t and t not in PUBLIC_WORDS}
+
+    def public_needs(self, requirements: list) -> list:
+        """The requirements that may be posted to every woken business: none naming private
+        context (private_terms); the market itself drops prices and the budget."""
+        terms = self.private_terms()
+        return [r for r in requirements if isinstance(r, str)
+                and not any(re.search(rf"\b{re.escape(t)}\b", r, re.IGNORECASE) for t in terms)]
 
     async def ask_agent(self, node_id: str, question: str) -> dict:
         """Ask a node's own agent (A2A); a commitment in the reply is kept for booking.
