@@ -43,10 +43,12 @@ export const ARM_MS = 600;
 /** Whether a click on a sheet's buttons counts. A click from code or the keyboard (`detail` 0)
  *  always does. A finger tap counts only if the finger came down on this sheet (`downAt`) once it
  *  had been on screen for ARM_MS (`shownAt`): a tap aimed at a sheet that just went never decides
- *  the one that took its place. */
-export function tapAccepted({ detail, shownAt, downAt }) {
+ *  the one that took its place. Without a pointerdown, the click's own time counts. */
+export function tapAccepted({ detail, shownAt, downAt, now = performance.now() }) {
   if (!detail) return true;
-  return downAt != null && downAt - shownAt >= ARM_MS;
+  // No pointerdown on this sheet (VoiceOver and some assistive input send only the click): judge
+  // the click's own time, which a quick tap aimed at the sheet that just went never passes.
+  return (downAt ?? now) - shownAt >= ARM_MS;
 }
 
 /** Whether the decision the server streamed (`recorded`) finishes the sheet now: only once the
