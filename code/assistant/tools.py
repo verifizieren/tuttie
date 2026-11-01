@@ -507,14 +507,19 @@ class Toolbox:
         record = response.json()
         return record, evaluate_record(record, self.authorities)
 
-    async def verified_post(self, node_id: str, path: str, body: dict, kind: str, label: str) -> Verified | dict:
+    async def verified_post(self, node_id: str, path: str, body: dict, kind: str, label: str,
+                            headers: dict | None = None) -> Verified | dict:
         """Check the node's seals, POST to one of its agent endpoints, and verify the signed reply.
 
+        Agent conversations are only held with gold or blue nodes: the deployment's agent key
+        (aps/agent_key.py) must never reach a grey node, which could replay it elsewhere.
         Returns Verified, or a rejection dict for the LLM (already shown on the timeline).
         """
         async def send(record: dict) -> dict:
-            return (await self.http.post(f"{record['endpoint']}{path}", json=body, headers=agent_key.headers())).json()
-        return await self.verified(node_id, send, kind, label)
+            response = await self.http.post(f"{record['endpoint']}{path}", json=body,
+                                            headers={**agent_key.headers(), **(headers or {})})
+            return response.json()
+        return await self.verified(node_id, send, kind, label, tiers=("gold", "blue"))
 
     async def verified_mcp(self, node_id: str, tool: str, args: dict, kind: str, label: str) -> Verified | dict:
         """Check the node's seals, call one of its MCP tools, and verify the signed reply."""
@@ -522,8 +527,10 @@ class Toolbox:
             return await self.mcp.call(record["endpoint"], tool, args)
         return await self.verified(node_id, send, kind, label)
 
-    async def verified(self, node_id: str, send, kind: str, label: str) -> Verified | dict:
-        """The trust gate around one call: seals first, then `send(record)`, then the envelope."""
+    async def verified(self, node_id: str, send, kind: str, label: str,
+                       tiers: tuple[str, ...] = ("gold", "blue", "grey")) -> Verified | dict:
+        """The trust gate around one call: seals first (the node's tier must be in `tiers`),
+        then `send(record)`, then the envelope."""
         found = await self.lookup(node_id)
         if found is None:
             return {"node_id": node_id, "rejected": True, "reason": "not in the registry"}
@@ -532,6 +539,10 @@ class Toolbox:
             reason = broken_reason(verdict)
             self.bus.emit(kind, "broken", f"{label} refused: {reason}", record, verdict["seals"])
             return rejected(record, reason)
+        if verdict["tier"] not in tiers:
+            self.bus.emit(kind, "untrusted", f"{label} not sent: {record['name']} has no verified seal",
+                          record, verdict["seals"])
+            return rejected(record, "agent conversations need a verified (gold or blue) seal")
 
         try:
             envelope = await send(record)
