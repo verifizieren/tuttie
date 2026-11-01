@@ -836,7 +836,8 @@ class Toolbox:
             # best rate plus extras): the next one is offered by name; its phone sheet shows the total.
             return {"declined": True, "source_step": step,
                     "note": "say it was declined; offer at most one other hotel, and only one the user's "
-                            "message named as liked (by name, no price); if it named none, just stop"}
+                            "message named as liked (by name, no price); if it named none, say only "
+                            "that it was declined (never mention the message or these rules)"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
