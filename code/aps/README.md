@@ -6,7 +6,7 @@ the owner (dev member 2). Wire formats: `documentation/formats.md`.
 
 | File | What |
 | --- | --- |
-| `canonical.py` | Canonical JSON and base64, the bytes every signature covers. |
+| `canonical.py` | Canonical JSON and strict, canonical base64 (one text per signature), the bytes every signature covers. |
 | `keys.py` | Key files in `keys/<id>.json` (demo keys committed on purpose; `keys/local/` private). |
 | `envelope.py` | Signed envelopes `{node_id, timestamp, payload, signature}`; opt-in freshness (`max_age_s`, 60 s clock skew). |
 | `uid.py` | Swiss business UIDs (CHE-xxx.xxx.xxx) with the mod-11 check digit. |
