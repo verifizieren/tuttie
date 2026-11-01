@@ -123,3 +123,14 @@ test("the streamed decision finishes a sheet the user decided on, also after a t
   assert.equal(finishesOn("approved", "scan", "approved"), false);   // not sent yet: the call says what happens
   assert.equal(finishesOn("approved", "done", "approved"), false);   // already finished
 });
+
+test("a press held across the swap (finger down before this sheet showed) never decides it", async () => {
+  const { tapAccepted, ARM_MS } = await import("./approval.js");
+  const shownAt = 1000;
+  // the finger came down on the old sheet 50 ms before the swap and lifts over the new Approve
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, lastDown: shownAt - 50, now: shownAt + ARM_MS + 100 }), false);
+  // no pointerdown anywhere (VoiceOver): still judged by the click's own time
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, lastDown: null, now: shownAt + ARM_MS + 100 }), true);
+  // a pointerdown long before the sheet (an earlier, finished tap) does not block an assistive tap
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, lastDown: shownAt - 5000, now: shownAt + ARM_MS + 100 }), true);
+});
