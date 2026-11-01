@@ -12,6 +12,7 @@ station, cancel, breakfast, wifi, parking, small), `ok` paints it green or red. 
 answer the user's needs come first.
 """
 
+import math
 import re
 
 MAX_CARDS = 5
@@ -32,30 +33,44 @@ def needs_text(requirements: list[str]) -> str:
     return " ".join(requirements).lower()
 
 
+def number(value) -> float | int | None:
+    """value if it is a finite number (not a bool), else None: signed hotel data may hold anything."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return value
+
+
 def features(facts: dict) -> list[dict]:
-    """Every feature the hotel's signed policies tell about, green (ok) or red."""
-    policies, amenities = facts.get("policies") or {}, facts.get("amenities") or {}
+    """Every feature the hotel's signed policies tell about, green (ok) or red.
+
+    Values of the wrong type are treated as missing (a text fee, a list for a policy).
+    """
+    policies, amenities = facts.get("policies"), facts.get("amenities")
+    policies = policies if isinstance(policies, dict) else {}
+    amenities = amenities if isinstance(amenities, dict) else {}
     found = []
 
     def add(key, ok, label):
         found.append({"key": key, "ok": ok, "label": label})
 
     if "dogs_allowed" in policies:
-        fee = policies.get("dog_fee_chf_per_night") or 0
+        fee = number(policies.get("dog_fee_chf_per_night")) or 0
         add("dog", bool(policies["dogs_allowed"]),
             ("Dogs free" if not fee else f"Dogs CHF {fee:g}") if policies["dogs_allowed"] else "No dogs")
     if "kids_beds" in amenities:
         add("kids", amenities["kids_beds"], "Kids' beds" if amenities["kids_beds"] else "No kids' beds")
     if "quiet" in facts:
         add("quiet", bool(facts["quiet"]), "Quiet" if facts["quiet"] else "Not quiet")
-    late = (policies.get("late_arrival") or "").lower()
+    late = policies.get("late_arrival")
+    late = late.lower() if isinstance(late, str) else ""
     if late:
         ok = not ("closes" in late or "no check-in" in late)
         add("late", ok, ("24h reception" if "24 hours" in late else "Late arrival") if ok else "No late check-in")
-    distance = facts.get("distance_to_basel_sbb_m")
+    distance = number(facts.get("distance_to_basel_sbb_m"))
     if distance is not None:
         add("station", distance <= NEAR_STATION_M, f"{max(1, round(distance / WALK_M_PER_MIN))} min to SBB")
-    cancellation = (policies.get("cancellation") or "").lower()
+    cancellation = policies.get("cancellation")
+    cancellation = cancellation.lower() if isinstance(cancellation, str) else ""
     if cancellation:
         add("cancel", "non-refundable" not in cancellation,
             "Non-refundable" if "non-refundable" in cancellation else "Free cancellation")
@@ -87,12 +102,12 @@ def profile_of(data: dict) -> dict:
 
 
 def rating_of(facts: dict) -> dict | None:
-    """facts["rating"] as {score: number, reviews: int | None}, or None if it is not one."""
+    """facts["rating"] as {score: 0..5, reviews: int | None}, or None if it is not one."""
     rating = facts.get("rating")
     if not isinstance(rating, dict):
         return None
-    score, reviews = rating.get("score"), rating.get("reviews")
-    if not isinstance(score, (int, float)) or isinstance(score, bool):
+    score, reviews = number(rating.get("score")), rating.get("reviews")
+    if score is None or not 0 <= score <= 5:
         return None
     return {"score": score, "reviews": reviews if isinstance(reviews, int) and not isinstance(reviews, bool) else None}
 

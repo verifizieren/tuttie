@@ -9,6 +9,7 @@ that emitted them (see `current_turn`), so the wallet attaches them to the right
 
 import asyncio
 import json
+import math
 from contextvars import ContextVar
 
 # The user turn being answered in this task. Set by the conversation for each request's run;
@@ -42,6 +43,7 @@ class EventBus:
             "summary": summary,
             "detail": detail or {},
         }
+        event = finite(event)  # NaN/Infinity are not JSON: the wallet would drop the frame, /history fail
         self.history.append(event)
         self._publish(("message", event))
         return event
@@ -72,6 +74,21 @@ class EventBus:
             self.subscribers.discard(queue)
 
 
+def finite(value):
+    """value with every NaN or Infinity (at any depth) replaced by None, so it is valid JSON."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: finite(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [finite(item) for item in value]
+    return value
+
+
 def sse(name: str, data: dict) -> str:
-    """One Server-Sent Events frame."""
-    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    """One Server-Sent Events frame (always valid JSON: NaN/Infinity become null)."""
+    try:
+        text = json.dumps(data, ensure_ascii=False, allow_nan=False)
+    except ValueError:
+        text = json.dumps(finite(data), ensure_ascii=False, allow_nan=False)
+    return f"event: {name}\ndata: {text}\n\n"

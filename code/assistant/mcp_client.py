@@ -5,6 +5,7 @@ verifies it (and the business's seals) before the LLM sees anything, as for ever
 """
 
 import json
+import math
 from collections.abc import Callable
 
 from mcp import Client
@@ -12,6 +13,19 @@ from mcp import Client
 
 class McpCallFailed(Exception):
     """The business could not be reached over MCP, or its tool failed without a signed answer."""
+
+
+def finite_float(text: str) -> float:
+    """A JSON number as float, refusing ones too big to be finite (1e309 would be Infinity)."""
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"{text} is not a finite number")
+    return value
+
+
+def reject_constant(name: str):
+    """json.loads hook: NaN and Infinity are not JSON, so a reply holding them is refused."""
+    raise ValueError(f"{name} is not JSON")
 
 
 def connect_url(endpoint: str) -> Client:
@@ -36,6 +50,6 @@ class McpLink:
         if result.is_error:
             raise McpCallFailed(text or "tool failed")
         try:
-            return json.loads(text)
-        except json.JSONDecodeError as error:
+            return json.loads(text, parse_float=finite_float, parse_constant=reject_constant)
+        except ValueError as error:  # also json.JSONDecodeError
             raise McpCallFailed("answer is not JSON") from error

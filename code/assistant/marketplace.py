@@ -23,7 +23,7 @@ import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
 from aps.envelope import parse_timestamp
-from assistant.cards import MAX_ABOUT_CHARS, MAX_NAME_CHARS, clean_text, profile_of  # noqa: F401
+from assistant.cards import MAX_ABOUT_CHARS, MAX_NAME_CHARS, clean_text, number, profile_of  # noqa: F401
 from assistant.events import EventBus
 from marketplace.client import new_request_id, post_request, sign_request
 from marketplace.messages import Request
@@ -216,6 +216,8 @@ class MarketDesk:
             verdict = evaluate_record(record, self.authorities)
             offer = item["offer"]
             summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
+            if number(offer["price_chf"]) is None:
+                raise ValueError("the price is not a finite number")
         except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
             self.bus.emit("marketplace", "broken", "A malformed offer or one from an unknown business, ignored")
             return None
