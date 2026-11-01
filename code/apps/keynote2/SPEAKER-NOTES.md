@@ -16,9 +16,9 @@ not at the screen. The same lines and cues are in the presenter view (press N).
 | | | | [pause] Anna's agent offered 135. Tuttie already bargained: 128. I still choose. | → on "One tap" |
 | | | side word "One tap." (blue) | And nothing happens without me. One tap, signed with my key, for exactly that price. | → hold on the booking |
 | | | booking card | (two seconds of silence) | → empty |
-| 5 | 1:55-2:05 | empty | The hotels and the register are demo. The signatures are real. | → 2000 website |
-| 6 | 2:05-2:25 | "2000 website" | In 2000 a business needed a website. | → 2033 signature |
-| | | "website → signature", 2000 / 2033 | In five to ten years, it needs a signature: a signed agent that answers for it. Anna sets her prices and limits once. Her agent does the rest. | → one more thing |
+| 5 | 1:55-2:05 | empty | The hotels and the register are demo. The signatures are real. | → website |
+| 6 | 2:05-2:25 | "website" (the years are spoken only) | In 2000 a business needed a website. | → signature |
+| | | "website → signature" | In five to ten years, it needs a signature: a signed agent that answers for it. Anna sets her prices and limits once. Her agent does the rest. | → one more thing |
 | 7 | 2:25-2:40 | "One more thing." | One more thing. | → owner view |
 | | | Anna's owner view in a laptop frame | This is Anna's side. She approves what her agent may say, in plain words. | → closing line |
 | 8 | 2:40-3:00 | "Signed businesses reach you." | Signed businesses reach you. | → second line |

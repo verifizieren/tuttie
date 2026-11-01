@@ -235,20 +235,10 @@ body.idle { cursor: none; }
 
 .era {
   position: absolute;
-  top: 432px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
+  top: 504px;                              /* one line, the arrow centred on it; years are spoken only */
 }
 .era.then { left: var(--margin); }
 .era.now { left: 1000px; }
-.year {
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ink-2);
-  font-feature-settings: "tnum";
-}
 .word {
   font-size: 176px;
   font-weight: 650;

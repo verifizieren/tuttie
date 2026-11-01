@@ -38,7 +38,7 @@ or a held key, moves one step only.
 0 empty · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 empty, then the cheap listing ·
 3 Tuttie's white card with her eyes · 4 demo: the eyes move into the phone and the real wallet takes over, side
 words "Never asked." and "One tap." · 5 empty, the honesty line is spoken (hotels and register
-are demo, signatures are real) · 6 2000 website → 2033 signature ·
+are demo, signatures are real) · 6 website → signature (years spoken only) ·
 7 one more thing: Anna's owner view in a laptop frame (optional) · 8 closing lines, then QR code.
 
 ## The demo (beat 4)

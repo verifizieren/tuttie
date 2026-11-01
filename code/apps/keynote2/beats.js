@@ -63,8 +63,8 @@ export const BEATS = [
   {
     id: "signature", title: "Website to signature", from: 125, to: 145,
     steps: [
-      { cue: "Click: 2000, website.", spoken: "In 2000 a business needed a website." },
-      { cue: "Click: 2033, signature.",
+      { cue: "Click: website.", spoken: "In 2000 a business needed a website." },
+      { cue: "Click: signature.",
         spoken: "In five to ten years, it needs a signature: a signed agent that answers for it. Anna sets her prices and limits once. Her agent does the rest." },
     ],
   },
