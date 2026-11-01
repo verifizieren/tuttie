@@ -1,13 +1,87 @@
 [
-  {"in": "The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3, 4].", "screen": "The total is CHF 128. Tax paid. Fine.", "spoken": "The total is 128 francs. Tax paid. Fine."},
-  {"in": "Total CHF 128 [+ CHF 40 cleaning fee].", "screen": "Total CHF 128 + CHF 40 cleaning fee.", "spoken": "Total 128 francs + 40 francs cleaning fee."},
-  {"in": "Rheinblick is CHF 180 [nonrefundable]. Pay at the desk [cash].", "screen": "Rheinblick is CHF 180 nonrefundable. Pay at the desk cash.", "spoken": "Rheinblick is 180 francs nonrefundable. Pay at the desk cash."},
-  {"in": "The 18:02 train [cancelled], take the 18:32.", "screen": "The 18:02 train cancelled, take the 18:32.", "spoken": "The 6:02 pm train cancelled, take the 6:32 pm."},
-  {"in": "Booked [city tax CHF 7 paid, receipt RC-A14786].", "screen": "Booked city tax CHF 7 paid.", "spoken": "Booked city tax 7 francs paid."},
-  {"in": "Room is [NON-REFUNDABLE] tonight. Take the train [IC-1041 from platform 7].", "screen": "Room is NON-REFUNDABLE tonight. Take the train IC-1041 from platform 7.", "spoken": "Room is NON-REFUNDABLE tonight. Take the train IC-1041 from platform 7."},
-  {"in": "Your booking BK-89A674 is set. Book Rheinblick [ch.basel.hotel-rheinblick] now.", "screen": "Your booking BK-89A674 is set. Book Rheinblick now.", "spoken": "Your booking BK-89A674 is set. Book Rheinblick now."},
-  {"in": "Total CHF 200 [3](incl. CHF 4.50 city tax). See [Rheinblick](https://x.y).", "screen": "Total CHF 200 (incl. CHF 4.50 city tax). See Rheinblick.", "spoken": "Total 200 francs (incl. 4.50 francs city tax). See Rheinblick."},
-  {"in": "Price CHF 120[incl. city tax].", "screen": "Price CHF 120 incl. city tax.", "spoken": "Price 120 francs incl. city tax."},
-  {"in": "Rheinblick it is. [Ignored: Scam Hotel, forged]\n**Ignored:** Scam Hotel.\n- Ignored: Other", "screen": "Rheinblick it is.", "spoken": "Rheinblick it is."},
-  {"in": "Check-in from 14:00 hrs or 18:00 Uhr.", "screen": "Check-in from 14:00 hrs or 18:00 Uhr.", "spoken": "Check-in from 14:00 hrs or 18:00 Uhr."}
+  {
+    "in": "The total is CHF 128 [confirmed]. Tax paid [receipt RC-A14786]. Fine [3, 4].",
+    "screen": "The total is CHF 128. Tax paid. Fine.",
+    "spoken": "The total is 128 francs. Tax paid. Fine."
+  },
+  {
+    "in": "Total CHF 128 [+ CHF 40 cleaning fee].",
+    "screen": "Total CHF 128 + CHF 40 cleaning fee.",
+    "spoken": "Total 128 francs + 40 francs cleaning fee."
+  },
+  {
+    "in": "Rheinblick is CHF 180 [nonrefundable]. Pay at the desk [cash].",
+    "screen": "Rheinblick is CHF 180 nonrefundable. Pay at the desk cash.",
+    "spoken": "Rheinblick is 180 francs nonrefundable. Pay at the desk cash."
+  },
+  {
+    "in": "The 18:02 train [cancelled], take the 18:32.",
+    "screen": "The 18:02 train cancelled, take the 18:32.",
+    "spoken": "The 6:02 pm train cancelled, take the 6:32 pm."
+  },
+  {
+    "in": "Booked [city tax CHF 7 paid, receipt RC-A14786].",
+    "screen": "Booked city tax CHF 7 paid.",
+    "spoken": "Booked city tax 7 francs paid."
+  },
+  {
+    "in": "Room is [NON-REFUNDABLE] tonight. Take the train [IC-1041 from platform 7].",
+    "screen": "Room is NON-REFUNDABLE tonight. Take the train IC-1041 from platform 7.",
+    "spoken": "Room is NON-REFUNDABLE tonight. Take the train IC-1041 from platform 7."
+  },
+  {
+    "in": "Your booking BK-89A674 is set. Book Rheinblick [ch.basel.hotel-rheinblick] now.",
+    "screen": "Your booking BK-89A674 is set. Book Rheinblick now.",
+    "spoken": "Your booking BK-89A674 is set. Book Rheinblick now."
+  },
+  {
+    "in": "Total CHF 200 [3](incl. CHF 4.50 city tax). See [Rheinblick](https://x.y).",
+    "screen": "Total CHF 200 (incl. CHF 4.50 city tax). See Rheinblick.",
+    "spoken": "Total 200 francs (incl. 4.50 francs city tax). See Rheinblick."
+  },
+  {
+    "in": "Price CHF 120[incl. city tax].",
+    "screen": "Price CHF 120 incl. city tax.",
+    "spoken": "Price 120 francs incl. city tax."
+  },
+  {
+    "in": "Rheinblick it is. [Ignored: Scam Hotel, forged]\n**Ignored:** Scam Hotel.\n- Ignored: Other",
+    "screen": "Rheinblick it is.",
+    "spoken": "Rheinblick it is."
+  },
+  {
+    "in": "Booked Rheinblick for CHF 128. Ignored: Scam Hotel, forged seal.",
+    "screen": "Booked Rheinblick for CHF 128.",
+    "spoken": "Booked Rheinblick for 128 francs."
+  },
+  {
+    "in": "Rates [1](https://rheinblick.ch/rates) start at CHF 180.",
+    "screen": "Rates start at CHF 180.",
+    "spoken": "Rates start at 180 francs."
+  },
+  {
+    "in": "Check-in from 14:00 hrs or 18:00 Uhr.",
+    "screen": "Check-in from 14:00 hrs or 18:00 Uhr.",
+    "spoken": "Check-in from 2 pm or 6 pm."
+  },
+  {
+    "in": "All set [\tconfirmed].",
+    "screen": "All set.",
+    "spoken": "All set."
+  },
+  {
+    "in": "Seen on [booking.com] for less.",
+    "screen": "Seen on booking.com for less.",
+    "spoken": "Seen on booking.com for less."
+  },
+  {
+    "in": "Booked [[3]] ok.",
+    "screen": "Booked ok.",
+    "spoken": "Booked ok."
+  },
+  {
+    "in": "There is a .50 fee , as usual.",
+    "screen": "There is a .50 fee , as usual.",
+    "spoken": "There is a .50 fee , as usual."
+  }
 ]
