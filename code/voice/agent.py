@@ -75,9 +75,14 @@ RECONNECT_S = (0.5, 10.0)  # wait before following the timeline again: first, an
 HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 
+def handoff_needed(answer: str) -> bool:
+    """Whether to add HANDOFF after the cards answer: not when the answer already says to swipe."""
+    return "swip" not in answer.lower()
+
+
 def francs(match: re.Match) -> str:
     """An amount as it is said: "CHF 128" is "128 francs", "CHF 1" is "1 franc"."""
-    amount = re.sub(r"['’ \u00a0\u202f]", "", match.group(1) or match.group(2))  # thousands: "1'280" is said 1280
+    amount = re.sub(r"['’\u00a0\u202f]", "", match.group(1) or match.group(2))  # thousands: "1'280" is said 1280
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
@@ -202,7 +207,8 @@ def spoken(answer: str) -> str:
     text = BARE_URL.sub("", text)  # nor web addresses
     text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
-    amount = r"(\d{1,3}(?:['’ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # "1'280", "1 280" too
+    # "1'280" and "1 280" with a no-break space; a plain space is not a separator ("CHF 128 100 percent")
+    amount = r"(\d{1,3}(?:['’\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
     text = re.sub(rf"\bCHF\s?{amount}|{amount}\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
@@ -382,7 +388,8 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
             agent.asked = None  # answered without (or after) a tool: no filler any more
             say(spoken(str(event.get("summary") or "")))
             if cards is not None and event.get("turn", "?") == cards:
-                say(HANDOFF)
+                if handoff_needed(str(event.get("summary") or "")):
+                    say(HANDOFF)
                 cards = None
             return
         if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
