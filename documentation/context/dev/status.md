@@ -6,10 +6,14 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (QR page: APS and two-layer web sections ported from `qr-aps`; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
+Last updated: 2026-11-01 (QR page: two-layer web vision and stacked-card diagram; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
+- **QR page web vision (1 Nov)**: "One web. Two layers." now explicitly describes our vision
+  of a new agent layer while existing websites stay the same. Replaced the flow diagram with
+  two offset cards: a website in front and an illustrative agent code layer behind. Uses the
+  existing guesthouse photo, purple accents and an updated screen-reader description.
 - **QR page APS and agent web (1 Nov)**: ported the sections from `qr-aps` into the current
   `code/apps/qr/` site. "A fair chance." replaces the business heading and 7 / 220 room cards.
   "One web. Two layers." includes the responsive diagram and a nested APS explanation with
