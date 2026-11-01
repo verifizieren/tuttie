@@ -12,15 +12,17 @@
 :root {
   --ease: cubic-bezier(.22, 1, .36, 1);
   --cam: cubic-bezier(.65, 0, .35, 1);
-  --bg: #08080b; --panel: #111117; --panel2: #16161e; --line: #23232d; --line2: #2e2e3b;
-  --text: #ecebf4; --muted: #8d8c9e; --dim: #5d5c6d;
-  --accent: #d97757; --peach: #f6d3c2; --gold: #e8b746; --blue: #8fb0ff; --red: #ff6b5f; --green: #34c77b;
+  /* The light wallet palette (apps/wallet/src/wallet.css): calm, iOS-like, readable on a projector. */
+  --bg: #f2f2f7; --panel: #ffffff; --panel2: #f6f6f9; --line: #e4e4ea; --line2: #d6d6de;
+  --text: #17171d; --muted: #5a5967; --dim: #8b8a97;
+  --accent: #d97757; --accent-text: #b4532f; --peach: #b4532f;
+  --gold: #b8860b; --blue: #2f6fe0; --red: #d93b3b; --green: #1f9d5c;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
 body.idle { cursor: none; }
-#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; background: #000; }
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; background: var(--bg); }
 #glow { position: absolute; inset: 0; opacity: 0; transition: opacity 2s ease;
         background: radial-gradient(760px 620px at 50% 50%, rgba(246,211,194,.035), transparent 70%); }
 .has-reveal #glow { opacity: 1; }
@@ -75,7 +77,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .has-try #shadow { opacity: .8; transform: translateX(330px); }
 
 /* ---------- The screen: 388 × 838, the wallet's own layout ---------- */
-.screen { position: relative; width: 388px; height: 838px; border-radius: 56px; overflow: hidden; background: #000; isolation: isolate; }
+.screen { position: relative; width: 388px; height: 838px; border-radius: 56px; overflow: hidden; background: var(--bg); color: var(--text); isolation: isolate; }
 .island { position: absolute; top: 11px; left: 50%; width: 120px; height: 35px; margin-left: -60px; border-radius: 20px; background: #000; z-index: 60; }
 .sbar { position: absolute; top: 18px; left: 36px; right: 28px; display: flex; justify-content: space-between; align-items: center;
         font-size: 16px; font-weight: 600; z-index: 59; }
@@ -91,14 +93,14 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 /* Lock screen */
 .ls { position: absolute; inset: 0; transition: opacity .7s ease, filter .9s ease, transform .9s var(--ease); }
 .ls .wp { position: absolute; inset: 0;
-          background: radial-gradient(280px 240px at 20% 80%, rgba(217,119,87,.8), transparent 70%),
-                      radial-gradient(320px 280px at 90% 95%, rgba(246,211,194,.55), transparent 70%),
-                      radial-gradient(360px 320px at 75% 18%, rgba(88,72,150,.6), transparent 70%),
-                      linear-gradient(#0b0a14, #1a1220 50%, #2a1612); }
-.ls .date { position: absolute; top: 86px; width: 100%; text-align: center; font-size: 19px; font-weight: 600; color: rgba(255,255,255,.88); }
-.ls .time { position: absolute; top: 102px; width: 100%; text-align: center; font-size: 96px; font-weight: 600; letter-spacing: -.02em; color: rgba(255,255,255,.95); }
-.ls .bt { position: absolute; bottom: 32px; width: 50px; height: 50px; border-radius: 50%; background: rgba(30,30,36,.45); backdrop-filter: blur(8px); display: grid; place-items: center; }
-.ls .bt svg { width: 21px; height: 21px; fill: none; stroke: #fff; stroke-width: 1.8; }
+          background: radial-gradient(300px 260px at 18% 82%, rgba(217,119,87,.42), transparent 70%),
+                      radial-gradient(320px 280px at 92% 96%, rgba(246,211,194,.8), transparent 70%),
+                      radial-gradient(360px 320px at 78% 16%, rgba(178,186,232,.55), transparent 70%),
+                      linear-gradient(#fbfbfd, #f2f2f7 50%, #f6ece6); }
+.ls .date { position: absolute; top: 86px; width: 100%; text-align: center; font-size: 19px; font-weight: 600; color: rgba(23,23,29,.72); }
+.ls .time { position: absolute; top: 102px; width: 100%; text-align: center; font-size: 96px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+.ls .bt { position: absolute; bottom: 32px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.6); box-shadow: 0 0 0 1px rgba(23,23,29,.06); backdrop-filter: blur(8px); display: grid; place-items: center; }
+.ls .bt svg { width: 21px; height: 21px; fill: none; stroke: var(--text); stroke-width: 1.8; }
 .ls .bt.l { left: 44px; } .ls .bt.r { right: 44px; }
 .hint { position: absolute; right: 0; top: 238px; display: flex; align-items: center; gap: 12px; opacity: 0; z-index: 55; }
 .hint span { font-size: 17px; font-weight: 600; color: #fff; }
@@ -109,7 +111,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .fwd.at-wallet .ls { transition-delay: 2s; }
 
 /* Wallet (apps/wallet/src/wallet.css, at a 388 px wide screen) */
-.wl { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .6s ease;
+.wl { position: absolute; inset: 0; background: var(--bg); opacity: 0; transition: opacity .6s ease;
       --top: 54px; --peek: 58px; --card-h: 224px; --stack: 122px; }
 .has-wallet .wl { opacity: 1; }
 .fwd.at-wallet .wl { transition-delay: 2.05s; }
@@ -117,7 +119,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .whead h1 { margin: 0; font-size: 33px; font-weight: 700; letter-spacing: -.01em; }
 .card { position: absolute; left: 16px; right: 16px; top: calc(var(--stack) + var(--i) * var(--peek)); height: var(--card-h);
         border-radius: 16px; overflow: hidden; transform: translateY(110%);
-        box-shadow: 0 -1px 0 rgba(255,255,255,.12) inset, 0 -8px 24px rgba(0,0,0,.55);
+        box-shadow: 0 -1px 0 rgba(255,255,255,.12) inset, 0 -6px 20px rgba(23,23,40,.16);
         transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
 .has-wallet .card { transform: none; }
 .fwd.at-wallet .card.b0 { transition-delay: 2.15s; } .fwd.at-wallet .card.b1 { transition-delay: 2.25s; } .fwd.at-wallet .card.agent { transition-delay: 2.35s; }
@@ -160,7 +162,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .steps li span { min-width: 0; overflow-wrap: anywhere; }
 .steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
 .steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
-.steps li.done .dot { background: #4a4a52; }
+.steps li.done .dot { background: #c4c3cc; }
 .steps li.done.latest .dot { background: var(--green); }
 .steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px; background: var(--line2); }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
@@ -171,38 +173,38 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .marks { display: inline-flex; flex: none; gap: 8px; min-width: 38px; }
 .marks i { position: relative; width: 22px; height: 22px; border-radius: 6px; }
 .marks svg, .seal-mark svg { display: block; width: 100%; height: 100%; }
-.marks .mini-shield { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; filter: drop-shadow(0 0 1.5px rgba(0,0,0,.8)); }
+.marks .mini-shield { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; filter: drop-shadow(0 0 1px rgba(255,255,255,.95)); }
 .mini-shield.gold path:first-child, .seal-badge.gold path:first-child { fill: var(--gold); }
-.mini-shield.blue path:first-child, .seal-badge.blue path:first-child { fill: #3d8bff; }
+.mini-shield.blue path:first-child, .seal-badge.blue path:first-child { fill: var(--blue); }
 
 /* The hotel cards: swipe right to like, left to pass */
 .deck { display: none; flex-direction: column; gap: 8px; }
 .at-swipe .deck { display: flex; }
 .deck-stack { position: relative; height: 392px; }
-.swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel2); border: 1px solid var(--line);
-              box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .5s var(--ease), opacity .4s; }
+.swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel); border: 1px solid var(--line);
+              box-shadow: 0 10px 28px rgba(23,23,40,.14); transition: transform .5s var(--ease), opacity .4s; }
 .swipe-photo { position: absolute; inset: 0 0 76px; }
-.swipe-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.swipe-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.35), transparent 22%, transparent 62%, rgba(14,14,18,.96)); }
+.swipe-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #e4e4ea; }
+.swipe-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.3), transparent 22%, transparent 55%, rgba(0,0,0,.62)); }
 .hotel-bars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 4px; }
 .hotel-bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
 .hotel-bars i.on { background: #fff; }
 .swipe-top { position: absolute; top: 20px; left: 14px; right: 12px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
 .rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b; background: rgba(255,255,255,.92); }
-.swipe-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+.swipe-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.35); letter-spacing: -.01em; line-height: 1.15; }
 .swipe-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .feature-icons { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
 .feature-icons li { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
 .feature-icons svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.feature-icons .yes { color: var(--green); background: rgba(52,199,123,.14); }
-.feature-icons .no { color: #ff6b6b; background: rgba(255,95,95,.14); }
+.feature-icons .yes { color: var(--green); background: rgba(31,157,92,.12); }
+.feature-icons .no { color: var(--red); background: rgba(217,59,59,.10); }
 .swipe-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
 .swipe-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
 .swipe-price s { font-size: 13px; color: var(--dim); }
 .stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px; font-size: 24px; font-weight: 800;
          text-transform: uppercase; letter-spacing: .04em; opacity: 0; transition: opacity .2s; }
-.stamp.like { left: 18px; color: var(--green); transform: rotate(-12deg); }
-.stamp.pass { right: 18px; color: #ff6b6b; transform: rotate(12deg); }
+.stamp.like { left: 18px; color: #fff; background: var(--green); border-color: var(--green); transform: rotate(-12deg); }
+.stamp.pass { right: 18px; color: #fff; background: var(--red); border-color: var(--red); transform: rotate(12deg); }
 .deck-count { text-align: center; font-size: 12px; color: var(--dim); }
 .c-back { transform: scale(.95) translateY(10px); opacity: .6; }
 .lean-l .c-top { transform: translateX(-60px) rotate(-3.3deg); transition-duration: .7s; }
@@ -214,26 +216,26 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .sw2 .c-back { transform: translate(520px, 40px) rotate(29deg); }
 .sw2 .deck { display: none; }
 /* the chosen hotel */
-.hotel { display: none; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); }
+.hotel { display: none; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
 .hotel.agreed { border-color: var(--green); }
 .hotel-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
 .hotel-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
-.price { font-size: 15px; white-space: nowrap; }
+.price { font-size: 15px; white-space: nowrap; color: var(--text); }
 .price s { color: var(--dim); margin-right: 2px; }
 .sw2 .hotel, .has-approve .hotel { display: flex; animation: rise .45s var(--ease) both; }
 .booked .hotel { display: none; }
 
 /* Illustrated approval and confirmation. No biometric authentication is claimed. */
-.sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 40; padding: 18px 18px 20px; border-radius: 26px; background: #1c1c1f;
-         box-shadow: 0 -12px 40px rgba(0,0,0,.6); transform: translateY(115%); transition: transform .5s var(--ease); }
+.sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 40; padding: 18px 18px 20px; border-radius: 26px; background: var(--panel);
+         border: 1px solid var(--line); box-shadow: 0 -10px 40px rgba(23,23,40,.18); transform: translateY(115%); transition: transform .5s var(--ease); }
 .at-approve .sheet { transform: none; }
 .fwd.at-approve .sheet { transition-delay: .9s; }
 .at-approve.booked .sheet { transform: translateY(115%); transition-delay: 0s; }
 .sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
 .sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
 .sheet-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
-.seal-list { border-radius: 14px; background: #1c1c1f; overflow: hidden; }
-.sheet .seal-list { margin-bottom: 16px; background: #2a2a2e; }
+.seal-list { border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
+.sheet .seal-list { margin-bottom: 16px; background: var(--panel2); }
 .seal-head { font-size: 12px; font-weight: 500; color: var(--dim); padding: 9px 12px 2px; letter-spacing: .02em; }
 .seal-row { display: flex; align-items: center; gap: 11px; padding: 9px 12px; position: relative; }
 .seal-row + .seal-row::before { content: ""; position: absolute; top: 0; left: 53px; right: 0; height: 1px; background: var(--line); }
@@ -244,25 +246,25 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .seal-badge { flex: none; width: 22px; height: 22px; }
 .sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sheet-buttons span { padding: 15px; border-radius: 16px; font-size: 16px; font-weight: 600; text-align: center; }
-.sheet-buttons .approve { background: #fff; color: #08080b; transition: transform .15s; }
-.sheet-buttons .decline { background: var(--panel2); color: var(--text); border: 1px solid var(--line2); }
+.sheet-buttons .approve { background: var(--text); color: #fff; transition: transform .15s; }
+.sheet-buttons .decline { background: #ececf1; color: var(--text); border: 1px solid var(--line); }
 .tapped .sheet-buttons .approve { transform: scale(.95); }
 .faceid { height: 92px; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .scan .sheet-buttons { display: none; }
 .scan .faceid { display: flex; }
-.faceid-scan { width: 34px; height: 34px; border: 3px solid rgba(255,255,255,.15);
-  border-top-color: var(--peach); border-radius: 50%; animation: confirm-spin .8s linear infinite; }
+.faceid-scan { width: 34px; height: 34px; border: 3px solid var(--line2);
+  border-top-color: var(--muted); border-radius: 50%; animation: confirm-spin .8s linear infinite; }
 .faceid-scan i { display: none; }
 @keyframes confirm-spin { to { transform: rotate(360deg); } }
 .faceid-ok { width: 52px; height: 52px; display: none; }
 .faceid-ok circle { fill: var(--green); }
-.faceid-ok path { fill: none; stroke: #04140c; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.faceid-ok path { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
 .approved .faceid-scan { display: none; }
 .approved .faceid-ok { display: block; }
 .approved .faceid-ok path { animation: draw .35s var(--ease) .1s forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 /* The confirmed booking and what Tuttie checked */
-.booking { display: none; padding: 14px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--green); }
+.booking { display: none; padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--green); }
 .booked .booking, .has-live .booking { display: block; animation: rise .45s var(--ease) both; }
 .booking-top { display: flex; align-items: center; gap: 10px; }
 .booking-hotel { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
@@ -270,7 +272,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .booking-total { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
 .booking-id { font-size: 13px; color: var(--muted); margin: 8px 0 12px 48px; }
 .booking-id b { font-family: var(--mono); font-weight: 500; color: var(--text); }
-.check-ok { flex: none; width: 20px; height: 20px; }
+.check-ok { flex: none; width: 18px; height: 18px; }
 .check-ok circle { fill: var(--green); }
 .check-ok path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .checks .seal-row { padding: 7px 12px; }
@@ -355,9 +357,10 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 #hud i::after { content: ""; display: block; height: 100%; width: var(--p, 0%); background: var(--accent); }
 .notes #hud, .auto #hud { display: block; }
 .auto:not(.notes) #hud { opacity: .0; }
-#notes { position: absolute; left: 40px; right: 40px; bottom: 30px; padding: 18px 26px; border-radius: 18px; background: rgba(30,30,34,.92);
-         font-size: 26px; line-height: 1.35; font-weight: 500; color: #d8d8de; display: none; z-index: 99; }
-#notes b { color: var(--peach); font-weight: 600; margin-right: 10px; }
+#notes { position: absolute; left: 40px; right: 40px; bottom: 30px; padding: 18px 26px; border-radius: 18px; background: #fff;
+         border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(23,23,40,.12);
+         font-size: 26px; line-height: 1.35; font-weight: 500; color: var(--text); display: none; z-index: 99; }
+#notes b { color: var(--accent-text); font-weight: 600; margin-right: 10px; }
 .notes #notes { display: block; }
 .demo-caption { position: absolute; left: 64px; bottom: 26px; color: #a5a5ad; font-size: 20px; letter-spacing: .01em; }
 .at-reveal .demo-caption, .at-noise .demo-caption, .at-try .demo-caption { opacity: 0; }
@@ -388,27 +391,31 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .story-verdict span { font-size: 14px; line-height: 1.5; color: #c3acaf; }
 .at-fake .story-verdict { display: block; }
 
-/* Warm paper surrounds the original dark wallet; ?theme=dark keeps the comparison. */
+/* A light, calm stage around the light wallet; ?theme=dark keeps the comparison. */
 html:not(.dark-theme), html:not(.dark-theme) body,
-html:not(.dark-theme) #stage { background: #faf9f6; }
+html:not(.dark-theme) #stage { background: var(--bg); }
 html:not(.dark-theme) #glow { display: none; }
 html:not(.dark-theme) .words {
-  --text: #20201f; --muted: #64615e; --peach: #a64b32;
+  --text: #17171d; --muted: #5a5967; --peach: #b4532f;
   color: var(--text);
 }
 html:not(.dark-theme) .words .dim,
 html:not(.dark-theme) #deal .story-fit,
 html:not(.dark-theme) #deal .story-price,
-html:not(.dark-theme) #live small { color: #64615e; }
-html:not(.dark-theme) .at-fake #claim .dim { color: #a04432; }
-html:not(.dark-theme) .arrows svg { stroke: #77716b; }
-html:not(.dark-theme) .demo-caption { color: #6b6660; }
-html:not(.dark-theme) #hud { color: #64615e; }
-html:not(.dark-theme) #hud.over { color: #a04432; }
-html:not(.dark-theme) #hud i { background: #e4dfd8; }
-html:not(.dark-theme) #try .qr { border-radius: 20px; box-shadow: 0 0 0 1px #e5e0d9; }
+html:not(.dark-theme) #live small { color: #5a5967; }
+html:not(.dark-theme) .at-fake #claim .dim { color: #b4532f; }
+html:not(.dark-theme) .arrows svg { stroke: #8b8a97; }
+html:not(.dark-theme) .demo-caption { color: #5a5967; }
+html:not(.dark-theme) #hud { color: #5a5967; }
+html:not(.dark-theme) #hud.over { color: #d93b3b; }
+html:not(.dark-theme) #hud i { background: #e4e4ea; }
+html:not(.dark-theme) #try .qr { border-radius: 20px; box-shadow: 0 0 0 1px #e4e4ea, 0 10px 30px rgba(23,23,40,.06); }
+/* ?theme=dark: the old black stage around the same light wallet. */
+html.dark-theme, html.dark-theme body, html.dark-theme #stage { background: #08080b; }
+html.dark-theme .words { --text: #ecebf4; --muted: #8d8c9e; --peach: #f6d3c2; color: var(--text); }
+html.dark-theme #hud { color: rgba(236,235,244,.55); }
 html:not(.dark-theme) #shadow {
-  background: radial-gradient(closest-side, rgba(56,43,31,.18), transparent);
+  background: radial-gradient(closest-side, rgba(23,23,40,.2), transparent);
 }
 /* Keep the grounding shadow underneath the device as the camera moves. */
 .has-reveal #shadow, .has-wallet #shadow, .has-context #shadow,
@@ -416,9 +423,9 @@ html:not(.dark-theme) #shadow {
 .has-swipe #shadow, .has-live #shadow { transform: none; }
 .has-approve #shadow, .has-try #shadow { transform: translateX(330px); }
 
-/* Final pitch composition: warm paper, dark device, deliberate emphasis. */
+/* Final pitch composition: light stage, light wallet in a dark device, deliberate emphasis. */
 #intro { top: 348px; width: 810px; font-size: 104px; font-weight: 650; }
-.intro-sub { display: block; margin-top: 24px; font-size: 38px; line-height: 1.3; font-weight: 450; color: #64615e; letter-spacing: -.02em; }
+.intro-sub { display: block; margin-top: 24px; font-size: 38px; line-height: 1.3; font-weight: 450; color: #5a5967; letter-spacing: -.02em; }
 #opening { top: 350px; font-size: 102px; line-height: 1.1; }
 #ask { top: 322px; font-size: 76px; width: 820px; line-height: 1.15; }
 #knows { top: 366px; font-size: 80px; width: 800px; }
@@ -463,7 +470,7 @@ html.dark-theme #proof p, html.dark-theme #owner p,
 html.dark-theme .eyebrow, html.dark-theme #owner small,
 html.dark-theme .proof-disclosure { color:#aaa69f; }
 @media print {
- html, body { overflow:visible!important; background:#faf9f6!important; }
+ html, body { overflow:visible!important; background:#f2f2f7!important; }
 }
 
 
@@ -477,8 +484,8 @@ html.dark-theme .proof-disclosure { color:#aaa69f; }
 .phone .btn.side::after { inset:-4px -5px; filter:none; background:rgba(217,119,87,.25); box-shadow:0 0 0 2px #d97757; }
 .fwd.at-wallet .phone .btn.side::after { animation:press-highlight 1.15s 1s both; }
 @keyframes press-highlight { 0%,12%,38%,58%,90%,100%{opacity:0} 20%,30%,68%,80%{opacity:1} }
-.side-press-cue { position:absolute; left:470px; top:275px; width:250px; color:#64615e; font-size:28px; font-weight:500; line-height:1.3; opacity:0; transform:translateX(8px); }
-.side-press-cue::before { content:""; position:absolute; left:-47px; top:27px; width:32px; height:2px; background:#a64b32; }
+.side-press-cue { position:absolute; left:470px; top:275px; width:250px; color:#5a5967; font-size:28px; font-weight:500; line-height:1.3; opacity:0; transform:translateX(8px); }
+.side-press-cue::before { content:""; position:absolute; left:-47px; top:27px; width:32px; height:2px; background:#b4532f; }
 .fwd.at-wallet .side-press-cue { animation:side-cue 3.15s .15s both; }
 @keyframes side-cue { 0%,100%{opacity:0;transform:translateX(8px)} 15%,82%{opacity:1;transform:none} }
 .fwd.at-wallet .hint { animation:none; }
