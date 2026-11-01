@@ -4,11 +4,14 @@ MCP is only the transport. A result is the business's signed envelope, and the T
 verifies it (and the business's seals) before the LLM sees anything, as for every APS reply.
 """
 
+import asyncio
 import json
 import math
 from collections.abc import Callable
 
 from mcp import Client
+
+CALL_TIMEOUT_S = 15  # the SDK waits up to 300 s; a hung hotel must not hold the turn that long
 
 
 class McpCallFailed(Exception):
@@ -41,10 +44,12 @@ class McpLink:
 
     async def call(self, endpoint: str, tool: str, args: dict) -> dict:
         """Call `tool` with `args`; returns the signed envelope the business sent."""
-        try:
+        async def once():
             async with self.connect(endpoint) as client:
-                result = await client.call_tool(tool, args)
-        except Exception as error:  # the SDK raises transport and protocol errors of many kinds
+                return await client.call_tool(tool, args)
+        try:
+            result = await asyncio.wait_for(once(), CALL_TIMEOUT_S)
+        except Exception as error:  # the SDK raises transport and protocol errors of many kinds (and TimeoutError)
             raise McpCallFailed(f"{type(error).__name__}: {error}") from error
         text = result.content[0].text if result.content and result.content[0].type == "text" else ""
         if result.is_error:

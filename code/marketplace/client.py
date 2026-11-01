@@ -13,6 +13,10 @@ from nacl.signing import SigningKey
 from aps import agent_key, sign_envelope
 from marketplace.messages import Request
 
+# The market answers only after every woken hotel replied or timed out (card fetch + wake-up,
+# 20 s each in marketplace/market.py), so the posting call waits longer than the shared client.
+POST_TIMEOUT_S = 60
+
 
 def new_request_id() -> str:
     """A fresh request id in the Request format (rq-<8 hex>)."""
@@ -30,6 +34,7 @@ async def post_request(http: httpx.AsyncClient, market_url: str, envelope: dict)
     Raises httpx.HTTPStatusError with the market's reason if it refuses the request.
     """
     # The deployment's agent key marks the posting as this deployment's own Tuttie (no cap).
-    response = await http.post(f"{market_url.rstrip('/')}/postings", json=envelope, headers=agent_key.headers())
+    response = await http.post(f"{market_url.rstrip('/')}/postings", json=envelope, headers=agent_key.headers(),
+                               timeout=POST_TIMEOUT_S)
     response.raise_for_status()
     return response.json()

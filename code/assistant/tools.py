@@ -686,7 +686,11 @@ class Toolbox:
                        tiers: tuple[str, ...] = ("gold", "blue", "grey")) -> Verified | dict:
         """The trust gate around one call: seals first (the node's tier must be in `tiers`),
         then `send(record)`, then the envelope."""
-        found = await self.lookup(node_id)
+        try:
+            found = await self.lookup(node_id)
+        except (httpx.HTTPError, ValueError) as error:  # a registry blip refuses this call only
+            self.bus.emit(kind, "broken", f"{label}: the registry did not answer")
+            return {"node_id": node_id, "rejected": True, "reason": f"registry unreachable: {error}"}
         if found is None:
             return {"node_id": node_id, "rejected": True, "reason": "not in the registry"}
         record, verdict = found

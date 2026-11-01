@@ -12,7 +12,7 @@ import httpx
 
 from assistant.card_commands import card_choice
 from assistant.events import EventBus
-from assistant.tools import SCHEMAS, Toolbox
+from assistant.tools import SCHEMAS, Toolbox, chf
 from llm import LLM
 from speech import said_times
 
@@ -169,6 +169,26 @@ def fallback_answer(said_goodbye: bool) -> str:
     return "Sorry, I didn't catch that."
 
 
+def done_answer(tool: str, result) -> str | None:
+    """What Tuttie can say from code alone once `tool` did its work this turn (the cards are on
+    screen, or the hotel signed the booking), so a failing LLM round after it never says "try
+    again"; None when the tool did not get that far."""
+    if not isinstance(result, dict):
+        return None
+    if tool == "post_request" and isinstance(result.get("cards"), list) and result["cards"]:
+        count = len(result["cards"])
+        hotels = "1 hotel" if count == 1 else f"{count} hotels"
+        return f"I found {hotels}; swipe through them and pick the ones you like."
+    if tool == "book" and result.get("status") == "confirmed":
+        hotel = " ".join(str(result.get("hotel") or "the hotel").split())[:60]
+        total = chf(result.get("total_chf"))
+        answer = f"It's booked: {hotel}" + (f", CHF {total}." if total != "?" else ".")
+        if result.get("mismatch"):
+            answer += " It differs from what you approved; the wallet shows how."
+        return answer
+    return None
+
+
 def split_mood(text: str) -> tuple[str, str]:
     """Split the trailing "Mood: x" line off an answer; unknown or missing moods are neutral."""
     match = MOOD_LINE.search(text)
@@ -186,6 +206,7 @@ class Assistant:
         self.toolbox = toolbox
         self.bus = bus
         self.lock = asyncio.Lock()
+        self.done: str | None = None  # this turn's answer from code (done_answer), if any
         self.reset()
 
     def reset(self) -> None:
@@ -205,14 +226,18 @@ class Assistant:
                 self.bus.emit("answer", "verified", answer, detail={"mood": "confused"})
                 return answer
             start = len(self.messages)
+            self.done = None  # set by _turn once cards were shown or a booking was confirmed
             try:
                 return await self._turn(text, first_tool)
             except Exception:  # e.g. the LLM provider is down or over its limit: answer instead
                 log.exception("turn failed")
                 self.close_open_calls(start)
-                answer = "I can't think right now, please try again in a moment."
+                answer = self.done or "I can't think right now, please try again in a moment."
                 self.messages.append({"role": "assistant", "content": answer})
-                self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
+                if self.done:
+                    self.bus.emit("answer", "verified", answer, detail={"mood": "happy"})
+                else:
+                    self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
                 return answer
             except asyncio.CancelledError:
                 self.close_open_calls(start)
@@ -272,6 +297,7 @@ class Assistant:
             for call in message["tool_calls"]:
                 said_goodbye = said_goodbye or call["function"]["name"] == "end_conversation"
                 result = await self.run_tool(call["function"]["name"], call["function"]["arguments"])
+                self.done = done_answer(call["function"]["name"], result) or self.done
                 showed_cards = showed_cards or (call["function"]["name"] == "post_request"
                                                 and isinstance(result, dict) and bool(result.get("cards")))
                 self.messages.append({

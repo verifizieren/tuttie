@@ -343,8 +343,8 @@ class BusinessAgent:
         `choice`, or asked now); the price is the room's price plus the add-ons' prices from the
         config. A room whose note rules out one of the guest's needs (e.g. too small for a dog),
         or a room type the hotel does not have, is replaced by the cheapest fitting room (a hotel
-        that said it is interested must not keep the guest waiting for an offer). An unknown
-        add-on or an LLM error means no offer: better silent than an offer it cannot honour.
+        that said it is interested must not keep the guest waiting for an offer). An add-on id
+        the hotel does not have is dropped; an LLM error means no offer.
         """
         request = posting.get("request", {}).get("payload", {})
         if choice is None:
@@ -359,7 +359,9 @@ class BusinessAgent:
         room = self.room_for(choice.room_type, covers(" ".join(requirements)))
         needed = self.add_ons_for(requirements)
         # The LLM's own picks only for what the needed ones do not cover yet (e.g. breakfast).
-        extra = [a for a in choice.add_ons if a not in needed and not covers(self.add_ons.get(a, {}).get("item", ""))
+        # An add-on id the hotel lacks is dropped (the market was told an offer is coming).
+        extra = [a for a in choice.add_ons if a in self.add_ons and a not in needed
+                 and not covers(self.add_ons[a]["item"])
                  & covers(" ".join(self.add_ons[n]["item"] for n in needed))]
         chosen = [self.add_ons.get(add_on_id) for add_on_id in dict.fromkeys([*needed, *extra])]
         if room is None or None in chosen:
