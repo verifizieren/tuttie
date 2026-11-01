@@ -22,6 +22,8 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   A double tap on Send sends the words once (`lib/sendGuard.js`).
   The same message sent twice at once from two tabs (or a retype) joins the running turn on the server,
   and the wallet drops its local copy (`bindTurn`); card commands stay separate swipes.
+  Private context never reaches a business: questions to a hotel (`ask_agent`) are refused and posted
+  requirements dropped when they name a private place, person, train or time (`tools.private_terms`).
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
