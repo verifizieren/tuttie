@@ -44,21 +44,23 @@ class FakeLLM:
         return self.reply
 
 
-def ask(config: dict, reply, question: str = "Late arrival with a dog?") -> tuple[dict, FakeLLM]:
+def ask(config: dict, reply, question: str = "Late arrival with a dog?", context: dict | None = None) -> tuple[dict, FakeLLM]:
     agent = BusinessAgent(config)
     agent.llm = FakeLLM(reply)
-    return asyncio.run(agent.answer(question, {})), agent.llm
+    return asyncio.run(agent.answer(question, context or {})), agent.llm
 
 
 # --- the node's A2A agent ---------------------------------------------------------------
 
 
 def test_commitment_price_comes_from_the_config_not_the_llm():
-    reply = {"answer": "Yes.", "add_on": "late-checkin-dog", "arrival_date": "2026-11-14", "price_chf": 1}
-    result, _ = ask(RHEINBLICK, reply)
+    night = datetime.now(timezone.utc).date() + timedelta(days=13)
+    reply = {"answer": "Yes.", "add_on": "late-checkin-dog", "arrival_date": "2026-11-02", "price_chf": 1}
+    result, _ = ask(RHEINBLICK, reply, context={"date": night.isoformat()})
     assert result["commitment"]["price_chf"] == 15
     assert result["commitment"]["item"] == "late check-in after 22:00 with dog"
-    assert result["commitment"]["valid_until"] == "2026-11-15T12:00:00Z"  # noon after the arrival night
+    # noon after the stay night Tuttie shared, not after the LLM's guess of the arrival
+    assert result["commitment"]["valid_until"] == f"{night + timedelta(days=1)}T12:00:00Z"
 
 
 def test_unknown_or_missing_add_on_gives_no_commitment():
@@ -70,7 +72,7 @@ CLAUDE_DOWN = APIConnectionError(request=httpx.Request("POST", "https://api.anth
 
 
 @pytest.mark.parametrize("reply", [{"add_on": "dog"}, OpenAIError("down"), CLAUDE_DOWN,
-                                   {"answer": "x", "arrival_date": "soon"}])
+                                   {"answer": "x", "add_on": 5}])
 def test_invalid_reply_or_llm_error_gives_the_safe_fallback(reply):
     assert ask(RHEINBLICK, reply)[0] == FALLBACK
 

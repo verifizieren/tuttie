@@ -19,6 +19,7 @@ Last updated: 2026-11-01 (the presentation QR page exists on branch `presentatio
   switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
   skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
   page in `code/apps/presentation/`. Details: `code/apps/keynote/README.md`.
+- **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Alex! Enjoy Basel."; the model is told when no deals exist yet.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
   eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for
@@ -743,6 +744,8 @@ Why things are the way they are, so nobody has to rediscover them:
   unless `API_DOCS=1` (`code/apidocs.py`, local development). The `tuttie_session` cookie is
   `Secure` when the request came over https (directly or `X-Forwarded-Proto: https` from
   nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
+- **Round 5b (1 Nov):** an offer's name/uid come from the sealed registry record and agent/profile
+  from the hotel's signed agent card (never the market's relay); card photos only `hotels/<node_id>/<file>.jpg|png|webp`.
 
 ## Environment
 
