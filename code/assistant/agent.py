@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 MOODS = ("happy", "excited", "proud", "thoughtful", "surprised", "confused", "sad", "sorry", "worried", "neutral")
 MOOD_LINE = re.compile(r"\n?\s*Mood:\s*(\w+)\s*\.?\s*$", re.IGNORECASE)
 
-GUEST_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
+GUEST_NAME = os.environ.get("GUEST_NAME", "Handan")
 SWISS_TIME = ZoneInfo("Europe/Zurich")
 
 

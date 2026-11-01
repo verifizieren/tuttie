@@ -1,5 +1,5 @@
 {
-  "user": "Alex Muster",
+  "user": "Handan",
   "about": "Demo data: what Tuttie may read about its user (location, messages, mail, calendar, preferences). Each item is classed public, negotiation or private; private items never leave Tuttie.",
   "location": [
     {
@@ -50,7 +50,7 @@
       "visibility": "private"
     },
     {
-      "from": "Alex",
+      "from": "Handan",
       "text": "Luna comes along. I'll find a quiet place near you for the night.",
       "visibility": "private"
     }

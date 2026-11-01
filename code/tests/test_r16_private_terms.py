@@ -3,6 +3,7 @@ last train from Milan"; the home city is private context)."""
 
 import asyncio
 
+from assistant.tools import GUEST_FIRST_NAME
 from tests.test_tools import RHEINBLICK, make_toolbox
 
 
@@ -10,7 +11,7 @@ def test_private_places_and_people_are_known():
     toolbox, _, _ = make_toolbox()
     terms = toolbox.private_terms()
     assert {"milan", "milano", "lukas", "sara"} <= terms
-    assert not {"basel", "luna", "alex"} & terms  # what the hotel needs, and the guest's own name
+    assert not {"basel", "luna", GUEST_FIRST_NAME.lower()} & terms  # what the hotel needs, and the guest's own name
 
 
 def test_ask_agent_refuses_a_question_naming_private_context():

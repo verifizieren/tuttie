@@ -387,7 +387,7 @@ def offered_room(offer: dict) -> str | None:
 
 # Words a private item may hold that every hotel may hear (the stay itself, the dog, the guest).
 PUBLIC_WORDS = frozenset({"basel", "sbb", "luna", "hotel", "rhine"})
-GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
+GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "Handan")
 GUEST_FIRST_NAME = GUEST_FULL_NAME.split()[0]
 
 
