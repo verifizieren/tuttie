@@ -29,7 +29,7 @@ What it shows, top to bottom (little text on purpose):
 
 A small textless arrow brings you back to the top once you are past the hero.
 
-Design rules (the user's, `DESIGN-RULES`): light theme (page #f2f2f7, white panels, ink
+Design rules (from the user): light theme (page #f2f2f7, white panels, ink
 #17171d), accents blue #2f6fe0, purple #7a5af8, pink #e5489b only (no orange), nothing in
 italic, no eyebrow labels above headings, no domain or URL as visible text, buttons are pills
 that fit their label. The page never links to the live wallet: people who scan the QR get the
