@@ -137,7 +137,7 @@ class MarketDesk:
         except httpx.TimeoutException:  # the market answers after waking the hotels: the posting may exist
             self.bus.emit("marketplace", "broken", "The market is still waking the hotels")
             return {"error": "the market is still waking the hotels; do not post again in this turn, "
-                             "tell the user to wait a moment"}
+                             "tell the user the hotels are slow right now and to ask again in a moment"}
         except httpx.HTTPError as error:
             self.bus.emit("marketplace", "broken", f"The market did not answer: {type(error).__name__}")
             return {"error": "the market is not reachable right now; do not post again in this turn, "

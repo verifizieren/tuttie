@@ -10,7 +10,7 @@ import secrets
 import httpx
 from nacl.signing import SigningKey
 
-from aps import sign_envelope
+from aps import agent_key, sign_envelope
 from marketplace.messages import Request
 
 
@@ -29,6 +29,7 @@ async def post_request(http: httpx.AsyncClient, market_url: str, envelope: dict)
 
     Raises httpx.HTTPStatusError with the market's reason if it refuses the request.
     """
-    response = await http.post(f"{market_url.rstrip('/')}/postings", json=envelope)
+    # The deployment's agent key marks the posting as this deployment's own Tuttie (no cap).
+    response = await http.post(f"{market_url.rstrip('/')}/postings", json=envelope, headers=agent_key.headers())
     response.raise_for_status()
     return response.json()
