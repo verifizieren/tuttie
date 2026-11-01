@@ -116,10 +116,14 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
   latest.current = { id: approval?.id, onFinished };
 
   // A sheet that goes while its decision is still open (another sheet took its place) tells the
-  // wallet, so the decision is never left "finishing" with no sheet to end it.
-  useEffect(() => () => {
-    unmounted.current = true;
-    if (busy.current && !finished.current) latest.current.onFinished?.(latest.current.id, gone.current);
+  // wallet, so the decision is never left "finishing" with no sheet to end it. (React's
+  // StrictMode unmounts and mounts again once in development: the mount resets the flag.)
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      if (busy.current && !finished.current) latest.current.onFinished?.(latest.current.id, gone.current);
+    };
   }, []);
 
   // The server's decision arrived on the event stream while the sheet still waits for the answer
