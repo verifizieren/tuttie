@@ -45,14 +45,16 @@ RHEINBLICK = json.loads((CODE / "data" / "nodes" / "hotel-rheinblick.json").read
 
 # --- 1. SERVICE_HOST ------------------------------------------------------------------------
 
-def test_service_host_defaults_to_all_interfaces_and_follows_the_setting(monkeypatch):
+def test_service_host_defaults_to_this_machine_only_and_follows_the_setting(monkeypatch):
+    """Secure by default: the demo keys are public, so internal services are not reachable
+    from outside unless SERVICE_HOST says so (e.g. 0.0.0.0 for a multi-machine setup)."""
     from hosting import service_host
     monkeypatch.delenv("SERVICE_HOST", raising=False)
-    assert service_host() == "0.0.0.0"
-    monkeypatch.setenv("SERVICE_HOST", "127.0.0.1")
     assert service_host() == "127.0.0.1"
-    monkeypatch.setenv("SERVICE_HOST", "  ")
+    monkeypatch.setenv("SERVICE_HOST", "0.0.0.0")
     assert service_host() == "0.0.0.0"
+    monkeypatch.setenv("SERVICE_HOST", "  ")
+    assert service_host() == "127.0.0.1"
 
 
 def test_run_all_passes_service_host_from_the_env_file_to_every_service():
