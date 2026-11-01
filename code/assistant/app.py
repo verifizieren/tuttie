@@ -76,6 +76,18 @@ async def session_cookie(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def fresh_app_shell(request: Request, call_next):
+    """The apps' unhashed files (index.html, sw.js, manifest) are revalidated on every load, so a
+    phone never keeps the old wallet for up to an hour after a deploy (heuristic HTTP caching).
+    The hashed build files under assets/ may stay cached."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith(("/wallet/", "/owner/")) and "/assets/" not in path:
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def over_https(request: Request) -> bool:
     """Whether the browser reached us over https: directly, or through nginx (X-Forwarded-Proto).
 
