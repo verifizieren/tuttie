@@ -26,6 +26,11 @@ never shows the spoken sentence. The spoken lines are in `SPEAKER-NOTES.md` and 
 
 Keys also work while a framed page has focus, except while typing in one of its fields.
 
+Only one deck tab drives the wallet and follows the presenter view: the one used last (any
+key in it claims the stage). Other deck tabs of the same browser turn passive (a small grey
+"passive" mark), because all tabs share one wallet session. A clicker press that fires twice,
+or a held key, moves one step only.
+
 ## Beats
 
 0 black · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 black, then the cheap listing ·
