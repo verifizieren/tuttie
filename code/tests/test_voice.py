@@ -239,14 +239,17 @@ def test_after_the_cards_the_voice_hands_the_choice_to_the_user():
     from contextlib import asynccontextmanager
     from voice.agent import HANDOFF, follow
 
-    events = [{"kind": "marketplace", "detail": {"phase": "cards"}},
-              {"kind": "answer", "summary": "Two hotels; I'd pick Gästehaus am Rhein."},
-              {"kind": "answer", "summary": "Sure."}]
+    events = [{"kind": "marketplace", "turn": "t1", "detail": {"phase": "cards"}},
+              {"kind": "answer", "turn": "t2", "summary": "Sure."},          # another turn answers first
+              {"kind": "answer", "turn": "t1", "summary": "Two hotels; I'd pick Gästehaus am Rhein."},
+              {"kind": "marketplace", "turn": "t3", "detail": {"phase": "cards"}},
+              "reset",                                                         # the chat was reset
+              {"kind": "answer", "turn": "t1", "summary": "Hello again."}]
 
     class Stream:
         async def aiter_lines(self):
             for event in events:
-                yield "data: " + json.dumps(event)
+                yield "event: reset" if event == "reset" else "data: " + json.dumps(event)
 
     class Http:
         @asynccontextmanager
@@ -268,4 +271,5 @@ def test_after_the_cards_the_voice_hands_the_choice_to_the_user():
 
     session = Session()
     asyncio.run(follow(session, Agent(), Http(), Room("on")))
-    assert session.lines == ["Two hotels; I'd pick Gästehaus am Rhein.", HANDOFF, "Sure."]  # once, after the cards
+    # Once, after the answer of the turn that showed the cards; never after a reset.
+    assert session.lines == ["Sure.", "Two hotels; I'd pick Gästehaus am Rhein.", HANDOFF, "Hello again."]

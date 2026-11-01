@@ -265,7 +265,7 @@ def voice_on(room: rtc.Room) -> bool:
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
     """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
     said: set[str] = set()
-    cards = False  # this turn showed the hotel cards: the answer hands the choice to the user
+    cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
     def say(text: str) -> None:
         if voice_on(room):
@@ -275,18 +275,19 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
         async for line in stream.aiter_lines():
             if line.startswith("event: reset"):
                 said.clear()
+                cards = None
             if not line.startswith("data:"):
                 continue
             event = json.loads(line[5:])
             if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
-                cards = True
+                cards = event.get("turn") or "?"
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
                 agent.asked = None  # answered without (or after) a tool: no filler any more
                 say(spoken(event["summary"]))
-                if cards:
+                if cards is not None and event.get("turn", "?") == cards:
                     say(HANDOFF)
-                    cards = False
+                    cards = None
                 continue
             if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
                 agent.asked = None
