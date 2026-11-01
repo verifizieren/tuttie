@@ -270,7 +270,7 @@ only if its `charge` is exactly this charge of this booking (refusal: `the appro
 the <purpose> of this booking`), so a "city tax for BK-1" approval cannot pay another charge or
 booking of the same amount. Book approvals are unchanged (no `charge`).
 The gate refuses any approval whose signed `decided_at` is more than 900 s old or in the
-future (`aps/gate.py` `APPROVAL_MAX_AGE_S`): used approvals live in memory, so an old one
+future beyond clock skew (`aps/gate.py` `APPROVAL_MAX_AGE_S`): used approvals live in memory, so an old one
 could otherwise book again after a node restart.
 
 `offer_mandate` is only offered for a charge above CHF 0 (`facts.charges[].price_chf` is a
