@@ -5,6 +5,10 @@ with the claimed tier and the signature verifies. A seal whose issuer is the nod
 itself is a self-signed grey seal. A node without any seal is unsigned and also grey
 (untrusted, but it claims nothing false). Any claimed seal that fails makes the node broken.
 
+Only an authority's seal carries authority power (licences, UID vouching), and never on a
+record whose node_id is itself an authority id: a grey node called "bar-association-ch"
+self-sealing its record stays grey and gets no licence.
+
 Seals also cover the node's Swiss business number (UID). An authority with
 "vouches_for_uid" (the commercial register) vouches that the UID belongs to this node,
 so its seal is only valid on a record with a well-formed UID. A UID counts as verified
@@ -76,18 +80,20 @@ def evaluate_record(record: dict, authorities: dict) -> dict:
     for issuer_id, authority in authorities.items():
         for capability in authority.get("licenses", []):
             licensed.setdefault(capability, set()).add(issuer_id)
-    issuers = {s["issuer"] for s in seals}
+    # Only seals by a real authority count, never the node's own seal: a node whose id equals
+    # an authority id ("bar-association-ch") self-seals as that "issuer" but stays grey.
+    authority_issuers = {s["issuer"] for s in seals if s["issuer"] in authorities and s["issuer"] != record["node_id"]}
 
     granted = []
     for capability in record.get("capabilities", []):
         if capability in licensed:
-            if issuers & licensed[capability]:
+            if authority_issuers & licensed[capability]:
                 granted.append(capability)
         elif capability in PAYMENT_CAPABILITIES:
             if TIER_RANK[tier] >= TIER_RANK["blue"]:
                 granted.append(capability)
         else:
             granted.append(capability)
-    uid_vouched = any(authorities.get(s["issuer"], {}).get("vouches_for_uid") for s in seals)
+    uid_vouched = any(authorities[issuer].get("vouches_for_uid") for issuer in authority_issuers)
     return {"tier": tier, "seals": seals, "capabilities": granted,
             "uid": record.get("uid") if uid_vouched else None}
