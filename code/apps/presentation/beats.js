@@ -58,7 +58,7 @@ export const BEATS = [
     id: "honest", title: "What is demo", from: 115, to: 125,
     steps: [
       { cue: "Click: black.",
-        spoken: "The hotels and the register are demo. My request was typed for you by the clicker. The signatures are real." },
+        spoken: "The hotels and the register are demo. The signatures are real." },
     ],
   },
   {
