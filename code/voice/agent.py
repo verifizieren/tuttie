@@ -77,7 +77,7 @@ HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 def francs(match: re.Match) -> str:
     """An amount as it is said: "CHF 128" is "128 francs", "CHF 1" is "1 franc"."""
-    amount = re.sub(r"['’]", "", match.group(1) or match.group(2))  # Swiss thousands: "1'280" is said 1280
+    amount = re.sub(r"['’ \u00a0\u202f]", "", match.group(1) or match.group(2))  # thousands: "1'280" is said 1280
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
@@ -194,7 +194,7 @@ def spoken(answer: str) -> str:
     text = BARE_URL.sub("", text)  # nor web addresses
     text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
-    amount = r"(\d{1,3}(?:['’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # "1'280" (Swiss thousands) too
+    amount = r"(\d{1,3}(?:['’ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # "1'280", "1 280" too
     text = re.sub(rf"\bCHF\s?{amount}|{amount}\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
