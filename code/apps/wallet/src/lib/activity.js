@@ -316,7 +316,8 @@ export function applyEvent(state, event) {
     const approved = event.status === "approved";
     const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
     return { ...progress(state, "tool", line, !approved, at), approval: null,
-             decided: { id: plain(detail.approval_id), status: plain(event.status) },
+             // the approval id is inside the signed decision (aps/approval.py sign_decision)
+             decided: { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) },
              phase: approved ? "booking" : "declined" };
   }
   return state;
