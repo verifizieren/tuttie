@@ -43,5 +43,10 @@ in `apps/wallet/src/components/BankCard.jsx`. `face.js` is a copy of
 `apps/wallet/src/lib/face.js`: keep it in sync. Photos: `img/` (copied from
 `apps/wallet/public/hotels`, credits in `apps/wallet/public/hotels/CREDITS.md`).
 
+Speed: both faces paint only while their canvas is on screen (`paintOnlyOnScreen` wraps the
+instance, so `face.js` stays an exact copy); each frame draws two eyes with a blurred halo at
+up to 3x resolution. Inter loads without blocking the first paint. Only the top bar keeps a
+backdrop blur (a blur under an almost opaque button costs every scroll frame and does not show).
+
 Edit the demo's timing in `EVENTS` and `capAt` near the end of `index.html` (`capAt` also
 defines the story parts the taps jump between).

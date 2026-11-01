@@ -8,7 +8,10 @@
 <title>Tuttie</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<!-- Loaded without blocking the first paint; display=swap shows the same text in the system font until Inter arrives. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"></noscript>
 <style>
 /* The page the pitch's QR code opens (issues #1, #6): the numbers, the concept, the business
    case, then an Apple-style scroll into a demo of the wallet that plays by itself.
@@ -47,14 +50,14 @@ em, i, cite, address, dfn, var { font-style: normal; }
        backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); pointer-events: none; }
 .top b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
 .top a { pointer-events: auto; display: inline-flex; align-items: center; min-height: 40px; font-size: 15px; font-weight: 600; text-decoration: none; padding: 0 16px; border-radius: 999px; cursor: pointer;
-         background: rgba(255,255,255,.75); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+         background: rgba(255,255,255,.75); border: 1px solid var(--line); }  /* no own blur: it sits on the bar's blur already */
 
 .in-demo .top { opacity: 0; }
 
 /* Back to top: a small arrow, no text, once you are past the hero. */
 .totop { position: fixed; z-index: 21; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 48px; height: 48px; border-radius: 50%;
          display: grid; place-items: center; padding: 0; cursor: pointer; color: var(--text); background: rgba(255,255,255,.9);
-         border: 1px solid var(--line2); box-shadow: var(--shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+         border: 1px solid var(--line2); box-shadow: var(--shadow);  /* 90 % white: a blur behind it would not show, but costs every scroll frame */
          opacity: 0; transform: translateY(12px) scale(.9); pointer-events: none; transition: opacity .3s var(--ease), transform .4s var(--ease); }
 .totop svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .totop.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -749,8 +752,20 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => 1 - Math.pow(1 - t, 3);
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// A face keeps its timeline (blinks, looks, expressions) but only paints while its canvas is on
+// screen: each frame draws both eyes with a blurred halo at up to 3x resolution, and two faces
+// painting 60 times a second off screen made scrolling slow on phones. face.js stays a copy of
+// the wallet's, so this wraps an instance instead of changing the file.
+function paintOnlyOnScreen(face, canvas) {
+  let onScreen = true;
+  new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; }).observe(canvas);
+  const draw = face.draw.bind(face);
+  face.draw = now => { if (onScreen) draw(now); };
+  return face;
+}
+
 // ---------- Hero: Tuttie wakes up ----------
-const hero = new TuttieFace($("#heroFace"));
+const hero = paintOnlyOnScreen(new TuttieFace($("#heroFace")), $("#heroFace"));
 hero.sleep(0);
 setTimeout(() => { hero.wake("happiness", 700); setTimeout(() => hero.set("neutral", 800), 1600); }, 1100);
 
@@ -860,7 +875,7 @@ addEventListener("keydown", e => {
 });
 
 // ---------- Demo: the wallet mock and its timeline ----------
-const screen = $("#screen"), face = new TuttieFace($("#demoFace"));
+const screen = $("#screen"), face = paintOnlyOnScreen(new TuttieFace($("#demoFace")), $("#demoFace"));
 face.sleep(0);
 const CAPS = [
   ["Tuttie lives in your wallet", "Tap to talk."],
