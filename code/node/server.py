@@ -42,6 +42,7 @@ from aps.delegation import verify_delegation
 from aps.envelope import is_fresh, parse_timestamp
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
+from hosting import service_host
 from marketplace.messages import PostingCreated
 from marketplace.messages import Request as MarketRequest
 from negotiation.agreement import AgreementRedeemer
@@ -615,7 +616,7 @@ def main() -> None:
     args = parser.parse_args()
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # OPENAI_API_KEY for /agent
     config = json.loads(Path(args.config).read_text())
-    uvicorn.run(create_app(config), host="0.0.0.0", port=args.port or config["port"])
+    uvicorn.run(create_app(config), host=service_host(), port=args.port or config["port"])
 
 
 if __name__ == "__main__":

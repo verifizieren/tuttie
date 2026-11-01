@@ -29,6 +29,7 @@ from mcp.server.mcpserver import MCPServer
 
 from apidocs import api_docs
 from aps import load_signing_key, sign_envelope
+from hosting import service_host
 from node.mcp_tools import mcp_app
 from services import trains, weather
 
@@ -131,7 +132,7 @@ def main() -> None:
     parser.add_argument("--port", type=int)
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text())
-    uvicorn.run(create_app(config), host="0.0.0.0", port=args.port or config["port"])
+    uvicorn.run(create_app(config), host=service_host(), port=args.port or config["port"])
 
 
 if __name__ == "__main__":

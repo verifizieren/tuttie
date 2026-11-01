@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 
 from apidocs import api_docs
 from aps.keys import load_public_key
+from hosting import service_host
 from marketplace.market import Market, MarketError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,4 +73,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host=service_host(), port=PORT)
