@@ -57,8 +57,20 @@ test("waking: a glad face first, then the state's looks", () => {
   assert.deepEqual(face.calls.slice(3), ["set:attentive", "look:0.18,-0.08"]);  // the loop goes on
 });
 
-test("asleep and typing close the eyes and stop the looks", () => {
-  for (const s of ["asleep", "typing"]) {
+test("a closed card rests awake: neutral, eyes open, the face's own idle glances only", () => {
+  const { face, timers, state } = setup();
+  state("searching");
+  state("asleep");
+  assert.notEqual(face.calls.at(-1), "sleep");
+  assert.equal(face.asleep, false);
+  assert.ok(face.calls.slice(-2).includes("set:neutral"), face.calls.join(" "));
+  const count = face.calls.length;
+  timers.advance(LOOK_MS * 5);
+  assert.equal(face.calls.length, count, "no director loop while resting");
+});
+
+test("typing closes the eyes and stops the looks", () => {
+  for (const s of ["typing"]) {
     const { face, timers, state } = setup();
     face.asleep = false;
     state("searching");
