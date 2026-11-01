@@ -36,6 +36,9 @@ def test_user_who_explicitly_asks_for_the_flexible_room_can_book_it(monkeypatch)
     toolbox, _, _ = make_toolbox()
     toolbox.market.last_offers = CARD
     made, result = book_and_decide(toolbox, "double-flex")
+    if not made:  # one nudge back to the card's room (round 17); asked again, it books
+        assert "unless the user asked" in result.get("error", "")
+        made, result = book_and_decide(toolbox, "double-flex")
     assert made == [205], f"no approval for the room the user asked for: {result}"
 
 

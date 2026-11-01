@@ -24,6 +24,10 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   and the wallet drops its local copy (`bindTurn`); card commands stay separate swipes.
   Private context never reaches a business: questions to a hotel (`ask_agent`) are refused and posted
   requirements dropped when they name a private place, person, train or time (`tools.private_terms`).
+  Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
+  owner page's direct node fetch then works only on the server itself). A booking without a deal for
+  another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
+  keeps two sentences.
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
@@ -32,7 +36,7 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   "Friday" for a Saturday); answers say 24-hour times as people do on screen too ("12:52 am",
   `code/speech.py`, shared with the voice).
 - **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
-  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). Caveat: the owner page fetches `<host>:4009/owner/...` straight from the browser, so with loopback binding it only works on the server itself. The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
+  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `127.0.0.1` since the end of the night); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). Caveat: the owner page fetches `<host>:4009/owner/...` straight from the browser, so with loopback binding it only works on the server itself. The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
   - The marketplace takes at most 10 keyless postings per requester a minute (only outsiders: wallet users post through Tuttie with the key) (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
   - The action gate refuses an approval whose signed `decided_at` is over 900 s old or in the future (after a node restart an old approval no longer books again).
   - `registry_lookup` (negotiation/hotel.py) looks up only node-id-shaped ids and returns only dict records; `../search` gave a 500 on `/tools/counter_offer` and made the gate raise.

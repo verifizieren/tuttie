@@ -153,6 +153,13 @@ def without_budget(text: str, amounts: set[int]) -> str:
     return text
 
 
+def first_sentences(text: str, count: int) -> str:
+    """The first `count` sentences of `text` (a sentence ends with . ! or ? before a space and a
+    capital letter, so "CHF 12.50" stays whole)."""
+    parts = re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])", text.strip())
+    return " ".join(parts[:count])
+
+
 def fallback_answer(said_goodbye: bool) -> str:
     """What Tuttie says when the model's final message was empty after cleaning: a short goodbye
     when end_conversation ran this turn (the model often writes only "Mood: happy" then)."""
@@ -234,6 +241,7 @@ class Assistant:
                 self.bus.emit("answer", "verified", answer, detail={"mood": "neutral"})
                 return answer
         said_goodbye = False
+        showed_cards = False
         for round_ in range(MAX_ROUNDS):
             # Refresh facts on every completion, so follow-ups cannot rely only on old chat text.
             notes = [{"role": "system", "content": today_note()}]
@@ -253,6 +261,8 @@ class Assistant:
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
                 answer = said_times(drop_notes(answer)) or fallback_answer(said_goodbye)
+                if showed_cards:  # read aloud while the user looks at the cards: pick and reason only
+                    answer = first_sentences(answer, 2)
                 asked = ASKED_BUDGET.search(text)
                 private = getattr(self.toolbox, "private_amounts", None)
                 answer = without_budget(answer, set() if asked or private is None else private())
@@ -261,6 +271,8 @@ class Assistant:
             for call in message["tool_calls"]:
                 said_goodbye = said_goodbye or call["function"]["name"] == "end_conversation"
                 result = await self.run_tool(call["function"]["name"], call["function"]["arguments"])
+                showed_cards = showed_cards or (call["function"]["name"] == "post_request"
+                                                and isinstance(result, dict) and bool(result.get("cards")))
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
