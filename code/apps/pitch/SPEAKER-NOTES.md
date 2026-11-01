@@ -16,7 +16,11 @@ For the fourteenth of November: quiet, dogs welcome, arrival at one in the morni
 0:38–0:52 | CONTEXT
 The hotels answer with their own offers. They set the rooms, prices and rules. Tuttie compares those offers against what I asked for.
 
-0:52–1:10 | NEGOTIATE
+0:52–1:10 | OFFERS COME IN (reverse marketplace, step 2)
+It turns around: the businesses come to me, through their own agents.
+
+ACTION: about a second after the click the phone slides in from the right and bargains with Anna's agent.
+
 Anna runs a seven-room guesthouse. It is quiet, dogs stay free, and a door code solves the late arrival. Her offer is 135 francs. Her agent agrees on 128, within her limits.
 
 [Sources] Fictional Anna, seven rooms, pricing and arrival/dog policy: repo demo data. The owner controls the prices and limits.
