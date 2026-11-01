@@ -37,6 +37,18 @@ from node.settings import apply, canonical, validate
 MAX_NOTE = 200
 
 
+def keep_live_negotiation(raw, live: dict):
+    """Owner input with the live negotiation limits filled in when `facts.negotiation` is left
+    out: only an explicit null ends the bargaining (the owner view sends null and shows it as a
+    change), so a partial draft never silently drops the floor."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("facts"), dict) or "negotiation" in raw["facts"]:
+        return raw
+    negotiation = live.get("facts", {}).get("negotiation")
+    if negotiation is None:
+        return raw
+    return {**raw, "facts": {**raw["facts"], "negotiation": negotiation}}
+
+
 def owner_app(config: dict, store: DeploymentStore, on_deploy: Callable[[], None]) -> FastAPI:
     """The owner app for one node. `config` is the node's live config, changed in place by a
     deploy; `on_deploy` tells the node's agent to re-read it."""
@@ -100,11 +112,14 @@ def owner_app(config: dict, store: DeploymentStore, on_deploy: Callable[[], None
         note = body.get("note")
         if note is not None and (not isinstance(note, str) or len(note) > MAX_NOTE):
             raise HTTPException(status_code=422, detail={"errors": [{"path": "note", "message": f"at most {MAX_NOTE} characters"}]})
-        settings, errors = validate(body.get("settings"))
-        if errors:
-            raise HTTPException(status_code=422, detail={"errors": errors})
         with store.lock:
             live = store.current
+            settings, errors = validate(keep_live_negotiation(body.get("settings"), live["settings"]))
+            if not errors and live["settings"].get("facts", {}).get("rooms") \
+                    and not any(room.available for room in settings.facts.rooms):
+                errors = [{"path": "facts.rooms", "message": "keep at least one room available"}]
+            if errors:
+                raise HTTPException(status_code=422, detail={"errors": errors})
             if body.get("base_version") != live["version"]:
                 raise HTTPException(status_code=409, detail=f"version {live['version']} is live now: "
                                                             "review the new state before deploying")

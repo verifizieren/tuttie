@@ -209,7 +209,7 @@ def test_switching_off_postings_stops_the_wake_ups_and_back_on_restores_them(fol
 
 def test_removing_the_negotiation_limits_means_the_hotel_does_not_negotiate(folder):
     _, client = start(folder)
-    deploy(client, edited(client, lambda s: s["facts"].pop("negotiation")))
+    deploy(client, edited(client, lambda s: s["facts"].update(negotiation=None)))  # explicit null, as the owner view sends
     assert "negotiation" not in current(client)["facts"]
 
 
