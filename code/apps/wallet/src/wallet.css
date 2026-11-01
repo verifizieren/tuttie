@@ -318,6 +318,8 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; padding: 18px 18px 20px; border-radius: 26px;
          background: #1c1c1f; box-shadow: 0 -12px 40px rgba(0, 0, 0, .6); animation: sheet .45s var(--ease) both; }
 @keyframes sheet { from { transform: translateY(110%); } }
+.sheet.leaving { animation: sheet-out .35s var(--ease) forwards; pointer-events: none; }
+@keyframes sheet-out { to { transform: translateY(110%); opacity: .6; } }
 /* Only on the open card: in the stack the sheet would show (and take taps) over the bank cards. */
 .app:not(.open) .sheet { visibility: hidden; pointer-events: none; }
 /* A short screen (landscape phone): the sheet scrolls instead of losing its top. */

@@ -16,6 +16,8 @@ import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs before an approval is sent
 const GONE_MS = 2600;   // how long "already decided or expired" is shown before the sheet goes
+const DONE_MS = 1400;   // how long the final mark (checkmark or X) is shown before the sheet slides away
+const LEAVE_MS = 350;   // the slide down (wallet.css .sheet.leaving)
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -60,8 +62,11 @@ function Progress({ stage, decision }) {
 
 // `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
 // booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
-export default function ApprovalSheet({ approval, onGone, note = "" }) {
+// `onDecide(approval)` when the user decides: the wallet keeps the sheet while it finishes, even
+// once the server stopped waiting; `onFinished()` after the final mark was shown and the sheet left.
+export default function ApprovalSheet({ approval, onGone, note = "", onDecide, onFinished }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
+  const [leaving, setLeaving] = useState(false); // sliding away after the final mark
   const [decision, setDecision] = useState(null); // the chosen decision, then the recorded one
   const [error, setError] = useState("");
   const [allow, setAllow] = useState(true);      // sign the offered mandate as well
@@ -82,6 +87,7 @@ export default function ApprovalSheet({ approval, onGone, note = "" }) {
     busy.current = true;
     setError("");
     setDecision(chosen);
+    onDecide?.(approval);
     if (chosen === "approved") {
       setStage("scan");
       await wait(SCAN_MS);
@@ -91,16 +97,21 @@ export default function ApprovalSheet({ approval, onGone, note = "" }) {
       const result = await decide(approval.id, chosen, chosen === "approved" && Boolean(offer) && allow);
       setDecision(recordedDecision(result, chosen));
       setStage("done");
+      await wait(DONE_MS);  // the checkmark (or X) is seen in full
+      setLeaving(true);
+      await wait(LEAVE_MS);
+      onFinished?.();
     } catch (e) {
       const failure = failureOf(e);
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
+      if (!failure.gone) onFinished?.();  // still waiting: shown as the server's approval again
     }
   }
 
   return (
-    <div className="sheet" role="dialog" aria-label="Approve payment" data-scroll>
+    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll>
       <div className="sheet-hotel">
         <SealMarks seals={approval.seals} />
         {approval.hotel}
