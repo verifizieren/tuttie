@@ -6,7 +6,7 @@ the owner (dev member 2). Wire formats: `documentation/formats.md`.
 
 | File | What |
 | --- | --- |
-| `canonical.py` | Canonical JSON and base64, the bytes every signature covers. |
+| `canonical.py` | Canonical JSON and strict, canonical base64 (one text per signature), the bytes every signature covers. |
 | `keys.py` | Key files in `keys/<id>.json` (demo keys committed on purpose; `keys/local/` private). |
 | `envelope.py` | Signed envelopes `{node_id, timestamp, payload, signature}`; opt-in freshness (`max_age_s`, 60 s clock skew). |
 | `uid.py` | Swiss business UIDs (CHE-xxx.xxx.xxx) with the mod-11 check digit. |
@@ -25,7 +25,7 @@ Which signature proves what:
 | Envelope | a node or agent | it said exactly this, at this time |
 | Delegation | the user | this agent may act for me within these scopes |
 | Signed call | the user's agent | this agent asks for exactly this action, once |
-| Approval | the user | I agree to this action, this payee, this amount |
+| Approval | the user | I agree to this action, this payee, this amount (the gate takes it for 900 s after `decided_at`) |
 | Mandate | the user | small payments to this payee for this purpose are fine up to this total |
 | Agreement (envelope) | the business | this negotiated price holds, once |
 

@@ -122,9 +122,15 @@ def test_offer_price_comes_from_the_config_whatever_the_llm_picks():
     assert (offer["room_type"], offer["date"], offer["rate"]) == ("double", "2099-11-14", "best rate, non-refundable")
 
 
-@pytest.mark.parametrize("choice", [{"room_type": "double", "add_ons": ["free-spa"]}, {"add_ons": []}])
-def test_no_offer_for_unknown_add_ons_or_an_invalid_choice(choice):
-    assert asyncio.run(agent_with(HOTELS["medium"], choice).make_offer(POSTING)) is None
+def test_no_offer_for_an_invalid_choice():
+    assert asyncio.run(agent_with(HOTELS["medium"], {"add_ons": []}).make_offer(POSTING)) is None
+
+
+def test_an_unknown_add_on_is_dropped_and_the_hotel_still_offers():
+    """The hotel told the market it will offer: an add-on id it lacks must not cost the offer."""
+    offer = asyncio.run(agent_with(HOTELS["medium"], {"room_type": "double", "add_ons": ["free-spa"]})
+                        .make_offer(POSTING))
+    assert offer["price_chf"] == 180 + 15 and offer["includes"] == ["late check-in after 22:00 with dog"]
 
 
 def test_an_unknown_room_gets_the_cheapest_real_room_instead_of_no_offer():

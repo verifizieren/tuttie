@@ -19,13 +19,21 @@ Live at <https://web4.mendes.dev/wallet/>.
   The wallet follows Tuttie's timeline (`GET /events`) and shows, under its eyes, two progress
   lines (what Tuttie knows, what it does), then the hotels as a **swipe deck** (photos, rating,
   features in green or red, the agreed price with the hotel's own offer crossed out; right =
-  like, left = pass), the chosen hotel, the booking and Tuttie's current answer. Tapping a
-  hotel shows who vouches for it. The face follows each phase through Tuttie's presence (below).
+  like, left = pass; cards pass through `cardOf` in `lib/activity.js`, so hotel text is plain
+  text, numbers finite, ratings 0..5, names at most two lines), the chosen hotel, the booking
+  and Tuttie's current answer. Tapping a hotel shows who vouches for it. The face follows each phase through Tuttie's presence (below).
 - **Approvals happen in the wallet:** a sheet shows hotel, seals and amount; approving runs a
   Face ID-style confirmation before the decision goes to `POST /approvals/{id}`, where the
   assistant signs it with the user's key. The sheet can also allow a small mandate, so the
-  city tax is paid right after the booking without a second prompt. The booking card shows
-  what Tuttie checked ("Checked by Tuttie") and the paid tax.
+  city tax is paid right after the booking without a second prompt. If the POST answer is
+  lost, the sheet finishes on the streamed decision (the approval id inside the signed
+  decision); `decide()` gives up after 15 s and offers another try. New chat and History wait
+  for a decision on its way instead of opening under the sheet. The streamed decision also
+  finishes a sheet after the timeout; a `decided` event for an older approval never closes a
+  newer one, and the city tax sheet waits until the booking's checkmark was shown
+  (`lib/approval.js` `sheetOf`, `finishesOn`). A newly shown sheet ignores finger taps for
+  600 ms (`ARM_MS`), so a tap aimed at the sheet that just went never decides the next one;
+  clicks from code or the keyboard always count. The booking card shows what Tuttie checked ("Checked by Tuttie") and the paid tax.
 - **Voice** (`hooks/useVoice.js`, server side in `code/voice/`): the wallet joins the
   conversation's LiveKit room with the microphone off; opening Tuttie's card switches it on.
 - **Dock** under the open card: history of earlier conversations (they can be continued), new

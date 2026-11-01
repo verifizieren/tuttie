@@ -14,6 +14,7 @@ signed offer to the posting's offer_url in the background (make_offer).
 
 import argparse
 import asyncio
+import base64
 import copy
 import hmac
 import json
@@ -42,6 +43,7 @@ from aps.delegation import verify_delegation
 from aps.envelope import is_fresh, parse_timestamp
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
+from hosting import service_host
 from marketplace.messages import PostingCreated
 from marketplace.messages import Request as MarketRequest
 from negotiation.agreement import AgreementRedeemer
@@ -158,20 +160,31 @@ async def requester_problem(posting, lookup, authorities: dict, now=None,
 class UsedCommitments:
     """Signed commitments already redeemed in a booking here: each one adds its add-on once.
 
-    A commitment is known by its envelope's signature (Ed25519 signs deterministically, so the
-    same signed promise always has the same one) and remembered until its valid_until (after
-    that commitment_expired refuses it anyway), at most MAX_ENTRIES at once.
+    A commitment is known by its envelope's signature bytes (Ed25519 signs deterministically, so
+    the same signed promise always has the same ones, whatever its base64 text) and remembered
+    until its valid_until (after that commitment_expired refuses it anyway), at most MAX_ENTRIES
+    at once.
     """
     MAX_ENTRIES = 10_000
 
     def __init__(self) -> None:
-        self.used: dict[str, datetime] = {}  # signature -> valid_until
+        self.used: dict[bytes | str, datetime] = {}  # signature bytes -> valid_until
+
+    @staticmethod
+    def key(extra: dict) -> bytes | str:
+        """The commitment's signature as bytes, decoded leniently so every base64 text of the same
+        signature maps to one key (its text if it is not base64 at all: it will not verify)."""
+        signature = str(extra.get("signature"))
+        try:
+            return base64.b64decode(signature, validate=True)
+        except ValueError:
+            return signature
 
     def problem(self, extras: list[dict]) -> str | None:
         """Why these commitments cannot be redeemed now (one used before, or twice here), or None."""
         now = datetime.now(timezone.utc)
         self.used = {sig: until for sig, until in self.used.items() if until > now}
-        signatures = [str(extra.get("signature")) for extra in extras]
+        signatures = [self.key(extra) for extra in extras]
         if len(set(signatures)) != len(signatures):
             return "the same commitment is attached twice"
         if any(sig in self.used for sig in signatures):
@@ -184,7 +197,7 @@ class UsedCommitments:
         """Remember these (checked) commitments as used."""
         for extra in extras:
             until = parse_timestamp(extra["payload"]["commitment"].get("valid_until"))
-            self.used[str(extra.get("signature"))] = until
+            self.used[self.key(extra)] = until
 
 
 class HandledRequests:
@@ -615,7 +628,7 @@ def main() -> None:
     args = parser.parse_args()
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")  # OPENAI_API_KEY for /agent
     config = json.loads(Path(args.config).read_text())
-    uvicorn.run(create_app(config), host="0.0.0.0", port=args.port or config["port"])
+    uvicorn.run(create_app(config), host=service_host(), port=args.port or config["port"])
 
 
 if __name__ == "__main__":

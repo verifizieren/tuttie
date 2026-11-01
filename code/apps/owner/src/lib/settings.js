@@ -58,7 +58,7 @@ const SECTION_LABELS = {
   negotiation: "Negotiation",
 };
 // Lists of objects are matched by this field, so removing one row is not "everything moved".
-const ROW_KEYS = { rooms: "room_type", add_ons: "item", charges: "purpose" };
+const ROW_KEYS = { rooms: "room_type", add_ons: "id", charges: "purpose" };
 
 const fieldLabel = key => FIELD_LABELS[key] || words(key);
 const sectionLabel = key => SECTION_LABELS[key] || fieldLabel(key);

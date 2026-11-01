@@ -2,7 +2,7 @@
 // offline. Network first, so a deployed change shows up on the next load; the cache is only a
 // fallback when the phone is offline.
 // Bump CACHE when the cached files must be dropped (e.g. after a change of the app's structure).
-const CACHE = "tuttie-wallet-v2";
+const CACHE = "tuttie-wallet-v3";
 // The built JS and CSS have hashed names and are cached on first use (see the fetch handler).
 const SHELL = ["/wallet/", "/wallet/manifest.json", "/wallet/icons/icon-192.png"];
 
@@ -23,10 +23,13 @@ self.addEventListener("fetch", event => {
   const appFile = url.pathname.startsWith("/wallet/");
   if (request.method !== "GET" || url.origin !== location.origin || !appFile) return;
   event.respondWith(
-    fetch(request)
+    // "no-cache": revalidate with the server, never take a stale copy from the HTTP cache.
+    fetch(request, { cache: "no-cache" })
       .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(request, copy));
+        if (response.ok) {  // never let an error page (e.g. a 502 during a restart) replace the offline copy
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(request)));

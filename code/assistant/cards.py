@@ -12,11 +12,15 @@ station, cancel, breakfast, wifi, parking, small), `ok` paints it green or red. 
 answer the user's needs come first.
 """
 
+import math
 import re
 
 MAX_CARDS = 5
 PHOTO_FILE = re.compile(r"[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)")
 MAX_FEATURES = 5
+MAX_NAME_CHARS = 60    # a business's agent name: one short line
+MAX_SIZE_CHARS = 20    # a profile's size ("small", "medium", "large")
+MAX_ABOUT_CHARS = 500  # a profile's "about"
 WALK_M_PER_MIN = 80
 NEAR_STATION_M = 1000
 NEEDS = {  # feature key -> words in the user's requirements that make it matter most
@@ -29,39 +33,86 @@ def needs_text(requirements: list[str]) -> str:
     return " ".join(requirements).lower()
 
 
+def number(value) -> float | int | None:
+    """value if it is a finite number (not a bool), else None: signed hotel data may hold anything."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        return value if math.isfinite(value) else None
+    except OverflowError:  # an int too big for a float (e.g. 400 digits)
+        return None
+
+
 def features(facts: dict) -> list[dict]:
-    """Every feature the hotel's signed policies tell about, green (ok) or red."""
-    policies, amenities = facts.get("policies") or {}, facts.get("amenities") or {}
+    """Every feature the hotel's signed policies tell about, green (ok) or red.
+
+    Values of the wrong type are treated as missing (a text fee, a list for a policy).
+    """
+    policies, amenities = facts.get("policies"), facts.get("amenities")
+    policies = policies if isinstance(policies, dict) else {}
+    amenities = amenities if isinstance(amenities, dict) else {}
     found = []
 
     def add(key, ok, label):
         found.append({"key": key, "ok": ok, "label": label})
 
     if "dogs_allowed" in policies:
-        fee = policies.get("dog_fee_chf_per_night") or 0
+        fee = number(policies.get("dog_fee_chf_per_night")) or 0
         add("dog", bool(policies["dogs_allowed"]),
             ("Dogs free" if not fee else f"Dogs CHF {fee:g}") if policies["dogs_allowed"] else "No dogs")
     if "kids_beds" in amenities:
         add("kids", amenities["kids_beds"], "Kids' beds" if amenities["kids_beds"] else "No kids' beds")
     if "quiet" in facts:
         add("quiet", bool(facts["quiet"]), "Quiet" if facts["quiet"] else "Not quiet")
-    late = (policies.get("late_arrival") or "").lower()
+    late = policies.get("late_arrival")
+    late = late.lower() if isinstance(late, str) else ""
     if late:
         ok = not ("closes" in late or "no check-in" in late)
         add("late", ok, ("24h reception" if "24 hours" in late else "Late arrival") if ok else "No late check-in")
-    distance = facts.get("distance_to_basel_sbb_m")
+    distance = number(facts.get("distance_to_basel_sbb_m"))
     if distance is not None:
         add("station", distance <= NEAR_STATION_M, f"{max(1, round(distance / WALK_M_PER_MIN))} min to SBB")
-    cancellation = (policies.get("cancellation") or "").lower()
+    cancellation = policies.get("cancellation")
+    cancellation = cancellation.lower() if isinstance(cancellation, str) else ""
     if cancellation:
         add("cancel", "non-refundable" not in cancellation,
             "Non-refundable" if "non-refundable" in cancellation else "Free cancellation")
     for key, label in (("breakfast", "Breakfast"), ("wifi", "Wifi"), ("parking", "Parking")):
         if key in amenities:
             add(key, amenities[key], label if amenities[key] else f"No {label.lower()}")
-    if (facts.get("profile") or {}).get("size") == "small":
+    if profile_of(facts).get("size") == "small":
         add("small", True, "Independent")
     return found
+
+
+def clean_text(value, limit: int) -> str | None:
+    """A business's text as one short line: strings only, control and format characters (newlines,
+    RTL overrides) replaced by spaces, at most `limit` characters; None if nothing is left."""
+    if not isinstance(value, str):
+        return None
+    text = " ".join("".join(c if c.isprintable() else " " for c in value).split())[:limit].strip()
+    return text or None
+
+
+def profile_of(data: dict) -> dict:
+    """The profile in a business's signed data (agent card or get_policies), cleaned: only `size`
+    and `about`, as short strings; {} if there is no profile dict."""
+    profile = data.get("profile")
+    if not isinstance(profile, dict):
+        return {}
+    return {"size": clean_text(profile.get("size"), MAX_SIZE_CHARS),
+            "about": clean_text(profile.get("about"), MAX_ABOUT_CHARS)}
+
+
+def rating_of(facts: dict) -> dict | None:
+    """facts["rating"] as {score: 0..5, reviews: int | None}, or None if it is not one."""
+    rating = facts.get("rating")
+    if not isinstance(rating, dict):
+        return None
+    score, reviews = number(rating.get("score")), rating.get("reviews")
+    if score is None or not 0 <= score <= 5:
+        return None
+    return {"score": score, "reviews": reviews if isinstance(reviews, int) and not isinstance(reviews, bool) else None}
 
 
 def own_photos(node_id: str, photos) -> list[str]:
@@ -87,7 +138,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
     wanted = {key for key, words in NEEDS.items() if any(w in needs for w in words)}
     # What the user asked for first, then the rest in a fixed order (sort is stable).
     ordered = sorted(features(facts), key=lambda f: f["key"] not in wanted)
-    profile = facts.get("profile") or item.get("profile") or {}
+    profile = profile_of(facts) or profile_of(item)  # both cleaned the same way
     price = offer["price_chf"]
     final = agreed_chf if agreed_chf is not None else price  # what the user would pay
     return {
@@ -97,7 +148,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
         "size": profile.get("size"),
         "about": profile.get("about"),
         "agent": item.get("agent"),
-        "rating": facts.get("rating"),
+        "rating": rating_of(facts),
         "photos": own_photos(item["node_id"], facts.get("photos")),
         "offer_id": offer["offer_id"],
         "item": offer["item"],

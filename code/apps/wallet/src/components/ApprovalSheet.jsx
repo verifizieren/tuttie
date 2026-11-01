@@ -5,13 +5,16 @@
 // with the user's key, and the hotel only books with that signature and only for exactly this
 // amount. Declining is sent right away. While a decision travels the sheet names it
 // ("Declining…"), and the final mark shows what the server recorded. A failed send shows why
-// and leaves the buttons ready for another try; an approval that no longer waits (already
+// and leaves the buttons ready for another try, also when no answer came at all (after 15 s,
+// lib/api.js); the event stream is the other way the server's decision arrives: once it says
+// the approval was decided, the sheet finishes even if the answer to its own call never comes.
+// An approval that no longer waits (already
 // decided or expired) says so and the sheet goes. A booking may also offer a mandate for a
 // small charge that follows (the city tax): with the switch on, the user's key signs it too
 // and Tuttie pays that charge without asking again.
 import { useEffect, useRef, useState } from "react";
 import { decide } from "../lib/api.js";
-import { doneLabel, failureOf, recordedDecision, sendingLabel } from "../lib/approval.js";
+import { doneLabel, failureOf, finishesOn, recordedDecision, sendingLabel, tapAccepted } from "../lib/approval.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs before an approval is sent
@@ -96,15 +99,44 @@ export function ApprovalFallback({ approval, onGone }) {
 // `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
 // booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
 // `onDecide(approval)` when the user decides: the wallet keeps the sheet while it finishes, even
-// once the server stopped waiting; `onFinished(id, decided)` after the final mark was shown and the
+// once the server stopped waiting; `recorded`: the decision the server streamed for this approval
+// (lib/approval.js serverDecision), which finishes a sheet still sending; `onFinished(id, decided)` after the final mark was shown and the
 // sheet left (decided), or after a failed send while the approval still waits (not decided).
-export default function ApprovalSheet({ approval, onGone, note = "", onDecide, onFinished }) {
+export default function ApprovalSheet({ approval, onGone, note = "", recorded = null, onDecide, onFinished }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
   const [leaving, setLeaving] = useState(false); // sliding away after the final mark
   const [decision, setDecision] = useState(null); // the chosen decision, then the recorded one
   const [error, setError] = useState("");
   const [allow, setAllow] = useState(true);      // sign the offered mandate as well
   const busy = useRef(false);                    // one decision in flight at a time (double taps)
+  const finished = useRef(false);                // the final mark is shown once: by the answer or the stream
+  const gone = useRef(false);                    // the server said this approval no longer waits
+  const unmounted = useRef(false);
+  const latest = useRef({ id: approval?.id, onFinished });
+  latest.current = { id: approval?.id, onFinished };
+
+  // A sheet that goes while its decision is still open (another sheet took its place) tells the
+  // wallet, so the decision is never left "finishing" with no sheet to end it. (React's
+  // StrictMode unmounts and mounts again once in development: the mount resets the flag.)
+  useEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      if (busy.current && !finished.current) latest.current.onFinished?.(latest.current.id, gone.current);
+    };
+  }, []);
+
+  // The server's decision arrived on the event stream while the sheet still waits for the answer
+  // to its call (which may never come), or after that call timed out or came back as no longer
+  // waiting: finish with the mark of what the server recorded.
+  useEffect(() => {
+    if (finishesOn(recorded, stage, decision)) finish(recorded);
+  }, [recorded, stage]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When this sheet came on screen and when a finger last came down on it (lib/approval.js tapAccepted).
+  const shownAt = useRef(performance.now());
+  const downAt = useRef(null);
+  const tap = chosen => e => { if (tapAccepted({ detail: e.detail, shownAt: shownAt.current, downAt: downAt.current })) choose(chosen); };
 
   // An approval that no longer waits: say so briefly, then let the sheet go.
   useEffect(() => {
@@ -115,6 +147,20 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
 
   if (!approval) return null;
   const offer = approval.offerMandate;
+
+  // The final mark for the recorded decision, then the sheet slides away; only the first of the
+  // call's answer and the stream's event does this, a later one changes nothing.
+  async function finish(recordedAs) {
+    if (finished.current) return;
+    finished.current = true;
+    setError("");
+    setDecision(recordedAs);
+    setStage("done");
+    await wait(DONE_MS);  // the checkmark (or X) is seen in full
+    setLeaving(true);
+    await wait(LEAVE_MS);
+    onFinished?.(approval.id, true);
+  }
 
   async function choose(chosen) {
     if (busy.current) return;
@@ -129,23 +175,24 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
     setStage("sending");
     try {
       const result = await decide(approval.id, chosen, chosen === "approved" && Boolean(offer) && allow);
-      setDecision(recordedDecision(result, chosen));
-      setStage("done");
-      await wait(DONE_MS);  // the checkmark (or X) is seen in full
-      setLeaving(true);
-      await wait(LEAVE_MS);
-      onFinished?.(approval.id, true);
+      await finish(recordedDecision(result, chosen));
     } catch (e) {
+      if (finished.current) return;  // the stream already showed the decision: a late failure changes nothing
       const failure = failureOf(e);
+      gone.current = failure.gone;
+      if (unmounted.current) return onFinished?.(approval.id, failure.gone);  // no sheet left to say it
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
-      if (!failure.gone) onFinished?.(approval.id, false);  // still waiting: shown as the server's approval again
+      // Still waiting: shown as the server's approval again. After a timeout the server may have
+      // decided anyway, so the sheet stays until its own retry or the stream says how it ended.
+      if (!failure.gone && !e?.timeout) onFinished?.(approval.id, false);
     }
   }
 
   return (
-    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll>
+    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll
+         onPointerDown={() => { downAt.current = performance.now(); }}>
       <div className="sheet-hotel">
         <SealMarks seals={approval.seals} />
         {approval.hotel}
@@ -169,8 +216,8 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
       {!error && note && <p className="sheet-note" role="status">{note}</p>}
       {stage === "ask" && (
         <div className="sheet-buttons">
-          <button type="button" className="decline" onClick={() => choose("declined")}>Decline</button>
-          <button type="button" className="approve" onClick={() => choose("approved")}>Approve</button>
+          <button type="button" className="decline" onClick={tap("declined")}>Decline</button>
+          <button type="button" className="approve" onClick={tap("approved")}>Approve</button>
         </div>
       )}
       {stage === "gone" && onGone && (

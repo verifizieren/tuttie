@@ -158,5 +158,70 @@
     "in": "Booked. Ignored: Scam",
     "screen": "Booked.",
     "spoken": "Booked."
+  },
+  {
+    "in": "Booked Hotel Rheinblick (ch.basel.hotel-rheinblick) for CHF 128.",
+    "screen": "Booked Hotel Rheinblick for CHF 128.",
+    "spoken": "Booked Hotel Rheinblick for 128 francs."
+  },
+  {
+    "in": "Booked ch.basel.gaestehaus-am-rhein for CHF 128.",
+    "screen": "Booked ch.basel.gaestehaus-am-rhein for CHF 128.",
+    "spoken": "Booked for 128 francs."
+  },
+  {
+    "in": "Please approve on your phone (ap-1a2b3c4d). Offer of-hotel-rheinblick-a1b2c3 holds [md-0a1b2c3d].",
+    "screen": "Please approve on your phone. Offer of-hotel-rheinblick-a1b2c3 holds.",
+    "spoken": "Please approve on your phone. Offer holds."
+  },
+  {
+    "in": "Rheinblick (ch.basel.hotel-rheinblick, of-hotel-rheinblick-a1b2c3) is CHF 128 (incl. city tax).",
+    "screen": "Rheinblick is CHF 128 (incl. city tax).",
+    "spoken": "Rheinblick is 128 francs (incl. city tax)."
+  },
+  {
+    "in": "See www.booking.com or sbb.ch (e.g. the IC) for more.",
+    "screen": "See www.booking.com or sbb.ch (e.g. the IC) for more.",
+    "spoken": "See or sbb.ch (e.g. the IC) for more."
+  },
+  {
+    "in": "They hold the room for 00:52 and in 23:10 too; the walk takes 00:20 and it is for 01:15 hrs.",
+    "screen": "They hold the room for 00:52 and in 23:10 too; the walk takes 00:20 and it is for 01:15 hrs.",
+    "spoken": "They hold the room for 12:52 am and in 11:10 pm too; the walk takes 00:20 and it is for 01:15 hrs."
+  },
+  {
+    "in": "That is CHF 1'280 in total, or 2’500.50 CHF for two.",
+    "screen": "That is CHF 1'280 in total, or 2’500.50 CHF for two.",
+    "spoken": "That is 1280 francs in total, or 2500.50 francs for two."
+  },
+  {
+    "in": "Rheinblick (ch.basel.hotel-rheinblick, CHF 128) is free (AP-1A2B3C4D; rq-1a2b3c4d).",
+    "screen": "Rheinblick (CHF 128) is free.",
+    "spoken": "Rheinblick (128 francs) is free."
+  },
+  {
+    "in": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically [en.wikipedia.org].",
+    "screen": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically en.wikipedia.org.",
+    "spoken": "See (en.wikipedia.org) or (de.sbb.ch) and ok.so.basically en.wikipedia.org."
+  },
+  {
+    "in": "Pay at https://evil.example/pay or www.evil.example now.",
+    "screen": "Pay at https://evil.example/pay or www.evil.example now.",
+    "spoken": "Pay at or now."
+  },
+  {
+    "in": "Booked for CHF [128] tonight.",
+    "screen": "Booked for CHF 128 tonight.",
+    "spoken": "Booked for 128 francs tonight."
+  },
+  {
+    "in": "Total [1,280] for ten nights.",
+    "screen": "Total 1,280 for ten nights.",
+    "spoken": "Total 1,280 for ten nights."
+  },
+  {
+    "in": "It is [90] CHF or [12.50] francs [3, 4]. Rooms from francs [95] [2], EUR [80][3].",
+    "screen": "It is 90 CHF or 12.50 francs. Rooms from francs 95, EUR 80.",
+    "spoken": "It is 90 francs or 12.50 francs. Rooms from francs 95, EUR 80."
   }
 ]

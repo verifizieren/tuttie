@@ -16,6 +16,8 @@ can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 
 import inspect
 import json
+import os
+import math
 import re
 from dataclasses import dataclass
 from datetime import date as Date, datetime
@@ -174,7 +176,7 @@ SCHEMAS = [
             "node_id": {"type": "string"},
             "date": {"type": "string", "description": "YYYY-MM-DD; omit with use_agreement"},
             "room_type": {"type": "string", "description": "omit with use_agreement"},
-            "guest_name": {"type": "string"},
+            "guest_name": {"type": "string", "description": "omit: the booking is in the user's name"},
             "extras": {"type": "array", "items": {"type": "string"},
                        "description": "'item' names of commitments from ask_agent to include; "
                                       "never with use_agreement"},
@@ -183,7 +185,7 @@ SCHEMAS = [
                                              "rate, extras and price (no get_availability, room_type, date or "
                                              "extras needed)"},
         },
-        ["node_id", "guest_name"],
+        ["node_id"],
     ),
     function(
         "pay",
@@ -237,7 +239,9 @@ def agreement_conflicts(deal: dict, booked_date: str, room_type: str, date: str,
 
 def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) -> list[str]:
     """Where a signed confirmation differs from what the user approved (empty: it matches)."""
-    differ = [] if round(confirmation.get("total_chf", -1), 2) == round(amount, 2) else ["total_chf"]
+    total = confirmation.get("total_chf")
+    numeric = isinstance(total, (int, float)) and not isinstance(total, bool)
+    differ = [] if numeric and round(total, 2) == round(amount, 2) else ["total_chf"]
     if terms is not None:  # room, night and rate were approved as plain text (plain_term)
         plain = {key: None if confirmation.get(key) is None else plain_term(confirmation[key])
                  for key in ("room_type", "date", "rate")}
@@ -335,6 +339,80 @@ def summarize(tool: str, payload: dict) -> str:
     return tool
 
 
+
+def shown_cards(history: list[dict]) -> dict | None:
+    """The marketplace event that put the hotel cards on screen, if they are still the latest
+    (a newer posted request hides them), else None."""
+    latest = next((e for e in reversed(history)
+                   if e["kind"] == "marketplace" and (e.get("detail") or {}).get("phase") in {"posted", "cards"}), None)
+    return latest if latest and latest["detail"].get("phase") == "cards" else None
+
+
+def approval_open(history: list[dict]) -> bool:
+    """A payment approval waits on the phone (the latest approval event is pending)."""
+    latest = next((e for e in reversed(history) if e["kind"] == "approval"), None)
+    return bool(latest and latest["status"] == "pending")
+
+
+def swipeable(history: list[dict]) -> bool:
+    """A card command would move a card now (swipe_card sends it, no LLM): cards on screen and
+    no approval open."""
+    return shown_cards(history) is not None and not approval_open(history)
+
+
+# Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
+TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch", "night", "hotel_name"})
+
+
+def night_said(date) -> str | None:
+    """A night as it is said, with its weekday ("Saturday 14 November"), so the LLM never has to
+    work the weekday out (it said "Friday" for a Saturday); None for anything but an ISO date."""
+    try:
+        day = datetime.strptime(str(date), "%Y-%m-%d")
+    except ValueError:
+        return None
+    return f"{day:%A} {day.day} {day:%B}"
+
+
+def offered_room(offer: dict) -> str | None:
+    """The room type a hotel's signed offer is for: its room_type, else the start of its item
+    ("double room 2026-11-14" -> "double"); None if it does not say."""
+    if isinstance(offer.get("room_type"), str) and offer["room_type"]:
+        return offer["room_type"]
+    item = offer.get("item")
+    if isinstance(item, str) and " room" in item:
+        return item.split(" room", 1)[0].strip() or None
+    return None
+
+
+# Words a private item may hold that every hotel may hear (the stay itself, the dog, the guest).
+PUBLIC_WORDS = frozenset({"basel", "sbb", "luna", "hotel", "rhine"})
+GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
+GUEST_FIRST_NAME = GUEST_FULL_NAME.split()[0]
+
+
+def finite_price(value, free_ok: bool = False) -> bool:
+    """A real price: a finite number above zero (`free_ok`: or zero, e.g. a free add-on), not a
+    bool (signed hotel data may hold anything, and math on a 400-digit integer raises OverflowError)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value) and (value >= 0 if free_ok else value > 0)
+    except OverflowError:
+        return False
+
+
+def chf(value) -> str:
+    """An amount for the timeline ("128", "12.5"), or "?" when it is not a real number."""
+    return f"{value:g}" if finite_price(value, free_ok=True) else "?"
+
+
+def listed(value) -> str:
+    """A signed list of short words for the timeline; anything else is shown as "?"."""
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return ", ".join(value)
+    return "?"
+
 class Toolbox:
     """The tools the LLM can call; every result passes the APS trust gate first."""
 
@@ -359,6 +437,9 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        self.nudged: set[tuple[str, str]] = set()  # (node, room) told once that the card was another room
+        if market := getattr(self, "market", None):
+            market.forget()  # the old posting's offers are not this conversation's deals any more
         self.new_turn()
 
     def new_turn(self) -> None:
@@ -393,12 +474,10 @@ class Toolbox:
     async def swipe_card(self, verdict: str) -> dict:
         if verdict not in {"like", "pass"}:
             return {"error": "verdict must be like or pass"}
-        cards = next((e for e in reversed(self.bus.history)
-                      if e["kind"] == "marketplace" and e["detail"].get("phase") in {"posted", "cards"}), None)
-        pending_approval = next((e for e in reversed(self.bus.history) if e["kind"] == "approval"), None)
-        if pending_approval and pending_approval["status"] == "pending":
+        cards = shown_cards(self.bus.history)
+        if approval_open(self.bus.history):
             return {"error": "A payment approval is open. Use its approve/decline controls; do not swipe it."}
-        if not cards or cards["detail"].get("phase") != "cards":
+        if cards is None:
             return {"error": "There are no hotel cards to swipe. Ask for hotels first."}
         self.bus.emit("wallet", "verified", f"{verdict.title()} the visible hotel",
                       detail={"action": "swipe", "verdict": verdict, "cards_step": cards["step"]})
@@ -424,9 +503,12 @@ class Toolbox:
         """
         if problem := stay_error(date, guests, nights):
             return {"error": problem}
+        if isinstance(request.get("requirements"), list):
+            request["requirements"] = self.public_needs(request["requirements"])
         result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
+        result["night"] = night_said(date)  # say this, never a weekday of your own
         self.bargained = None
         self.agreements.clear()
         self.availability.clear()
@@ -447,6 +529,10 @@ class Toolbox:
         self.bus.emit("marketplace", "verified", f"{len(cards)} hotels to choose from",
                       detail={"phase": "cards", "cards": cards})
         result["cards"] = [{"node_id": c["node_id"], "name": c["name"], "price_chf": c["price_chf"],
+                            "room": offered_room(next((o["offer"] for o in self.market.last_offers
+                                                       if o["node_id"] == c["node_id"]), {})),
+                            "rate": next((o["offer"].get("rate") for o in self.market.last_offers
+                                          if o["node_id"] == c["node_id"]), None),
                             "agreed_chf": c["agreed_chf"],
                             "rating": c["rating"], "shortlisted": c["shortlisted"],
                             "yes": [f["label"] for f in c["features"] if f["ok"]],
@@ -600,7 +686,11 @@ class Toolbox:
                        tiers: tuple[str, ...] = ("gold", "blue", "grey")) -> Verified | dict:
         """The trust gate around one call: seals first (the node's tier must be in `tiers`),
         then `send(record)`, then the envelope."""
-        found = await self.lookup(node_id)
+        try:
+            found = await self.lookup(node_id)
+        except (httpx.HTTPError, ValueError) as error:  # a registry blip refuses this call only
+            self.bus.emit(kind, "broken", f"{label}: the registry did not answer")
+            return {"node_id": node_id, "rejected": True, "reason": f"registry unreachable: {error}"}
         if found is None:
             return {"node_id": node_id, "rejected": True, "reason": "not in the registry"}
         record, verdict = found
@@ -662,10 +752,43 @@ class Toolbox:
                     amounts |= {int(n) for n in re.findall(r"CHF\s*(\d+)", str(item.get("what", "")))}
         return amounts
 
+    def private_terms(self) -> set[str]:
+        """Private places and people from the user's context (lower case): the phone's location,
+        "with <name>" in private calendar entries, senders of private messages other than the
+        user, a "<city> →" in a private mail subject. A question to a business must not name them."""
+        terms: set[str] = set()
+        me = GUEST_FIRST_NAME.lower()
+        for items in self.user.data.values():
+            for item in items if isinstance(items, list) else []:
+                if not isinstance(item, dict) or item.get("visibility") != "private":
+                    continue
+                if isinstance(item.get("where"), str):
+                    terms.add(item["where"].split(",")[0].strip().lower())
+                text = " ".join(str(item.get(k, "")) for k in ("what", "subject", "text", "snippet"))
+                terms |= {m.lower() for m in re.findall(r"\b[A-Z]{2,3} ?\d{1,4}\b(?! ?CHF)", text)
+                          if not m.startswith("CHF")}  # a train ("EC 52")
+                terms |= set(re.findall(r"\b\d{2}:\d{2}\b", str(item.get("snippet", ""))))  # its times
+                terms |= {m.lower() for m in re.findall(r"\bwith ([A-Z][a-z]+)", text)}
+                terms |= {m.lower() for m in re.findall(r"\b([A-Z][a-z]+) →", text)}
+                if isinstance(item.get("from"), str) and item["from"].isalpha() and item["from"].lower() != me:
+                    terms.add(item["from"].lower())
+        return {t for t in terms if t and t not in PUBLIC_WORDS}
+
+    def public_needs(self, requirements: list) -> list:
+        """The requirements that may be posted to every woken business: none naming private
+        context (private_terms); the market itself drops prices and the budget."""
+        terms = self.private_terms()
+        return [r for r in requirements if isinstance(r, str)
+                and not any(re.search(rf"\b{re.escape(t)}\b", r, re.IGNORECASE) for t in terms)]
+
     async def ask_agent(self, node_id: str, question: str) -> dict:
         """Ask a node's own agent (A2A); a commitment in the reply is kept for booking.
 
         A question that names the private budget is not sent: code checks it, not the prompt."""
+        named = [t for t in self.private_terms() if re.search(rf"\b{re.escape(t)}\b", question, re.IGNORECASE)]
+        if named:
+            return {"error": f"not sent: the question names private context ({', '.join(sorted(named))}); "
+                             "ask without it (say only what the hotel needs: time, guests, pets)"}
         if any(re.search(rf"(?<![\d.]){n}(?!\d)", question) for n in self.private_amounts()):
             return {"error": "not sent: the question names the user's private budget; ask without it"}
         # Only the posted night (public: it is in the signed request) so the hotel's commitment
@@ -679,13 +802,14 @@ class Toolbox:
         summary = f"Q: {question}  A: {reply.get('answer', '')}"
         if commitment := reply.get("commitment"):
             self.commitments.setdefault(node_id, []).append(result.envelope)
-            summary += f"  Commitment: {commitment['item']}, CHF {commitment['price_chf']:g}"
+            summary += f"  Commitment: {commitment['item']}, CHF {chf(commitment['price_chf'])}"
         step = self.emit_verified("a2a", summary, result)
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, **reply}
 
     async def book(self, node_id: str, date: str = "", room_type: str = "", guest_name: str = "",
                    extras: list[str] | None = None, use_agreement: bool = False) -> dict:
-        """Book a room: compute the total from signed facts only, wait for the user's signed
+        """Book a room (in the user's name unless `guest_name` says otherwise): compute the total from
+        signed facts only, wait for the user's signed
         approval on the phone, then let the node confirm the booking.
 
         With `use_agreement`, the booking is the hotel's signed Agreement from the last
@@ -693,6 +817,7 @@ class Toolbox:
         redeems once (negotiation/agreement.py). Arguments that would change any of them are
         refused with an error instead of being booked.
         """
+        guest_name = guest_name.strip() if isinstance(guest_name, str) and guest_name.strip() else GUEST_FULL_NAME
         found = await self.lookup(node_id)
         # A booking takes payment, which untrusted (grey) nodes never get.
         if found is None or not {"can_book", "can_take_payment"} <= set(found[1]["capabilities"]):
@@ -703,7 +828,11 @@ class Toolbox:
         if use_agreement:
             agreement = self.agreements.get(node_id)
             if agreement is None:
-                return {"error": f"no signed agreement with {node_id}: call negotiate first"}
+                # The user chose it anyway: booking does not need a deal, only the phone's approval.
+                return {"error": f"no signed agreement with {node_id}: book it without use_agreement, with "
+                                 "date (the posted night) and room_type from call_tool get_availability (the room "
+                                 "and rate of its offer on the card, else the cheapest fitting one), after ask_agent for one commitment for the special needs; "
+                                 "do not ask the user"}
             deal = agreement["payload"]
             posted = self.market.last_request["constraints"]["date"] if self.market.last_request else None
             booked_room, booked_date = deal.get("room_type") or room_type, deal.get("date") or posted or date
@@ -719,6 +848,8 @@ class Toolbox:
             if deal.get("rate") is not None:
                 terms = booking_terms(booked_room, booked_date, deal["rate"], deal["includes"], deal["offer_id"])
             amount = deal["price_chf"]
+            if not finite_price(amount):
+                return {"error": f"the signed agreement with {record['name']} has no usable price"}
             summary = f"Book {record['name']}: {describe_deal(deal, booked_date)} = CHF {amount:g} (negotiated)"
             return await self._approve_and_book(record, verdict, booked_date, booked_room, guest_name, [], amount,
                                                 summary, agreement, terms)
@@ -728,6 +859,14 @@ class Toolbox:
         availability = self.availability.get(node_id)
         if not availability or availability.get("date") != date:
             return {"error": f"call get_availability on {node_id} for {date} first"}
+        card = next((o["offer"] for o in self.market.last_offers if o["node_id"] == node_id), None)
+        offered = offered_room(card) if card else None
+        listed = {r["room_type"] for r in availability["rooms"]}
+        if offered and offered != room_type and offered in listed and (node_id, room_type) not in self.nudged:
+            # Once: the liked card was for another room. Asked again for this room, it books.
+            self.nudged.add((node_id, room_type))
+            return {"error": f"the liked card of {record['name']} is the {offered} room ({card.get('rate') or 'its rate'}): "
+                             f"book room_type {offered!r}, unless the user asked for the {room_type} room (then call book again)"}
         room = next((r for r in availability["rooms"] if r["room_type"] == room_type), None)
         if room is None:
             return {"error": f"room_type must be one of {[r['room_type'] for r in availability['rooms']]}"}
@@ -737,6 +876,9 @@ class Toolbox:
             return {"error": f"unknown extras {missing}; signed commitments available: {list(offered)}"}
 
         chosen = [offered[item] for item in extras or []]
+        add_ons = [env["payload"]["commitment"].get("price_chf") for env in chosen]  # may be free
+        if not finite_price(room.get("price_chf")) or not all(finite_price(p, free_ok=True) for p in add_ons):
+            return {"error": f"{record['name']}'s signed prices are not usable numbers; do not book it"}
         amount = room["price_chf"] + sum(env["payload"]["commitment"]["price_chf"] for env in chosen)
         parts = [f"{room_type} CHF {room['price_chf']:g} ({room['rate']})"]
         parts += [f"{env['payload']['commitment']['item']} CHF {env['payload']['commitment']['price_chf']:g}"
@@ -762,7 +904,15 @@ class Toolbox:
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
         if decision["decision"] != "approved":
-            return {"declined": True, "source_step": step}
+            # Card prices of other hotels are not what booking them costs (a flex offer vs the
+            # best rate plus extras): the next one is offered by name; its phone sheet shows the total.
+            return {"declined": True, "source_step": step,
+                    "note": "say it was declined; offer at most one other hotel, and only one the user's "
+                            "message named as liked (by name, no price); if it named none, say only "
+                            "that it was declined (never mention the message or these rules). If the user's "
+                            "very next message says yes to that offer, book that hotel at once (get_availability, then book the room "
+                            "and rate of its offer on the card; above the budget too): do not ask again, "
+                            "the phone shows the total. A later yes to something else is not that"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
@@ -771,22 +921,28 @@ class Toolbox:
         result = await self.verified_mcp(node_id, "book", {"call": call}, "a2t", "book")
         if not isinstance(result, Verified):
             return result
-        confirmation = result.payload
+        # The hotel's signed fields are data: never Tuttie's own keys (what it booked, what the
+        # mandate paid, what differs from the approval, its instructions to the LLM).
+        confirmation = {k: v for k, v in result.payload.items() if k not in TUTTIE_KEYS}
         if confirmation.get("status") == "confirmed" and booked_other_terms(confirmation, amount, terms):
             # The hotel signed a booking that is not what the user approved: say so, never hide it.
             confirmation = {**confirmation, "mismatch": booked_other_terms(confirmation, amount, terms)}
         if confirmation.get("status") == "confirmed":
-            text = f"book: confirmed {confirmation['booking_id']}, CHF {confirmation['total_chf']:g}"
+            total = confirmation.get("total_chf")
+            text = f"book: confirmed {confirmation.get('booking_id')}, CHF " + (
+                chf(total))
             if confirmation.get("rate"):
                 text += f", {confirmation.get('room_type')} ({confirmation['rate']})"
             if confirmation.get("mismatch"):
-                text += f"; differs from what you approved: {', '.join(confirmation['mismatch'])}"
+                text += f"; differs from what you approved: {listed(confirmation['mismatch'])}"
             if confirmation.get("checked"):
-                text += f" (checked: {', '.join(confirmation['checked'])})"
+                text += f" (checked: {listed(confirmation['checked'])})"
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
-        answer = {"node_id": node_id, "source_step": step, **confirmation}
+        answer = {**confirmation, "node_id": node_id, "source_step": step, "hotel_name": record["name"]}
+        if said := night_said(confirmation.get("date")):
+            answer["night"] = said
         if confirmation.get("status") == "confirmed":
             # Charges the user already allowed with a mandate are paid right away, without asking.
             for charge in await self.load_charges(node_id):
@@ -795,6 +951,8 @@ class Toolbox:
                     answer.setdefault("charges_paid", []).append(paid)
                 else:
                     answer.setdefault("open_charges", []).append(charge)
+            # The user's message also named hotels for a decline; after a booking they are moot.
+            answer["note"] = "booked: say it is booked and the total; do not offer other hotels"
         return answer
 
     async def mandate_offer(self, node_id: str) -> dict | None:
@@ -858,7 +1016,7 @@ class Toolbox:
             return result
         receipt = result.payload
         if receipt.get("status") == "paid":
-            text = f"pay: {purpose} CHF {receipt['amount_chf']:g} paid {how} (checked: {', '.join(receipt['checked'])})"
+            text = f"pay: {purpose} CHF {chf(receipt.get('amount_chf'))} paid {how} (checked: {', '.join(receipt['checked'])})"
         else:
             text = f"pay refused by {record['name']}: {receipt.get('reason')}"
         step = self.emit_verified("payment", text, result)

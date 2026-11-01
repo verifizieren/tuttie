@@ -247,14 +247,21 @@ def test_after_the_cards_the_voice_hands_the_choice_to_the_user():
               {"kind": "answer", "turn": "t1", "summary": "Hello again."}]
 
     class Stream:
+        status_code, is_success = 200, True
+
         async def aiter_lines(self):
             for event in events:
                 yield "event: reset" if event == "reset" else "data: " + json.dumps(event)
 
+    class Gone:
+        status_code, is_success = 409, False  # follow() reconnects; then the chat is inactive: it stops
+
     class Http:
+        streams = [Stream(), Gone()]
+
         @asynccontextmanager
         async def stream(self, *args, **kwargs):
-            yield Stream()
+            yield self.streams.pop(0)
 
     class Session:
         def __init__(self):

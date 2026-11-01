@@ -58,7 +58,7 @@ function Negotiation() {
   const price = standardPrice(settings);
   const toggle = on => (on
     ? update(s => setIn(s, "facts.negotiation", { floor_chf: standardPrice(s), max_rounds: 3 }))
-    : set("facts.negotiation", undefined));
+    : set("facts.negotiation", null)); // null, not a missing key: the node keeps a left-out floor
   return (
     <Block title="Negotiation" note="Private: no guest's agent ever sees these limits.">
       <Line label="Lower the price">

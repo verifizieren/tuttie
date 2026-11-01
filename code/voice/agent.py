@@ -10,7 +10,8 @@ signed MCP calls, bargaining, booking. It follows that conversation's timeline (
 booking after swiping), and asks for the Face ID approval.
 
 The user can talk at any time, also while Tuttie works or speaks; what they say is queued as
-the next message. Robust in a noisy room: English only, fragments without meaning (one word,
+the next message (except while the Face ID sheet is up: then it asks the user to decide on the
+phone first). Robust in a noisy room: English only, fragments without meaning (one word,
 noises) are dropped, and only real words (two or more, half a second) interrupt Tuttie; if a
 noise cut it off and no words follow, it carries on. The wallet can mute the microphone.
 
@@ -21,9 +22,11 @@ import asyncio
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 from assistant.card_commands import card_choice
+from speech import CLOCK, clock
 from assistant.inputs import MAX_MESSAGE_CHARS
 
 import httpx
@@ -65,25 +68,57 @@ UPDATES = {"approval": "Please confirm with Face ID."}
 BUSY = "One moment please."  # too many turns a minute (429): the user can say it again shortly
 NOT_PASSED = "Sorry, that did not go through. Could you say it again?"
 # After Tuttie recommends a hotel, the choice goes to the user (said once, after the answer).
+# While the Face ID sheet is up, the running turn holds Tuttie: a spoken line would wait behind it
+# for minutes (and a "yes, book it" could run after the decision), so it is not passed on.
+DECIDE_FIRST = "Please approve or decline on your phone first."
+DECIDE_FIRST_EVERY_S = 5  # said at most this often, so noise does not make it repeat
+RECONNECT_S = (0.5, 10.0)  # wait before following the timeline again: first, and at most (doubling)
 HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
+
+
+def handoff_needed(answer: str) -> bool:
+    """Whether to add HANDOFF after the cards answer: not when the answer already says to swipe."""
+    return "swip" not in answer.lower()
 
 
 def francs(match: re.Match) -> str:
     """An amount as it is said: "CHF 128" is "128 francs", "CHF 1" is "1 franc"."""
-    amount = match.group(1) or match.group(2)
+    amount = re.sub(r"['’\u00a0\u202f]", "", match.group(1) or match.group(2))  # thousands: "1'280" is said 1280
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
 # What the model may put in square brackets, cleaned the same way as the wallet's screen
 # (apps/wallet/src/lib/activity.js withoutNotes; shared cases in tests/fixtures/answer_notes.json).
 # Only what carries nothing to say goes: citations ([3], [3, 4]), a few labels ([confirmed]),
-# booking and receipt ids, node ids. Any other note may be a fact (a fee, "cancelled"), so it is
+# booking and receipt ids, node ids, approval, offer and mandate ids (also alone in parentheses:
+# "Rheinblick (ch.basel.hotel-rheinblick)"). Any other note may be a fact (a fee, "cancelled"), so it is
 # kept and only its brackets go. Markdown links keep their text.
 LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
 NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
 CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
+# A bracketed number that is a price, not a citation: with a thousands separator ("[1,280]"), or
+# right after a currency ("CHF [128]") or before one ("[90] CHF"). Decimals are no citation anyway.
+THOUSANDS = re.compile(r"[0-9]{1,3}(?:[,'’][0-9]{3})+")
+CURRENCY_BEFORE = re.compile(r"(?:\b(?:CHF|francs?|EUR|USD|GBP|Fr\.)|[€$£])[ \t]*$", re.IGNORECASE)
+CURRENCY_AFTER = re.compile(r"[ \t]*(?:(?:CHF|francs?|EUR|USD|GBP)\b|[€$£])", re.IGNORECASE)
 LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
-NODE_ID = re.compile(r"[a-z]{2}(?:\.[a-z0-9-]+){2,}")          # ch.basel.hotel-rheinblick, not booking.com
+# Node ids have one shape (data/nodes/*.json): ch.<area>.<name>, e.g. ch.basel.hotel-rheinblick or
+# ch.legal.advisor; hosts and dotted words (de.sbb.ch, en.wikipedia.org, ok.so.basically) stay.
+NODE_ID_TOKEN = r"ch\.[a-z]{2,20}\.[a-z0-9]{1,30}(?:-[a-z0-9]{1,30}){0,6}"
+NODE_ID = re.compile(NODE_ID_TOKEN, re.IGNORECASE)
+# Approval, mandate, request and offer ids (assistant/approvals.py, aps/mandate.py,
+# marketplace/client.py, node/agent.py), in any case; an offer's hex tail has a digit ("of-a-decade" stays).
+REF_TOKEN = r"(?:ap|md|rq)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-(?=[a-f]*\d)[0-9a-f]{6}"
+REF = re.compile(REF_TOKEN, re.IGNORECASE)
+INTERNAL = rf"(?:{NODE_ID_TOKEN}|{REF_TOKEN})"
+IDS = rf"{INTERNAL}(?:\s*[,;]\s*{INTERNAL})*"
+PAREN_IDS = re.compile(rf"\(\s*{IDS}\s*\)", re.IGNORECASE)  # "(ch.basel.x)", "(ap-…, of-…)": all of it goes
+LEAD_IDS = re.compile(rf"(?<=\()\s*{IDS}\s*[,;]\s*", re.IGNORECASE)  # "(ch.basel.x, CHF 128)": "(CHF 128)"
+TRAIL_IDS = re.compile(rf"(?<=\S)\s*[,;]\s*{IDS}\s*(?=\))", re.IGNORECASE)  # "(CHF 128, ch.basel.x)": "(CHF 128)"
+# (TRAIL_IDS starts after a non-space, so a long run of spaces stays linear.)
+# Spoken only: bare ids and web addresses are never read aloud (the screen keeps them).
+BARE_INTERNAL = re.compile(rf"[ \t]?(?<![\w.@/-]){INTERNAL}(?![\w-]|\.[a-z0-9])", re.IGNORECASE)
+BARE_URL = re.compile(r"[ \t]?(?:https?://|www\.)[^\s()\[\]<>]*[^\s()\[\]<>.,;:!?'\"]", re.IGNORECASE)
 ID_TOKEN = r"\b(?:BK|RC)-[0-9A-F]{6}\b"  # booking and receipt ids (node/server.py): one pattern for all uses
 ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?" + ID_TOKEN, re.IGNORECASE)
 BARE_ID = re.compile(r"[ \t]?" + ID_TOKEN, re.IGNORECASE)
@@ -96,11 +131,6 @@ IGNORED_LINE = re.compile(r"^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:
 IGNORED_SENTENCE = re.compile(r"(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)", re.MULTILINE)
 LINES = re.compile(r"\r\n?|\n|\u2028|\u2029")  # line breaks, split the same way as the wallet
 EMPTY_ANSWER = "Done."  # an answer that cleans to nothing
-# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration; a
-# trailing "hrs"/"Uhr" is part of the time: "18:00", "00:52", "14:00 hrs" yes; "8:30 pm",
-# "1:30 hours", "18:00:30" no.
-CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)(?:[ \t]*(?:hrs?|uhr)\b)?\b"
-                   r"(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))", re.IGNORECASE)
 
 
 def link(match: re.Match) -> str:
@@ -114,8 +144,11 @@ def link(match: re.Match) -> str:
 def note(match: re.Match) -> str:
     """A bracketed note: dropped if it says nothing, else its words without the brackets."""
     inner = re.sub(r"^[\s,;]+|[\s,;]+$", "", ID.sub("", match.group(1)))
-    if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
-            or inner.lower().startswith("ignored:")):
+    price = THOUSANDS.fullmatch(inner) or (re.fullmatch(r"[0-9]+", inner) and (
+        CURRENCY_BEFORE.search(match.string, max(0, match.start() - 12), match.start())
+        or CURRENCY_AFTER.match(match.string, match.end())))
+    if (not inner or (CITATION.fullmatch(inner) and not price) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
+            or REF.fullmatch(inner) or inner.lower().startswith("ignored:")):
         return GONE
     glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
     return (" " if glued else "") + inner
@@ -125,7 +158,8 @@ def without_notes(raw: str) -> str:
     """Links and bracketed notes cleaned (see above), lines starting with "Ignored:" dropped, and
     the spaces tidied only where something was taken out. Same rules as the wallet's
     withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
-    text = LINK.sub(link, re.sub(r"\r\n?", "\n", raw))
+    text = PAREN_IDS.sub(GONE, LINK.sub(link, re.sub(r"\r\n?", "\n", raw)))
+    text = TRAIL_IDS.sub("", LEAD_IDS.sub("", text))
     for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
         text = NOTE.sub(note, text)
     text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
@@ -139,30 +173,18 @@ def without_notes(raw: str) -> str:
     return EMPTY_ANSWER if not text.strip() and raw.strip() else text
 
 
-DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts|for|in)(?:\s+(?:about|around|approx\.?))?\s+$",
-                            re.IGNORECASE)
-
-
-def clock(match: re.Match) -> str:
-    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight".
-    After "takes", "for", "in" ... it is a length of time ("takes 01:15 hrs") and stays."""
-    if DURATION_WORDS.search(match.string[max(0, match.start() - 12):match.start()]):
-        return match.group(0)
-    hour, minute = int(match.group(1)), int(match.group(2))
-    if minute == 0 and hour in (0, 12):
-        return "midnight" if hour == 0 else "noon"
-    said = str(hour % 12 or 12) + (f":{minute:02d}" if minute else "")
-    return f"{said} {'am' if hour < 12 else 'pm'}"
-
-
 def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
     text = without_notes(answer)
     text = BARE_ID.sub("", text)  # ids are never spoken: the wallet shows them
+    text = BARE_INTERNAL.sub("", text)  # nor node, approval, offer, request or mandate ids
+    text = BARE_URL.sub("", text)  # nor web addresses
     text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
-    text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
+    # "1'280" and "1 280" with a no-break space; a plain space is not a separator ("CHF 128 100 percent")
+    amount = r"(\d{1,3}(?:['’\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
+    text = re.sub(rf"\bCHF\s?{amount}|{amount}\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
     text = re.sub(r"\s?°\s?[CF]\b|\s?°", " degrees", text)  # "11.6 °C" is said "11.6 degrees"
     text = re.sub(r"(\d)\s?%", r"\1 percent", text)
@@ -209,13 +231,15 @@ def pick_ack(event: dict) -> str | None:
 
 
 def update_for(event: dict, said: set[str]) -> str | None:
-    """The short line to speak for a timeline event, once per turn, or None."""
-    detail = event.get("detail") or {}
-    key = "approval" if event["kind"] == "approval" and event["status"] == "pending" else None
-    if key is None or key in said:
+    """The short line to speak for a timeline event, once per approval (a booking and then the
+    city tax in one turn are two prompts), or None."""
+    if event["kind"] != "approval" or event["status"] != "pending":
+        return None
+    key = f"approval:{(event.get('detail') or {}).get('approval_id') or ''}"
+    if key in said:
         return None
     said.add(key)
-    return UPDATES[key]
+    return UPDATES["approval"]
 
 
 class Tuttie(Agent):
@@ -227,10 +251,16 @@ class Tuttie(Agent):
         self.http = http
         self.turns = 0
         self.asked = None  # what the user asked last, until Tuttie uses a tool for it or answers
+        self.pending_approvals: set[str] = set()  # approval ids on the phone, kept by follow()
+        self.decide_first_at = float("-inf")  # when DECIDE_FIRST was said last
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         text = (new_message.text_content or "").strip()
-        if meaningful(text):  # noise and stray words are not requests
+        if meaningful(text) and self.pending_approvals:  # the phone decides first
+            if time.monotonic() - self.decide_first_at >= DECIDE_FIRST_EVERY_S:
+                self.decide_first_at = time.monotonic()
+                self.speak(DECIDE_FIRST)
+        elif meaningful(text):  # noise and stray words are not requests
             self.turns += 1
             self.asked = text
             if trouble := await self.pass_on(fitted(text)):
@@ -256,12 +286,34 @@ class Tuttie(Agent):
         self.session.say(text)
 
     def filler(self) -> str | None:
-        """A filler fitting the last request, once, when Tuttie starts a tool for it."""
+        """A filler fitting the last request, once, when Tuttie starts a tool for it. An exact
+        card command ("next") gets none: the card moves at once, without the LLM."""
         if self.asked is None or self.session.agent_state == "speaking":
+            return None
+        if card_choice(self.asked):
+            self.asked = None
             return None
         options = FILLERS[filler_kind(self.asked)]
         self.asked = None
         return options[self.turns % len(options)]
+
+
+def track_approvals(event: dict, pending: set[str]) -> None:
+    """Keep `pending` (approval ids on the phone) up to date from a timeline event: a pending
+    approval adds its id, a decided one (approved, declined, expired) removes it. An answer
+    clears all: Tuttie answers only after its turn is done, so nothing waits on the phone then
+    (also when an approval was dropped without a decision event)."""
+    detail = event.get("detail") if isinstance(event.get("detail"), dict) else {}
+    if event["kind"] == "answer":
+        pending.clear()
+    elif event["kind"] == "approval" and event.get("status") == "pending":
+        pending.add(str(detail.get("approval_id") or "?"))
+    elif event["kind"] == "approval":
+        decision = detail.get("decision") if isinstance(detail.get("decision"), dict) else {}
+        if decision.get("approval_id"):
+            pending.discard(str(decision["approval_id"]))
+        else:
+            pending.clear()
 
 
 def voice_on(room: rtc.Room) -> bool:
@@ -274,42 +326,80 @@ def voice_on(room: rtc.Room) -> bool:
 
 
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
-    """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
+    """Speak every answer and the approval prompt from the conversation's timeline, in voice mode.
+
+    When the timeline stream ends (the assistant restarted, a dropped connection) it connects
+    again after RECONNECT_S[0] s, doubling up to RECONNECT_S[1] s while it keeps failing; it stops
+    for good when the room is unknown (404) or its conversation is no longer active (409).
+    Pending approvals are forgotten on every (re)connect and when it stops.
+    """
     said: set[str] = set()
+    pending: set[str] = getattr(agent, "pending_approvals", set())  # shared with the agent's turns
     cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
     def say(text: str) -> None:
         if text.strip() and voice_on(room):
             session.say(text)
 
-    async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
-        async for line in stream.aiter_lines():
-            if line.startswith("event: reset"):
-                said.clear()
-                cards = None
-            if not line.startswith("data:"):
-                continue
+    def handle(line: str) -> None:
+        nonlocal cards
+        if line.startswith("event: reset"):
+            said.clear()
+            cards = None
+            pending.clear()  # a reset declines open approvals
+        if not line.startswith("data:"):
+            return
+        try:
             event = json.loads(line[5:])
-            if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
-                cards = event.get("turn") or "?"
-            if event["kind"] == "answer":
-                said.clear()  # the next turn may prompt again
-                agent.asked = None  # answered without (or after) a tool: no filler any more
-                say(spoken(event["summary"]))
-                if cards is not None and event.get("turn", "?") == cards:
+        except ValueError:
+            return
+        if not isinstance(event, dict) or "kind" not in event:
+            return
+        if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
+            cards = event.get("turn") or "?"
+        track_approvals(event, pending)
+        if event["kind"] == "answer":
+            said.clear()  # the next turn may prompt again
+            agent.asked = None  # answered without (or after) a tool: no filler any more
+            say(spoken(str(event.get("summary") or "")))
+            if cards is not None and event.get("turn", "?") == cards:
+                if handoff_needed(str(event.get("summary") or "")):
                     say(HANDOFF)
-                    cards = None
-                continue
-            if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
-                agent.asked = None
-                say(ack)
-                continue
-            # The first tool for the request gets a filler; opening the turn, thinking and closing the
-            # card do not (a goodbye follows).
-            if event["kind"] not in ("turn", "thinking", "close") and (line := agent.filler()):
-                say(line)
-            if prompt := update_for(event, said):
-                say(prompt)
+                cards = None
+            return
+        if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
+            agent.asked = None
+            say(ack)
+            return
+        # The first tool for the request gets a filler; opening the turn, thinking, closing the
+        # card (a goodbye follows) and a swipe on the cards (it already happened) do not.
+        if event["kind"] not in ("turn", "thinking", "close", "wallet") and (filler := agent.filler()):
+            say(filler)
+        if prompt := update_for(event, said):
+            say(prompt)
+
+    delay = RECONNECT_S[0]
+    while True:
+        # A new stream replays no history: a decision made while it was down would never arrive,
+        # so nothing counts as pending from before (at worst a spoken line queues, never mute).
+        pending.clear()
+        try:
+            async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
+                if stream.status_code in (404, 409):
+                    print(f"voice: /voice/events answered {stream.status_code}, room {room.name} stops", flush=True)
+                    pending.clear()  # no timeline any more: never block what the user says
+                    return
+                if not stream.is_success:
+                    print(f"voice: /voice/events answered {stream.status_code}", flush=True)
+                else:
+                    async for line in stream.aiter_lines():
+                        delay = RECONNECT_S[0]  # the stream works: a later drop reconnects quickly
+                        handle(line)
+                    print("voice: /voice/events ended, connecting again", flush=True)
+        except httpx.HTTPError as error:
+            print(f"voice: /voice/events failed: {type(error).__name__}", flush=True)
+        await asyncio.sleep(delay)
+        delay = min(2 * delay, RECONNECT_S[1])
 
 
 def prewarm(proc: JobProcess) -> None:

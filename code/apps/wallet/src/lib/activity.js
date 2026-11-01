@@ -21,6 +21,7 @@ export const EMPTY = {
   deck: null,           // { step, index, liked: [node_id] }: how far the user swiped these cards (kept on reload)
   picked: null,         // node ids the user liked
   approval: null,       // { id, amount, hotel, summary, seals, uid, offerMandate, terms } while the user decides
+  decided: null,        // { id, status } of the last approval the server closed (approved, declined, expired)
   booking: null,        // the latest { id, hotel, total, date, room, rate, extras, checked, seals, uid, payments }; each stays in its turn
   bookingTurn: null,
   answer: "",           // Tuttie's latest answer
@@ -54,6 +55,26 @@ export function approvalOf(event, detail) {
     terms: terms && { room_type: plain(terms.room_type), date: plain(terms.date), rate: plain(terms.rate) },
   };
 }
+/** A hotel card (assistant/cards.py) as the deck shows it: the shown fields are plain text,
+ *  numbers or null, never an object (a hotel's own text flows into a card, and an object in
+ *  React's output breaks the whole chat view). Other fields stay as they came. */
+const number = value => (typeof value === "number" && Number.isFinite(value) ? value : null);
+export function cardOf(card) {
+  const rated = number(card.rating?.score);
+  const score = rated !== null && rated >= 0 && rated <= 5 ? rated : null;  // a score out of 5
+  return {
+    ...card,
+    node_id: plain(card.node_id), name: plain(card.name), agent: plain(card.agent), about: plain(card.about),
+    trust_tier: plain(card.trust_tier), price_chf: number(card.price_chf), agreed_chf: number(card.agreed_chf),
+    over_budget_chf: number(card.over_budget_chf),
+    rating: score === null ? null : { ...card.rating, score },
+    features: (Array.isArray(card.features) ? card.features : []).filter(f => f && typeof f === "object")
+      .map(f => ({ ...f, key: plain(f.key), ok: f.ok === true, label: plain(f.label) })),
+    photos: (Array.isArray(card.photos) ? card.photos : []).filter(p => typeof p === "string"),
+  };
+}
+const cardsOf = cards => (Array.isArray(cards) ? cards : []).filter(c => c && typeof c === "object" && !Array.isArray(c)).map(cardOf);
+
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
@@ -82,9 +103,12 @@ export function startTurn(state, said, id = null, source = "text") {
 const unsent = (state, said) => state.turns.findLastIndex(t => !t.id && !t.answer && t.said === said);
 
 /** POST /chat accepted a message as turn `id`: bind it now, so its events land in it even if the
- *  "turn" event is late or was missed. Never twice. */
+ *  "turn" event is late or was missed. Never twice: an id already bound drops this send's copy. */
 export function bindTurn(state, said, id) {
-  if (!id || state.turns.some(t => t.id === id)) return state;
+  if (!id) return state;
+  // The server joined these words to a turn that already has its local twin (two tabs, a
+  // retype): this send is not a turn of its own, so its unsent copy goes.
+  if (state.turns.some(t => t.id === id)) return dropTurn(state, said);
   const i = unsent(state, said);
   if (i === -1) return state;
   return { ...state, turns: state.turns.map((t, n) => (n === i ? { ...t, id } : t)) };
@@ -113,13 +137,30 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
 // Notes the model put in square brackets, cleaned the same way as the voice (voice/agent.py
 // spoken(); shared cases in code/tests/fixtures/answer_notes.json). Only what carries nothing to
 // say goes: citations ([3], [3, 4]), a few labels ([confirmed]), booking and receipt ids, node
-// ids. Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
+// ids, approval, offer and mandate ids (also alone in parentheses: "Rheinblick (ch.basel.x)").
+// Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
 // Markdown links keep their text. All patterns run in linear time.
 const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
 const NOTE = /\[([^[\]\n]{0,60})\]/g;
 const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
+// A bracketed number that is a price, not a citation: with a thousands separator ("[1,280]"), or
+// right after a currency ("CHF [128]") or before one ("[90] CHF"). Decimals are no citation anyway.
+const THOUSANDS = /^[0-9]{1,3}(?:[,'’][0-9]{3})+$/;
+const CURRENCY_BEFORE = /(?:\b(?:CHF|francs?|EUR|USD|GBP|Fr\.)|[€$£])[ \t]*$/i;
+const CURRENCY_AFTER = /^[ \t]*(?:(?:CHF|francs?|EUR|USD|GBP)\b|[€$£])/i;
 const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
-const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rheinblick, not booking.com
+// Node ids have one shape (data/nodes/*.json): ch.<area>.<name>; hosts like de.sbb.ch stay.
+const NODE_ID_TOKEN = "ch\\.[a-z]{2,20}\\.[a-z0-9]{1,30}(?:-[a-z0-9]{1,30}){0,6}";
+const NODE_ID = new RegExp(`^${NODE_ID_TOKEN}$`, "i");
+// Approval, mandate, request and offer ids (assistant/approvals.py, aps/mandate.py,
+// marketplace/client.py, node/agent.py), in any case; an offer's hex tail has a digit.
+const REF_TOKEN = "(?:ap|md|rq)-[0-9a-f]{8}|of-[a-z0-9-]{1,60}-(?=[a-f]*\\d)[0-9a-f]{6}";
+const REF = new RegExp(`^(?:${REF_TOKEN})$`, "i");
+const INTERNAL = `(?:${NODE_ID_TOKEN}|${REF_TOKEN})`;
+const IDS = `${INTERNAL}(?:\\s*[,;]\\s*${INTERNAL})*`;
+const PAREN_IDS = new RegExp(`\\(\\s*${IDS}\\s*\\)`, "gi");               // "(ch.basel.x)": all of it goes
+const LEAD_IDS = new RegExp(`(?<=\\()\\s*${IDS}\\s*[,;]\\s*`, "gi");        // "(ch.basel.x, CHF 128)": "(CHF 128)"
+const TRAIL_IDS = new RegExp(`(?<=\\S)\\s*[,;]\\s*${IDS}\\s*(?=\\))`, "gi"); // "(CHF 128, ch.basel.x)": "(CHF 128)"
 const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
 const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
 const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
@@ -138,13 +179,17 @@ function link(all, label, target) {
 
 function note(all, inner, offset, text) {
   const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
-  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || /^ignored:/i.test(words)) return GONE;
+  const price = THOUSANDS.test(words) || (/^[0-9]+$/.test(words) && (
+    CURRENCY_BEFORE.test(text.slice(Math.max(0, offset - 12), offset))
+    || CURRENCY_AFTER.test(text.slice(offset + all.length, offset + all.length + 12))));
+  if (!words || (CITATION.test(words) && !price) || LABEL.test(words) || NODE_ID.test(words) || REF.test(words) || /^ignored:/i.test(words)) return GONE;
   return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
 }
 
 export function withoutNotes(value) {
   const raw = String(value ?? "");
-  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link);
+  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link).replace(PAREN_IDS, GONE)
+    .replace(LEAD_IDS, "").replace(TRAIL_IDS, "");
   for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
   text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
     .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")
@@ -268,15 +313,19 @@ export function applyEvent(state, event) {
       return { ...progress(state, "tool", "Comparing offers", false, at), hotels, shortlistDone: true };
     }
     if (detail.phase === "cards") {
-      const n = (detail.cards || []).length;
+      const cards = cardsOf(detail.cards);
+      const n = cards.length;
       return { ...progress(state, "tool", `${n} hotel${n === 1 ? "" : "s"} for you`, true, at),
-               cards: detail.cards || [], cardsStep: event.step, swipes: [], deck: null, phase: "picking" };
+               cards, cardsStep: event.step, swipes: [], deck: null, phase: "picking" };
     }
     return state;
   }
 
   // Negotiation rounds arrive as signed a2a replies whose payload is a counter or an agreement.
-  if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)) {
+  // A round whose price is not a number (a hotel's own reply) changes nothing: it would break
+  // the card that shows it.
+  if (event.kind === "a2a" && event.node_id && ["counter", "agreement"].includes(detail.payload?.type)
+      && number(detail.payload.price_chf) !== null) {
     const h = hotel(state, event.node_id, event.node_name);
     const step = { price: detail.payload.price_chf, final: Boolean(detail.payload.final), type: detail.payload.type };
     const trail = [h.offer?.price_chf, ...h.rounds.map(r => r.price), step.price].filter((p, i, all) => p != null && (i === 0 || p !== all[i - 1]))
@@ -311,10 +360,15 @@ export function applyEvent(state, event) {
       return { ...progress(state, "tool", "Waiting for your approval", false, at), ...chosen, phase: "approval",
                approval: approvalOf(event, detail) };
     }
+    // the approval id is inside the signed decision (aps/approval.py sign_decision)
+    const decided = { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) };
+    // The end of an older approval while a newer one waits: only remembered (its sheet may still
+    // be finishing), the newer approval stays.
+    if (decided.id && state.approval && decided.id !== state.approval.id) return { ...state, decided };
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
     const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
-    return { ...progress(state, "tool", line, !approved, at), approval: null,
+    return { ...progress(state, "tool", line, !approved, at), approval: null, decided,
              phase: approved ? "booking" : "declined" };
   }
   return state;

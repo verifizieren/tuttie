@@ -14,7 +14,8 @@ signature that is missing:
                       "book"; `pay` has no scope: paying is never delegated), not expired
     7. agreement      if the call carries one: this business's own signed Agreement, valid, unused
     8. approval       if the action needs one: the user's signed "approved" decision for this
-                      action and this business, not used before, for exactly the amount: the
+                      action and this business, decided within APPROVAL_MAX_AGE_S, not used
+                      before, for exactly the amount: the
                       agreement's price, or else the total the business computed itself (the
                       caller's own figures are never trusted); for a payment also for exactly
                       this charge (purpose and booking)
@@ -53,17 +54,21 @@ For `pay` (the business computes what it charges):
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aps.approval import payment_charge, verify_decision
 from aps.call import CALL_MAX_AGE_S, NonceBook, call_body, verify_call
 from aps.delegation import verify_delegation
-from aps.envelope import is_fresh
+from aps.envelope import is_fresh, parse_timestamp
 from aps.mandate import mandate_refusal
 from aps.seals import evaluate_record
 
 Lookup = Callable[[str], Awaitable[dict | None]]  # node_id -> registry record, or None
 TRUSTED_TIERS = {"gold", "blue"}
+# The user approves on the phone and Tuttie waits at most 300 s for it, then books at once. An
+# older approval is refused: used approvals live in memory, so after a node restart an old one
+# would otherwise book again.
+APPROVAL_MAX_AGE_S = 900
 
 
 @dataclass(frozen=True)
@@ -123,7 +128,19 @@ class ActionGate:
         self.agreements = agreements
         self.nonces = NonceBook(CALL_MAX_AGE_S)
         self.used_approvals: set[str] = set()
+        # Used nonces and approvals live in memory only: anything signed before this gate started
+        # (a restart) may have been used already, so it never acts (made_before_start).
+        self.started_at = datetime.now(timezone.utc)
         self.paid_with_mandate: dict[str, float] = {}  # mandate id -> CHF paid with it
+
+    def made_before_start(self, timestamp: str, now: datetime) -> bool:
+        """Whether `timestamp` is from before this gate started (stamps are whole seconds).
+        A clock before the start (tests) never counts."""
+        stamped = parse_timestamp(timestamp)
+        if stamped is None or now < self.started_at:
+            return False
+        # Stamps are whole seconds: anything from an earlier second than the start is refused.
+        return stamped < self.started_at.replace(microsecond=0)
 
     async def check_action(self, call: dict, needs: Needs, now: datetime | None = None) -> Verdict:
         """Run every check for this call; never raises for bad input, refuses instead."""
@@ -144,7 +161,7 @@ class ActionGate:
             raise Refused(f"the call is for {body['tool']}, not {needs.tool}")
 
         caller = await self.lookup(body["agent_id"])
-        if caller is None or caller.get("kind") != "user-agent":
+        if not isinstance(caller, dict) or caller.get("kind") != "user-agent":
             raise Refused("the caller is not a known user agent")
         tier = evaluate_record(caller, self.authorities)["tier"]
         if tier == "broken":
@@ -156,6 +173,8 @@ class ActionGate:
 
         if not is_fresh(body["timestamp"], CALL_MAX_AGE_S, now):
             raise Refused("the call is outdated (possible replay)")
+        if self.made_before_start(body["timestamp"], now):
+            raise Refused("the call was signed before this business restarted (possible replay); send a new one")
         if not verify_call(call, caller["public_key"], needs.tool, CALL_MAX_AGE_S, now):
             raise Refused("the call is not signed by the caller's key")
         verdict.checks.append("signature")
@@ -177,7 +196,7 @@ class ActionGate:
             verdict.mandate, verdict.amount_chf = self._mandate(args["mandate"], body["agent_id"], needs, now)
             verdict.checks.append("mandate")
         elif needs.approval:
-            verdict.approval, verdict.amount_chf = self._approval(args.get("approval"), needs, verdict.agreement)
+            verdict.approval, verdict.amount_chf = self._approval(args.get("approval"), needs, verdict.agreement, now)
             verdict.checks.append("approval")
 
     def _mandate(self, mandate, agent_id: str, needs: Needs, now: datetime) -> tuple[dict, float]:
@@ -200,10 +219,13 @@ class ActionGate:
         except Exception as error:  # AgreementInvalid; its message is safe to send back
             raise Refused(str(error)) from None
 
-    def _approval(self, approval, needs: Needs, agreement) -> tuple[dict, float]:
-        """The user's signed approval for this action, this business and exactly this amount."""
+    def _approval(self, approval, needs: Needs, agreement, now: datetime) -> tuple[dict, float]:
+        """The user's signed approval for this action, this business and exactly this amount,
+        decided at most APPROVAL_MAX_AGE_S ago (and not in the future beyond the clock skew)."""
         if not isinstance(approval, dict) or not verify_decision(approval, self.user_public_key):
             raise Refused("the approval is not signed by the user")
+        if not is_fresh(approval["decided_at"], APPROVAL_MAX_AGE_S, now):
+            raise Refused("the approval is too old (or dated in the future); ask the user again")
         if (approval["action"], approval["payee_node_id"], approval["decision"]) != (needs.tool, self.node_id, "approved"):
             raise Refused(f"the approval does not approve {needs.tool} with this business")
         if approval["approval_id"] in self.used_approvals:
@@ -215,6 +237,8 @@ class ActionGate:
             raise Refused(f"approved CHF {approval['amount_chf']:g} does not match the total CHF {amount:g}")
         if needs.purpose is not None and approval.get("charge") != payment_charge(needs.purpose, needs.booking_id):
             raise Refused(f"the approval is not for the {needs.purpose} of this booking")
+        if self.made_before_start(approval["decided_at"], now):
+            raise Refused("the approval was decided before this business restarted; ask the user again")
         return approval, amount
 
     def commit(self, verdict: Verdict) -> None:

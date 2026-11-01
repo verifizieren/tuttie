@@ -113,10 +113,13 @@ def service_env(settings: dict, environ=os.environ) -> dict:
     """The environment every service starts with.
 
     It carries the agent key the services share (aps/agent_key.py): the one in code/.env or
-    the environment if set, else a new random one for this run.
+    the environment if set, else a new random one for this run; and SERVICE_HOST from
+    code/.env, where the internal services listen (hosting.py).
     """
     env = {**environ, "PYTHONUNBUFFERED": "1"}  # lines appear when printed, not when a buffer fills
     env["AGENT_WEB_KEY"] = settings.get("AGENT_WEB_KEY") or secrets.token_urlsafe(32)
+    if settings.get("SERVICE_HOST"):  # where the internal services listen (hosting.py)
+        env["SERVICE_HOST"] = settings["SERVICE_HOST"]
     return env
 
 

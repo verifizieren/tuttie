@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 
 from apidocs import api_docs
+from hosting import service_host
 
 REGISTRY_PATH = Path(__file__).resolve().parent.parent / "data" / "registry.json"
 
@@ -45,4 +46,4 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("REGISTRY_PORT", "4000")))
+    uvicorn.run(app, host=service_host(), port=int(os.environ.get("REGISTRY_PORT", "4000")))

@@ -57,8 +57,7 @@ def booking_request(liked: list[dict]) -> str:
     best, *others = sorted(liked, key=price)
     text = f"Book {best['name']} ({best['node_id']})" + (" at the agreed price." if best["agreed_chf"] is not None else ".")
     if others:
-        text += " If I decline it, I also liked: " + ", ".join(
-            f"{c['name']} ({c['node_id']}) at CHF {price(c):g}" for c in others) + "."
+        text += " If I decline it, I also liked: " + ", ".join(f"{c['name']} ({c['node_id']})" for c in others) + "."
     return text
 
 

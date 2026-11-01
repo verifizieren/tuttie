@@ -187,7 +187,9 @@ first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a d
 conversation or 300 for one client address; a room is never handed out twice.
 `POST /chat` answers 429 (`Retry-After` in seconds, a `detail` sentence for the user) after
 10 turns a minute for one browser or 600 for one client address (an IPv6 address counts by
-its /64); spoken turns (`POST /voice/say`) count towards the browser's 10. A refused body
+its /64). Spoken turns (`POST /voice/say`) have their own count: 20 a minute per browser, and an
+exact card command ("next", "like") while hotel cards can be swiped counts only towards 30 a
+minute; neither uses up the browser's 10 typed turns. A refused body
 (422, or 409 for a stale `conversation_id`) does not count as a turn. `POST /conversations`
 (new chat) answers the same 429 after 10 a minute for one browser or 120 for one client
 address; an empty chat is not kept, so resuming its id is a 410. A browser whose conversation
@@ -267,6 +269,9 @@ A payment approval carries `charge` (`aps/approval.py`, `payment_charge`):
 only if its `charge` is exactly this charge of this booking (refusal: `the approval is not for
 the <purpose> of this booking`), so a "city tax for BK-1" approval cannot pay another charge or
 booking of the same amount. Book approvals are unchanged (no `charge`).
+The gate refuses any approval whose signed `decided_at` is more than 900 s old or in the
+future beyond clock skew (`aps/gate.py` `APPROVAL_MAX_AGE_S`): used approvals live in memory, so an old one
+could otherwise book again after a node restart.
 
 `offer_mandate` is only offered for a charge above CHF 0 (`facts.charges[].price_chf` is a
 whole number from 1). If the offered mandate cannot be signed, the decision still counts
@@ -497,7 +502,10 @@ an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_
 | `GET /postings/{id}/shortlist` | best five current offers within budget: by price, grey last |
 
 `status` is `interested`, `declined`, `invited` (no clear answer) or `unreachable`.
-Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410 or 422.
+Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410, 422 or 429. `POST /postings`
+answers 429 (`Retry-After` in seconds) after 10 keyless postings a minute from one requester, unless
+the request carries the deployment's `AGENT_WEB_KEY` in `X-Agent-Web-Key` (Tuttie sends it on
+its own postings, so they are never capped). The market keeps the newest 500 postings.
 
 ### Counter-offer (either side, during negotiation; implemented in `code/negotiation/`)
 

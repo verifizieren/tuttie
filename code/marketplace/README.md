@@ -30,6 +30,9 @@ Flow:
    itself before it builds its shortlist with the private budget.
 
 Refusals are `{"refused": true, "reason": "..."}` with 403 (trust), 404, 409 (duplicate),
-410 (posting expired) or 422 (format). Postings are kept in memory until restart.
+410 (posting expired), 422 (format) or 429 (more than 10 keyless postings a minute from one requester,
+with `Retry-After`; postings that carry the deployment's `X-Agent-Web-Key`, i.e. Tuttie's own,
+are not capped). The newest 500 postings are kept in memory until restart. The market listens
+on `SERVICE_HOST` (`code/hosting.py`; set `127.0.0.1` to keep it off the public ports).
 
 Tests: `code/tests/test_marketplace.py`.

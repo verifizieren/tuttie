@@ -35,6 +35,7 @@ import useVisibleViewport from "./hooks/useVisibleViewport.js";
 import useVoice from "./hooks/useVoice.js";
 import { sendChat } from "./lib/api.js";
 import { currentTask } from "./lib/activity.js";
+import { serverDecision, sheetOf } from "./lib/approval.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 import { bookingRequest } from "./lib/picks.js";
@@ -47,6 +48,7 @@ const REVEAL_WAIT_MS = 3000;  // no speech for a new answer by then: show it in 
 const CLOSE_AFTER_MS = 900;  // after the goodbye: a moment to read it before the card closes
 const RESEND_MS = 1500;  // a message that did not reach Tuttie is sent once more after this
 const DECIDE_FIRST = "Decide on the booking first";
+const DECISION_ON_ITS_WAY = "One moment, your decision is on its way";
 const NOTICE_MS = 4000;  // a friendly note under the eyes (e.g. "still working") goes after this
 
 
@@ -64,9 +66,10 @@ export default function App() {
   const [goneApproval, setGoneApproval] = useState(null);
   const approval = agent.approval && agent.approval.id !== goneApproval ? agent.approval : null;
   // A decided approval stays on screen until its sheet has shown the final mark (the Face ID
-  // checkmark or the X) and slid away, even though the server already stopped waiting for it.
+  // checkmark or the X) and slid away, even though the server already stopped waiting for it;
+  // a newer approval (the city tax right after the booking) is shown after it.
   const [finishing, setFinishing] = useState(null);
-  const sheetApproval = approval || finishing;
+  const sheetApproval = sheetOf(approval, finishing);
   const approvalId = sheetApproval?.id;
   const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
   // Only the sheet that is finishing clears it: a late finish of an older sheet leaves a newer one.
@@ -145,7 +148,9 @@ export default function App() {
   // A new conversation from the dock: the current one goes into the history.
   async function newChat() {
     setShowHistory(false);
-    if (approval) return setNotice(DECIDE_FIRST);  // the user must decide the waiting approval first
+    // Never a new chat under the sheet: a decision on its way finishes first, a waiting one needs the user.
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);
+    if (approval) return setNotice(DECIDE_FIRST);
     try {
       await actions.newConversation(agent);
       setError("");
@@ -170,7 +175,8 @@ export default function App() {
 
   // The dock's History button always shows the list, also from inside a past chat.
   function openHistory() {
-    if (approval) return setNotice(DECIDE_FIRST);  // the sheet covers the card: never open the history under it
+    if (finishing) return setNotice(DECISION_ON_ITS_WAY);  // the sheet covers the card: never open the history under it
+    if (approval) return setNotice(DECIDE_FIRST);
     setHistoryChat({ id: null, error: "", resuming: false });
     setShowHistory(true);
   }
@@ -282,7 +288,7 @@ export default function App() {
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
         {sheetApproval && <Boundary key={approvalId} fallback={<ApprovalFallback approval={sheetApproval} onGone={() => { dropApproval(); sheetDone(); }} />}>
-          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice}
+          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice} recorded={serverDecision(agent, approvalId)}
                          onDecide={setFinishing} onFinished={sheetDone} />
         </Boundary>}
       </AgentCard>

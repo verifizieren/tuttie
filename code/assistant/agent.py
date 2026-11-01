@@ -12,8 +12,9 @@ import httpx
 
 from assistant.card_commands import card_choice
 from assistant.events import EventBus
-from assistant.tools import SCHEMAS, Toolbox
+from assistant.tools import SCHEMAS, Toolbox, chf
 from llm import LLM
+from speech import said_times
 
 MAX_ROUNDS = 12
 log = logging.getLogger(__name__)
@@ -40,14 +41,17 @@ you use the agent web, a network where every business is a signed node (hotels a
 The user lives in Switzerland; a system message gives today's date.
 
 How you sound:
-- Like a capable friend on the phone: warm, natural and brief. One to three short sentences.
+- Like a capable friend on the phone: warm, natural and brief. One to three short sentences, never more: \
+when you refuse or cannot do something, one sentence for why and at most one for what you can do. \
+If that is a booking they want, start it right away (the phone asks them) instead of asking "shall I go ahead?".
 - Say what matters now. Never narrate tools or steps; the wallet shows them. Your answer is \
 only what you say to the user: no notes to yourself about what you will do or report.
 - Always English, whatever language the message is in (speech may be misheard as another one).
 - Plain sentences only: no lists, markdown, emoji or anything in square brackets.
 - Never say ids or codes (node ids, booking ids, receipt numbers): the wallet shows them.
 - Say numbers as people do: "CHF 128", "6 pm", "8:30 pm", "12:52 am" (never "18:00"), \
-"14 November", "about 9 degrees", "a 25 percent chance of rain".
+"14 November", "about 9 degrees", "a 25 percent chance of rain". Name a weekday only as a tool \
+result gives it (the "night" field), never one you worked out.
 - Small talk is welcome, with a bit of personality, and needs no tools.
 
 Priorities, highest first:
@@ -68,22 +72,28 @@ calendar (pass them as date, nights and guests). \
 When the user names no date, use the check-in date the calendar names, even when the arrival is \
 after midnight. If post_request refuses the date or the nights, tell the user and ask; never \
 post another date or length instead. Private items (e.g. the budget) go only into budget_chf: never into \
-requirements, messages to businesses or your answers.
+requirements or messages to businesses, and never say the budget amount unless they ask for it (others may \
+hear it: say "within" or "above your budget").
 2. Call post_request with only public needs in requirements and tags (tags are places only). It \
 collects the signed offers, bargains (budget private) and returns cards with the agreed prices, \
 which the user swipes (right = like, left = pass). Then say in two short sentences how many \
 hotels you found and which one you would pick and why (one reason that matters to them, e.g. \
-"quiet and takes Luna"). The wallet then hands the choice to the user; do not ask whether to book \
-and do not book yet: the user chooses first.
-3. When the user asks to book a hotel (its node id is in parentheses), book it right away. If \
+"quiet and takes Luna"), under 40 words. Nothing more: not the other hotels, not swiping, not the policies. The \
+wallet then hands the choice to the user; do not ask whether to book and do not book yet: the \
+user chooses first.
+3. When the user picks a hotel to book, in any words (its node id in parentheses, its name, "the \
+cheapest" or "the most expensive", or "yes, that one" after you offered it), book it right away, \
+also without an agreement or above their budget. If \
 post_request got an agreement with it, call book with use_agreement=true and without room_type, date or extras: the agreement fixes them. \
-Otherwise get its availability with call_tool, ask its agent with ask_agent for one commitment \
-covering the user's special needs together (arrival time, pets, children), then call book with \
-the commitment's item as an extra. Never ask for confirmation in chat: the phone does that.
+Otherwise get its availability with call_tool and take the cheapest rate that fits, ask its agent \
+with ask_agent for one commitment covering the user's special needs together (arrival time, pets, \
+children), then call book with the commitment's item as an extra. Never ask for confirmation in chat: the phone does that.
 4. When book returns "confirmed", the user has approved: say it is booked and the total in one \
 sentence, and mention charges_paid (already paid with their mandate) or open_charges (pay one \
-with pay only if they ask). If they declined and the user's message named other liked hotels, \
-offer the next one with its price in one short question; otherwise say so and stop.
+with pay only if they ask). That is all: no other hotels, nothing about declining. If book \
+returns "declined" and the user's message named other liked hotels, offer the next one by name in \
+one short question, without a price (its booking may cost something else; the phone shows the \
+total); otherwise say so and stop.
 5. Call negotiate only when the user asks for a better price again. Use call_tool for signed \
 facts (get_availability, get_policies) and search_registry only for what the marketplace does \
 not cover. Never invent facts. A question about a hotel (check-in, dogs, cancellation, address) \
@@ -125,12 +135,59 @@ def drop_notes(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+# A user message about their own budget: then the number may be said ("budget hotel", "limited"
+# and "spend the night" are not about it).
+ASKED_BUDGET = re.compile(r"budget(?! rooms| hotels?)|\blimit\b|maximum|\bmax\b|\bspend\b(?! the night)"
+                          r"|how much (?:can|did) i|ausgeben|wie viel", re.IGNORECASE)
+
+
+def without_budget(text: str, amounts: set[int]) -> str:
+    """The answer without the user's private budget amount in phrases about *their* budget ("your
+    CHF 160 budget" -> "your budget", "within your CHF 160" -> "within your budget"): others hear
+    Tuttie. Prices and hotel facts stay; `amounts` empty (the user asked) leaves the text as is."""
+    for n in amounts:
+        chf = rf"CHF\s?{n}(?:\.-|\.00)?(?![\d.,]\d|\d)"
+        text = re.sub(rf"\b(your) {chf} (budget|limit|maximum|cap)\b", r"\1 \2", text, flags=re.IGNORECASE)
+        text = re.sub(rf"\b(your) (budget|limit|maximum|cap) of {chf}", r"\1 \2", text, flags=re.IGNORECASE)
+        text = re.sub(rf"\b(within|under|over|above|below) your {chf}", r"\1 your budget", text,
+                      flags=re.IGNORECASE)
+    return text
+
+
+def first_sentences(text: str, count: int) -> str:
+    """The first `count` sentences of `text` (a sentence ends with . ! or ? before a space and a
+    capital letter, so "CHF 12.50" stays whole)."""
+    parts = re.split(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])", text.strip())
+    return " ".join(parts[:count])
+
+
 def fallback_answer(said_goodbye: bool) -> str:
     """What Tuttie says when the model's final message was empty after cleaning: a short goodbye
     when end_conversation ran this turn (the model often writes only "Mood: happy" then)."""
     if said_goodbye:
         return f"Bye, {GUEST_NAME.split()[0]}! Enjoy Basel."
     return "Sorry, I didn't catch that."
+
+
+def done_answer(tool: str, result) -> str | None:
+    """What Tuttie can say from code alone once `tool` did its work this turn (the cards are on
+    screen, or the hotel signed the booking), so a failing LLM round after it never says "try
+    again"; None when the tool did not get that far."""
+    if not isinstance(result, dict):
+        return None
+    if tool == "post_request" and isinstance(result.get("cards"), list) and result["cards"]:
+        count = len(result["cards"])
+        hotels = "1 hotel" if count == 1 else f"{count} hotels"
+        return f"I found {hotels}; swipe through them and pick the ones you like."
+    if tool == "book" and result.get("status") == "confirmed":
+        # The registry's name (set by Tuttie), never the hotel's own signed "hotel" text.
+        hotel = " ".join(str(result.get("hotel_name") or "the hotel").split())[:60]
+        total = chf(result.get("total_chf"))
+        answer = f"It's booked: {hotel}" + (f", CHF {total}." if total != "?" else ".")
+        if result.get("mismatch"):
+            answer += " It differs from what you approved; the wallet shows how."
+        return answer
+    return None
 
 
 def split_mood(text: str) -> tuple[str, str]:
@@ -150,6 +207,7 @@ class Assistant:
         self.toolbox = toolbox
         self.bus = bus
         self.lock = asyncio.Lock()
+        self.done: str | None = None  # this turn's answer from code (done_answer), if any
         self.reset()
 
     def reset(self) -> None:
@@ -169,14 +227,18 @@ class Assistant:
                 self.bus.emit("answer", "verified", answer, detail={"mood": "confused"})
                 return answer
             start = len(self.messages)
+            self.done = None  # set by _turn once cards were shown or a booking was confirmed
             try:
                 return await self._turn(text, first_tool)
             except Exception:  # e.g. the LLM provider is down or over its limit: answer instead
                 log.exception("turn failed")
                 self.close_open_calls(start)
-                answer = "I can't think right now, please try again in a moment."
+                answer = self.done or "I can't think right now, please try again in a moment."
                 self.messages.append({"role": "assistant", "content": answer})
-                self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
+                if self.done:
+                    self.bus.emit("answer", "verified", answer, detail={"mood": "happy"})
+                else:
+                    self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
                 return answer
             except asyncio.CancelledError:
                 self.close_open_calls(start)
@@ -206,6 +268,7 @@ class Assistant:
                 self.bus.emit("answer", "verified", answer, detail={"mood": "neutral"})
                 return answer
         said_goodbye = False
+        showed_cards = False
         for round_ in range(MAX_ROUNDS):
             # Refresh facts on every completion, so follow-ups cannot rely only on old chat text.
             notes = [{"role": "system", "content": today_note()}]
@@ -224,17 +287,28 @@ class Assistant:
             self.messages.append(message)
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
-                answer = drop_notes(answer) or fallback_answer(said_goodbye)
+                answer = said_times(drop_notes(answer)) or fallback_answer(said_goodbye)
+                if showed_cards:  # read aloud while the user looks at the cards: pick and reason only
+                    answer = first_sentences(answer, 2)
+                asked = ASKED_BUDGET.search(text)
+                private = getattr(self.toolbox, "private_amounts", None)
+                answer = without_budget(answer, set() if asked or private is None else private())
                 self.bus.emit("answer", "verified", answer, detail={"mood": mood})
                 return answer
             for call in message["tool_calls"]:
                 said_goodbye = said_goodbye or call["function"]["name"] == "end_conversation"
                 result = await self.run_tool(call["function"]["name"], call["function"]["arguments"])
+                self.done = done_answer(call["function"]["name"], result) or self.done
+                showed_cards = showed_cards or (call["function"]["name"] == "post_request"
+                                                and isinstance(result, dict) and bool(result.get("cards")))
                 self.messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
                     "content": json.dumps(result, ensure_ascii=False),
                 })
+        if self.done:  # the work got done (cards shown, booking signed); only the talk ran out
+            self.bus.emit("answer", "verified", self.done, detail={"mood": "happy"})
+            return self.done
         answer = "Sorry, I could not finish this request."
         self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
         return answer

@@ -17,7 +17,9 @@ from fastapi import FastAPI, Request as HttpRequest
 from fastapi.responses import JSONResponse
 
 from apidocs import api_docs
+from aps import agent_key
 from aps.keys import load_public_key
+from hosting import service_host
 from marketplace.market import Market, MarketError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -47,12 +49,15 @@ def create_app(http: httpx.AsyncClient | None = None) -> FastAPI:
     @app.exception_handler(MarketError)
     async def refused(_: HttpRequest, error: MarketError) -> JSONResponse:
         """Every refusal says why, so the sender's agent can show or fix it."""
-        return JSONResponse({"refused": True, "reason": error.reason}, status_code=error.status)
+        headers = {"Retry-After": str(error.retry_after)} if error.retry_after else None
+        return JSONResponse({"refused": True, "reason": error.reason}, status_code=error.status, headers=headers)
 
     @app.post("/postings", status_code=201)
-    async def post_request(envelope: dict) -> dict:
+    async def post_request(envelope: dict, http_request: HttpRequest) -> dict:
         """Accept a signed request and wake the matching business agents."""
-        return await app.state.market.post_request(envelope)
+        key = http_request.headers.get(agent_key.HEADER)
+        keyed = bool(agent_key.current()) and agent_key.allowed(key)
+        return await app.state.market.post_request(envelope, keyed=keyed)
 
     @app.post("/postings/{request_id}/offers", status_code=201)
     async def post_offer(request_id: str, envelope: dict) -> dict:
@@ -72,4 +77,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host=service_host(), port=PORT)

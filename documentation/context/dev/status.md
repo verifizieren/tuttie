@@ -6,10 +6,101 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
+Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not merged; the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
 
 ## Done
 
+- **Round 11 (owner view)**: `?node=` is used only for the page's own host or localhost (the owner
+  token never goes to a linked server); a deploy without an available room is refused, a left-out
+  `facts.negotiation` keeps the live floor (the owner view sends `null` to end bargaining); public
+  facts are capped at 8000 characters per hotel prompt; a stored version that fails today's checks is
+  skipped (logged) instead of stopping the node and the whole service; the change list keys add-ons by `id`.
+- **Round 10 (closing)**: a deploy reaches every phone on its next load (`Cache-Control: no-cache`
+  on the apps' unhashed files, service worker fetches with `cache: "no-cache"`, `CACHE` v3; reload the
+  presenter phone after a deploy anyway); a hotel's malformed signed session reply skips that hotel
+  instead of sinking all bargaining (`assistant/subagents.py`); a free (CHF 0) signed add-on books. A hand-started stack without `AGENT_WEB_KEY` shares the keyless 10 postings/min across all users
+  (run.sh/run_all.py always set a key). The service worker caches only successful answers. The action gate refuses calls and approvals stamped before
+  it started (whole-second stamps), so nothing captured before a node restart books again. After a
+  decline the very next yes books the offered hotel at once, for the room of its card offer
+  (the cards summary names each card's room; a room the user asks for is still bookable). The private budget amount is dropped
+  from answer phrases like "your CHF 160 budget" unless the user asks about the budget (`agent.without_budget`).
+  A double tap on Send sends the words once (`lib/sendGuard.js`).
+  The same message sent twice at once from two tabs (or a retype) joins the running turn on the server,
+  and the wallet drops its local copy (`bindTurn`); card commands stay separate swipes.
+  Private context never reaches a business: questions to a hotel (`ask_agent`) are refused and posted
+  requirements dropped when they name a private place, person, train or time (`tools.private_terms`).
+  Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
+  owner page's direct node fetch then works only on the server itself). A booking without a deal for
+  another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
+  keeps two sentences. A booking is in the user's name unless said otherwise (Tuttie never asks for it).
+  Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
+  owner page's direct node fetch then works only on the server itself). A booking without a deal for
+  another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
+  keeps two sentences.
+- **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
+  never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
+  pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
+  the booking path (`tools.finite_price`/`chf`, the timeline shows "?"); `post_request` and `book`
+  return `night` ("Saturday 14 November") and the prompt names a weekday only from it (Tuttie said
+  "Friday" for a Saturday); answers say 24-hour times as people do on screen too ("12:52 am",
+  `code/speech.py`, shared with the voice).
+- **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
+  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `127.0.0.1` since the end of the night); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). Caveat: the owner page fetches `<host>:4009/owner/...` straight from the browser, so with loopback binding it only works on the server itself. The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
+  - The marketplace takes at most 10 keyless postings per requester a minute (only outsiders: wallet users post through Tuttie with the key) (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
+  - The action gate refuses an approval whose signed `decided_at` is over 900 s old or in the future (after a node restart an old approval no longer books again).
+  - `registry_lookup` (negotiation/hotel.py) looks up only node-id-shaped ids and returns only dict records; `../search` gave a 500 on `/tools/counter_offer` and made the gate raise.
+- **Round 6 (overnight)** (branches `fix/r6-trust`, `fix/r6-approval-sheet`, `fix/r6-voice`,
+  `overnight/harden`, merged for testing on `overnight/integration`, not on main, not deployed):
+  - Trust: a verified hotel's signed agent card and `get_policies` profile are type-checked and
+    cleaned (`assistant/cards.py` `clean_text`/`profile_of`: agent name max 60 chars, profile
+    `size` 20, `about` 500, no control or RTL/format characters; rating only as numbers), so a
+    non-dict persona no longer crashes every search. The card is fetched once per hotel per
+    search and the offer deadline is checked per offer; malformed relayed offers are dropped.
+    `aps/canonical.py` `b64decode` accepts only canonical base64 and used commitments are keyed
+    by signature bytes (a re-encoded signature could be redeemed twice).
+  - Wallet approval sheet: finishes on the streamed `decided` event (approval id read from
+    `detail.decision.approval_id`, existing shape) when the POST answer is lost; `decide()`
+    gives up after 15 s (`DECIDE_TIMEOUT_MS`) and offers another try; New chat / History wait
+    for a decision on its way instead of opening under the sheet. Booking message names the
+    other liked hotels without card prices.
+  - Voice: spoken turns have their own budget (`VOICE_TURNS_PER_SESSION_PER_MIN` = 20/min per
+    browser); exact card commands count only towards `CARD_COMMANDS_PER_SESSION_PER_MIN` = 30/min
+    and only while a card can be swiped (else they are normal voice turns); `/voice/diag` logs one
+    clean line, max 10/min per address. `follow()` reconnects (0.5 s doubling to 10 s, stops on
+    404/409) instead of going mute; while the Face ID sheet is up a spoken line gets "Please
+    approve or decline on your phone first." (at most every 5 s) instead of queueing; Face ID is
+    asked once per approval; node/approval/offer/mandate/request ids and web addresses are never
+    read aloud; "for 00:52" is a clock time; CHF 1'280 (or 1 280 with a no-break space) is one
+    amount, a plain space never joins two numbers ("CHF 128 100 percent"); no filler on swipes;
+    no "swipe right" handoff line when the cards answer already says to swipe.
+  - Tuttie (`overnight/harden`): Claude prompt caching of the fixed prompt + tools (`llm.py`,
+    round notes stay an uncached second system block; ~90 % cheaper input, latency unchanged);
+    after `recall_context` for a hotel it posts the request in the same turn; cards answer = pick
+    + one reason; after booking only "booked" + total (the `book` result carries an LLM-facing
+    `note`); after a decline one other hotel by name, no price; "yes, book that one" books
+    without an agreement at the cheapest fitting rate; the budget amount is said only when the
+    user asks for it. A hotel's signed confirmation never fills Tuttie's own `book` result keys
+    (`node_id`, `source_step`, `note`, `charges_paid`, `open_charges`, `mismatch`); a non-number
+    `total_chf` counts as a mismatch. After a decline Tuttie offers only a hotel the user's
+    message named as liked (else it just stops). `/reset` also forgets the old posting and its
+    offers (`MarketDesk.forget`).
+  - Trust, numbers: NaN, Infinity and integers too big for a float never reach events or cards:
+    `mcp_client` refuses an MCP reply holding them, `EventBus.emit` turns any non-finite float
+    into null (SSE frames and `/history` stay valid JSON), `cards.number()` accepts only finite
+    numbers (a 400-digit integer is no OverflowError), card ratings only 0..5, and an offer whose
+    price is not a finite number is dropped.
+  - Wallet sheet and cards (after the first pass): a `decided` event for an older approval never
+    closes a newer sheet; the city tax sheet waits until the booking's checkmark was shown
+    (`sheetOf`); a sheet replaced mid-decision tells the wallet, so no ghost sheet stays; the
+    streamed decision also finishes the sheet after the 15 s timeout or a "gone" answer
+    (`finishesOn`). A newly shown sheet ignores finger taps for 600 ms (`ARM_MS`, its slide-in),
+    judged by the pointerdown time or, for assistive taps without one, the click time;
+    `button.click()` (keyboard, keynote deck) always counts. Hotel cards pass through `cardOf`
+    (shown fields are plain text, finite numbers or null; rating only 0..5); a late agreement
+    whose price is not a number is ignored; long hotel names clamp to two lines.
+  - Note: the LLM behaviour eval used overnight (real Haiku, 24 scenarios) lives outside the repo
+    (`/home/baselhack/overnight/eval`). Left open: 24-hour times on screen, long answers outside
+    the pitch path, re-dating after the cards.
 - **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Alex! Enjoy Basel."; the model is told when no deals exist yet.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
@@ -485,8 +576,9 @@ Why things are the way they are, so nobody has to rediscover them:
   and after each deploy: `create_app` works on that copy, tools read `facts()` per call,
   `BusinessAgent.apply` re-reads persona and facts, and `CounterOfferTool.limits` / `add_ons`
   are properties, so no restart or rebuilt router is needed. A deploy carries the version it
-  started from (`base_version`); a stale one gets 409. A damaged deployment file stops the node
-  at start: it must never run with other prices than the owner deployed. Rolling back is
+  started from (`base_version`); a stale one gets 409. A deployment file that is not JSON stops
+  the node at start; a single version that fails today's checks is skipped (logged, kept on disk)
+  and the newest valid one is live. Rolling back is
   deploying an old version again, so history only grows. Drafts live in the owner's browser.
     Tests never read the machine's real deployments: `tests/conftest.py` points `OWNER_DATA_DIR`
     at a temporary folder (a deploy made while trying the owner view once broke two unrelated
@@ -726,6 +818,12 @@ Why things are the way they are, so nobody has to rediscover them:
   nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
 - **Round 5b (1 Nov):** an offer's name/uid come from the sealed registry record and agent/profile
   from the hotel's signed agent card (never the market's relay); card photos only `hotels/<node_id>/<file>.jpg|png|webp`.
+- **Round 11 faults (1 Nov):** one slow piece no longer sinks a search: POST /postings waits
+  60 s (`marketplace/client.py` `POST_TIMEOUT_S`, above the market's 20 s card + 20 s wake), a
+  failed offer poll keeps polling, an unknown add-on id is dropped (the hotel still offers), a
+  registry blip refuses only that call and `negotiate_all` isolates each hotel, MCP calls give up
+  after 15 s (`CALL_TIMEOUT_S`). An LLM error after the cards or a confirmed booking answers from
+  code ("I found 3 hotels; swipe...", "It's booked: <hotel>, CHF 128.") instead of "try again".
 
 ## Environment
 

@@ -12,6 +12,7 @@ checks (negotiation/hotel.py). This module only describes the tools; the node do
 from collections.abc import Callable
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 
 INSTRUCTIONS = ("Tools of one business on the agent web. Every result is a signed envelope "
                 "(node_id, timestamp, payload, signature): verify it against the business's registry "
@@ -66,7 +67,10 @@ def mcp_app(server: MCPServer):
 
     Stateless with plain JSON answers: every call stands alone, like the signed tools themselves.
     A business is a public service that any agent may reach, so the host check against DNS
-    rebinding (meant for servers on a user's own machine) is not used.
+    rebinding (meant for servers on a user's own machine) is not used. It is switched off
+    explicitly, not derived from the bind address: the SDK turns it on for a "127.0.0.1" host,
+    and with SERVICE_HOST=127.0.0.1 (hosting.py) the bind address alone decides who connects.
     """
     return server.streamable_http_app(streamable_http_path="/", stateless_http=True, json_response=True,
-                                      host="0.0.0.0")
+                                      transport_security=TransportSecuritySettings(
+                                          enable_dns_rebinding_protection=False))

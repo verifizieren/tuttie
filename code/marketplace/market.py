@@ -19,6 +19,8 @@ which builds the shortlist (assistant/marketplace.py). No LLM runs here.
 
 import asyncio
 import re
+import time
+from collections import deque
 from datetime import datetime, timezone
 
 import httpx
@@ -35,15 +37,21 @@ MAX_CARD_AGE_S = 300  # a node signs its agent card on every GET; an older card 
 INVOKE_TIMEOUT_S = 20  # a business agent may run an LLM before it answers the wake-up
 TRUSTED_TIERS = ("gold", "blue")  # untrusted (grey) and broken businesses are never woken
 EVENT = "posting.created"
+# Every posting wakes every subscribed hotel (two paid LLM calls each), and the demo keys are
+# public: so postings are limited per requester. All wallet users share Tuttie's agent id, so the
+# limit leaves room for a full room scanning the QR code at once.
+POSTINGS_PER_MIN = 10  # keyless postings a minute per requester: only outsiders (Tuttie sends the agent key)
+MAX_OPEN_POSTINGS = 500  # postings kept in memory; the oldest is dropped beyond this
 
 
 class MarketError(Exception):
     """A refused message; `status` is the HTTP status the app answers with."""
 
-    def __init__(self, reason: str, status: int = 422):
+    def __init__(self, reason: str, status: int = 422, retry_after: int | None = None):
         super().__init__(reason)
         self.reason = reason
         self.status = status
+        self.retry_after = retry_after  # seconds, for a Retry-After header (429)
 
 
 def utc(now: datetime | None) -> datetime:
@@ -61,7 +69,8 @@ class Market:
         self.authorities = authorities
         self.user_public_key = user_public_key  # the (demo) user whose delegation Tuttie carries
         self.public_url = public_url.rstrip("/")  # how businesses reach this market
-        self.postings: dict[str, dict] = {}
+        self.postings: dict[str, dict] = {}  # oldest first (insertion order)
+        self.recent_postings: dict[str, deque] = {}  # requester id -> times of its postings this minute
 
     # --- registry ---------------------------------------------------------------------
 
@@ -88,8 +97,13 @@ class Market:
 
     # --- postings ---------------------------------------------------------------------
 
-    async def post_request(self, envelope: dict, now: datetime | None = None) -> dict:
-        """Accept a signed Request from a user agent and wake the matching businesses."""
+    async def post_request(self, envelope: dict, now: datetime | None = None, keyed: bool = False) -> dict:
+        """Accept a signed Request from a user agent and wake the matching businesses.
+
+        `keyed`: it came with this deployment's agent key (aps/agent_key.py), so from its own
+        Tuttie: the demo signing keys are public, so only keyless postings meet the cap and an
+        outsider's burst can never lock the real wallet users out.
+        """
         requester_id = envelope.get("node_id") if isinstance(envelope, dict) else None
         record, verdict = await self.record(requester_id)
         if record.get("kind") != "user-agent":
@@ -106,6 +120,8 @@ class Market:
             raise MarketError("request has already expired")
         if request.request_id in self.postings:
             raise MarketError("request_id already posted", 409)
+        if not keyed:
+            self.throttle(record["node_id"])
 
         posting = Posting(
             request_id=request.request_id,
@@ -117,8 +133,24 @@ class Market:
         entry = {"posting": posting.model_dump(), "request": request.model_dump(mode="json"),
                  "requester_tier": verdict["tier"], "invited": {}, "skipped": {}, "offers": []}
         self.postings[request.request_id] = entry
+        while len(self.postings) > MAX_OPEN_POSTINGS:
+            del self.postings[next(iter(self.postings))]
         await self.wake(posting, [request.category, *request.tags], entry)
         return self.view(request.request_id)
+
+    def throttle(self, requester_id: str) -> None:
+        """Count one posting for `requester_id`; refuse it (429) beyond POSTINGS_PER_MIN a minute.
+
+        Only requesters in the registry get here, so the table stays small.
+        """
+        now = time.monotonic()
+        times = self.recent_postings.setdefault(requester_id, deque())
+        while times and now - times[0] > 60:
+            times.popleft()
+        if len(times) >= POSTINGS_PER_MIN:
+            raise MarketError("too many postings right now, try again in a minute", 429,
+                              retry_after=max(1, int(times[0] + 60 - now) + 1))
+        times.append(now)
 
     async def wake(self, posting: Posting, tags: list[str], entry: dict) -> None:
         """Wake every matching, verified business that subscribed to new postings, in parallel.
