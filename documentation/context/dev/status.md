@@ -6,10 +6,15 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
+Last updated: 2026-11-01 (QR page: APS and two-layer web sections ported from `qr-aps`; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
+- **QR page APS and agent web (1 Nov)**: ported the sections from `qr-aps` into the current
+  `code/apps/qr/` site. "A fair chance." replaces the business heading and 7 / 220 room cards.
+  "One web. Two layers." includes the responsive diagram and a nested APS explanation with
+  a smaller heading and divider. Adapted to the current purple accents and no-eyebrow design;
+  retained the 5 % fee, reverse marketplace, source figures, bank cards and story demo.
 - **Design rules (1 Nov)**: black/white with blue #2f6fe0, purple #7a5af8, pink #e5489b accents, no
   orange, no italic, no small labels above headings, no URL text, pill buttons; the top seal tier is
   purple. Wallet, owner (now light), QR page and `/pitch/` follow them. The QR page has

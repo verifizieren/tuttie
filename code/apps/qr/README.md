@@ -20,15 +20,21 @@ What it shows, top to bottom (little text on purpose):
 4. **Under the hood:** what is signed, for technical readers (seals, offers and agreements,
    delegation, approval, mandate, prices from signed data). Keep it true to `code/aps/`.
 5. **It searches, checks, bargains; you tap:** the kinds of businesses and the seal colours.
-6. **For businesses:** 7 rooms vs 220, the commission an agency takes on a CHF 135 night
+6. **For businesses:** "A fair chance." Matches on signed facts, needs and budget, without
+   the room-count comparison cards. The commission an agency takes on a CHF 135 night
    (15–18 %) against Tuttie's 5 % per signed booking (CHF 6.75), bars to scale. No invented
    market numbers.
-7. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
+7. **The agent web:** "One web. Two layers." Websites remain for people; agents exchange
+   signed facts and offers alongside them. A responsive HTML/CSS and inline SVG diagram
+   shows the two layers, ownership links and APS exchanges, with a screen-reader description.
+   **APS** follows as a nested "Trust, signed." subsection about sender identity, offer
+   integrity and user permission, with a smaller heading and a subtle divider.
+8. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
    one progress segment per part, tap right = next part, tap left = previous part, press and
    hold = pause, arrow keys (Space pauses) and side arrows on desktop. It follows the real
    wallet's screens and wording. Dark "behind the screen" callouts explain what happens out of
    sight. At the end: Replay on the phone and a textless chevron to scroll on.
-8. **Close:** throughline, "Watch it again", the honesty line, team, a "Code on GitHub" pill.
+9. **Close:** throughline, "Watch it again", the honesty line, team, a "Code on GitHub" pill.
 
 A small textless arrow brings you back to the top once you are past the hero.
 
