@@ -723,6 +723,7 @@ html #try .try-row .qr { margin-top: 0; }
 .at-gather #cam { opacity:1; transform:translate3d(380px, 0, 0) scale(1); transition:transform .7s var(--cam) .4s, opacity .2s ease .4s; }
 .at-gather #shadow { opacity:.8; transform:translateX(380px); transition:transform .7s var(--cam) .4s, opacity .4s ease .6s; }
 .at-gather #market { transform:translateX(-430px); transition:opacity .45s ease, transform .7s var(--cam) .4s; }
+.wait-voice #cam, .wait-voice #shadow { opacity: 0; }
 </style>
 </head>
 <body>
@@ -1220,12 +1221,18 @@ function go(i, fromAuto = false) {
   const fwd = i === cur + 1 || (fromAuto && i > cur);
   timers.forEach(clearTimeout); timers = [];
   sfx.stopClips();
-  if (fwd && i === 6) sfx.play("checkEmOut");  // #5 -> #6: the line starts as the slide changes
   cur = i;
   const name = STEPS[i], now = performance.now();
   STEPS.forEach((n, k) => { if (k > i) delete startedAt[n]; else if (k === i) startedAt[n] = fwd ? now : now - 1e5; else if (!fwd || startedAt[n] === undefined) startedAt[n] = now - 1e5; });
   const keep = ["notes", "auto"].filter(c => stage.classList.contains(c));
   stage.className = [...STEPS.slice(0, i + 1).map(n => "has-" + n), "at-" + name, fwd ? "fwd" : "jump", ...keep].join(" ");
+  // #5 -> #6: "check 'em out" (1.45x) starts as the slide changes; the phone appears when it ends.
+  if (fwd && i === 6) {
+    stage.classList.add("wait-voice");
+    const show = () => { if (cur === 6) stage.classList.remove("wait-voice"); };
+    sfx.play("checkEmOut", { rate: 1.45, onEnd: show });
+    later(show, 3000);  // never keep the phone hidden longer than the line
+  }
   if (name === "like") stage.classList.add("at-swipe");   // the like is the second half of the swipe scene
   $("#notes").innerHTML = SHOTS[i][2] ? `<b>${i}</b>${SHOTS[i][2]}` : "";
   history.replaceState(null, "", "#" + i);
@@ -1286,7 +1293,15 @@ const sfx = (() => {
   // Recorded lines (audio/): played as files; they need the same first key or click.
   const clips = { checkEmOut: new Audio("audio/check-em-out.mp3"), seeYou: new Audio("audio/see-you.mp3") };
   Object.values(clips).forEach(a => { a.preload = "auto"; });
-  function play(name) { const a = clips[name]; if (!a) return; try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) {} }
+  function play(name, { rate = 1, onEnd } = {}) {
+    const a = clips[name]; let done = false;
+    const end = () => { if (!done) { done = true; a && a.removeEventListener("ended", end); onEnd && onEnd(); } };
+    if (!a) return end();
+    try {
+      a.currentTime = 0; a.playbackRate = rate; a.preservesPitch = true; a.addEventListener("ended", end);
+      const p = a.play(); if (p) p.catch(end);  // blocked (no key or click yet): carry on without it
+    } catch (e) { end(); }
+  }
   function stopClips() { Object.values(clips).forEach(a => { try { a.pause(); } catch (e) {} }); }
   return {
     play, stopClips,
