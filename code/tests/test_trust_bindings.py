@@ -168,6 +168,15 @@ def wake_with(monkeypatch, record: dict, card: dict) -> tuple[list, dict]:
     return keys_sent, entry
 
 
+def test_an_old_agent_card_is_not_accepted_even_at_the_sealed_endpoint(monkeypatch):
+    record = copy.deepcopy(REGISTRY["ch.basel.hotel-rheinblick"])
+    old = sign_envelope(record["node_id"], {"wakes_on": [market_mod.EVENT]},
+                        load_signing_key(record["node_id"]), timestamp="2020-01-01T00:00:00Z")
+    keys_sent, entry = wake_with(monkeypatch, record, old)
+    assert keys_sent == []
+    assert entry["skipped"][record["node_id"]]["reason"] == "no verifiable agent card"
+
+
 def test_a_fresh_card_at_the_sealed_endpoint_wakes_the_agent(monkeypatch):
     record = copy.deepcopy(REGISTRY["ch.basel.hotel-rheinblick"])
     card = sign_envelope(record["node_id"], {"wakes_on": [market_mod.EVENT]}, load_signing_key(record["node_id"]))
