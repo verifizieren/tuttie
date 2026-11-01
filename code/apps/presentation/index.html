@@ -360,6 +360,87 @@ footer a { color: var(--muted); }
   .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
   .cue i, .edge, .steps li.active .dot, .fscan { animation: none !important; }
 }
+
+/* ---------- No browser scrollbar: the page reveals itself by scrolling ---------- */
+html { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ---------- The wallet as it looks now (apps/wallet/src/wallet.css) ---------- */
+.chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90,68,28,.55); stroke-width: 1; }
+.chip { overflow: hidden; }
+.deck { height: auto; display: flex; flex-direction: column; gap: 8px; }
+.deck-stack { position: relative; height: 392px; }
+.sw { opacity: 0; transform: scale(.95) translateY(10px); transition: transform .45s var(--ease), opacity .45s var(--ease); }
+.sw.next { opacity: .6; }
+.sw.top { opacity: 1; transform: none; z-index: 2; }
+.sw.top.lean-r { transform: translateX(46px) rotate(3deg); }
+.sw.top.lean-l { transform: translateX(-46px) rotate(-3deg); }
+.sw.right { transform: translate(520px, 40px) rotate(29deg); opacity: 1; z-index: 3; }
+.sw.left { transform: translate(-520px, 40px) rotate(-29deg); opacity: 1; z-index: 3; }
+.hbars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 4; display: flex; gap: 4px; }
+.hbars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
+.hbars i.on { background: #fff; }
+.sw-price small { font-size: 11px; color: var(--muted); letter-spacing: .01em; }
+.dcount { margin: 0; }
+.deck-note { margin: 0 4px; font-size: 13px; line-height: 1.35; color: var(--muted); text-align: center; }
+.hotel { border-radius: 16px; background: var(--panel2); border: 1px solid var(--green); animation: rise .45s var(--ease) both; }
+.hotel-line { display: flex; align-items: center; gap: 10px; padding: 11px 14px; }
+.hotel-name { flex: 1; font-size: 15px; font-weight: 600; }
+.hotel-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.price { font-size: 15px; white-space: nowrap; }
+.price s { color: var(--dim); margin-right: 2px; }
+.sh-terms span { display: block; }
+.slist { background: #2a2a2e; }
+.shead { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--dim); padding: 9px 12px 2px; }
+.shead svg { width: 13px; height: 13px; }
+.srow { gap: 11px; padding: 9px 12px; font-weight: 400; }
+.smark { flex: none; width: 30px; height: 30px; border-radius: 8px; overflow: hidden; }
+.smark svg { width: 100%; height: 100%; display: block; }
+.stext { flex: 1; }
+.stext b { display: block; font-size: 14px; font-weight: 600; }
+.stext small { display: block; font-size: 12px; color: var(--muted); }
+.sbadge { flex: none; width: 22px; height: 22px; fill: var(--gold); }
+.sheet.leaving { transform: translateY(115%); }
+.faceid { gap: 8px; }
+.fglyph { width: 56px; height: 56px; overflow: visible; color: #fff; transition: color .35s var(--ease) .15s; }
+.fglyph path { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.fframe { transform-box: view-box; transform-origin: 30px 30px; animation: frame-pulse 1.1s ease-in-out infinite; }
+.fface { transform-box: view-box; transform-origin: 30px 30px; animation: face-turn 1.1s ease-in-out infinite; }
+.fcheck { opacity: 0; }
+.fglyph.done { color: var(--green); }
+.fglyph.done .fframe { animation: none; }
+.fglyph.done .fface { animation: face-out .2s ease-out forwards; }
+.fglyph.done .fcheck { opacity: 1; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s var(--ease) .15s forwards; }
+@keyframes frame-pulse { 50% { transform: scale(.9); } }
+@keyframes face-turn { 25% { transform: translateX(-2.5px) scaleX(.93); } 75% { transform: translateX(2.5px) scaleX(.93); } }
+@keyframes face-out { to { opacity: 0; transform: scale(.7); } }
+.bk-hotel small + small { margin-top: 1px; }
+.ccount { padding: 0 6px; border-radius: 8px; font-size: 11px; background: #2a2a2f; }
+.chev { margin-left: auto; }
+.bubble.tuttie p { margin: 0; }
+.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: breathe 1s ease-in-out infinite; }
+.dock { justify-content: space-around; }
+.steps { list-style: none; }
+/* Replay: on the phone itself, never over the caption or its progress bars. */
+.replay { position: absolute; left: 50%; top: 60%; right: auto; bottom: auto; z-index: 9; transform: translateX(-50%);
+          padding: 14px 28px; border-radius: 30px; font-size: 22px; font-weight: 650; color: #08080b; background: #fff; border: 0;
+          box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+.cap h3 { padding-right: 0; }
+.cap p { min-height: 2.8em; }
+
+.chips { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips span { padding: 7px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
+.chips span:last-child { color: var(--peach); border-color: rgba(217,119,87,.4); }
+.step { grid-template-columns: 34px 1fr; align-items: center; padding-bottom: 18px; }
+.step::before { top: 34px; }
+.step b { margin-top: 0; }
+.seal b span { color: var(--muted); font-weight: 500; }
+.seals { margin-top: 30px; }
+.biz-h { margin: 12px 0 0; font-size: clamp(32px, 9.5vw, 44px); line-height: 1.05; font-weight: 800; letter-spacing: -.035em; }
+.vs span { margin-top: 6px; }
+.model > div { align-items: center; }
+.model b { font-size: 16px; }
+.honest { text-align: center; font-size: 15px; }
 </style>
 </head>
 <body>
@@ -368,6 +449,8 @@ footer a { color: var(--muted); }
   <symbol id="generic" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3a3a3f"/><path d="M16 7l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10v-5z" fill="none" stroke="#fff" stroke-width="2"/></symbol>
   <symbol id="shield" viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.4 12.2l2.5 2.5 4.8-5.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="shop" viewBox="0 0 48 48"><path d="M8 20v20h32V20M5 20l4-11h30l4 11zM5 20c0 3 2.5 5 5.5 5s5.5-2 5.5-5c0 3 2.5 5 5.5 5h5c3 0 5.5-2 5.5-5 0 3 2.5 5 5.5 5S43 23 43 20M20 40V30h8v10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="shield-line" viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.6 12.2l2.4 2.4 4.6-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="f-kids" viewBox="0 0 24 24"><path d="M4 18V6M20 18V6M4 15h16M4 9h16M8 9v6M12 9v6M16 9v6"/></symbol>
   <symbol id="f-dog" viewBox="0 0 24 24"><path d="M8 6.5 5 5.2 4 10.5l2.4.9M16 6.5l3-1.3 1 5.3-2.4.9M8 6.5h8l1.6 5v3.3a5.6 5.6 0 0 1-11.2 0v-3.3zM10 11.5h.01M14 11.5h.01M11 15.2h2l-1 1.2z"/></symbol>
   <symbol id="f-quiet" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
   <symbol id="f-late" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2"/></symbol>
@@ -381,9 +464,9 @@ footer a { color: var(--muted); }
 <!-- ============ Hero ============ -->
 <header class="hero">
   <div class="wrap">
-    <div class="tcard rv"><canvas id="heroFace"></canvas><span class="lbl">Tuttie</span></div>
-    <h1 class="rv">Your agent lives in <em>your wallet.</em></h1>
-    <p class="rv">Say what you need. Businesses' agents come to you with signed offers. Tuttie drops the fakes, bargains for you, and you approve with one tap.</p>
+    <div class="tcard rv"><canvas id="heroFace"></canvas></div>
+    <h1 class="rv">Your agent<br><em>for the web.</em></h1>
+    <p class="rv">It searches, checks and bargains for you.<br>Fakes never reach you.</p>
   </div>
   <div class="cue">Scroll<i></i></div>
 </header>
@@ -392,29 +475,29 @@ footer a { color: var(--muted); }
 <section class="nums" id="nums" aria-label="The problem in numbers">
   <div class="pin">
     <div class="ticks" id="ticks"></div>
-    <div class="fig" data-n="2">
+    <div class="fig">
       <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--peach)"><use href="#shop"/></svg></div>
       <div class="big"><span class="count" data-to="2">0</span><small>in 3</small></div>
-      <p>Swiss firms under ten people have no website. <span>Nobody finds them, and no AI can either.</span></p>
-      <div class="src">localsearch &amp; HSLU, SME Digital Pulse 2025</div>
+      <p>small Swiss firms have no website.</p>
+      <div class="src">localsearch &amp; HSLU, 2025</div>
     </div>
     <div class="fig">
       <div class="viz"><div class="dots" id="dots"></div></div>
       <div class="big"><span class="count" data-to="3">0</span><small>%</small></div>
-      <p>of Swiss SMEs take bookings online. <span>The rest wait for the phone to ring.</span></p>
-      <div class="src">localsearch &amp; HSLU, SME Digital Pulse 2025</div>
+      <p>of Swiss SMEs take bookings online.</p>
+      <div class="src">localsearch &amp; HSLU, 2025</div>
     </div>
     <div class="fig">
       <div class="viz"><svg class="ring" viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="fg" id="ring" cx="50" cy="50" r="42" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg></div>
       <div class="big"><span class="count" data-to="29.6" data-dec="1">0</span><small>%</small></div>
-      <p>of European hotel bookings go through online agencies. <span>71% of those through a single group, at a commission of typically 15 to 18%.</span></p>
-      <div class="src">HOTREC European Hotel Distribution Study 2024 · Best Western FDD 2025</div>
+      <p>of European hotel bookings go through agencies.</p>
+      <div class="src">HOTREC, 2024</div>
     </div>
     <div class="fig">
       <div class="viz"><svg class="spark" viewBox="0 0 330 96" preserveAspectRatio="none"><path d="M4 88 C 120 86, 200 80, 250 56 S 310 14, 326 6"/></svg></div>
       <div class="big accent">+<span class="count" data-to="539">0</span><small>%</small></div>
-      <p>AI traffic to US travel sites, holiday season 2025. <span>People already let agents shop for them.</span></p>
-      <div class="src">Adobe Analytics, via Digital Commerce 360, Jan 2026 · curve illustrative</div>
+      <p>AI traffic to travel sites. <span>Agents already shop.</span></p>
+      <div class="src">Adobe Analytics, US holidays 2025 · curve illustrative</div>
     </div>
   </div>
 </section>
@@ -423,55 +506,51 @@ footer a { color: var(--muted); }
 <section class="block turn">
   <div class="wrap">
     <div class="kicker rv">The idea</div>
-    <h2 class="rv">So we turned the web around.</h2>
+    <h2 class="rv">We turned the web around.</h2>
     <div class="three" id="three">
-      <span>A shopper.</span><span>A scam filter.</span><span>A shop window.</span><span class="one">One card.</span>
+      <span>It searches.</span><span>It checks.</span><span>It bargains.</span><span class="one">You tap.</span>
     </div>
-    <p class="lead rv">Tuttie is <b>your</b> agent, in your phone's wallet. You don't search businesses. <b>Their agents come to you</b>, with offers they signed.</p>
+    <div class="chips rv"><span>Hotels</span><span>Lawyers</span><span>Repairs</span><span>Tickets</span><span>Anything online</span></div>
 
     <div class="flow">
-      <div class="step rv"><i class="n">1</i><div><b>You ask once</b><span>By voice or text. Tuttie knows your day, your dog and your budget, and keeps them to herself.</span></div></div>
-      <div class="step rv"><i class="n">2</i><div><b>Signed offers come to you</b><span>Only verified businesses are woken. Their agents answer with offers they signed, priced by the owner, never by an AI.</span></div></div>
-      <div class="step rv"><i class="n">3</i><div><b>Fakes never reach you</b><span>A seal that doesn't verify is dropped before anyone is asked. Scams aren't blocked one by one; they can't sign.</span></div></div>
-      <div class="step rv"><i class="n">4</i><div><b>Tuttie bargains, you tap</b><span>She negotiates within limits nobody else sees, shows you the best few, and books only with your signature.</span></div></div>
+      <div class="step rv"><i class="n">1</i><b>You ask once</b></div>
+      <div class="step rv"><i class="n">2</i><b>Businesses' agents come to you</b></div>
+      <div class="step rv"><i class="n">3</i><b>Forged seals are dropped</b></div>
+      <div class="step rv"><i class="n">4</i><b>Tuttie bargains. You approve.</b></div>
     </div>
 
-    <div class="h3 rv">Seals show who vouches</div>
-    <p class="sub rv">Who sent an offer, and who stands behind them. Tuttie checks it on every message.</p>
     <div class="seals rv">
-      <div class="seal"><svg style="fill:var(--gold)"><use href="#shield"/></svg><div><b>An official register vouches</b><span>The commercial register knows this business.</span></div></div>
-      <div class="seal"><svg style="fill:var(--blue)"><use href="#shield"/></svg><div><b>A platform vouches</b><span>A company that checked the business.</span></div></div>
-      <div class="seal"><svg style="fill:#5d5c6d"><use href="#shield"/></svg><div><b>Unsigned</b><span>Never woken for a request, never books or pays.</span></div></div>
-      <div class="seal forged"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ff453a"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><div><b>Forged</b><span>Dropped. You never see it.</span></div></div>
+      <div class="seal"><svg style="fill:var(--gold)"><use href="#shield"/></svg><b>Register vouches</b></div>
+      <div class="seal"><svg style="fill:var(--blue)"><use href="#shield"/></svg><b>Platform vouches</b></div>
+      <div class="seal"><svg style="fill:#5d5c6d"><use href="#shield"/></svg><b>Unsigned <span>· never books</span></b></div>
+      <div class="seal forged"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#ff453a"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><b>Forged <span>· never shown</span></b></div>
     </div>
   </div>
 </section>
 
 <!-- ============ Business case ============ -->
-<section class="block" style="padding-top:30px">
+<section class="block" style="padding-top:20px">
   <div class="wrap">
-    <div class="kicker rv">The business case</div>
-    <h2 class="rv" style="margin:12px 0 0;font-size:clamp(32px,9.5vw,44px);line-height:1.05;font-weight:800;letter-spacing:-.035em">Small wins on fit,<br>not on ad budget.</h2>
+    <div class="kicker rv">For businesses</div>
+    <h2 class="rv biz-h">Small wins on fit,<br>not ad budget.</h2>
     <div class="vs rv">
-      <div class="anna"><em>Gästehaus am Rhein</em><b>7</b><span>rooms. Owner Anna, no marketing team. Her agent answers every request, day and night.</span></div>
-      <div><em>Alpina Grand</em><b>220</b><span>rooms, a chain branch. Same request, same rules, same seal check.</span></div>
+      <div class="anna"><b>7</b><span>rooms · Anna's guesthouse</span></div>
+      <div><b>220</b><span>rooms · a chain</span></div>
     </div>
-    <p class="lead rv">About <b>92%</b> of Swiss hotels are independent, like Anna's. <span class="src">(Horwath HTL 2021)</span></p>
 
     <div class="bill rv" id="bill">
-      <h4>One night at Anna's, CHF 135</h4>
-      <div class="barrow"><span>Through an agency today</span><strong class="lost">− CHF 20 to 24</strong>
+      <h4>One night, CHF 135</h4>
+      <div class="barrow"><span>Agency</span><strong class="lost">− CHF 20–24</strong>
         <div class="bar"><i class="keep a"></i><i class="fee a"></i></div></div>
-      <div class="barrow"><span>Through Tuttie, signed directly</span><strong>Anna keeps the price</strong>
+      <div class="barrow"><span>Tuttie</span><strong>Anna keeps it</strong>
         <div class="bar"><i class="keep b"></i></div></div>
-      <p class="src" style="margin:12px 0 0">At a typical 15 to 18% commission. Anna is a demo persona; the hotels in the demo are demo data.</p>
+      <p class="src" style="margin:12px 0 0">Typical 15–18% commission. Anna is a demo persona.</p>
     </div>
 
-    <div class="h3 rv">Who pays</div>
     <div class="model">
-      <div class="rv"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM4 11h16M8 15h3"/></svg><div><b>A small fee per signed booking</b><span>Paid to the marketplace host only when a deal is approved and signed. No ads, no ranking to buy.</span></div></div>
-      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 15.6 7 18.2l1-5.5-4-3.9 5.5-.8z"/></svg><div><b>The agent, as a service</b><span>The host runs each business's agent. Owners set prices and limits in plain language, no website needed.</span></div></div>
-      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.6 12l2.4 2.4 4.4-4.8"/></svg><div><b>Registers and platforms vouch</b><span>They sign seals instead of owning the customer. Trust becomes the product.</span></div></div>
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM4 11h16M8 15h3"/></svg><b>Fee per signed booking</b></div>
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 3l2.5 5 5.5.8-4 3.9 1 5.5L12 15.6 7 18.2l1-5.5-4-3.9 5.5-.8z"/></svg><b>Agent as a service</b></div>
+      <div class="rv"><svg viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.6 12l2.4 2.4 4.4-4.8"/></svg><b>No website needed</b></div>
     </div>
   </div>
 </section>
@@ -479,7 +558,7 @@ footer a { color: var(--muted); }
 <!-- ============ Demo: scroll into the phone ============ -->
 <section class="demo" id="demo" aria-label="Demo">
   <div class="pin">
-    <div class="intro" id="intro"><div class="kicker">The demo</div><h2>One request.<br>Watch.</h2></div>
+    <div class="intro" id="intro"><div class="kicker">One example</div><h2>Book a room.<br>Watch.</h2></div>
     <div class="cap" id="cap">
       <div class="bars" id="bars"></div>
       <h3 id="capT">&nbsp;</h3>
@@ -491,68 +570,56 @@ footer a { color: var(--muted); }
           <div class="island"></div>
           <div class="sbar"><span>23:52</span><svg viewBox="0 0 64 14"><rect x="0" y="9" width="3" height="5" rx="1"/><rect x="5" y="6" width="3" height="8" rx="1"/><rect x="10" y="3" width="3" height="11" rx="1"/><rect x="15" y="0" width="3" height="14" rx="1"/><rect x="36" y="1" width="24" height="12" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="38" y="3" width="17" height="8" rx="2"/><rect x="61" y="5" width="2" height="4" rx="1" fill-opacity=".45"/></svg></div>
           <div class="whead">Wallet</div>
-          <div class="wc bank bank-blue" style="--i:0"><span class="chip"></span></div>
-          <div class="wc bank bank-black" style="--i:1"><span class="chip"></span></div>
+          <div class="wc bank bank-blue" style="--i:0"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span></div>
+          <div class="wc bank bank-black" style="--i:1"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span></div>
           <div class="wc agent" id="agent" style="--i:2">
-            <canvas id="demoFace"></canvas><span class="alabel">Tuttie</span><div class="edge"></div><div class="grab"></div>
+            <canvas id="demoFace"></canvas><div class="edge"></div><div class="grab"></div>
             <div class="act" id="act">
-              <div class="bubble user hide" id="ask"></div>
-              <ul class="steps hide" id="steps"></ul>
-              <div class="deck hide" id="deck">
-                <div class="sw back" id="cardA">
-                  <div class="sw-photo"><img src="img/gaestehaus.jpg" alt=""><div class="pbars"><i></i><i></i><i></i></div></div>
-                  <div class="sw-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span><span class="rating">★ 4.8</span></div>
-                  <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
-                  <div class="sw-name">Gästehaus am Rhein<small>Kleinbasel · 7 rooms · by the Rhine</small></div>
-                  <div class="sw-foot"><div class="feats"><i class="y"><svg><use href="#f-dog"/></svg></i><i class="y"><svg><use href="#f-quiet"/></svg></i><i class="y"><svg><use href="#f-late"/></svg></i><i class="y"><svg><use href="#f-small"/></svg></i><i class="n"><svg><use href="#f-station"/></svg></i></div>
-                    <div class="sw-price"><s>CHF 135</s><b>CHF 128</b></div></div>
-                </div>
-                <div class="sw" id="cardB">
-                  <div class="sw-photo"><img src="img/alpina.jpg" alt=""><div class="pbars"><i></i><i></i><i></i></div></div>
-                  <div class="sw-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i><i><svg><use href="#generic"/></svg><svg class="ms" style="fill:var(--blue)"><use href="#shield"/></svg></i></span><span class="rating">★ 4.2</span></div>
-                  <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
-                  <div class="sw-name">Alpina Grand Basel<small>Near Basel SBB · 220 rooms</small></div>
-                  <div class="sw-foot"><div class="feats"><i class="y"><svg><use href="#f-dog"/></svg></i><i class="n"><svg><use href="#f-quiet"/></svg></i><i class="y"><svg><use href="#f-late"/></svg></i><i class="y"><svg><use href="#f-station"/></svg></i><i class="y"><svg><use href="#f-cancel"/></svg></i></div>
-                    <div class="sw-price"><b>CHF 240</b><small>over budget</small></div></div>
-                </div>
-              </div>
-              <div class="dcount hide" id="dcount">1 of 2</div>
+              <ol class="steps hide" id="steps"><li id="lCtx"><i class="dot"></i><span></span></li><li id="lTool" class="hide"><i class="dot"></i><span></span></li></ol>
+              <div class="deck hide" id="deck"><div class="deck-stack" id="stack"></div><div class="dcount" id="dcount">1 of 3</div><p class="deck-note" id="note"></p></div>
+              <div class="hotel agreed hide" id="row"><div class="hotel-line"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>
+                <span class="hotel-name">Gästehaus am Rhein<small>agreed</small></span><span class="price"><s>CHF 135</s> <b>CHF 128</b></span></div></div>
               <div class="booking hide" id="booking">
                 <div class="bk-top"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>
-                  <span class="bk-hotel">Gästehaus am Rhein<small>Tonight · double room · with your dog</small></span><span class="bk-total">CHF 128</span></div>
-                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Booked and signed by the hotel</div>
-                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>City tax paid with your mandate</div>
+                  <span class="bk-hotel">Gästehaus am Rhein<small>14 Nov · BK-4F2A91</small><small>double room · free cancellation until 48h before arrival</small></span><span class="bk-total">CHF 128</span></div>
+                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>City tax CHF 4 paid</div>
+                <div class="bk-line"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Checked by Tuttie <span class="ccount">4</span><span class="chev">⌄</span></div>
               </div>
-              <div class="bubble tuttie hide" id="reply"></div>
+              <div class="bubble tuttie hide" id="reply"><p><span id="replyText"></span><span class="caret" id="caret"></span></p></div>
             </div>
-            <div class="status" id="status">Listening…</div>
+            <div class="status" id="status"></div>
           </div>
-          <div class="dock"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4"/></svg><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg></div>
+          <div class="dock">
+            <svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4.5V9H8M12 7.5V12l3 2"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 20.5h7.5M16 4.5l3.5 3.5L9 18.5l-4.5 1 1-4.5z"/></svg>
+            <svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg>
+            <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+          </div>
           <div class="tap" id="tap"></div>
           <div class="paused-tag">Paused · tap to play</div>
 
           <div class="sheet" id="sheet">
             <div class="sh-hotel"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>Gästehaus am Rhein</div>
             <div class="sh-amount">CHF 128</div>
-            <div class="sh-terms">Tonight · double room · arrival after midnight · dog welcome</div>
+            <div class="sh-terms">double room · 14 Nov<span>free cancellation until 48h before arrival</span></div>
             <div class="slist">
-              <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Registered in the commercial register</div>
-              <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>The hotel signed the agreed price</div>
+              <div class="shead"><svg viewBox="0 0 24 24"><use href="#shield-line"/></svg> Signed and verified by</div>
+              <div class="srow"><i class="smark"><svg><use href="#swiss"/></svg></i><span class="stext"><b>Handelsregister</b><small>Basel-Stadt</small></span><svg class="sbadge"><use href="#shield"/></svg></div>
             </div>
             <div class="mandate"><span>Also pay city tax (CHF 4)</span><i></i></div>
             <div class="sh-btns"><span class="decline">Decline</span><span class="approve">Approve</span></div>
-            <div class="faceid"><div class="fscan"><i></i><i></i><i></i><i></i></div><svg class="fok" viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg><span id="fidText">Face ID</span></div>
+            <div class="faceid"><svg class="fglyph" id="fglyph" viewBox="0 0 60 60"><g class="fframe"><path d="M4 18V10a6 6 0 0 1 6-6h8M42 4h8a6 6 0 0 1 6 6v8M56 42v8a6 6 0 0 1-6 6h-8M18 56h-8a6 6 0 0 1-6-6v-8"/></g><g class="fface"><path d="M21 22v5M39 22v5M30 22v11h-2.5M22 40q8 6 16 0"/></g><path class="fcheck" d="M19 31l7.5 7.5L41.5 23"/></svg><span id="fidText">Face ID</span></div>
           </div>
 
-          <div class="call" id="cBudget" style="top:96px"><small>Stays on your phone</small><b>Budget CHF 160 is private</b><span>The request goes out signed. Your budget never leaves Tuttie.</span></div>
-          <div class="call red" id="cForged" style="top:430px"><small>Behind the screen · seal check failed</small><b>Refused before anyone asked it</b>
+          <div class="call" id="cBudget" style="top:96px"><small>Behind the screen</small><b>Budget CHF 160 is never sent</b></div>
+          <div class="call red" id="cForged" style="top:330px"><small>Behind the screen</small><b>Forged seal · refused</b>
             <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
-          <div class="call" id="cBargain" style="top:470px"><small>Behind the screen</small><b>Limits compared in code</b><span>Your budget and the hotel's floor price stay private. No AI ever sees both.</span></div>
-          <div class="call" id="cSigned" style="top:110px"><small>Behind the screen · your key</small><b>Signed for exactly CHF 128</b><span>The hotel books only with your signature, for this price, this room.</span></div>
+          <div class="call" id="cBargain" style="top:330px"><small>Behind the screen</small><b>Both limits stay private</b><span>Compared in code, never by AI.</span></div>
+          <div class="call" id="cSigned" style="top:96px"><small>Behind the screen · your key</small><b>Signed for exactly CHF 128</b></div>
+          <button class="replay" id="replay" type="button">↻ Replay</button>
         </div>
       </div>
     </div>
-    <button class="replay" id="replay" type="button">Replay</button>
   </div>
 </section>
 
@@ -561,10 +628,9 @@ footer a { color: var(--muted); }
   <div class="wrap">
     <h2 class="rv">Signed businesses reach you.<br><span>Fakes never do.</span></h2>
     <p class="year rv">In 2000 you needed a website.<br><b>In 2033 you need a signature.</b></p>
-    <a class="go rv" href="https://web4.mendes.dev/wallet/">Wake yours
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-    <div class="hint rv">Try: "Quiet room in Basel tonight, after midnight, with my dog, under CHF 160."</div>
-    <p class="honest rv">Honest about the demo: the hotels, their agents and the register are <b>demo data</b>. The demo above is an animation of the wallet; the real one is one tap away. The signatures are <b>real</b> and really checked, Tuttie and the hotels' agents run on a real language model, and prices, bargaining moves and totals are computed in code from signed messages, never by AI.</p>
+    <a class="go rv" href="#demo" id="again">Watch it again
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></a>
+    <p class="honest rv">Hotels and register: <b>demo data</b>.<br>Signatures: <b>real</b>, really checked.</p>
   </div>
   <footer>
     Built in one weekend at <b>BaselHack 2026</b><br>
@@ -633,41 +699,57 @@ function onNums() {
 const screen = $("#screen"), face = new TuttieFace($("#demoFace"));
 face.sleep(0);
 const CAPS = [
-  ["Tuttie lives in your wallet", "Your agent, next to your cards. Asleep until you need her."],
-  ["You ask once", "By voice or text. She knows your train arrives late and that you travel with a dog."],
-  ["Businesses come to you", "A signed request goes out. Only verified hotel agents are woken, and each answers with a signed offer."],
-  ["Fakes never reach you", "A hotel with a forged seal is refused before anyone asks it. Your wallet never even shows it."],
-  ["Tuttie bargains for you", "One subagent per hotel, in parallel. Gästehaus am Rhein comes down from CHF 135 to 128."],
-  ["You pick, with a swipe", "The best offers as cards, with the agreed price. Too loud and over budget: pass. Anna's: like."],
-  ["One tap, signed with your key", "Exactly this hotel, exactly this price. Nothing is booked without it."],
-  ["Booked. Every step signed.", "The hotel checks your signature and confirms with its own. Seven rooms just beat 220."],
+  ["Tuttie lives in your wallet", "Tap to talk."],
+  ["You ask once", "“Quiet room in Basel, with my dog, under 160.”"],
+  ["She knows your day", "A signed request goes out."],
+  ["Fakes never reach you", "Forged seal: refused, never shown."],
+  ["She bargains for you", "CHF 135 → 128."],
+  ["You swipe", "Right to like, left to pass."],
+  ["One tap, signed", "This hotel, this price. Nothing without you."],
+  ["Booked", "Seven rooms beat 220."],
 ];
-const ASK = "Quiet room in Basel tonight, after midnight, with my dog, under 160. Get me a good price.";
-const REPLY = "Booked: Gästehaus am Rhein tonight for CHF 128, dog welcome. The door code comes after midnight.";
-const STEP_LINES = {
-  ctx: "Your train arrives at Basel SBB at 00:52",
-  post: "Posted a signed request · budget kept private",
-  ask: "Asked 3 hotels",
-  barg: "Bargaining with Gästehaus am Rhein · CHF 135 → 131",
-  deal: "Agreed with Gästehaus am Rhein · CHF 128",
-};
-const DURATION = 39000;
-const capAt = [0, 2600, 7000, 11000, 15000, 19500, 26500, 32500];
+const REPLY = "Booked: Gästehaus am Rhein on the 14th for CHF 128, and the city tax is paid. Anna sends the door code on the day.";
+const DURATION = 38500;
+const capAt = [0, 2000, 6600, 9300, 13300, 17300, 24200, 30400];
+const typers = [{ el: $("#replyText"), text: REPLY, start: 31800, dur: 3000 }];
 
-// Pause-safe typing: rendered from the timeline clock each frame.
-const typers = [
-  { el: $("#status"), text: ASK, start: 3300, dur: 2600, until: 6700 },
-  { el: $("#reply"), text: REPLY, start: 34200, dur: 2600 },
+// The deck, in the wallet's card order: the shortlisted, agreed hotel first, then by price.
+const HOTELS = [
+  { img: "img/gaestehaus.jpg", name: "Gästehaus am Rhein", rating: "4.8", blue: false, price: "<s>CHF 135</s><b>CHF 128</b>",
+    feats: [["dog", 1], ["quiet", 1], ["late", 1], ["kids", 0], ["station", 0]] },
+  { img: "img/rheinblick.jpg", name: "Hotel Rheinblick", rating: "4.5", blue: true, price: "<b>CHF 180</b><small>over your budget</small>",
+    feats: [["dog", 1], ["quiet", 1], ["late", 1], ["kids", 1], ["station", 1]] },
+  { img: "img/alpina.jpg", name: "Alpina Grand Basel", rating: "4.2", blue: true, price: "<b>CHF 240</b><small>over your budget</small>",
+    feats: [["dog", 1], ["quiet", 0], ["late", 1], ["kids", 1], ["station", 1]] },
 ];
-
-function setStep(key, state) {
-  const ul = $("#steps");
-  let li = ul.querySelector(`[data-k="${key}"]`);
-  if (!li) { li = document.createElement("li"); li.dataset.k = key; li.innerHTML = `<i class="dot"></i><span>${STEP_LINES[key]}</span>`; ul.append(li); }
-  ul.querySelectorAll("li").forEach(x => x.classList.remove("latest"));
-  li.className = state; if (state === "done") li.classList.add("latest");
-  return li;
+const mark = (sym, tier) => `<i><svg><use href="#${sym}"/></svg><svg class="ms" style="fill:var(--${tier})"><use href="#shield"/></svg></i>`;
+$("#stack").innerHTML = HOTELS.map((h, n) => `
+  <div class="sw" data-n="${n}">
+    <div class="sw-photo"><img src="${h.img}" alt=""></div>
+    <div class="hbars">${HOTELS.map((_, k) => `<i class="${k === n ? "on" : ""}"></i>`).join("")}</div>
+    <div class="sw-top"><span class="marks">${mark("swiss", "gold")}${h.blue ? mark("generic", "blue") : ""}</span><span class="rating">★ ${h.rating}</span></div>
+    <div class="stamp like">Like</div><div class="stamp pass">Pass</div>
+    <div class="sw-name">${h.name}</div>
+    <div class="sw-foot"><div class="feats">${h.feats.map(([f, ok]) => `<i class="${ok ? "y" : "n"}"><svg><use href="#f-${f}"/></svg></i>`).join("")}</div>
+      <div class="sw-price">${h.price}</div></div>
+  </div>`).join("");
+const cards = [...document.querySelectorAll("#stack .sw")];
+function deckAt(i) {
+  cards.forEach((c, k) => { c.classList.toggle("top", k === i); c.classList.toggle("next", k === i + 1); c.classList.toggle("gone", k > i + 1); });
+  $("#dcount").textContent = `${Math.min(i + 1, 3)} of 3`;
 }
+function swipe(i, dir) { cards[i].classList.add(dir); face.lookAt(dir === "right" ? .9 : -.9, 0, 200); }
+function lean(i, dir) { cards[i].classList.add("lean-" + dir); face.lookAt(dir === "r" ? .5 : -.5, 0, 200); }
+
+// The progress lines: one context line and one tool line, each updated in place (as in the wallet).
+function line(id, text, state) {
+  const li = $(id); li.classList.remove("hide");
+  li.querySelector("span").textContent = text;
+  li.className = state;
+  if (state === "done latest") document.querySelectorAll("#steps li").forEach(x => { if (x !== li) x.classList.remove("latest"); });
+  $("#status").textContent = state === "active" ? text : "";
+}
+
 const show = (id, on = true) => { const el = $(id); el.classList.toggle("hide", !on); if (on) { el.classList.remove("fadein"); void el.offsetWidth; el.classList.add("fadein"); } };
 const call = (id, on) => $(id).classList.toggle("show", on);
 const cls = (c, on) => screen.classList.toggle(c, on);
@@ -676,44 +758,50 @@ function tapAt(x, y) { const t = $("#tap"); t.style.left = x + "px"; t.style.top
 const EVENTS = [
   [1700, () => tapAt(195, 355)],
   [1900, () => { cls("s-open", true); cls("s-voice", true); face.wake("happiness", 500); }],
-  [2700, () => face.set("listening", 500)],
-  [3200, () => $("#status").classList.add("heard")],
-  [3700, () => call("#cBudget", true)],
-  [6400, () => call("#cBudget", false)],
-  [6700, () => { cls("s-voice", false); cls("s-busy", true); face.set("attentive", 400); $("#status").classList.remove("heard"); $("#status").textContent = "Working…"; }],
-  [7300, () => { $("#ask").textContent = ASK; show("#ask"); show("#steps"); setStep("ctx", "active"); }],
-  [8300, () => { setStep("ctx", "done"); setStep("post", "active"); }],
-  [9200, () => { setStep("post", "done"); setStep("ask", "active"); }],
-  [10900, () => { call("#cForged", true); face.set("suspicion", 350); }],
-  [13300, () => $("#cForged").classList.add("gone")],
-  [14200, () => { call("#cForged", false); setStep("ask", "done"); face.set("attentive", 400); }],
-  [15000, () => { setStep("barg", "active"); call("#cBargain", true); }],
-  [17000, () => { $(`#steps [data-k="barg"] span`).textContent = "Bargaining with Gästehaus am Rhein · CHF 135 → 131 → 130"; }],
-  [18300, () => { call("#cBargain", false); setStep("barg", "done"); setStep("deal", "done"); face.set("happiness", 400); }],
-  [19500, () => { show("#steps", false); show("#ask", false); show("#deck"); show("#dcount"); $("#status").textContent = ""; face.set("neutral", 400); }],
-  [21300, () => $("#cardB").classList.add("lean-l")],
-  [22300, () => { $("#cardB").classList.replace("lean-l", "left"); $("#cardA").classList.remove("back"); $("#dcount").textContent = "2 of 2"; }],
-  [24000, () => $("#cardA").classList.add("lean-r")],
-  [25000, () => { $("#cardA").classList.replace("lean-r", "right"); face.set("happiness", 400); }],
-  [26300, () => { show("#deck", false); show("#dcount", false); $("#sheet").classList.add("up"); }],
-  [28300, () => tapAt(285, 800)],
-  [28500, () => { $("#sheet").classList.add("scan"); }],
-  [29600, () => { $("#sheet").classList.add("done"); $("#fidText").textContent = "Approved"; }],
-  [29900, () => call("#cSigned", true)],
-  [32300, () => { call("#cSigned", false); $("#sheet").classList.remove("up"); }],
-  [32700, () => { show("#booking"); $("#status").textContent = ""; face.set("happiness", 500); }],
-  [34200, () => show("#reply")],
-  [37400, () => { cls("s-open", false); cls("s-busy", false); face.sleep(900); }],
+  [2600, () => { face.set("listening", 500); face.setVoice(0, .8); }],
+  [3200, () => call("#cBudget", true)],
+  [6000, () => { call("#cBudget", false); face.setVoice(0, 0); }],
+  [6600, () => { cls("s-voice", false); cls("s-busy", true); face.set("skepticism", 400); face.lookAt(-.6, -.5); }],
+  [7100, () => { show("#steps"); line("#lCtx", "Checking location", "active"); }],
+  [7400, () => line("#lCtx", "Checking messages", "active")],
+  [7700, () => line("#lCtx", "Checking mails", "active")],
+  [8000, () => line("#lCtx", "Checking calendar", "active")],
+  [8300, () => line("#lCtx", "Checking what you like", "active")],
+  [8600, () => { line("#lCtx", "Checked your location, messages, mails and calendar", "done"); line("#lTool", "Asked 3 hotels", "active"); face.set("confusion", 400); face.lookAt(.5, -.4); }],
+  [9600, () => { call("#cForged", true); face.set("suspicion", 350); face.lookAt(0, .2); }],
+  [11900, () => $("#cForged").classList.add("gone")],
+  [12700, () => { call("#cForged", false); line("#lTool", "Comparing offers", "active"); face.set("neutral", 400); face.lookAt(.7, -.6); }],
+  [13300, () => { line("#lTool", "Bargaining with Gästehaus am Rhein · CHF 135 → CHF 131", "active"); call("#cBargain", true); face.set("skepticism", 400); }],
+  [15000, () => line("#lTool", "Bargaining with Gästehaus am Rhein · CHF 135 → CHF 131 → CHF 130", "active")],
+  [16400, () => { call("#cBargain", false); line("#lTool", "Agreed with Gästehaus am Rhein · CHF 128", "done latest"); face.set("happiness", 400); face.lookAt(0, 0); }],
+  [17300, () => { show("#steps", false); deckAt(0); show("#deck"); $("#note").textContent = "Three hotels answered. I'd take Gästehaus am Rhein: quiet, by the Rhine, dogs welcome, and 128 after bargaining."; face.set("neutral", 400); }],
+  [19300, () => lean(0, "r")],
+  [19900, () => { swipe(0, "right"); deckAt(1); }],
+  [21000, () => lean(1, "l")],
+  [21600, () => { swipe(1, "left"); deckAt(2); }],
+  [22600, () => lean(2, "l")],
+  [23200, () => { swipe(2, "left"); face.lookAt(0, 0); }],
+  [24200, () => { show("#deck", false); show("#steps"); show("#row"); line("#lTool", "Waiting for your approval", "active"); $("#sheet").classList.add("up"); face.set("happiness", 400); }],
+  [26400, () => tapAt(282, 790)],
+  [26600, () => { $("#sheet").classList.add("scan"); }],
+  [27700, () => { $("#fglyph").classList.add("done"); $("#fidText").textContent = "Approved"; }],
+  [28000, () => call("#cSigned", true)],
+  [29500, () => { call("#cSigned", false); $("#sheet").classList.add("leaving"); line("#lTool", "Booking…", "active"); }],
+  [30400, () => { $("#sheet").className = "sheet"; show("#row", false); show("#booking"); line("#lTool", "Booked · BK-4F2A91", "done latest"); }],
+  [31000, () => line("#lTool", "Booked · city tax paid", "done latest")],
+  [31700, () => { show("#reply"); face.setVoice(.7, 0); }],
+  [34900, () => { $("#caret").classList.add("hide"); face.setVoice(0, 0); }],
+  [36200, () => { cls("s-open", false); cls("s-busy", false); face.sleep(900); }],
 ];
 
 function resetDemo() {
   screen.className = "screen";
-  ["#ask", "#steps", "#deck", "#dcount", "#booking", "#reply"].forEach(id => $(id).classList.add("hide"));
-  $("#steps").innerHTML = ""; $("#ask").textContent = ""; $("#reply").textContent = "";
-  $("#cardA").className = "sw back"; $("#cardB").className = "sw"; $("#dcount").textContent = "1 of 2";
-  $("#sheet").className = "sheet"; $("#fidText").textContent = "Face ID"; $("#status").textContent = "Listening…"; $("#status").classList.remove("heard");
+  ["#steps", "#lTool", "#deck", "#row", "#booking", "#reply"].forEach(id => $(id).classList.add("hide"));
+  $("#lCtx").className = ""; $("#replyText").textContent = ""; $("#caret").classList.remove("hide"); $("#status").textContent = "";
+  cards.forEach(c => { c.className = "sw"; }); $("#note").textContent = "";
+  $("#sheet").className = "sheet"; $("#fglyph").classList.remove("done"); $("#fidText").textContent = "Face ID";
   document.querySelectorAll(".call").forEach(c => c.classList.remove("show", "gone"));
-  face.sleep(0);
+  face.setVoice(0, 0); face.sleep(0);
 }
 
 $("#bars").innerHTML = CAPS.map(() => "<i><b></b></i>").join("");
@@ -742,7 +830,13 @@ function tickDemo(dt) {
   });
   if (clock >= DURATION) { finished = true; $("#replay").classList.add("show"); }
 }
-$("#replay").addEventListener("click", () => { restart(); playing = true; });
+// "Watch it again": land where the phone is docked, so the demo plays right away.
+$("#again").addEventListener("click", e => {
+  e.preventDefault();
+  const d = $("#demo");
+  scrollTo({ top: d.offsetTop + (d.offsetHeight - innerHeight) * .36, behavior: "smooth" });
+});
+$("#replay").addEventListener("click", e => { e.stopPropagation(); restart(); playing = true; });
 // Tap the phone to pause and resume; a tap pause sticks until the next tap (scrolling back
 // into view resumes only an automatic pause).
 let tapPaused = false;
