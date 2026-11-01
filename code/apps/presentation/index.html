@@ -167,7 +167,12 @@ section.block { padding: 90px 0; }
          border-radius: 60px; padding: 8px; background: #1b1b20;
          box-shadow: inset 0 0 0 2px #3a3a42, inset 0 0 0 5px #0d0d10, 0 40px 100px rgba(0,0,0,.8), 0 0 0 1px #000;
          will-change: transform; pointer-events: auto; }
-.replay { position: absolute; z-index: 4; right: var(--gut); bottom: calc(14px + env(safe-area-inset-bottom)); padding: 8px 14px; border-radius: 16px;
+.paused-tag { position: absolute; left: 50%; top: 50%; z-index: 8; transform: translate(-50%, -50%); padding: 14px 26px; border-radius: 30px;
+              font-size: 26px; font-weight: 650; color: #fff; background: rgba(0,0,0,.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+              white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.phone.paused .paused-tag { opacity: 1; }
+.cap h3 { padding-right: 84px; }
+.replay { position: absolute; z-index: 4; right: var(--gut); top: calc(4px + env(safe-area-inset-top)); padding: 8px 14px; border-radius: 16px;
           font: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
           opacity: 0; pointer-events: none; transition: opacity .4s; cursor: pointer; }
 .replay.show { opacity: 1; pointer-events: auto; }
@@ -286,6 +291,10 @@ section.block { padding: 90px 0; }
 .ok { flex: none; width: 18px; height: 18px; }
 .ok circle { fill: var(--green); }
 .ok path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mandate { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 8px 12px; border-radius: 12px; background: #2a2a2e; font-size: 13px; color: var(--muted); }
+.mandate span { flex: 1; }
+.mandate i { position: relative; flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--green); }
+.mandate i::after { content: ""; position: absolute; top: 2px; left: 20px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
 .sh-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sh-btns span { padding: 15px; border-radius: 16px; font-size: 16px; font-weight: 600; text-align: center; }
 .sh-btns .approve { background: #fff; color: #08080b; }
@@ -520,6 +529,7 @@ footer a { color: var(--muted); }
           </div>
           <div class="dock"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4"/></svg><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg></div>
           <div class="tap" id="tap"></div>
+          <div class="paused-tag">Paused · tap to play</div>
 
           <div class="sheet" id="sheet">
             <div class="sh-hotel"><span class="marks"><i><svg><use href="#swiss"/></svg><svg class="ms" style="fill:var(--gold)"><use href="#shield"/></svg></i></span>Gästehaus am Rhein</div>
@@ -529,15 +539,16 @@ footer a { color: var(--muted); }
               <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>Registered in the commercial register</div>
               <div class="srow"><svg class="ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg>The hotel signed the agreed price</div>
             </div>
+            <div class="mandate"><span>Also pay city tax (CHF 4)</span><i></i></div>
             <div class="sh-btns"><span class="decline">Decline</span><span class="approve">Approve</span></div>
             <div class="faceid"><div class="fscan"><i></i><i></i><i></i><i></i></div><svg class="fok" viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg><span id="fidText">Face ID</span></div>
           </div>
 
           <div class="call" id="cBudget" style="top:96px"><small>Stays on your phone</small><b>Budget CHF 160 is private</b><span>The request goes out signed. Your budget never leaves Tuttie.</span></div>
-          <div class="call red" id="cForged" style="top:430px"><small>Seal check · failed</small><b>Refused before anyone asked it</b>
+          <div class="call red" id="cForged" style="top:430px"><small>Behind the screen · seal check failed</small><b>Refused before anyone asked it</b>
             <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
           <div class="call" id="cBargain" style="top:470px"><small>Behind the screen</small><b>Limits compared in code</b><span>Your budget and the hotel's floor price stay private. No AI ever sees both.</span></div>
-          <div class="call" id="cSigned" style="top:110px"><small>Ed25519 · your key</small><b>Signed for exactly CHF 128</b><span>The hotel books only with your signature, for this price, this room.</span></div>
+          <div class="call" id="cSigned" style="top:110px"><small>Behind the screen · your key</small><b>Signed for exactly CHF 128</b><span>The hotel books only with your signature, for this price, this room.</span></div>
         </div>
       </div>
     </div>
@@ -553,7 +564,7 @@ footer a { color: var(--muted); }
     <a class="go rv" href="https://web4.mendes.dev/wallet/">Wake yours
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     <div class="hint rv">Try: "Quiet room in Basel tonight, after midnight, with my dog, under CHF 160."</div>
-    <p class="honest rv">Honest about the demo: the hotels, their agents and the register are <b>demo data</b>. The signatures are <b>real</b> and really checked, the bargaining runs on a real language model, and totals come from signed messages, never from AI text.</p>
+    <p class="honest rv">Honest about the demo: the hotels, their agents and the register are <b>demo data</b>. The demo above is an animation of the wallet; the real one is one tap away. The signatures are <b>real</b> and really checked, Tuttie and the hotels' agents run on a real language model, and prices, bargaining moves and totals are computed in code from signed messages, never by AI.</p>
   </div>
   <footer>
     Built in one weekend at <b>BaselHack 2026</b><br>
@@ -625,7 +636,7 @@ const CAPS = [
   ["Tuttie lives in your wallet", "Your agent, next to your cards. Asleep until you need her."],
   ["You ask once", "By voice or text. She knows your train arrives late and that you travel with a dog."],
   ["Businesses come to you", "A signed request goes out. Only verified hotel agents are woken, and each answers with a signed offer."],
-  ["Fakes never reach you", "A hotel with a forged seal is refused before anyone asks it. In the wallet, it never exists."],
+  ["Fakes never reach you", "A hotel with a forged seal is refused before anyone asks it. Your wallet never even shows it."],
   ["Tuttie bargains for you", "One subagent per hotel, in parallel. Gästehaus am Rhein comes down from CHF 135 to 128."],
   ["You pick, with a swipe", "The best offers as cards, with the agreed price. Too loud and over budget: pass. Anna's: like."],
   ["One tap, signed with your key", "Exactly this hotel, exactly this price. Nothing is booked without it."],
@@ -637,7 +648,7 @@ const STEP_LINES = {
   ctx: "Your train arrives at Basel SBB at 00:52",
   post: "Posted a signed request · budget kept private",
   ask: "Asked 3 hotels",
-  barg: "Bargaining with Gästehaus am Rhein · 135 → 130",
+  barg: "Bargaining with Gästehaus am Rhein · CHF 135 → 131",
   deal: "Agreed with Gästehaus am Rhein · CHF 128",
 };
 const DURATION = 39000;
@@ -677,7 +688,7 @@ const EVENTS = [
   [13300, () => $("#cForged").classList.add("gone")],
   [14200, () => { call("#cForged", false); setStep("ask", "done"); face.set("attentive", 400); }],
   [15000, () => { setStep("barg", "active"); call("#cBargain", true); }],
-  [17000, () => { $(`#steps [data-k="barg"] span`).textContent = "Bargaining with Gästehaus am Rhein · 135 → 128"; }],
+  [17000, () => { $(`#steps [data-k="barg"] span`).textContent = "Bargaining with Gästehaus am Rhein · CHF 135 → 131 → 130"; }],
   [18300, () => { call("#cBargain", false); setStep("barg", "done"); setStep("deal", "done"); face.set("happiness", 400); }],
   [19500, () => { show("#steps", false); show("#ask", false); show("#deck"); show("#dcount"); $("#status").textContent = ""; face.set("neutral", 400); }],
   [21300, () => $("#cardB").classList.add("lean-l")],
@@ -717,7 +728,7 @@ function setCaption(i) {
   clearTimeout(capTimer);
   capTimer = setTimeout(() => { $("#capT").textContent = CAPS[i][0]; $("#capP").textContent = CAPS[i][1]; cap.classList.remove("swap"); }, capIndex === 0 && clock < 50 ? 0 : 220);
 }
-function restart() { resetDemo(); tapPaused = false; clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
+function restart() { resetDemo(); tapPaused = false; $("#phone").classList.remove("paused"); clock = 0; fired = 0; capIndex = -1; finished = false; $("#replay").classList.remove("show"); setCaption(0); }
 function tickDemo(dt) {
   if (!playing || finished) return;
   clock += dt;
@@ -738,6 +749,7 @@ let tapPaused = false;
 $("#phone").addEventListener("click", () => {
   if (!started || finished) return;
   playing = !playing; tapPaused = !playing;
+  $("#phone").classList.toggle("paused", tapPaused);
 });
 
 // ---------- Scroll into the demo ----------
