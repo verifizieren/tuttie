@@ -31,6 +31,7 @@ class HangingClient:
 
 def test_a_hung_hotel_fails_the_mcp_call_quickly(monkeypatch):
     monkeypatch.setattr(mcp_client, "CALL_TIMEOUT_S", 0.2, raising=False)
+    monkeypatch.setattr(mcp_client, "COMMIT_TIMEOUT_S", 0.4, raising=False)  # book: longer, still bounded
     link = McpLink(lambda endpoint: HangingClient())
 
     async def run():
