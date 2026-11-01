@@ -10,6 +10,17 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
 
 ## Done
 
+- **Red team round 2, hotel side** (branch `wip/r2-node`, not deployed): `/agent/invoke`
+  answers only posting events, and `posting.updated` now gets the same checks as
+  `posting.created` (valid posting, the market's offer door, a fresh request signed by a
+  verified user agent that is itself a valid Request) before any LLM runs. A request already
+  handled is answered "already handled" without the LLM or a second offer (kept in memory per
+  node, bounded, 10 min). An offer's `valid_until` comes from the signed request's
+  `expires_at`, at most 24 h ahead and never past noon after the stay night (it came from the
+  unsigned posting). The offer-door check compares the effective port (443 for https) and
+  refuses any user info. Tuttie accepts an agreement only at a real price (finite, above zero,
+  not a bool) and only if it is a valid `Agreement`; a counter without a real price ends the
+  negotiation.
 - **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
   timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
   silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
