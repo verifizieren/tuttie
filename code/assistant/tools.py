@@ -387,7 +387,7 @@ def offered_room(offer: dict) -> str | None:
 
 # Words a private item may hold that every hotel may hear (the stay itself, the dog, the guest).
 PUBLIC_WORDS = frozenset({"basel", "sbb", "luna", "hotel", "rhine"})
-GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "Handan")
+GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "").strip() or "Handan"
 GUEST_FIRST_NAME = GUEST_FULL_NAME.split()[0]
 
 
@@ -757,7 +757,8 @@ class Toolbox:
         "with <name>" in private calendar entries, senders of private messages other than the
         user, a "<city> →" in a private mail subject. A question to a business must not name them."""
         terms: set[str] = set()
-        me = GUEST_FIRST_NAME.lower()
+        own = str(self.user.data.get("user", "")).split()
+        me = {GUEST_FIRST_NAME.lower(), *(own[:1] and [own[0].lower()])}  # env and context both name the user
         for items in self.user.data.values():
             for item in items if isinstance(items, list) else []:
                 if not isinstance(item, dict) or item.get("visibility") != "private":
@@ -770,7 +771,7 @@ class Toolbox:
                 terms |= set(re.findall(r"\b\d{2}:\d{2}\b", str(item.get("snippet", ""))))  # its times
                 terms |= {m.lower() for m in re.findall(r"\bwith ([A-Z][a-z]+)", text)}
                 terms |= {m.lower() for m in re.findall(r"\b([A-Z][a-z]+) →", text)}
-                if isinstance(item.get("from"), str) and item["from"].isalpha() and item["from"].lower() != me:
+                if isinstance(item.get("from"), str) and item["from"].isalpha() and item["from"].lower() not in me:
                     terms.add(item["from"].lower())
         return {t for t in terms if t and t not in PUBLIC_WORDS}
 
