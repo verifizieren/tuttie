@@ -252,6 +252,16 @@ redeemed). The wallet shows them under the amount, and the signed decision inclu
 equal the terms it is about to book, so an approval for the non-refundable double cannot
 book the flexible rate. The pending `approval` event carries `detail.terms`.
 
+A payment approval carries `charge` (`aps/approval.py`, `payment_charge`):
+`{purpose, booking_id}`, signed with the decision like `terms`. The gate pays with an approval
+only if its `charge` is exactly this charge of this booking (refusal: `the approval is not for
+the <purpose> of this booking`), so a "city tax for BK-1" approval cannot pay another charge or
+booking of the same amount. Book approvals are unchanged (no `charge`).
+
+`offer_mandate` is only offered for a charge above CHF 0 (`facts.charges[].price_chf` is a
+whole number from 1). If the offered mandate cannot be signed, the decision still counts
+without it, and Tuttie asks for that charge on the phone later.
+
 ## Business tools over MCP (`node/mcp_tools.py`)
 
 Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
@@ -267,7 +277,9 @@ call (below) and run only through the action gate (`aps/gate.py`):
   `date` the same way.
 - `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
   signed commitments, or its own signed agreement) and asks the gate with
-  `Needs("book", scope="book", approval=True, amount_chf=total)`. With an agreement the
+  `Needs("book", scope="book", approval=True, amount_chf=total)`. An extra whose commitment's
+  `valid_until` has passed, or ends before the booked night, is refused (`the commitment for
+  <item> has expired: ask the hotel again`). With an agreement the
   call must name the agreement's `room_type`, `date` and a room with its `rate`, and carry no
   `extras` (refusals: `the agreement is for a <room> room, not <x>` / `... for the night of
   <date>, not <x>` / `... for the rate ..., not ...` / `an agreement fixes what is included:
@@ -279,7 +291,8 @@ call (below) and run only through the action gate (`aps/gate.py`):
   when extras were redeemed.
 - `pay`: `args = {purpose, booking_id, mandate | approval}`. The amount is the charge's
   `price_chf` from `facts.charges`; each charge is paid once per booking at this business.
-  Gate: `Needs("pay", scope=None, approval=True, mandate=True, amount_chf, purpose)`. Receipt:
+  Gate: `Needs("pay", scope=None, approval=True, mandate=True, amount_chf, purpose,
+  booking_id)`; an approval must carry `charge = {purpose, booking_id}` (see Approval). Receipt:
   `{status: "paid", receipt_id, booking_id, purpose, amount_chf, paid_with: "mandate" |
   "approval", checked}`.
 
@@ -364,7 +377,7 @@ approval, agreement, amount_chf}`:
 | 5 | nonce not seen | `the call was already used (replayed nonce)` |
 | 6 | `delegation` with the scope, signed by the user, not expired | `the user has not delegated <scope> to this agent (...)` |
 | 7 | `agreement` (only if `args.agreement`): own signature, valid, unused | `the agreement is not signed by this hotel` / `... has expired` / `... was already booked` / `this business does not negotiate, ...` |
-| 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` |
+| 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` / for `pay`: `the approval is not for the <purpose> of this booking` |
 | 8b | or `mandate` (only `pay`, `Needs(mandate=True)`, call has `mandate` and no `approval`) | `the mandate is not signed by the user` / `... is for another agent` / `... for another payee` / `... is for <x>, not <purpose>` / `... has expired` / `CHF a is above the CHF 10 a mandate covers; the user must approve it` / `the mandate's amount is used up` |
 
 `pay` uses `Needs("pay", scope=None, approval=True, mandate=True, amount_chf=<charge>,
