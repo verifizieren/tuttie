@@ -11,29 +11,11 @@ function Chip() {
   );
 }
 
-function UbsBrand() {
+/** The bank's real logo, drawn white on the card (files in public/banks/). */
+function BankLogo({ bank }) {
   return (
-    <span className="bank-brand ubs-brand" aria-hidden="true">
-      <svg className="ubs-keys" viewBox="0 0 42 30">
-        <g fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="7" cy="15" r="4.5" />
-          <path d="M11.5 15h24l4-4M31 15l4 4M26 15v4" />
-          <circle cx="13" cy="6" r="3.5" />
-          <path d="M16 8l18 13 5-1M31 19l-1 4" />
-          <circle cx="13" cy="24" r="3.5" />
-          <path d="M16 22L34 9l5 1M31 11l-1-4" />
-        </g>
-      </svg>
-      <b>UBS</b>
-    </span>
-  );
-}
-
-function ZkbBrand() {
-  return (
-    <span className="bank-brand zkb-brand" aria-hidden="true">
-      <span className="swiss-mark"><i /><i /></span>
-      <span><b>ZKB</b><small>Zürcher Kantonalbank</small></span>
+    <span className="bank-brand" aria-hidden="true">
+      <img className={`bank-logo ${bank}`} src={`banks/${bank}-logo.svg`} alt="" />
     </span>
   );
 }
@@ -42,9 +24,9 @@ function ZkbBrand() {
 export default function BankCard({ index, color }) {
   return (
     <div className={`card bank bank-${color}`} style={{ "--i": index }}
-         aria-label={color === "black" ? "UBS card" : "ZKB card"}>
+         aria-label={color === "black" ? "UBS card" : "BKB card"}>
       <Chip />
-      {color === "black" ? <UbsBrand /> : <ZkbBrand />}
+      <BankLogo bank={color === "black" ? "ubs" : "bkb"} />
     </div>
   );
 }

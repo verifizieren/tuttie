@@ -7,7 +7,7 @@ Live at <https://web4.mendes.dev/wallet/>.
 
 ## What it does today
 
-- A minimal Apple Wallet-like stack: UBS and ZKB bank cards (without personal details) and the
+- A minimal Apple Wallet-like stack: UBS and BKB (Basler Kantonalbank) bank cards with their real logos (`public/banks/`, from Wikimedia Commons) (without personal details) and the
   **Tuttie card**, which is nothing but the agent's face (procedural eyes ported from
   pycozmo) with a quiet "Tuttie" label.
 - **Quietly awake** in the stack (open eyes, gentle glances and blinks). **Tap or swipe up**

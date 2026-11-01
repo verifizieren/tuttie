@@ -403,3 +403,8 @@ body { position: fixed; inset: 0; background: var(--bg); user-select: none; -web
 .sheet-note { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: var(--accent-text); }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* Real bank logos (BKB, UBS), white on the cards */
+.bank-logo { display: block; filter: brightness(0) invert(1); }
+.bank-logo.bkb { height: 30px; }
+.bank-logo.ubs { height: 36px; margin-top: -4px; }
