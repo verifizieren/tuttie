@@ -375,8 +375,8 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .sw.top { opacity: 1; transform: none; z-index: 2; }
 .sw.top.lean-r { transform: translateX(46px) rotate(3deg); }
 .sw.top.lean-l { transform: translateX(-46px) rotate(-3deg); }
-.sw.top.right { transform: translate(520px, 40px) rotate(29deg); }
-.sw.top.left { transform: translate(-520px, 40px) rotate(-29deg); }
+.sw.right { transform: translate(520px, 40px) rotate(29deg); opacity: 1; z-index: 3; }
+.sw.left { transform: translate(-520px, 40px) rotate(-29deg); opacity: 1; z-index: 3; }
 .hbars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 4; display: flex; gap: 4px; }
 .hbars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
 .hbars i.on { background: #fff; }
@@ -426,7 +426,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
           padding: 14px 28px; border-radius: 30px; font-size: 22px; font-weight: 650; color: #08080b; background: #fff; border: 0;
           box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 .cap h3 { padding-right: 0; }
-.cap p { min-height: 1.4em; }
+.cap p { min-height: 2.8em; }
 
 .chips { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
 .chips span { padding: 7px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
@@ -611,7 +611,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
             <div class="faceid"><svg class="fglyph" id="fglyph" viewBox="0 0 60 60"><g class="fframe"><path d="M4 18V10a6 6 0 0 1 6-6h8M42 4h8a6 6 0 0 1 6 6v8M56 42v8a6 6 0 0 1-6 6h-8M18 56h-8a6 6 0 0 1-6-6v-8"/></g><g class="fface"><path d="M21 22v5M39 22v5M30 22v11h-2.5M22 40q8 6 16 0"/></g><path class="fcheck" d="M19 31l7.5 7.5L41.5 23"/></svg><span id="fidText">Face ID</span></div>
           </div>
 
-          <div class="call" id="cBudget" style="top:96px"><small>Stays on your phone</small><b>Budget CHF 160 is private</b></div>
+          <div class="call" id="cBudget" style="top:96px"><small>Behind the screen</small><b>Budget CHF 160 is never sent</b></div>
           <div class="call red" id="cForged" style="top:330px"><small>Behind the screen</small><b>Forged seal · refused</b>
             <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
           <div class="call" id="cBargain" style="top:330px"><small>Behind the screen</small><b>Both limits stay private</b><span>Compared in code, never by AI.</span></div>
@@ -708,7 +708,7 @@ const CAPS = [
   ["One tap, signed", "This hotel, this price. Nothing without you."],
   ["Booked", "Seven rooms beat 220."],
 ];
-const REPLY = "Booked: Gästehaus am Rhein on the 14th for CHF 128, and the city tax is paid. The door code comes after midnight.";
+const REPLY = "Booked: Gästehaus am Rhein on the 14th for CHF 128, and the city tax is paid. Anna sends the door code on the day.";
 const DURATION = 38500;
 const capAt = [0, 2000, 6600, 9300, 13300, 17300, 24200, 30400];
 const typers = [{ el: $("#replyText"), text: REPLY, start: 31800, dur: 3000 }];
@@ -763,8 +763,10 @@ const EVENTS = [
   [6000, () => { call("#cBudget", false); face.setVoice(0, 0); }],
   [6600, () => { cls("s-voice", false); cls("s-busy", true); face.set("skepticism", 400); face.lookAt(-.6, -.5); }],
   [7100, () => { show("#steps"); line("#lCtx", "Checking location", "active"); }],
-  [7600, () => line("#lCtx", "Checking messages", "active")],
-  [8100, () => line("#lCtx", "Checking calendar", "active")],
+  [7400, () => line("#lCtx", "Checking messages", "active")],
+  [7700, () => line("#lCtx", "Checking mails", "active")],
+  [8000, () => line("#lCtx", "Checking calendar", "active")],
+  [8300, () => line("#lCtx", "Checking what you like", "active")],
   [8600, () => { line("#lCtx", "Checked your location, messages, mails and calendar", "done"); line("#lTool", "Asked 3 hotels", "active"); face.set("confusion", 400); face.lookAt(.5, -.4); }],
   [9600, () => { call("#cForged", true); face.set("suspicion", 350); face.lookAt(0, .2); }],
   [11900, () => $("#cForged").classList.add("gone")],
@@ -828,6 +830,12 @@ function tickDemo(dt) {
   });
   if (clock >= DURATION) { finished = true; $("#replay").classList.add("show"); }
 }
+// "Watch it again": land where the phone is docked, so the demo plays right away.
+$("#again").addEventListener("click", e => {
+  e.preventDefault();
+  const d = $("#demo");
+  scrollTo({ top: d.offsetTop + (d.offsetHeight - innerHeight) * .36, behavior: "smooth" });
+});
 $("#replay").addEventListener("click", e => { e.stopPropagation(); restart(); playing = true; });
 // Tap the phone to pause and resume; a tap pause sticks until the next tap (scrolling back
 // into view resumes only an automatic pause).
