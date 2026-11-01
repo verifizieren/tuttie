@@ -499,7 +499,10 @@ an invited business, fresh (≤ 300 s), for this `request_id` and before `valid_
 | `GET /postings/{id}/shortlist` | best five current offers within budget: by price, grey last |
 
 `status` is `interested`, `declined`, `invited` (no clear answer) or `unreachable`.
-Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410 or 422.
+Refusals: `{"refused": true, "reason"}` with 403, 404, 409, 410, 422 or 429. `POST /postings`
+answers 429 (`Retry-After` in seconds) after 120 postings a minute from one requester, unless
+the request carries the deployment's `AGENT_WEB_KEY` in `X-Agent-Web-Key` (Tuttie sends it on
+its own postings, so they are never capped). The market keeps the newest 500 postings.
 
 ### Counter-offer (either side, during negotiation; implemented in `code/negotiation/`)
 
