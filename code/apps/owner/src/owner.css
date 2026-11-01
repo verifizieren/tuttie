@@ -32,7 +32,7 @@ header h1 { font-size: 34px; font-weight: 700; letter-spacing: -.01em; }
 .seal.broken { background: var(--red); }
 .live { display: inline-flex; align-items: center; gap: 7px; }
 .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
-.live.down i { background: var(--amber); }
+.live.down i { background: var(--red); }
 .notice { margin-top: 24px; color: var(--green); font-size: 14px; }
 
 /* ---- blocks of lines ---- */
@@ -92,7 +92,7 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 
 /* ---- login ---- */
 .login form { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; margin-top: 12vh; }
-.login h1 span { display: block; margin-top: 4px; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); }
+.login h1 span { color: var(--muted); font-weight: 500; }
 .login .input { text-align: left; width: 100%; }
 
 @media (max-width: 560px) {
