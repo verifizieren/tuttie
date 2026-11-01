@@ -6,13 +6,13 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (round 6 overnight fixes on `overnight/integration`, not merged; the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
+Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not merged; the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
 
 ## Done
 
 - **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
   - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
-  - The marketplace takes at most 120 postings per requester a minute (429 + Retry-After; all wallet users share Tuttie's id) and keeps the newest 500; Tuttie turns a busy, unreachable or non-JSON market into a calm tool error.
+  - The marketplace takes at most 120 keyless postings per requester a minute (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
   - The action gate refuses an approval whose signed `decided_at` is over 900 s old or in the future (after a node restart an old approval no longer books again).
   - `registry_lookup` (negotiation/hotel.py) looks up only node-id-shaped ids and returns only dict records; `../search` gave a 500 on `/tools/counter_offer` and made the gate raise.
 - **Round 6 (overnight)** (branches `fix/r6-trust`, `fix/r6-approval-sheet`, `fix/r6-voice`,
@@ -36,13 +36,34 @@ Last updated: 2026-11-01 (round 6 overnight fixes on `overnight/integration`, no
     404/409) instead of going mute; while the Face ID sheet is up a spoken line gets "Please
     approve or decline on your phone first." (at most every 5 s) instead of queueing; Face ID is
     asked once per approval; node/approval/offer/mandate/request ids and web addresses are never
-    read aloud; "for 00:52" is a clock time; CHF 1'280 / 1 280 is one amount; no filler on swipes.
+    read aloud; "for 00:52" is a clock time; CHF 1'280 (or 1 280 with a no-break space) is one
+    amount, a plain space never joins two numbers ("CHF 128 100 percent"); no filler on swipes;
+    no "swipe right" handoff line when the cards answer already says to swipe.
   - Tuttie (`overnight/harden`): Claude prompt caching of the fixed prompt + tools (`llm.py`,
     round notes stay an uncached second system block; ~90 % cheaper input, latency unchanged);
     after `recall_context` for a hotel it posts the request in the same turn; cards answer = pick
     + one reason; after booking only "booked" + total (the `book` result carries an LLM-facing
     `note`); after a decline one other hotel by name, no price; "yes, book that one" books
-    without an agreement at the cheapest fitting rate; the budget amount is never said aloud.
+    without an agreement at the cheapest fitting rate; the budget amount is said only when the
+    user asks for it. A hotel's signed confirmation never fills Tuttie's own `book` result keys
+    (`node_id`, `source_step`, `note`, `charges_paid`, `open_charges`, `mismatch`); a non-number
+    `total_chf` counts as a mismatch. After a decline Tuttie offers only a hotel the user's
+    message named as liked (else it just stops). `/reset` also forgets the old posting and its
+    offers (`MarketDesk.forget`).
+  - Trust, numbers: NaN, Infinity and integers too big for a float never reach events or cards:
+    `mcp_client` refuses an MCP reply holding them, `EventBus.emit` turns any non-finite float
+    into null (SSE frames and `/history` stay valid JSON), `cards.number()` accepts only finite
+    numbers (a 400-digit integer is no OverflowError), card ratings only 0..5, and an offer whose
+    price is not a finite number is dropped.
+  - Wallet sheet and cards (after the first pass): a `decided` event for an older approval never
+    closes a newer sheet; the city tax sheet waits until the booking's checkmark was shown
+    (`sheetOf`); a sheet replaced mid-decision tells the wallet, so no ghost sheet stays; the
+    streamed decision also finishes the sheet after the 15 s timeout or a "gone" answer
+    (`finishesOn`). A newly shown sheet ignores finger taps for 600 ms (`ARM_MS`, its slide-in),
+    judged by the pointerdown time or, for assistive taps without one, the click time;
+    `button.click()` (keyboard, keynote deck) always counts. Hotel cards pass through `cardOf`
+    (shown fields are plain text, finite numbers or null; rating only 0..5); a late agreement
+    whose price is not a number is ignored; long hotel names clamp to two lines.
   - Note: the LLM behaviour eval used overnight (real Haiku, 24 scenarios) lives outside the repo
     (`/home/baselhack/overnight/eval`). Left open: 24-hour times on screen, long answers outside
     the pitch path, re-dating after the cards.
