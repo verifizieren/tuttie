@@ -20,6 +20,17 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   approval for another charge or booking (book approvals unchanged). Tuttie flags a
   confirmation whose extras differ from the approved `includes` (`mismatch: ["includes"]`).
   Regression tests: `tests/test_r3_approvals.py`, `tests/test_r3_booking.py`.
+- **Tell the team: the seal body changed (red team round 4, trust core; branch
+  `wip/r4-trust`, not deployed).** Seals now also sign `name`, `kind` and `endpoint`
+  (`aps/seals.py` `seal_body`, `documentation/formats.md`), and `data/registry.json` is
+  re-signed. Pull it and run `scripts/issue_seals.py` after any change to a node config's
+  name, kind or port; the live service must be restarted to load the new registry. Also fixed:
+  a node whose `node_id` equals an authority id (e.g. "bar-association-ch") and self-seals
+  stays grey with no licence or vouched UID (issue_seals refuses such ids); hotels answer a
+  posting only if the requester holds the user's `post_requests` delegation; a delegation
+  whose `scopes` is a string never verifies; the marketplace refuses an agent card older than
+  300 s. Tiers unchanged (Rheinblick gold+blue, Spalenhof blue, scam broken, fake lawyer grey,
+  Budget Rooms grey, Gästehaus gold, Alpina gold+blue, Tuttie blue).
 - **Red team round 2, hotel side** (branch `wip/r2-node`, not deployed): `/agent/invoke`
   answers only posting events, and `posting.updated` now gets the same checks as
   `posting.created` (valid posting, the market's offer door, a fresh request signed by a
