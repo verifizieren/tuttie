@@ -35,6 +35,16 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   (formats.md):** `/conversations` 429; resuming an empty chat is a 410. Remaining: a patient
   bot can still create sessions early and use them later (N3 cannot be fully solved).
   Tests: `tests/test_r4_conversations.py`.
+- **Red team round 4, hotel sessions** (branch `wip/r4-sessions`, not deployed): Tuttie never
+  closed the hotel sessions it opened, so after 200 negotiations a hotel answered 500 to every
+  user until restart. Now Tuttie closes them when a negotiation ends, a full store closes its
+  least recently used idle session (429 only if all are busy), closed sessions are freed (50
+  kept) and turns are capped (100). Sessions are bound to their opener (`session_token`, header
+  `X-Session-Token`, else 403; 128-bit ids); message/context sizes are capped (422); a close
+  waits for a reply in progress. Tuttie sends the agent key only to gold/blue nodes (grey nodes
+  could replay it). A signed commitment books once; the LLM's arrival date is bounded.
+  **Tell the team (formats.md):** the session table and the agent key note.
+  Regression tests: `tests/test_r4c_sessions.py`.
 - **Red team round 3, approvals, booking and payments** (branch `wip/r3-pay`, not deployed):
   an approval is signed before it leaves the pending list, so a failing mandate no longer loses
   the decision (a CHF 0 charge used to 500 the approve call and hang the booking 300 s); a
