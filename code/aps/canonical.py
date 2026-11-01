@@ -15,5 +15,14 @@ def b64encode(data: bytes) -> str:
 
 
 def b64decode(text: str) -> bytes:
-    """Base64 text -> bytes; rejects anything that is not strict base64."""
-    return base64.b64decode(text.encode(), validate=True)
+    """Base64 text -> bytes; rejects anything that is not strict, canonical base64.
+
+    Canonical means the one encoding b64encode gives: base64 lets the unused bits before "="
+    vary, so without this one signature would have several texts (and look unused again).
+    """
+    if not isinstance(text, str):
+        raise TypeError("base64 text must be a string")
+    data = base64.b64decode(text.encode(), validate=True)
+    if b64encode(data) != text:
+        raise ValueError("not canonical base64")
+    return data

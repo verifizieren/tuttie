@@ -23,6 +23,7 @@ import httpx
 
 from aps import evaluate_record, load_signing_key, verify_envelope
 from aps.envelope import parse_timestamp
+from assistant.cards import MAX_ABOUT_CHARS, MAX_NAME_CHARS, clean_text, profile_of  # noqa: F401
 from assistant.events import EventBus
 from marketplace.client import new_request_id, post_request, sign_request
 from marketplace.messages import Request
@@ -49,6 +50,18 @@ def public_requirements(requirements: list[str], budget_chf: float | None) -> li
     secret = re.compile(rf"(?<![\d.]){int(budget_chf)}(?![\d])") if budget_chf else None
     return [r for r in requirements
             if not MONEY.search(r) and not (secret and secret.search(r))]
+
+
+def card_fields(card: dict) -> tuple[str | None, dict]:
+    """The agent's name and the profile from a signed agent card, only if of the right type.
+
+    The card is signed by a verified business, but it is still the business's own text: the name
+    must be one short line (it reaches the wallet and the LLM) and the profile is cleaned like
+    the one in the hotel's get_policies (cards.profile_of).
+    """
+    persona = card.get("persona")
+    name = persona.get("name") if isinstance(persona, dict) else None
+    return clean_text(name, MAX_NAME_CHARS), profile_of(card)
 
 
 def shortlist(offers: list[dict], budget_chf: float | None, now: datetime, size: int = SHORTLIST_SIZE) -> list[dict]:
@@ -79,6 +92,7 @@ class MarketDesk:
         self.last_shortlist: list[dict] = []     # its shortlisted offers, with their signed envelopes
         self.last_offers: list[dict] = []        # every checked offer for it (the user may pick any)
         self.last_budget: float | None = None    # the private budget it was shortlisted with
+        self.cards: dict[str, dict[str, dict]] = {}  # request_id -> node_id -> agent card, while collecting
 
     async def find(self, date: str, requirements: list[str] | None = None, tags: list[str] | None = None,
                    category: str = "hotel", guests: int = 1, budget_chf: float | None = None) -> dict:
@@ -134,22 +148,37 @@ class MarketDesk:
         an offer that checks out. A hotel keeps one offer: a newer one from the same hotel
         replaces its earlier one (its latest word), so one eager hotel can neither end the
         wait for the others nor fill the cards twice. Each offer is checked again by Tuttie
-        and shown once on the timeline.
+        and shown once on the timeline. Each hotel's agent card is fetched once per collect, and
+        the wait ends on time even in the middle of a long list of offers.
         """
+        self.cards[request_id] = {}             # each hotel's agent card, fetched once (see check)
+        try:
+            return await self.poll(request_id, expected, invited)
+        finally:
+            self.cards.pop(request_id, None)
+
+    async def poll(self, request_id: str, expected: int, invited: dict) -> list[dict]:
+        """collect's loop: check each new relayed offer until enough hotels offered or time is up."""
         seen: set[str] = set()                  # offer ids already checked (valid or not)
         by_hotel: dict[str, dict] = {}          # node_id -> its latest offer that checked out
-        deadline = asyncio.get_running_loop().time() + self.offer_wait_s
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.offer_wait_s
         while True:
             response = await self.http.get(f"{self.market_url}/postings/{request_id}")
             for item in response.json().get("offers", []):
-                offer_id = item["offer"]["offer_id"]
+                try:
+                    offer_id, node_id = str(item["offer"]["offer_id"]), str(item["node_id"])
+                except (KeyError, TypeError):
+                    continue                    # not an offer at all
                 if offer_id in seen:
                     continue
                 seen.add(offer_id)
-                checked = await self.check(item, invited.get(item["node_id"], {}), request_id)
+                checked = await self.check(item, invited.get(node_id, {}), request_id)
                 if checked:
                     by_hotel[checked["node_id"]] = checked
-            if len(by_hotel) >= expected or asyncio.get_running_loop().time() > deadline:
+                if loop.time() > deadline:
+                    break
+            if len(by_hotel) >= expected or loop.time() > deadline:
                 return list(by_hotel.values())
             await asyncio.sleep(POLL_S)
 
@@ -159,17 +188,23 @@ class MarketDesk:
         Checks the business's seals from the registry, the offer's signature (by that
         business, over exactly the offer shown), that it answers *this* request (`request_id`:
         a genuine offer from another posting has another date or other needs) and that it is
-        still valid. Anything else is shown as broken and ignored.
+        still valid. Anything else is shown as broken and ignored, also a malformed item (an
+        unknown business, a price that is not a number). While collect runs for this request,
+        each business's agent card is fetched only once.
         """
-        node_id = item["node_id"]
-        record = (await self.http.get(f"{self.registry_url}/nodes/{node_id}")).json()
-        verdict = evaluate_record(record, self.authorities)
-        offer = item["offer"]
-        summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
+        try:
+            node_id = item["node_id"]
+            record = (await self.http.get(f"{self.registry_url}/nodes/{node_id}")).json()
+            verdict = evaluate_record(record, self.authorities)
+            offer = item["offer"]
+            summary = f"{record['name']} offers {offer['item']} for CHF {offer['price_chf']:g}"
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError):
+            self.bus.emit("marketplace", "broken", "A malformed offer or one from an unknown business, ignored")
+            return None
         valid_until = parse_timestamp(offer.get("valid_until", ""))
         problem = None
         if not (verdict["tier"] in TRUSTED_TIERS
-                and verify_envelope(item["envelope"], record["public_key"], expected_node_id=node_id)
+                and verify_envelope(item.get("envelope"), record["public_key"], expected_node_id=node_id)
                 and item["envelope"]["payload"] == offer):
             problem = "offer does not verify"
         elif offer.get("request_id") != request_id:
@@ -181,8 +216,10 @@ class MarketDesk:
             return None
         # Name, uid, agent and profile come from signed data only (the sealed registry record and
         # the business's own signed agent card), never from the market's unsigned relay.
-        card = await self.agent_card(record)
-        agent, profile = (card.get("persona") or {}).get("name"), card.get("profile")
+        cards = self.cards.get(request_id, {})
+        if node_id not in cards:
+            cards[node_id] = await self.agent_card(record)
+        agent, profile = card_fields(cards[node_id])
         event = self.bus.emit("marketplace", "verified", summary, record, verdict["seals"],
                               {"phase": "offer", "offer": offer, "agent": agent, "profile": profile})
         return {"node_id": node_id, "name": record["name"], "uid": verdict.get("uid"),
