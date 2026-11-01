@@ -96,6 +96,17 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   10 new rooms a minute per conversation and 300 per client address, else 429 (the wallet
   retries on its own); rooms are not reused because the voice agent closes its session when
   the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
+- Conversation store, red team round 2 (2026-11-01, branch wip/r2-conv; many visitors share
+  the live site via the QR code): saved chats are capped at 20 per browser (its own oldest go)
+  and 200 in all (the browser with the most gives one up), so one browser pressing "new chat"
+  cannot expire anyone else's chats. Active conversations: empty ones are dropped first; one
+  with history only above 400, the fewest turns first. A browser whose conversation was dropped
+  gets a new id for its next one (no longer the same HMAC), so a late "book" for the old chat
+  is a 409. `POST /chat` (and spoken turns, `POST /voice/say`): at most 10 turns a minute per
+  browser and 120 per client address, else 429 with `Retry-After` (the wallet shows the
+  server's sentence). `POST /voice/token` throttles before it creates a conversation. A
+  TypeError inside a tool is reported as a failure, not as "bad arguments" (the LLM retried
+  correct calls). Tests: `test_r2_conversations.py`, `test_book_args.py`.
 
 - Demo-story polish (2026-10-31, branch wip/story-polish), from live runs: (1) the facts note
   Tuttie gets every round (`current_deals`) now carries each card hotel's signed policies
@@ -493,8 +504,8 @@ Why things are the way they are, so nobody has to rediscover them:
   History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
   the keyboard in an open past chat resumes that chat before typing, and the dock's History
   button always returns to the list. Old or expired entries stay read-only: a 404/410 shows
-  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 200
-  globally in addition to the 200 active browser conversations; a restart expires them. The
+  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 20
+  per browser and 200 globally, in addition to the active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
   LiveKit 1.13.11 + LiveKit Agents 1.8.10 with ElevenLabs (Scribe v2 realtime, Flash v2.5).
