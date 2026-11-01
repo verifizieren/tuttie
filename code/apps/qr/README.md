@@ -29,6 +29,10 @@ What it shows, top to bottom (little text on purpose):
    website in front and an illustrative code layer behind, with a screen-reader description.
    **APS** follows as a nested "Trust, signed." subsection about sender identity, offer
    integrity and user permission, with a smaller heading and a subtle divider.
+   Animations (CSS only, triggered by the reveal's `.in`): the code card slides out from behind
+   the website, its lines appear and "signed" gets a check; next to each APS point a double seal
+   draws in, a signed price is changed and its check turns into a cross (looping), and `pay`
+   stays locked while `ask` and `negotiate` are granted.
 8. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
    one progress segment per part, tap right = next part, tap left = previous part, press and
    hold = pause, arrow keys (Space pauses) and side arrows on desktop. It follows the real

@@ -6,10 +6,16 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (QR page: two-layer web vision and stacked-card diagram; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
+Last updated: 2026-11-01 (QR page: two-layer and APS animations; two-layer web vision and stacked-card diagram; light design for wallet, QR page and pitch deck; decks at `/pitch/` (Sebastian's pitch); the demo runner is open).
 
 ## Done
 
+- **QR page two-layer and APS animations (1 Nov)**: the agent-layer card slides out from behind
+  the website card, its code lines appear and "signed" gets a check (once). Each APS point has a
+  small figure: a double seal draws in (register purple, platform blue), a signed price flips
+  135 → 95 and its check turns into a cross (the only loop, 6 s), and the scopes `ask` and
+  `negotiate` arrive while `pay` stays locked. Pure CSS on the existing reveal (`.in`);
+  reduced motion shows the end state.
 - **QR page web vision (1 Nov)**: "One web. Two layers." now explicitly describes our vision
   of a new agent layer while existing websites stay the same. Replaced the flow diagram with
   two offset cards: a website in front and an illustrative agent code layer behind. Uses the

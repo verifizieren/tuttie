@@ -157,6 +157,74 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .aps-subsection .sub { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
 .aps-subsection .tech { margin-top: 18px; }
 
+/* Two layers, animated once on reveal: the agent card starts hidden exactly behind the website
+   (same size, so the offset is the diagram's padding), then slides out to its place; its code
+   lines appear one by one and "signed" gets a check. Calm: one move, no loop. */
+.web-agent-card { transform: translate(-32px, 88px); transition: transform 1.1s var(--ease) .45s; }
+.web-diagram.in .web-agent-card { transform: none; }
+.web-code .ln { display: block; opacity: 0; transform: translateX(-6px); transition: opacity .5s, transform .5s var(--ease); }
+.web-diagram.in .web-code .ln { opacity: 1; transform: none; }
+.web-diagram.in .web-code .ln:nth-child(1) { transition-delay: 1.1s; }  .web-diagram.in .web-code .ln:nth-child(2) { transition-delay: 1.22s; }
+.web-diagram.in .web-code .ln:nth-child(3) { transition-delay: 1.34s; } .web-diagram.in .web-code .ln:nth-child(4) { transition-delay: 1.46s; }
+.web-diagram.in .web-code .ln:nth-child(5) { transition-delay: 1.58s; } .web-diagram.in .web-code .ln:nth-child(6) { transition-delay: 1.7s; }
+.web-ok { display: inline-grid; place-items: center; width: 14px; height: 14px; margin-left: 5px; vertical-align: -2px; border-radius: 50%;
+          background: var(--purple); transform: scale(0); transition: transform .45s cubic-bezier(.34,1.56,.64,1) 2.1s; }
+.web-ok svg { width: 10px; height: 10px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.web-diagram.in .web-ok { transform: scale(1); }
+
+/* APS: text left, a small figure right. */
+.aps-rows > div { display: flex; align-items: center; gap: 14px; }
+.aps-rows p { flex: 1; margin: 0; }
+.aps-fig { flex: none; width: 92px; }
+.tech .aps-fig, .tech .aps-fig span { margin-top: 0; color: var(--text); }  /* undo .tech span (text rows) */
+.tech .aps-offer { display: flex; } .tech .aps-scope { display: flex; } .tech .aps-offer .tag, .tech .aps-offer .pr { display: inline-block; } .tech .aps-offer .mark { display: block; }
+/* Who: the register's seal (purple) and the platform's (blue) draw in, then a check settles. */
+.aps-seal { height: 56px; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.aps-seal path { stroke-dasharray: 120; stroke-dashoffset: 120; }
+.aps-seal .s1 { stroke: var(--purple); stroke-width: 2.2; fill: var(--tint-purple); }
+.aps-seal .s2 { stroke: var(--blue); stroke-width: 2.2; fill: rgba(234,241,253,.92); }
+.aps-seal .ck { stroke: var(--blue); stroke-width: 2.6; stroke-dasharray: 22; stroke-dashoffset: 22; }
+.aps-rows.in .aps-seal path { transition: stroke-dashoffset 1s var(--ease); stroke-dashoffset: 0; }
+.aps-rows.in .aps-seal .s1 { transition-delay: .5s; } .aps-rows.in .aps-seal .s2 { transition-delay: .9s; }
+.aps-rows.in .aps-seal .ck { transition: stroke-dashoffset .45s var(--ease) 1.7s; }
+/* What: a signed price checks out; the price is changed, the check turns into a cross; back. Loops calmly (6 s). */
+.aps-offer { display: flex; align-items: center; justify-content: flex-end; gap: 6px; width: auto; min-width: 92px; }
+.aps-offer .tag { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel); font: 600 12px/1 var(--mono); white-space: nowrap; }
+.aps-offer .tag::before { content: "CHF "; color: var(--dim); }
+.aps-offer .pr { position: relative; display: inline-block; width: 3ch; height: 1em; overflow: hidden; vertical-align: bottom; }
+.aps-offer .pr i { position: absolute; left: 0; top: 0; }
+.aps-offer .pr .b { transform: translateY(110%); color: var(--pink); }
+.aps-offer .mark { position: relative; width: 20px; height: 20px; }
+.aps-offer .mark svg { position: absolute; inset: 0; width: 20px; height: 20px; padding: 4px; border-radius: 50%; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
+.aps-offer .ok { background: var(--purple); }
+.aps-offer .no { background: var(--pink); opacity: 0; transform: scale(.4); }
+.aps-rows.in .aps-offer .pr .a { animation: off-a 6s var(--ease) 1s infinite; }
+.aps-rows.in .aps-offer .pr .b { animation: off-b 6s var(--ease) 1s infinite; }
+.aps-rows.in .aps-offer .tag  { animation: off-tag 6s 1s infinite; }
+.aps-rows.in .aps-offer .ok   { animation: off-ok 6s var(--ease) 1s infinite; }
+.aps-rows.in .aps-offer .no   { animation: off-no 6s var(--ease) 1s infinite; }
+@keyframes off-a   { 0%,35% { transform: none; } 42%,85% { transform: translateY(-110%); } 92%,100% { transform: none; } }
+@keyframes off-b   { 0%,35% { transform: translateY(110%); } 42%,85% { transform: none; } 92%,100% { transform: translateY(110%); } }
+@keyframes off-tag { 0%,44% { border-color: var(--line2); transform: none; } 47% { transform: translateX(-3px); } 50% { transform: translateX(3px); }
+                     53%,85% { border-color: rgba(229,72,155,.45); transform: none; } 92%,100% { border-color: var(--line2); } }
+@keyframes off-ok  { 0%,42% { opacity: 1; transform: none; } 46%,85% { opacity: 0; transform: scale(.4); } 92%,100% { opacity: 1; transform: none; } }
+@keyframes off-no  { 0%,42% { opacity: 0; transform: scale(.4); } 46%,85% { opacity: 1; transform: none; } 92%,100% { opacity: 0; transform: scale(.4); } }
+/* Allow: the scopes Tuttie gets come in one by one; "pay" arrives last, nudges and stays locked. */
+.aps-scope { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.aps-scope i { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font: 600 11px/1.2 var(--mono);
+               background: var(--tint-purple); color: var(--accent-text); opacity: 0; transform: translateX(14px);
+               transition: opacity .5s, transform .6s var(--ease); }
+.aps-scope .pay { background: transparent; color: var(--pink); border: 1px dashed rgba(229,72,155,.6); }
+.aps-scope svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+.aps-rows.in .aps-scope i { opacity: 1; transform: none; }
+.aps-rows.in .aps-scope i:nth-child(1) { transition-delay: .7s; } .aps-rows.in .aps-scope i:nth-child(2) { transition-delay: .9s; }
+.aps-rows.in .aps-scope .pay { transition-delay: 1.3s; animation: pay-nudge .5s 2.1s; }
+@keyframes pay-nudge { 30% { transform: translateX(-4px); } 60% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .web-agent-card, .web-code .ln, .web-ok, .aps-seal path, .aps-scope i { transition: none !important; }
+  .aps-offer *, .aps-scope i { animation: none !important; }
+}
+
 /* ---------- The idea ---------- */
 section.block { padding: 90px 0; }
 .turn h2 { margin: 12px 0 28px; font-size: clamp(34px, 10vw, 46px); line-height: 1.04; font-weight: 800; letter-spacing: -.035em; }
@@ -733,12 +801,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
     <figure class="web-diagram rv" role="img" aria-label="Our vision of the web, illustrated by two overlapping cards. An unchanged website for people sits in front. Behind it, a code card represents a new agent layer for signed offers and agent-to-agent exchanges.">
       <div class="web-card web-agent-card" aria-hidden="true">
         <div class="web-card-bar"><span class="web-code-mark">&lt;/&gt;</span><b>New agent layer</b></div>
-        <pre class="web-code"><code>{
-  <span class="web-code-key">"offers"</span>: "signed",
-  <span class="web-code-key">"actions"</span>: [
-    "ask", "negotiate", "book"
-  ]
-}</code></pre>
+        <pre class="web-code"><code><span class="ln">{</span><span class="ln">  <span class="web-code-key">"offers"</span>: "signed"<span class="web-ok" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6l4.5-5"/></svg></span>,</span><span class="ln">  <span class="web-code-key">"actions"</span>: [</span><span class="ln">    "ask", "negotiate", "book"</span><span class="ln">  ]</span><span class="ln">}</span></code></pre>
       </div>
       <div class="web-card web-site-card" aria-hidden="true">
         <div class="web-card-bar"><span class="web-browser-dots"><i></i><i></i><i></i></span><b>Existing website</b></div>
@@ -758,10 +821,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
     <section class="aps-subsection" id="aps" aria-labelledby="aps-title">
       <h3 class="h3 rv" id="aps-title">Trust, signed.</h3>
       <p class="sub rv">Agent Protocol Secure (APS) is the trust layer behind our marketplace.<br>Digital signatures make three things checkable.</p>
-      <div class="tech rv">
-        <div><b>Who is behind it</b><span>A register or platform vouches for the sender's identity.</span></div>
-        <div><b>What they sent</b><span>The business signs its offer. Change a detail, and the signature no longer checks out.</span></div>
-        <div><b>What you allow</b><span>Your signature sets the agent's limits. Booking or paying requires your signed permission.</span></div>
+      <!-- Each point has a small figure that plays once it is on screen (.in from the reveal observer):
+           a double seal, an offer whose signature breaks when its price changes, scopes where paying stays locked. -->
+      <div class="tech aps-rows rv">
+        <div><p><b>Who is behind it</b><span>A register or platform vouches for the sender's identity.</span></p>
+          <svg class="aps-fig aps-seal" viewBox="0 0 64 56" aria-hidden="true">
+            <path class="s1" d="M24 6 40 12v13c0 10-7 17-16 21C15 42 8 35 8 25V12Z"/>
+            <path class="s2" d="M40 10 56 16v13c0 10-7 17-16 21-9-4-16-11-16-21V16Z"/>
+            <path class="ck" d="m33 29 5 5 9-10"/>
+          </svg></div>
+        <div><p><b>What they sent</b><span>The business signs its offer. Change a detail, and the signature no longer checks out.</span></p>
+          <span class="aps-fig aps-offer" aria-hidden="true">
+            <span class="tag"><span class="pr"><i class="a">135</i><i class="b">95</i></span></span>
+            <span class="mark"><svg class="ok" viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6l4.5-5"/></svg><svg class="no" viewBox="0 0 12 12"><path d="M3.5 3.5l5 5m0-5-5 5"/></svg></span>
+          </span></div>
+        <div><p><b>What you allow</b><span>Your signature sets the agent's limits. Booking or paying requires your signed permission.</span></p>
+          <span class="aps-fig aps-scope" aria-hidden="true">
+            <i>ask</i><i>negotiate</i><i class="pay"><svg viewBox="0 0 12 12"><rect x="2.5" y="5.5" width="7" height="5" rx="1"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5"/></svg>pay</i>
+          </span></div>
       </div>
     </section>
   </div>
