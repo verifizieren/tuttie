@@ -85,19 +85,45 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
   return { ...state, turns, phase: "thinking", closing: null };
 }
 
-// Notes the model put in square brackets (as voice/agent.py spoken() does for the voice): a
-// citation ([3]), a one-word label ([confirmed]) or an id ([receipt RC-A14786]) is dropped; any
-// other note may be a fact (a fee, a condition), so only its brackets go. Links keep their text.
-const NOTE = /[ \t]?\[([^\]\n]{0,60})\]/g;
-const EMPTY_NOTE = /^(?:\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*)$/;
-export const withoutNotes = text => String(text ?? "").replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1").replace(NOTE, (all, inner) => {
-  const note = inner.trim();
-  return !note || EMPTY_NOTE.test(note) ? "" : (/^[ \t]/.test(all) ? " " : "") + note;
-});
+// Notes the model put in square brackets, cleaned the same way as the voice (voice/agent.py
+// spoken(); shared cases in code/tests/fixtures/answer_notes.json). Only what carries nothing to
+// say goes: citations ([3], [3, 4]), a few labels ([confirmed]), booking and receipt ids, node
+// ids. Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
+// Markdown links keep their text. All patterns run in linear time.
+const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
+const NOTE = /\[([^[\]\n]{0,60})\]/g;
+const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
+const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
+const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rheinblick, not booking.com
+const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
+const URL = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
+const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
+const IGNORED = /(?<![ \t])[ \t]*\bignored:.*$/i;     // "Ignored: <business>" to the line's end
 
-/** Tuttie's answer without bracketed notes (see above) or lines about ignored businesses. */
-export const cleanAnswer = text => withoutNotes(text).split("\n")
-  .filter(line => !/^\s*Ignored:/i.test(line)).join("\n").trim();
+function link(all, label, target) {
+  const text = label.trim();
+  if (text && !CITATION.test(text)) return text;
+  return !target.trim() || URL.test(target) ? GONE : `(${target})`;
+}
+
+function note(all, inner, offset, text) {
+  const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
+  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || /^ignored:/i.test(words)) return GONE;
+  return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
+}
+
+export function withoutNotes(value) {
+  let text = String(value ?? "").replace(LINK, link);
+  for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
+  text = text.replace(/[ \t]?\u0000+(?=[.,;:!?]|$)/gm, "").replace(/^\u0000+[ \t]?/gm, "")
+    .replace(/[ \t]?\u0000+[ \t]?/g, " ");
+  // A line left with only a bullet or bold marks ("- ", "**") was all "Ignored: ...": dropped.
+  return text.split("\n").map(line => [line, line.replace(IGNORED, "")])
+    .filter(([line, cut]) => cut.replace(/[ \t\-*_#>]/g, "") || !line.trim()).map(([, cut]) => cut).join("\n");
+}
+
+/** Tuttie's answer without bracketed notes or "Ignored: ..." parts (see above). */
+export const cleanAnswer = text => withoutNotes(text).trim();
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
