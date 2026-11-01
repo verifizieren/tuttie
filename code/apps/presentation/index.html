@@ -145,6 +145,25 @@ section.block { padding: 90px 0; }
 .h3 { margin: 56px 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .sub { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
 
+/* ---------- Reverse marketplace: one dot asks three, three answer one ---------- */
+.rev h2 { margin: 0 0 30px; font-size: clamp(34px, 10vw, 46px); line-height: 1.04; font-weight: 800; letter-spacing: -.035em; }
+.mks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mks figure { margin: 0; padding: 18px 10px 16px; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); text-align: center; }
+.mks figure:nth-child(2) { transition-delay: .15s; }
+.mk { display: block; width: 100%; height: auto; overflow: visible; }
+.mk .ln { stroke: #d7d7df; stroke-width: 2; stroke-dasharray: 3 6; stroke-linecap: round; animation: flow 1.2s linear infinite; }
+.mk.back .ln { animation-direction: reverse; }
+@keyframes flow { to { stroke-dashoffset: -18; } }
+.mk .you { fill: var(--purple); }
+.mk .you-halo { fill: var(--purple); opacity: .14; transform-box: fill-box; transform-origin: center; animation: halo 2.4s ease-in-out infinite; }
+@keyframes halo { 50% { transform: scale(1.25); opacity: .06; } }
+.mk .biz { fill: #fff; stroke: var(--blue); stroke-width: 3; }
+.mk .pl { fill: var(--purple); opacity: 0; }
+.mk.back .pl { fill: var(--blue); }
+.mk.back .biz { fill: var(--blue); }
+.mks figcaption { margin-top: 12px; font-size: 16px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+.turn { padding-top: 10px; }
+
 /* ---------- Business case ---------- */
 .vs { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vs div { padding: 16px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); box-shadow: var(--shadow); }
@@ -387,7 +406,7 @@ footer .gh svg { width: 18px; height: 18px; fill: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
   .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
-  .cue i, .edge, .steps li.active .dot, .fscan { animation: none !important; }
+  .cue i, .edge, .steps li.active .dot, .fscan, .mk .ln, .mk .you-halo { animation: none !important; }
 }
 
 /* ---------- No browser scrollbar: the page reveals itself by scrolling ---------- */
@@ -542,21 +561,24 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   </div>
 </section>
 
+<!-- ============ Reverse marketplace: your request goes out, offers come back ============ -->
+<section class="block rev" aria-label="A reverse marketplace">
+  <div class="wrap">
+    <h2 class="rv">A reverse marketplace.</h2>
+    <div class="mks">
+      <figure class="rv"><svg class="mk" viewBox="0 0 160 120" aria-hidden="true"><path class="ln" d="M34 60 L126 22"/><path class="ln" d="M34 60 L126 60"/><path class="ln" d="M34 60 L126 98"/><circle class="pl" r="4"><animateMotion dur="2.4s" begin="0.0s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M34 60 L126 22"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="0.0s" repeatCount="indefinite"/></circle><circle class="pl" r="4"><animateMotion dur="2.4s" begin="0.5s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M34 60 L126 60"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="0.5s" repeatCount="indefinite"/></circle><circle class="pl" r="4"><animateMotion dur="2.4s" begin="1.0s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M34 60 L126 98"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="1.0s" repeatCount="indefinite"/></circle><circle class="you-halo" cx="34" cy="60" r="18"/><circle class="you" cx="34" cy="60" r="11"/><circle class="biz" cx="126" cy="22" r="9"/><circle class="biz" cx="126" cy="60" r="9"/><circle class="biz" cx="126" cy="98" r="9"/></svg><figcaption>You ask once.</figcaption></figure>
+      <figure class="rv"><svg class="mk back" viewBox="0 0 160 120" aria-hidden="true"><path class="ln" d="M34 60 L126 22"/><path class="ln" d="M34 60 L126 60"/><path class="ln" d="M34 60 L126 98"/><circle class="pl" r="4"><animateMotion dur="2.4s" begin="0.0s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M126 22 L34 60"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="0.0s" repeatCount="indefinite"/></circle><circle class="pl" r="4"><animateMotion dur="2.4s" begin="0.5s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M126 60 L34 60"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="0.5s" repeatCount="indefinite"/></circle><circle class="pl" r="4"><animateMotion dur="2.4s" begin="1.0s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1" path="M126 98 L34 60"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.15;.8;1" dur="2.4s" begin="1.0s" repeatCount="indefinite"/></circle><circle class="you-halo" cx="34" cy="60" r="18"/><circle class="you" cx="34" cy="60" r="11"/><circle class="biz" cx="126" cy="22" r="9"/><circle class="biz" cx="126" cy="60" r="9"/><circle class="biz" cx="126" cy="98" r="9"/></svg><figcaption>Offers come to you.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
 <!-- ============ The idea ============ -->
 <section class="block turn">
   <div class="wrap">
-    <h2 class="rv">We turned the web around.</h2>
     <div class="three" id="three">
       <span>It searches.</span><span>It checks.</span><span>It bargains.</span><span class="one">You tap.</span>
     </div>
     <div class="chips rv"><span>Hotels</span><span>Lawyers</span><span>Repairs</span><span>Tickets</span><span>Anything online</span></div>
-
-    <div class="flow">
-      <div class="step rv"><i class="n">1</i><b>You ask once</b></div>
-      <div class="step rv"><i class="n">2</i><b>Businesses' agents come to you</b></div>
-      <div class="step rv"><i class="n">3</i><b>Forged seals are dropped</b></div>
-      <div class="step rv"><i class="n">4</i><b>Tuttie bargains. You approve.</b></div>
-    </div>
 
     <div class="seals rv">
       <div class="seal"><svg style="fill:var(--gold)"><use href="#shield"/></svg><b>Register vouches</b></div>
@@ -705,6 +727,9 @@ new IntersectionObserver((es, o) => es.forEach(e => {
   three.forEach((s, i) => setTimeout(() => s.classList.add("in"), reduced ? 0 : 450 * i));
   o.disconnect();
 }), { rootMargin: "0px 0px -25% 0px" }).observe($("#three"));
+
+// Reverse marketplace graphics: SMIL pulses stop for reduced motion.
+if (reduced) document.querySelectorAll(".mk").forEach(s => { s.pauseAnimations(); s.querySelectorAll(".pl").forEach(c => c.remove()); });
 
 // ---------- Numbers: pinned, one figure per step of scroll ----------
 const figs = [...document.querySelectorAll(".fig")];
