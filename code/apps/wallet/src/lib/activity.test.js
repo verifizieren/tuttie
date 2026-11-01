@@ -190,3 +190,8 @@ test('a booking decided in another tab keeps the cards away here too (no second 
   assert.equal(choosing(s), false);
   assert.deepEqual(s.picked, ['h1']);
 });
+
+test('a price in brackets is kept, a citation goes', () => {
+  assert.equal(cleanAnswer('Booked for CHF [128] tonight.'), 'Booked for CHF 128 tonight.');
+  assert.equal(cleanAnswer('Total [1,280] for ten nights [3, 4].'), 'Total 1,280 for ten nights.');
+});
