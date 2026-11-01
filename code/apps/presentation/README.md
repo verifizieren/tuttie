@@ -9,23 +9,25 @@ What it shows, top to bottom (little text on purpose):
 1. **Hero:** the Tuttie card wakes up, "Your agent for the web.", a textless chevron cue.
 2. **Numbers:** three figures, one per screen, each with its source and the source's logo
    (`img/sources/`, credits in `img/sources/CREDITS.md`). Only figures from the "facts we may
-   say" table in `documentation/context/pitch/storyline.md`: 2 in 3 small Swiss firms without a
-   website (localsearch & HSLU 2025), 29.6 % of European hotel bookings via online agencies
+   say" table in `documentation/context/pitch/storyline.md`: 58 % of Swiss cyber reports
+   are fraud (NCSC, H1 2025, of 35,727 reports), 29.6 % of European hotel bookings via online agencies
    (HOTREC 2024), +539 % visits to US travel sites from AI assistants, holiday season
    (Nov–Dec) 2025 vs 2024 (Adobe Analytics; clicks, not bookings). One scroll gesture (wheel,
    trackpad flick, swipe, arrow key) moves exactly one number (`numsTarget` in `index.html`);
    before and after the section the page scrolls natively.
 3. **A reverse marketplace:** two animated graphics, your request goes out to three
    businesses, their offers come back.
-4. **It searches, checks, bargains; you tap:** the kinds of businesses and the seal colours.
-5. **For businesses:** 7 rooms vs 220, the commission an agency takes on a CHF 135 night,
+4. **Under the hood:** what is signed, for technical readers (seals, offers and agreements,
+   delegation, approval, mandate, prices from signed data). Keep it true to `code/aps/`.
+5. **It searches, checks, bargains; you tap:** the kinds of businesses and the seal colours.
+6. **For businesses:** 7 rooms vs 220, the commission an agency takes on a CHF 135 night,
    and who pays. No invented market numbers.
-6. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
+7. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
    one progress segment per part, tap right = next part, tap left = previous part, press and
    hold = pause, arrow keys (Space pauses) and side arrows on desktop. It follows the real
    wallet's screens and wording. Dark "behind the screen" callouts explain what happens out of
    sight. At the end: Replay on the phone and a textless chevron to scroll on.
-7. **Close:** throughline, "Watch it again", the honesty line, team, a "Code on GitHub" pill.
+8. **Close:** throughline, "Watch it again", the honesty line, team, a "Code on GitHub" pill.
 
 A small textless arrow brings you back to the top once you are past the hero.
 

@@ -87,6 +87,7 @@ of silence.
 | Fact | Source | Confidence |
 | --- | --- | --- |
 | Two in three Swiss firms under ten people have no website | localsearch & HSLU, SME Digital Pulse 2025 | high |
+| 58 % of the 35,727 cyber incidents reported in Switzerland in H1 2025 were fraud | NCSC (BACS) semi-annual report 2025/1, bacs.admin.ch/en/hjb-2025-1-en | high |
 | AI traffic to US travel sites +539 %, holidays 2025 | Adobe Analytics via Digital Commerce 360, Jan 2026 | high |
 | Q&A: online agencies take 29.6 % of EU hotel bookings; Booking Holdings has 71 % of that | HOTREC European Hotel Distribution Study 2024 | high |
 | Q&A: 3 % of Swiss SMEs take bookings online | localsearch & HSLU 2025 | high |

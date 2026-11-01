@@ -24,6 +24,13 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
   switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
   skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
   page in `code/apps/presentation/`. Details: `code/apps/keynote2/README.md`.
+- **QR page for technical readers (1 Nov)**: the first figure is now the NCSC's 58 % fraud share of
+  35,727 Swiss cyber reports (H1 2025) instead of "2 in 3 have no website"; the +539 % has its baseline (2024 vs 2025 holidays,
+  bars to scale, replacing the illustrative curve); a new "Under the hood" block says what is
+  signed (seals, offers and agreements, delegation, approval, mandate, prices from signed data);
+  the agency bar is set against Tuttie's fixed fee per booking (amount not set yet); "fakes never
+  reach you" became "forged seals"; 7 vs 220 says why the small one won; a callout marks the
+  read context as demo data. Details: `code/apps/presentation/README.md`.
 - **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie
   card, black glossy eyes with a catchlight, idle glances, ZKB and UBS bank cards) on a full light theme
   (page #f2f2f7, white panels, ink #17171d, Approve = dark button); a closed card rests awake with a
