@@ -360,7 +360,17 @@ def swipeable(history: list[dict]) -> bool:
 
 
 # Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
-TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch"})
+TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch", "night"})
+
+
+def night_said(date) -> str | None:
+    """A night as it is said, with its weekday ("Saturday 14 November"), so the LLM never has to
+    work the weekday out (it said "Friday" for a Saturday); None for anything but an ISO date."""
+    try:
+        day = datetime.strptime(str(date), "%Y-%m-%d")
+    except ValueError:
+        return None
+    return f"{day:%A} {day.day} {day:%B}"
 
 
 def finite_price(value) -> bool:
@@ -477,6 +487,7 @@ class Toolbox:
         result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
+        result["night"] = night_said(date)  # say this, never a weekday of your own
         self.bargained = None
         self.agreements.clear()
         self.availability.clear()
@@ -854,6 +865,8 @@ class Toolbox:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
         answer = {**confirmation, "node_id": node_id, "source_step": step}
+        if said := night_said(confirmation.get("date")):
+            answer["night"] = said
         if confirmation.get("status") == "confirmed":
             # Charges the user already allowed with a mandate are paid right away, without asking.
             for charge in await self.load_charges(node_id):
