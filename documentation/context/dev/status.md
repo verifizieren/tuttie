@@ -28,6 +28,10 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   owner page's direct node fetch then works only on the server itself). A booking without a deal for
   another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
   keeps two sentences.
+  Internal services listen on 127.0.0.1 by default now (`SERVICE_HOST`, set 0.0.0.0 only on purpose; the
+  owner page's direct node fetch then works only on the server itself). A booking without a deal for
+  another room than the liked card's gets one nudge back to the card's room; the cards turn's answer
+  keeps two sentences.
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
