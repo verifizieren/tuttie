@@ -15,7 +15,8 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
   the booking path (`tools.finite_price`/`chf`, the timeline shows "?"); `post_request` and `book`
   return `night` ("Saturday 14 November") and the prompt names a weekday only from it (Tuttie said
-  "Friday" for a Saturday).
+  "Friday" for a Saturday); answers say 24-hour times as people do on screen too ("12:52 am",
+  `code/speech.py`, shared with the voice).
 - **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
   - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
   - The marketplace takes at most 120 keyless postings per requester a minute (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
