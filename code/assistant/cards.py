@@ -59,9 +59,15 @@ def features(facts: dict) -> list[dict]:
     for key, label in (("breakfast", "Breakfast"), ("wifi", "Wifi"), ("parking", "Parking")):
         if key in amenities:
             add(key, amenities[key], label if amenities[key] else f"No {label.lower()}")
-    if (facts.get("profile") or {}).get("size") == "small":
+    if profile_of(facts).get("size") == "small":
         add("small", True, "Independent")
     return found
+
+
+def profile_of(data: dict) -> dict:
+    """data["profile"] if it is a dict (a business's signed text may hold anything), else {}."""
+    profile = data.get("profile")
+    return profile if isinstance(profile, dict) else {}
 
 
 def own_photos(node_id: str, photos) -> list[str]:
@@ -87,7 +93,7 @@ def hotel_card(item: dict, facts: dict, requirements: list[str], budget_chf: flo
     wanted = {key for key, words in NEEDS.items() if any(w in needs for w in words)}
     # What the user asked for first, then the rest in a fixed order (sort is stable).
     ordered = sorted(features(facts), key=lambda f: f["key"] not in wanted)
-    profile = facts.get("profile") or item.get("profile") or {}
+    profile = profile_of(facts) or profile_of(item)
     price = offer["price_chf"]
     final = agreed_chf if agreed_chf is not None else price  # what the user would pay
     return {
