@@ -18,6 +18,17 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   to History and says "Tuttie restarted — please ask again" until the next message
   (`lostOnRestart`). A booking approval puts the hotel cards away in every tab (it sets
   `picked`), so a second tab can no longer swipe a second booking after a Decline.
+- **Real-user test round 4, Tuttie's turn** (branch `wip/r4d-backend`, not deployed): the
+  user's own date, nights and party size beat the calendar ("tomorrow for 2 people" posts
+  2 November, guests 2; the calendar only fills in what was not said, "I want to book
+  something" still posts 14 Nov). `post_request` takes `guests` and `nights` and refuses in code
+  a past night (Swiss today), a bad party size and more than one night (hotels book one night
+  per booking), so Tuttie asks instead of booking something else. Only the answer reaches the
+  user: `llm.py` keeps the text after the last tool call (last block / last message item) and
+  `agent.py` `drop_notes` drops a leading paragraph about "the user". `negotiate` right after
+  `post_request` in the same message returns its signed outcomes instead of bargaining twice;
+  a new message or another budget bargains again. Open: hotels still offer a "double room" to
+  5 guests (node side ignores `guests`).
 
 - **Wallet red-team round 2 holes closed** (branch `wip/r2-wallet`, not deployed): booking
   terms (room, night, rate, included items) are short plain text before the user signs them
