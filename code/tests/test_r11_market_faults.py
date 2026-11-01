@@ -120,3 +120,20 @@ def test_a_registry_blip_during_one_hotels_negotiation_keeps_the_other_hotels_ca
     result = asyncio.run(scenario())
     assert state["failed"]
     assert "Gästehaus am Rhein" in {c["name"] for c in result["cards"]}
+
+
+def test_negotiate_all_turns_one_hotels_error_into_a_refused_outcome():
+    """negotiate_all isolates each hotel: an unexpected error is that hotel's refusal only."""
+    from negotiation.tuttie import Outcome, TuttieNegotiator
+
+    class Negotiator(TuttieNegotiator):
+        async def negotiate(self, node_id, envelope, context):
+            if node_id == "bad":
+                raise httpx.ConnectError("registry restarting")
+            return Outcome(node_id, "of-good", "agreed", 135, price_chf=128)
+
+    offers = [{"node_id": "bad", "envelope": {"payload": {"offer_id": "of-bad", "price_chf": 150}}},
+              {"node_id": "good", "envelope": {"payload": {"offer_id": "of-good", "price_chf": 135}}}]
+    bad, good = asyncio.run(Negotiator(None, "tuttie", None).negotiate_all(offers, None))
+    assert (bad.status, bad.offer_id, bad.offer_price_chf) == ("refused", "of-bad", 150)
+    assert good.status == "agreed"
