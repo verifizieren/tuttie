@@ -352,20 +352,20 @@ def night_said(date) -> str | None:
     return f"{day:%A} {day.day} {day:%B}"
 
 
-def finite_price(value) -> bool:
-    """A real price: a finite number above zero, not a bool (signed hotel data may hold anything,
-    and math on a 400-digit integer raises OverflowError)."""
+def finite_price(value, free_ok: bool = False) -> bool:
+    """A real price: a finite number above zero (`free_ok`: or zero, e.g. a free add-on), not a
+    bool (signed hotel data may hold anything, and math on a 400-digit integer raises OverflowError)."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     try:
-        return math.isfinite(value) and value > 0
+        return math.isfinite(value) and (value >= 0 if free_ok else value > 0)
     except OverflowError:
         return False
 
 
 def chf(value) -> str:
     """An amount for the timeline ("128", "12.5"), or "?" when it is not a real number."""
-    return f"{value:g}" if finite_price(value) or value == 0 else "?"
+    return f"{value:g}" if finite_price(value, free_ok=True) else "?"
 
 
 def listed(value) -> str:
@@ -785,8 +785,8 @@ class Toolbox:
             return {"error": f"unknown extras {missing}; signed commitments available: {list(offered)}"}
 
         chosen = [offered[item] for item in extras or []]
-        prices = [room.get("price_chf"), *(env["payload"]["commitment"].get("price_chf") for env in chosen)]
-        if not all(finite_price(price) for price in prices):
+        add_ons = [env["payload"]["commitment"].get("price_chf") for env in chosen]  # may be free
+        if not finite_price(room.get("price_chf")) or not all(finite_price(p, free_ok=True) for p in add_ons):
             return {"error": f"{record['name']}'s signed prices are not usable numbers; do not book it"}
         amount = room["price_chf"] + sum(env["payload"]["commitment"]["price_chf"] for env in chosen)
         parts = [f"{room_type} CHF {room['price_chf']:g} ({room['rate']})"]
