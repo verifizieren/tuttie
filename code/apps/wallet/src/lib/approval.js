@@ -44,11 +44,23 @@ export const ARM_MS = 600;
  *  always does. A finger tap counts only if the finger came down on this sheet (`downAt`) once it
  *  had been on screen for ARM_MS (`shownAt`): a tap aimed at a sheet that just went never decides
  *  the one that took its place. Without a pointerdown, the click's own time counts. */
-export function tapAccepted({ detail, shownAt, downAt, now = performance.now() }) {
+export function tapAccepted({ detail, shownAt, downAt, lastDown = pointer.lastDown, now = performance.now() }) {
   if (!detail) return true;
-  // No pointerdown on this sheet (VoiceOver and some assistive input send only the click): judge
-  // the click's own time, which a quick tap aimed at the sheet that just went never passes.
-  return (downAt ?? now) - shownAt >= ARM_MS;
+  if (downAt != null) return downAt - shownAt >= ARM_MS;
+  // No pointerdown on this sheet. A finger that came down shortly before it showed (on the sheet
+  // that went) and lifts over it now never counts; with no pointerdown at all (VoiceOver and some
+  // assistive input send only the click), the click's own time is judged.
+  if (lastDown != null && lastDown > shownAt - HELD_MS) return false;
+  return now - shownAt >= ARM_MS;
+}
+
+/** How long before a sheet showed a pointerdown elsewhere still counts as a press held across it. */
+const HELD_MS = 2000;
+
+/** The last pointerdown anywhere on the page (capture phase), for tapAccepted. */
+export const pointer = { lastDown: null };
+if (typeof document !== "undefined") {
+  document.addEventListener("pointerdown", () => { pointer.lastDown = performance.now(); }, { capture: true });
 }
 
 /** Whether the decision the server streamed (`recorded`) finishes the sheet now: only once the
