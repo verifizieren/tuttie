@@ -49,3 +49,15 @@ def test_a_different_or_later_message_is_its_own_turn():
 
     turns, calls = asyncio.run(run())
     assert len(turns) == 3 and calls == 3
+
+
+def test_card_commands_said_twice_are_two_swipes():
+    async def run():
+        llm = SlowLLM()
+        conv = Conversation(httpx.AsyncClient(), "http://registry", llm)
+        conv.start("Find me a hotel")  # a turn running, so the commands queue
+        a, b = conv.start("next"), conv.start("next")
+        await asyncio.sleep(0.8)
+        return a, b
+    a, b = asyncio.run(run())
+    assert a != b
