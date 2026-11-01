@@ -332,12 +332,15 @@ export function applyEvent(state, event) {
       return { ...progress(state, "tool", "Waiting for your approval", false, at), ...chosen, phase: "approval",
                approval: approvalOf(event, detail) };
     }
+    // the approval id is inside the signed decision (aps/approval.py sign_decision)
+    const decided = { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) };
+    // The end of an older approval while a newer one waits: only remembered (its sheet may still
+    // be finishing), the newer approval stays.
+    if (decided.id && state.approval && decided.id !== state.approval.id) return { ...state, decided };
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
     const line = approved ? "Booking…" : event.status === "declined" ? "You declined" : "Approval closed";
-    return { ...progress(state, "tool", line, !approved, at), approval: null,
-             // the approval id is inside the signed decision (aps/approval.py sign_decision)
-             decided: { id: plain(detail.decision?.approval_id ?? detail.approval_id), status: plain(event.status) },
+    return { ...progress(state, "tool", line, !approved, at), approval: null, decided,
              phase: approved ? "booking" : "declined" };
   }
   return state;
