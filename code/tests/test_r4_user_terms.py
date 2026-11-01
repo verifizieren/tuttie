@@ -195,3 +195,26 @@ def test_every_user_message_starts_a_new_turn_for_the_toolbox():
     asyncio.run(tuttie.chat("try for a better price"))
     assert box.bargained is None
     assert json.dumps(bus.history)  # the turn answered normally
+
+
+def test_a_leading_note_to_self_in_the_same_text_is_dropped():
+    from assistant.agent import drop_notes
+    said = ("The user said tomorrow, but the calendar shows 14 November. I'll go with what they said.\n\n"
+            "Looking for two people tomorrow, 2 November.")
+    assert drop_notes(said) == "Looking for two people tomorrow, 2 November."
+    assert drop_notes("Basel has no Zurich hotels, so I'll report that.\n\nSorry, none in Zurich.") == \
+        "Sorry, none in Zurich."
+    assert drop_notes("The user's dog is welcome.") == "The user's dog is welcome."  # never empty
+    assert drop_notes("Booked for CHF 128.\n\nEnjoy Basel!") == "Booked for CHF 128.\n\nEnjoy Basel!"
+
+
+def test_the_spoken_answer_has_no_note_to_self():
+    class Narrating:
+        async def complete(self, messages, schemas, first_tool=None):
+            return {"role": "assistant",
+                    "content": "The user wants Zurich, so I'll report that.\n\nSorry, no Zurich hotels yet.\nMood: sorry"}
+
+    bus = EventBus()
+    answer = asyncio.run(Assistant(Narrating(), toolbox(), bus).chat("Zurich?"))
+    assert answer == "Sorry, no Zurich hotels yet."
+    assert [e["summary"] for e in bus.history if e["kind"] == "answer"] == [answer]
