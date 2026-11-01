@@ -17,7 +17,7 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   (run.sh/run_all.py always set a key). The service worker caches only successful answers. The action gate refuses calls and approvals stamped before
   it started (whole-second stamps), so nothing captured before a node restart books again. After a
   decline the very next yes books the offered hotel at once, for the room of its card offer
-  (`book` refuses another room without a deal; the cards summary names each card's room).
+  (the cards summary names each card's room; a room the user asks for is still bookable).
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
