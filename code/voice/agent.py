@@ -273,8 +273,12 @@ class Tuttie(Agent):
         self.session.say(text)
 
     def filler(self) -> str | None:
-        """A filler fitting the last request, once, when Tuttie starts a tool for it."""
+        """A filler fitting the last request, once, when Tuttie starts a tool for it. An exact
+        card command ("next") gets none: the card moves at once, without the LLM."""
         if self.asked is None or self.session.agent_state == "speaking":
+            return None
+        if card_choice(self.asked):
+            self.asked = None
             return None
         options = FILLERS[filler_kind(self.asked)]
         self.asked = None
@@ -321,9 +325,9 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
                 agent.asked = None
                 say(ack)
                 continue
-            # The first tool for the request gets a filler; opening the turn, thinking and closing the
-            # card do not (a goodbye follows).
-            if event["kind"] not in ("turn", "thinking", "close") and (line := agent.filler()):
+            # The first tool for the request gets a filler; opening the turn, thinking, closing the
+            # card (a goodbye follows) and a swipe on the cards (it already happened) do not.
+            if event["kind"] not in ("turn", "thinking", "close", "wallet") and (line := agent.filler()):
                 say(line)
             if prompt := update_for(event, said):
                 say(prompt)
