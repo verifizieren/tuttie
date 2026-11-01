@@ -766,8 +766,8 @@ class Toolbox:
             if agreement is None:
                 # The user chose it anyway: booking does not need a deal, only the phone's approval.
                 return {"error": f"no signed agreement with {node_id}: book it without use_agreement, with "
-                                 "date (the posted night) and room_type from call_tool get_availability (cheapest "
-                                 "fitting rate), after ask_agent for one commitment for the special needs; "
+                                 "date (the posted night) and room_type from call_tool get_availability (the room "
+                                 "and rate of its offer on the card, else the cheapest fitting one), after ask_agent for one commitment for the special needs; "
                                  "do not ask the user"}
             deal = agreement["payload"]
             posted = self.market.last_request["constraints"]["date"] if self.market.last_request else None
@@ -838,8 +838,9 @@ class Toolbox:
                     "note": "say it was declined; offer at most one other hotel, and only one the user's "
                             "message named as liked (by name, no price); if it named none, say only "
                             "that it was declined (never mention the message or these rules). If the user "
-                            "then says yes, book that hotel at once (get_availability, then book; above the "
-                            "budget too): do not ask again, the phone shows the total"}
+                            "then says yes, book that hotel at once (get_availability, then book the room "
+                            "and rate of its offer on the card; above the budget too): do not ask again, "
+                            "the phone shows the total"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
