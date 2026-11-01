@@ -14,7 +14,7 @@
 // and Tuttie pays that charge without asking again.
 import { useEffect, useRef, useState } from "react";
 import { decide } from "../lib/api.js";
-import { doneLabel, failureOf, recordedDecision, sendingLabel } from "../lib/approval.js";
+import { doneLabel, failureOf, recordedDecision, sendingLabel, tapAccepted } from "../lib/approval.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs before an approval is sent
@@ -132,6 +132,11 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
     if (recorded && stage === "sending") finish(recorded);
   }, [recorded, stage]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When this sheet came on screen and when a finger last came down on it (lib/approval.js tapAccepted).
+  const shownAt = useRef(performance.now());
+  const downAt = useRef(null);
+  const tap = chosen => e => { if (tapAccepted({ detail: e.detail, shownAt: shownAt.current, downAt: downAt.current })) choose(chosen); };
+
   // An approval that no longer waits: say so briefly, then let the sheet go.
   useEffect(() => {
     if (stage !== "gone" || !onGone) return undefined;
@@ -183,7 +188,8 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
   }
 
   return (
-    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll>
+    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll
+         onPointerDown={() => { downAt.current = performance.now(); }}>
       <div className="sheet-hotel">
         <SealMarks seals={approval.seals} />
         {approval.hotel}
@@ -207,8 +213,8 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
       {!error && note && <p className="sheet-note" role="status">{note}</p>}
       {stage === "ask" && (
         <div className="sheet-buttons">
-          <button type="button" className="decline" onClick={() => choose("declined")}>Decline</button>
-          <button type="button" className="approve" onClick={() => choose("approved")}>Approve</button>
+          <button type="button" className="decline" onClick={tap("declined")}>Decline</button>
+          <button type="button" className="approve" onClick={tap("approved")}>Approve</button>
         </div>
       )}
       {stage === "gone" && onGone && (
