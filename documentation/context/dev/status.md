@@ -6,10 +6,41 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
+Last updated: 2026-11-01 (round 6 overnight fixes on `overnight/integration`, not merged; the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
 
 ## Done
 
+- **Round 6 (overnight)** (branches `fix/r6-trust`, `fix/r6-approval-sheet`, `fix/r6-voice`,
+  `overnight/harden`, merged for testing on `overnight/integration`, not on main, not deployed):
+  - Trust: a verified hotel's signed agent card and `get_policies` profile are type-checked and
+    cleaned (`assistant/cards.py` `clean_text`/`profile_of`: agent name max 60 chars, profile
+    `size` 20, `about` 500, no control or RTL/format characters; rating only as numbers), so a
+    non-dict persona no longer crashes every search. The card is fetched once per hotel per
+    search and the offer deadline is checked per offer; malformed relayed offers are dropped.
+    `aps/canonical.py` `b64decode` accepts only canonical base64 and used commitments are keyed
+    by signature bytes (a re-encoded signature could be redeemed twice).
+  - Wallet approval sheet: finishes on the streamed `decided` event (approval id read from
+    `detail.decision.approval_id`, existing shape) when the POST answer is lost; `decide()`
+    gives up after 15 s (`DECIDE_TIMEOUT_MS`) and offers another try; New chat / History wait
+    for a decision on its way instead of opening under the sheet. Booking message names the
+    other liked hotels without card prices.
+  - Voice: spoken turns have their own budget (`VOICE_TURNS_PER_SESSION_PER_MIN` = 20/min per
+    browser); exact card commands count only towards `CARD_COMMANDS_PER_SESSION_PER_MIN` = 30/min
+    and only while a card can be swiped (else they are normal voice turns); `/voice/diag` logs one
+    clean line, max 10/min per address. `follow()` reconnects (0.5 s doubling to 10 s, stops on
+    404/409) instead of going mute; while the Face ID sheet is up a spoken line gets "Please
+    approve or decline on your phone first." (at most every 5 s) instead of queueing; Face ID is
+    asked once per approval; node/approval/offer/mandate/request ids and web addresses are never
+    read aloud; "for 00:52" is a clock time; CHF 1'280 / 1 280 is one amount; no filler on swipes.
+  - Tuttie (`overnight/harden`): Claude prompt caching of the fixed prompt + tools (`llm.py`,
+    round notes stay an uncached second system block; ~90 % cheaper input, latency unchanged);
+    after `recall_context` for a hotel it posts the request in the same turn; cards answer = pick
+    + one reason; after booking only "booked" + total (the `book` result carries an LLM-facing
+    `note`); after a decline one other hotel by name, no price; "yes, book that one" books
+    without an agreement at the cheapest fitting rate; the budget amount is never said aloud.
+  - Note: the LLM behaviour eval used overnight (real Haiku, 24 scenarios) lives outside the repo
+    (`/home/baselhack/overnight/eval`). Left open: 24-hour times on screen, long answers outside
+    the pitch path, re-dating after the cards.
 - **Red team round 5, commitments and answers** (branch `fix/r5-commitments`): `ask_agent` shares the posted night (never the budget) and the hotel anchors a commitment's `valid_until` to noon after it, so Rheinblick after a Decline books with the dog/late-arrival extra; `drop_notes` drops only clear narration; all text parts are kept; an empty goodbye says "Bye, Alex! Enjoy Basel."; the model is told when no deals exist yet.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
