@@ -72,13 +72,20 @@ def test_the_agent_only_gets_new_events():
     bus.emit("answer", "verified", "old")
 
     async def first_frame():
-        stream = voice.live_only(bus)
+        rooms = voice.VoiceRooms()
+        rooms.add("room", ("session", "conv"), 0)
+        stream = voice.live_only(bus, rooms, "room")
         task = asyncio.ensure_future(stream.__anext__())
         await asyncio.sleep(0.05)
         bus.emit("answer", "verified", "new")
-        return await asyncio.wait_for(task, 1)
+        frame = await asyncio.wait_for(task, 1)
+        live = rooms.live["room"]
+        await stream.aclose()
+        return frame, live, rooms.live["room"]
 
-    assert '"summary": "new"' in asyncio.run(first_frame())
+    frame, live, after = asyncio.run(first_frame())
+    assert '"summary": "new"' in frame
+    assert (live, after) == (1, 0)  # live while the agent follows the room, not after
 
 
 def test_answers_are_spoken_without_citations_markdown_or_emoji():

@@ -83,10 +83,18 @@ def test_voice_rooms_are_bounded(monkeypatch):
     monkeypatch.setattr(voice, "API_KEY", "key")
     monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests")
     monkeypatch.setattr(voice, "MAX_VOICE_ROOMS", 3)
+    monkeypatch.setattr(voice, "VOICE_ROOM_GRACE_S", 0)  # every unused room may go at once
     with TestClient(app):  # runs the service (lifespan) once
         # One browser each: a single conversation would get its newest room again.
         rooms = [TestClient(app).post("/voice/token").json()["room"] for _ in range(5)]
         assert list(app.state.voice_rooms) == rooms[-3:]
+        # Rooms in use (followed, or new and not yet joined) may push the total up to twice the
+        # limit; then new rooms wait (429).
+        app.state.voice_rooms.live.update(app.state.voice_rooms)
+        monkeypatch.setattr(voice, "VOICE_ROOM_GRACE_S", 120)
+        more = [TestClient(app).post("/voice/token") for _ in range(4)]
+        assert [r.status_code for r in more] == [200, 200, 200, 429]
+        assert set(rooms[-3:]) <= set(app.state.voice_rooms) and len(app.state.voice_rooms) == 6
 
 
 def test_api_docs_are_off_unless_asked_for(monkeypatch):

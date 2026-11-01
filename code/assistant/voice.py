@@ -19,7 +19,7 @@ import hmac
 import os
 import secrets
 import time
-from collections import deque
+from collections import Counter, deque
 from datetime import timedelta
 
 import httpx
@@ -38,7 +38,8 @@ API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 TOKEN_TTL_S = 2 * 60 * 60
 ROOMS_PER_CONVERSATION_PER_MIN = 10  # a flaky phone retries after 2, 4, 8 ... s; a loop gets 429
 ROOMS_PER_CLIENT_PER_MIN = 300  # per client address a minute: a venue's Wi-Fi shares one, and every page load asks
-MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; the oldest are forgotten
+MAX_VOICE_ROOMS = 1000  # the wallet asks for a room on every page load; unused ones are forgotten
+VOICE_ROOM_GRACE_S = 120  # a new room is kept this long before it is used (the wallet joins within seconds)
 
 router = APIRouter()
 
@@ -77,6 +78,60 @@ def agent_only(request: Request) -> None:
     sent = request.headers.get("authorization", "").encode()
     if not configured() or not hmac.compare_digest(sent, f"Bearer {API_SECRET}".encode()):
         raise HTTPException(status_code=401, detail="voice agent only")
+
+
+class VoiceRooms(dict):
+    """LiveKit room -> (session id, conversation id), and which rooms are in use.
+
+    Anyone can ask for rooms (no login), so a flood of new rooms must never unmap a live user's
+    room (their speech would get 404 and the voice agent would go mute). Only rooms nobody uses
+    are forgotten: first those whose conversation is gone, then those unused for
+    VOICE_ROOM_GRACE_S, least recently used first. A room the voice agent follows (an open
+    /voice/events stream) is never forgotten. Rooms are not reused (see RoomThrottle).
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.used: dict[str, float] = {}  # room -> when it was created, spoken into or followed last
+        self.live: Counter = Counter()  # room -> open /voice/events streams
+
+    def add(self, room: str, owner: tuple[str, str], now: float) -> None:
+        """Map a new room to its conversation."""
+        self[room] = owner
+        self.used[room] = now
+
+    def touch(self, room: str, now: float) -> None:
+        """Mark a room as used now."""
+        if room in self:
+            self.used[room] = now
+
+    def forget(self, room: str) -> None:
+        """Unmap a room (its token stops working for /voice/say and /voice/events)."""
+        self.pop(room, None)
+        self.used.pop(room, None)
+
+    def unused(self, conversations, now: float) -> list[str]:
+        """Rooms that may be forgotten, in that order: of a gone conversation, then idle ones."""
+        gone, idle = [], []
+        for room, (session_id, conversation_id) in self.items():
+            if self.live[room]:
+                continue
+            conv = conversations.by_session.get(session_id)  # not find(): a check must not reorder the store
+            if conv is None or conv.id != conversation_id:
+                gone.append(room)
+            elif now - self.used.get(room, 0) >= VOICE_ROOM_GRACE_S:
+                idle.append(room)
+        return gone + sorted(idle, key=lambda room: self.used.get(room, 0))
+
+    def make_space(self, conversations, now: float) -> bool:
+        """Forget unused rooms until one more fits under MAX_VOICE_ROOMS. Rooms in use may push
+        the total up to twice that; beyond it there is no space (False: no new room for now)."""
+        if len(self) >= MAX_VOICE_ROOMS:
+            for room in self.unused(conversations, now):
+                if len(self) < MAX_VOICE_ROOMS:
+                    break
+                self.forget(room)
+        return len(self) < 2 * MAX_VOICE_ROOMS
 
 
 class RoomThrottle:
@@ -120,7 +175,7 @@ async def voice_token(request: Request) -> dict:
 
     429 if the conversation asked for more than ROOMS_PER_CONVERSATION_PER_MIN rooms in the
     last minute, or its client address for more than ROOMS_PER_CLIENT_PER_MIN (the wallet
-    tries again later on its own).
+    tries again later on its own), or if every room is in use (VoiceRooms.make_space).
     """
     if not configured():
         raise HTTPException(status_code=503, detail="voice is not configured")
@@ -131,13 +186,13 @@ async def voice_token(request: Request) -> dict:
     if not request.app.state.voice_throttle.allow(owner, client, time.monotonic()):
         raise HTTPException(status_code=429, detail="Too many voice connections. Please try again in a minute.",
                             headers={"Retry-After": "60"})
+    rooms, now = request.app.state.voice_rooms, time.monotonic()
+    if not rooms.make_space(store, now):
+        raise HTTPException(status_code=429, detail="Voice is busy. Please try again in a minute.",
+                            headers={"Retry-After": "60"})
     conv = store.get(session_id)
-    owner = (session_id, conv.id)
     room = f"tuttie-{secrets.token_urlsafe(12)}"
-    rooms = request.app.state.voice_rooms
-    rooms[room] = owner
-    while len(rooms) > MAX_VOICE_ROOMS:
-        rooms.pop(next(iter(rooms)))
+    rooms.add(room, (session_id, conv.id), now)
     token = (api.AccessToken(API_KEY, API_SECRET)
              .with_identity(f"user-{secrets.token_hex(4)}")
              .with_name("You")
@@ -161,6 +216,7 @@ async def voice_say(said: Said, request: Request) -> dict:
     """
     conv = room_conversation(request, said.room)
     session_id = request.app.state.voice_rooms[said.room][0]
+    request.app.state.voice_rooms.touch(said.room, time.monotonic())
     wait = request.app.state.turn_throttle.wait({("session", session_id): TURNS_PER_SESSION_PER_MIN},
                                                 time.monotonic())
     if wait:
@@ -169,20 +225,31 @@ async def voice_say(said: Said, request: Request) -> dict:
     return {"accepted": True, "turn_id": turn_id}
 
 
-async def live_only(bus):
-    """The bus's SSE frames without the replayed history: the voice agent speaks only what is new."""
+async def live_only(bus, rooms: VoiceRooms, room: str):
+    """The bus's SSE frames without the replayed history: the voice agent speaks only what is new.
+
+    While the stream is open the room counts as live (never forgotten by VoiceRooms)."""
     skip = len(bus.history)
-    async for frame in bus.stream():
-        if skip and frame.startswith("event: message"):
-            skip -= 1
-            continue
-        yield frame
+    rooms.live[room] += 1
+    try:
+        async for frame in bus.stream():
+            if skip and frame.startswith("event: message"):
+                skip -= 1
+                continue
+            yield frame
+    finally:
+        rooms.live[room] -= 1
+        if rooms.live[room] <= 0:
+            del rooms.live[room]
+        rooms.touch(room, time.monotonic())  # the grace period starts when the agent leaves
 
 
 @router.get("/voice/events", dependencies=[Depends(agent_only)])
 async def voice_events(room: str, request: Request) -> StreamingResponse:
     """New events of the room's conversation as Server-Sent Events, for the voice agent to speak from."""
-    return StreamingResponse(live_only(room_conversation(request, room).bus), media_type="text/event-stream",
+    rooms = request.app.state.voice_rooms
+    rooms.touch(room, time.monotonic())
+    return StreamingResponse(live_only(room_conversation(request, room).bus, rooms, room), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
