@@ -768,7 +768,8 @@ class Toolbox:
             # Card prices of other hotels are not what booking them costs (a flex offer vs the
             # best rate plus extras): the next one is offered by name; its phone sheet shows the total.
             return {"declined": True, "source_step": step,
-                    "note": "say it was declined; offer at most one other liked hotel, by name only, no price"}
+                    "note": "say it was declined; offer at most one other hotel, and only one the user's "
+                            "message named as liked (by name, no price); if it named none, just stop"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:
