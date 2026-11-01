@@ -152,6 +152,14 @@ export function withoutNotes(value) {
 /** Tuttie's answer without bracketed notes or lines starting with "Ignored:" (see above). */
 export const cleanAnswer = text => withoutNotes(text).trim();
 
+/** Simple markdown (**bold**, *italic*, _italic_, `code`) as plain text, for a line that shows
+ *  no formatting (the note under the hotel cards). Underscores inside words stay. */
+export const plainMarkdown = text => String(text ?? "")
+  .replace(/\*\*([^*\n]+?)\*\*/g, "$1")
+  .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, "$1$2")
+  .replace(/(^|[^\w])_(?=\S)([^_\n]*?\S)_(?!\w)/g, "$1$2")
+  .replace(/`([^`\n]+)`/g, "$1");
+
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
 

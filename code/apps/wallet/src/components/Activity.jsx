@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import BookingCard from "./BookingCard.jsx";
 import Deck from "./Deck.jsx";
-import { deckStart } from "../lib/activity.js";
+import { deckStart, plainMarkdown } from "../lib/activity.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 /** The turn's progress: a context line, then a tool line joined to it. Each updates in place.
@@ -147,7 +147,7 @@ export default function Activity({ state, readOnly = false, onPick, onLean, onDe
       <div className="activity swiping">
         <Deck key={state.cardsStep} cards={state.cards} hotels={state.hotels} onDone={onPick} onLean={onLean} commands={state.swipes}
               start={deckStart(state)} onProgress={onDeck} />
-        {note && <p className="deck-note">{spoken ?? note}</p>}
+        {note && <p className="deck-note">{plainMarkdown(spoken ?? note)}</p>}
       </div>
     );
   }

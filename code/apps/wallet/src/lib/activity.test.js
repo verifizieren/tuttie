@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, cleanAnswer, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
+import { applyEvent, cleanAnswer, deckStart, plainMarkdown, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -163,4 +163,11 @@ test('a deck position in the wrong shape never starts the deck', () => {
   assert.deepEqual(deckStart({ ...state, deck: { step: 3, index: 1, liked: ['a'] } }), { index: 1, liked: ['a'] });
   assert.equal(deckStart({ ...state, deck: { step: 3, index: 1 } }), null);
   assert.equal(deckStart({ ...state, deck: { step: 3, index: -1, liked: [] } }), null);
+});
+
+test('the note under the cards shows simple markdown as plain text', () => {
+  assert.equal(plainMarkdown('I recommend Hotel 1 **strongly**'), 'I recommend Hotel 1 strongly');
+  assert.equal(plainMarkdown('*Rheinblick* or _Spalenhof_, use `book`'), 'Rheinblick or Spalenhof, use book');
+  assert.equal(plainMarkdown('room_type double_flex stays, 2 * 3 too'), 'room_type double_flex stays, 2 * 3 too');
+  assert.equal(plainMarkdown(cleanAnswer('Take **Hotel 1** [3]')), 'Take Hotel 1');
 });
