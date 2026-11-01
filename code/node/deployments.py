@@ -9,6 +9,7 @@ deploying an older version's settings again as a new version, so history is neve
 """
 
 import json
+import logging
 import os
 import threading
 from datetime import datetime, timezone
@@ -18,6 +19,7 @@ from node.settings import Settings, canonical, snapshot, validate
 
 ROOT = Path(__file__).resolve().parent.parent
 ORIGINAL_NOTE = "Original configuration"
+log = logging.getLogger(__name__)
 
 
 def default_dir() -> Path:
@@ -33,19 +35,25 @@ class DeploymentStore:
         self.lock = threading.Lock()
         self.original = {"version": 0, "deployed_at": None, "note": ORIGINAL_NOTE,
                          "settings": canonical(snapshot(base_config))}
+        self.skipped: list[dict] = []  # stored versions that no longer pass the checks
         self.versions: list[dict] = self.load()
 
     def load(self) -> list[dict]:
-        """The stored versions, oldest first. A damaged file stops the node: it must not
-        silently run with other settings than the owner deployed."""
+        """The stored versions that pass today's checks, oldest first. A version a newer,
+        stricter check rejects is skipped (logged, kept on disk) and the newest valid one, or
+        the config, is live: one bad record must not stop the node and with it every service.
+        A file that is not readable JSON still stops the node (it is not overwritten)."""
         if not self.path.exists():
             return []
-        versions = json.loads(self.path.read_text())["versions"]
-        for record in versions:
-            _, errors = validate(record["settings"])
+        valid = []
+        for record in json.loads(self.path.read_text())["versions"]:
+            _, errors = validate(record.get("settings"))
             if errors:
-                raise ValueError(f"{self.path}: version {record['version']} is invalid: {errors[0]}")
-        return versions
+                log.error("%s: skipping version %s, it is invalid now: %s", self.path, record.get("version"), errors[0])
+                self.skipped.append(record)
+            else:
+                valid.append(record)
+        return valid
 
     @property
     def current(self) -> dict:
@@ -59,13 +67,15 @@ class DeploymentStore:
     def deploy(self, settings: Settings, note: str | None) -> dict:
         """Store `settings` as the next version and return its record (write first, then
         remember: a failed write leaves the live version unchanged). Call with the lock held."""
-        record = {"version": self.current["version"] + 1,
+        newest = max([self.current["version"], *(r.get("version", 0) for r in self.skipped)])
+        record = {"version": newest + 1,
                   "deployed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                   "note": (note or "").strip() or None,
                   "settings": canonical(settings)}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({"versions": [*self.versions, record]}, indent=2, ensure_ascii=False))
+        stored = sorted([*self.versions, *self.skipped], key=lambda r: r.get("version", 0)) + [record]
+        temporary.write_text(json.dumps({"versions": stored}, indent=2, ensure_ascii=False))
         temporary.replace(self.path)  # atomic: a crash never leaves half a history
         self.versions.append(record)
         return record

@@ -40,7 +40,8 @@ price cannot be above the standard room's price, …) live in `code/node/setting
 stored in `code/data/deployments/<node_id>.json` (git-ignored) by `code/node/deployments.py`.
 
 Which node: `?node=<url>` in the page address, else `VITE_NODE_URL`, else the Gästehaus am
-Rhein's node (port 4009) on the host serving the page.
+Rhein's node (port 4009) on the host serving the page. `?node=` counts only for the page's own
+host or localhost/127.0.0.1 (any port), since the owner token is sent there; any other value is ignored.
 
 ## Code
 

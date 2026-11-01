@@ -209,7 +209,7 @@ def test_switching_off_postings_stops_the_wake_ups_and_back_on_restores_them(fol
 
 def test_removing_the_negotiation_limits_means_the_hotel_does_not_negotiate(folder):
     _, client = start(folder)
-    deploy(client, edited(client, lambda s: s["facts"].pop("negotiation")))
+    deploy(client, edited(client, lambda s: s["facts"].update(negotiation=None)))  # explicit null, as the owner view sends
     assert "negotiation" not in current(client)["facts"]
 
 
@@ -245,14 +245,14 @@ def test_rolling_back_is_deploying_an_old_version_again(folder):
     assert current(client)["version"] == 2 and current(client)["facts"]["rooms"][0]["price_chf"] == 135
 
 
-def test_a_damaged_deployment_file_stops_the_node_instead_of_changing_prices(folder):
+def test_an_unreadable_deployment_file_stops_the_node_instead_of_changing_prices(folder):
+    """Invalid single versions are skipped (tests/test_owner_deploy_guards.py); a file that is
+    not JSON at all stops the node and is not overwritten."""
     _, client = start(folder)
     deploy(client, edited(client, lambda s: s["facts"]["rooms"][0].update(price_chf=150)))
     path = folder / f"{CONFIG['node_id']}.json"
-    data = json.loads(path.read_text())
-    data["versions"][0]["settings"]["facts"]["rooms"][0]["price_chf"] = -1
-    path.write_text(json.dumps(data))
-    with pytest.raises(ValueError, match="version 1 is invalid"):
+    path.write_text("{not json")
+    with pytest.raises(ValueError):
         DeploymentStore(CONFIG["node_id"], CONFIG, folder)
 
 

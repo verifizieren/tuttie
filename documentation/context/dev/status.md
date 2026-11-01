@@ -10,6 +10,11 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
 
 ## Done
 
+- **Round 11 (owner view)**: `?node=` is used only for the page's own host or localhost (the owner
+  token never goes to a linked server); a deploy without an available room is refused, a left-out
+  `facts.negotiation` keeps the live floor (the owner view sends `null` to end bargaining); public
+  facts are capped at 8000 characters per hotel prompt; a stored version that fails today's checks is
+  skipped (logged) instead of stopping the node and the whole service; the change list keys add-ons by `id`.
 - **Round 10 (closing)**: a deploy reaches every phone on its next load (`Cache-Control: no-cache`
   on the apps' unhashed files, service worker fetches with `cache: "no-cache"`, `CACHE` v3; reload the
   presenter phone after a deploy anyway); a hotel's malformed signed session reply skips that hotel
@@ -571,8 +576,9 @@ Why things are the way they are, so nobody has to rediscover them:
   and after each deploy: `create_app` works on that copy, tools read `facts()` per call,
   `BusinessAgent.apply` re-reads persona and facts, and `CounterOfferTool.limits` / `add_ons`
   are properties, so no restart or rebuilt router is needed. A deploy carries the version it
-  started from (`base_version`); a stale one gets 409. A damaged deployment file stops the node
-  at start: it must never run with other prices than the owner deployed. Rolling back is
+  started from (`base_version`); a stale one gets 409. A deployment file that is not JSON stops
+  the node at start; a single version that fails today's checks is skipped (logged, kept on disk)
+  and the newest valid one is live. Rolling back is
   deploying an old version again, so history only grows. Drafts live in the owner's browser.
     Tests never read the machine's real deployments: `tests/conftest.py` points `OWNER_DATA_DIR`
     at a temporary folder (a deploy made while trying the owner view once broke two unrelated
