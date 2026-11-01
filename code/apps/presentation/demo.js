@@ -64,11 +64,20 @@ export function createDemo(iframe) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   };
 
+  /** The wallet's microphone off, before the card opens: the deck's iframe may not use the
+   *  microphone, and a refused one shows "Microphone blocked" under Tuttie's eyes. Muted from
+   *  the start, the wallet never asks for it (hooks/useVoice.js), so no note shows. The dock's
+   *  own mute button (a click works while the closed dock is hidden). */
+  function muteMicrophone() {
+    $('.dock button[aria-label="Mute microphone"]')?.click();
+  }
+
   /** A finger tap on the closed Tuttie card (useCardGestures reads a down/up without movement). */
   async function openTuttie() {
     if ($(".app.open")) return true;
     const card = await waitFor(() => $(".card.agent"));
     if (!card) return false;
+    muteMicrophone();
     const target = card.querySelector("canvas") || card;
     const { x, y } = centre(card);
     pointer(target, "pointerdown", x, y);
