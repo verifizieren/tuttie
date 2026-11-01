@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import date as Date
 from datetime import datetime, timedelta
@@ -40,12 +41,14 @@ from aps.envelope import is_fresh
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
 from marketplace.messages import PostingCreated
+from marketplace.messages import Request as MarketRequest
 from negotiation.agreement import AgreementRedeemer
 from negotiation.hotel import counter_offer_mcp_tool, counter_offer_router, load_authorities, registry_lookup
 from node.agent import BusinessAgent
 from node.deployments import DeploymentStore
 from node.mcp_tools import mcp_app, mcp_server
 from node.owner import owner_app
+from node.settings import POSTING_EVENTS
 from node.settings import apply as apply_settings
 from node.settings import validate as validate_settings
 from sessions import SessionClosed, SessionStore
@@ -129,7 +132,40 @@ async def requester_problem(posting, lookup, authorities: dict, now=None) -> str
     payload = envelope.get("payload")
     if not isinstance(payload, dict) or payload.get("request_id") != posting.request_id:
         return "the signed request is for another posting"
+    try:
+        MarketRequest.model_validate(payload)
+    except ValidationError:
+        return "the signed request is not a valid request"
     return None
+
+
+class HandledRequests:
+    """The signed requests this node has already answered, so a replay is not answered again.
+
+    An entry is kept for twice MAX_REQUEST_AGE_S (after that the request is refused as outdated
+    anyway), and at most MAX_ENTRIES at once: when full of fresh entries, new ones are refused
+    (better no answer than an unbounded memory or a second LLM call for the same request).
+    """
+    MAX_ENTRIES = 10_000
+    KEEP_S = 2 * MAX_REQUEST_AGE_S
+
+    def __init__(self) -> None:
+        self.seen: dict[tuple, float] = {}  # key -> when it may be forgotten (monotonic), oldest first
+
+    def claim(self, key: tuple) -> str | None:
+        """None the first time `key` is seen (it is then remembered), else why it is not answered."""
+        now = time.monotonic()
+        while self.seen:
+            oldest = next(iter(self.seen))
+            if self.seen[oldest] > now:
+                break
+            del self.seen[oldest]
+        if key in self.seen:
+            return "already handled"
+        if len(self.seen) >= self.MAX_ENTRIES:
+            return "too many requests right now"
+        self.seen[key] = now + self.KEEP_S
+        return None
 
 
 def agent_caller(request: Request) -> None:
@@ -192,6 +228,7 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
     business_agent = BusinessAgent(config)
     sessions = SessionStore(owner=node_id)
     background: set[asyncio.Task] = set()  # offers being prepared and sent
+    handled = HandledRequests()  # requests already answered: a replay gets no second LLM call
 
     def signed(payload: dict) -> dict:
         """Wrap a response payload in this node's signed envelope."""
@@ -421,26 +458,33 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
         """The marketplace wakes the agent on a change; it answers whether and how it would respond.
 
         The body is the event itself, e.g. {"type": "posting.created", "posting": {...}}
-        (marketplace/messages.py, PostingCreated). A new posting must be a valid PostingCreated
-        whose offer_url is the configured market's offer door for it (offer_url_allowed); else
-        422. Its request must be fresh and signed by a verified user agent (requester_problem);
-        else 403. Both are checked before any LLM runs.
+        (marketplace/messages.py, PostingCreated). Only posting events are answered, and each one
+        (posting.created or posting.updated) must hold a valid posting whose offer_url is the
+        configured market's offer door for it (offer_url_allowed); else 422. Its request must be
+        fresh and signed by a verified user agent (requester_problem); else 403. A request
+        already handled is answered "already handled" (no second LLM call, no second offer).
+        All of this is checked before any LLM runs.
         """
-        if event.get("type") == "posting.created":
-            try:
-                posting = PostingCreated.model_validate(event).posting
-            except ValidationError as error:
-                raise HTTPException(status_code=422, detail=f"not a valid posting.created event: "
-                                                            f"{error.errors()[0]['msg']}") from None
-            if not offer_url_allowed(posting.offer_url, posting.request_id, market_url()):
-                raise HTTPException(status_code=422, detail="offer_url is not this marketplace's offer address")
-            problem = await requester_problem(posting, lookup, authorities)
-            if problem:
-                raise HTTPException(status_code=403, detail=problem)
+        kind = event.get("type")
+        if kind not in POSTING_EVENTS:
+            return signed({"woken_by": kind, "interested": False, "ignored": True,
+                           "reason": "this agent only answers posting events", "next_tool": None})
+        try:
+            posting = PostingCreated.model_validate({**event, "type": "posting.created"}).posting
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=f"not a valid {kind} event: "
+                                                        f"{error.errors()[0]['msg']}") from None
+        if not offer_url_allowed(posting.offer_url, posting.request_id, market_url()):
+            raise HTTPException(status_code=422, detail="offer_url is not this marketplace's offer address")
+        problem = await requester_problem(posting, lookup, authorities)
+        if problem:
+            raise HTTPException(status_code=403, detail=problem)
+        refused = handled.claim((posting.requester_id, posting.request_id))
+        if refused:
+            return signed({"woken_by": kind, "interested": False, "reason": refused, "next_tool": None})
         decision = await business_agent.invoke(event)
         choice = decision.pop("offer_choice", None)  # chosen while deciding; not part of the reply
-        if (event.get("type") == "posting.created" and decision.get("interested")
-                and decision.get("next_tool") == "make_offer"):
+        if kind == "posting.created" and decision.get("interested") and decision.get("next_tool") == "make_offer":
             task = asyncio.create_task(send_offer(event["posting"], choice))  # the market need not wait for it
             background.add(task)
             task.add_done_callback(background.discard)
