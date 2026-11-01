@@ -20,8 +20,9 @@ What it shows, top to bottom (little text on purpose):
 4. **Under the hood:** what is signed, for technical readers (seals, offers and agreements,
    delegation, approval, mandate, prices from signed data). Keep it true to `code/aps/`.
 5. **It searches, checks, bargains; you tap:** the kinds of businesses and the seal colours.
-6. **For businesses:** 7 rooms vs 220, the commission an agency takes on a CHF 135 night,
-   and who pays. No invented market numbers.
+6. **For businesses:** 7 rooms vs 220, the commission an agency takes on a CHF 135 night
+   (15–18 %) against Tuttie's 5 % per signed booking (CHF 6.75), bars to scale. No invented
+   market numbers.
 7. **Demo:** an Apple-style scroll docks the phone, then the demo plays by itself, like a story:
    one progress segment per part, tap right = next part, tap left = previous part, press and
    hold = pause, arrow keys (Space pauses) and side arrows on desktop. It follows the real
@@ -42,6 +43,15 @@ native 390 x 844 size; the live product is the wallet itself. The bank cards are
 in `apps/wallet/src/components/BankCard.jsx`. `face.js` is a copy of
 `apps/wallet/src/lib/face.js`: keep it in sync. Photos: `img/` (copied from
 `apps/wallet/public/hotels`, credits in `apps/wallet/public/hotels/CREDITS.md`).
+
+Dark mode follows the phone's setting (`prefers-color-scheme`, one block at the end of the
+styles): the page swaps its colour variables; the Tuttie card and the wallet inside the phone
+stay light, as the wallet looks (`.phone` sets the light variables again).
+
+Speed: both faces paint only while their canvas is on screen (`paintOnlyOnScreen` wraps the
+instance, so `face.js` stays an exact copy); each frame draws two eyes with a blurred halo at
+up to 3x resolution. Inter loads without blocking the first paint. Only the top bar keeps a
+backdrop blur (a blur under an almost opaque button costs every scroll frame and does not show).
 
 Edit the demo's timing in `EVENTS` and `capAt` near the end of `index.html` (`capAt` also
 defines the story parts the taps jump between).

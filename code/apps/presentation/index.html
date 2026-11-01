@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f2f2f7">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="description" content="Tuttie: your agent in your wallet. Businesses' agents come to you with signed offers, fakes never reach you.">
 <title>Tuttie</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<!-- Loaded without blocking the first paint; display=swap shows the same text in the system font until Inter arrives. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"></noscript>
 <style>
 /* The page the pitch's QR code opens (issues #1, #6): the numbers, the concept, the business
    case, then an Apple-style scroll into a demo of the wallet that plays by itself.
@@ -47,14 +52,14 @@ em, i, cite, address, dfn, var { font-style: normal; }
        backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); pointer-events: none; }
 .top b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
 .top a { pointer-events: auto; display: inline-flex; align-items: center; min-height: 40px; font-size: 15px; font-weight: 600; text-decoration: none; padding: 0 16px; border-radius: 999px; cursor: pointer;
-         background: rgba(255,255,255,.75); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+         background: rgba(255,255,255,.75); border: 1px solid var(--line); }  /* no own blur: it sits on the bar's blur already */
 
 .in-demo .top { opacity: 0; }
 
 /* Back to top: a small arrow, no text, once you are past the hero. */
 .totop { position: fixed; z-index: 21; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 48px; height: 48px; border-radius: 50%;
          display: grid; place-items: center; padding: 0; cursor: pointer; color: var(--text); background: rgba(255,255,255,.9);
-         border: 1px solid var(--line2); box-shadow: var(--shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+         border: 1px solid var(--line2); box-shadow: var(--shadow);  /* 90 % white: a blur behind it would not show, but costs every scroll frame */
          opacity: 0; transform: translateY(12px) scale(.9); pointer-events: none; transition: opacity .3s var(--ease), transform .4s var(--ease); }
 .totop svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .totop.show { opacity: 1; transform: none; pointer-events: auto; }
@@ -183,7 +188,7 @@ section.block { padding: 90px 0; }
 .bar .keep { background: var(--green); }
 .bar .fee { background: var(--red); opacity: .85; }
 .bill.in .bar .keep.a { width: 83.5%; } .bill.in .bar .fee.a { width: 16.5%; }
-.bill.in .bar .keep.b { width: 97%; } .bill.in .bar .fee.b { width: 3%; background: var(--muted); }
+.bill.in .bar .keep.b { width: 95%; } .bill.in .bar .fee.b { width: 5%; background: var(--muted); }  /* 5 % fee, to scale */
 .barrow strong { font-weight: 700; font-variant-numeric: tabular-nums; }
 .barrow .lost { color: var(--red); }
 .model { margin-top: 18px; display: grid; gap: 10px; }
@@ -522,6 +527,39 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .swiss-mark i:last-child { width: 4px; height: 13px; }
 /* Seal marks on light rows get a white rim instead of the dark one they need on photos. */
 .hotel .marks .ms, .booking .marks .ms, .sh-hotel .marks .ms { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+
+/* ---------- Dark mode: follows the phone's setting ----------
+   The page swaps its colours; the Tuttie card and the wallet inside the phone stay light,
+   because that is how the wallet looks (the phone gets the light colours back below). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0b0f; --panel: #17171d; --panel2: #17171d; --line: #26262e; --line2: #34343e; --soft: #22222a;
+    --text: #f2f2f7; --muted: #a3a2b0; --dim: #74737f;
+    --accent-text: #a48dff;
+    --tint-blue: rgba(47,111,224,.18); --tint-purple: rgba(122,90,248,.18); --tint-pink: rgba(229,72,155,.18);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  .phone {
+    --bg: #f2f2f7; --panel: #fff; --panel2: #fff; --line: #e4e4ea; --line2: #d7d7df; --soft: #ececf1;
+    --text: #17171d; --muted: #5a5967; --dim: #8a8996; --accent-text: #6a4ae6;
+    --tint-blue: #eaf1fd; --tint-purple: #f1edfe; --tint-pink: #fdeaf4;
+    --shadow: 0 1px 2px rgba(23,23,29,.04), 0 8px 24px rgba(23,23,29,.06);
+    box-shadow: inset 0 0 0 2px #3a3a42, inset 0 0 0 5px #0d0d10, 0 18px 44px rgba(0,0,0,.5), 0 0 0 1px #2a2a30;
+  }
+  .top { background: rgba(11,11,15,.78); border-bottom-color: rgba(255,255,255,.07); }
+  .top a { background: rgba(34,34,42,.8); }
+  .totop { background: rgba(28,28,35,.92); }
+  .tcard { box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 70px rgba(0,0,0,.55); }
+  .ring .bg, .split .bar2 { stroke: #2a2a33; background: #2a2a33; }
+  .yoy i, .ticks i { background: #3a3a44; }
+  .three span { color: #3d3d47; }
+  .mk .ln { stroke: #3a3a44; }
+  .mk .biz { fill: var(--panel); }
+  .bars i { background: rgba(255,255,255,.16); }
+  .snav { background: var(--panel); }
+  .again { color: #17171d; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .seal svg[style*="5d5c6d"] { fill: #8e8e9a !important; }  /* the grey seal, visible on dark */
+}
 </style>
 </head>
 <body>
@@ -637,9 +675,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <h4>One night, CHF 135</h4>
       <div class="barrow"><span>Agency</span><strong class="lost">− CHF 20–24</strong>
         <div class="bar"><i class="keep a"></i><i class="fee a"></i></div></div>
-      <div class="barrow"><span>Tuttie</span><strong>− a fixed fee</strong>
+      <div class="barrow"><span>Tuttie</span><strong>− CHF 6.75</strong>
         <div class="bar"><i class="keep b"></i><i class="fee b"></i></div></div>
-      <p class="src" style="margin:12px 0 0">Agencies: typically 15–18% commission. Tuttie: a fixed fee per signed booking, not a share of the price (amount not set yet). Anna is a demo persona.</p>
+      <p class="src" style="margin:12px 0 0">Agencies: typically 15–18% commission. Tuttie: 5% per signed booking. Anna is a demo persona.</p>
     </div>
 
     <div class="model">
@@ -749,8 +787,20 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const ease = t => 1 - Math.pow(1 - t, 3);
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// A face keeps its timeline (blinks, looks, expressions) but only paints while its canvas is on
+// screen: each frame draws both eyes with a blurred halo at up to 3x resolution, and two faces
+// painting 60 times a second off screen made scrolling slow on phones. face.js stays a copy of
+// the wallet's, so this wraps an instance instead of changing the file.
+function paintOnlyOnScreen(face, canvas) {
+  let onScreen = true;
+  new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; }).observe(canvas);
+  const draw = face.draw.bind(face);
+  face.draw = now => { if (onScreen) draw(now); };
+  return face;
+}
+
 // ---------- Hero: Tuttie wakes up ----------
-const hero = new TuttieFace($("#heroFace"));
+const hero = paintOnlyOnScreen(new TuttieFace($("#heroFace")), $("#heroFace"));
 hero.sleep(0);
 setTimeout(() => { hero.wake("happiness", 700); setTimeout(() => hero.set("neutral", 800), 1600); }, 1100);
 
@@ -860,7 +910,7 @@ addEventListener("keydown", e => {
 });
 
 // ---------- Demo: the wallet mock and its timeline ----------
-const screen = $("#screen"), face = new TuttieFace($("#demoFace"));
+const screen = $("#screen"), face = paintOnlyOnScreen(new TuttieFace($("#demoFace")), $("#demoFace"));
 face.sleep(0);
 const CAPS = [
   ["Tuttie lives in your wallet", "Tap to talk."],
