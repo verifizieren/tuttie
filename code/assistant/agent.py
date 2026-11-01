@@ -133,6 +133,12 @@ def drop_notes(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+# A user message about their own budget: then the number may be said ("budget hotel", "limited"
+# and "spend the night" are not about it).
+ASKED_BUDGET = re.compile(r"budget(?! rooms| hotels?)|\blimit\b|maximum|\bmax\b|\bspend\b(?! the night)"
+                          r"|how much (?:can|did) i|ausgeben|wie viel", re.IGNORECASE)
+
+
 def without_budget(text: str, amounts: set[int]) -> str:
     """The answer without the user's private budget amount in phrases about *their* budget ("your
     CHF 160 budget" -> "your budget", "within your CHF 160" -> "within your budget"): others hear
@@ -141,7 +147,7 @@ def without_budget(text: str, amounts: set[int]) -> str:
         chf = rf"CHF\s?{n}(?:\.-|\.00)?(?![\d.,]\d|\d)"
         text = re.sub(rf"\b(your) {chf} (budget|limit|maximum|cap)\b", r"\1 \2", text, flags=re.IGNORECASE)
         text = re.sub(rf"\b(your) (budget|limit|maximum|cap) of {chf}", r"\1 \2", text, flags=re.IGNORECASE)
-        text = re.sub(rf"\b(within|under|over|above|below) your {chf}(?! \w)", r"\1 your budget", text,
+        text = re.sub(rf"\b(within|under|over|above|below) your {chf}", r"\1 your budget", text,
                       flags=re.IGNORECASE)
     return text
 
@@ -246,8 +252,7 @@ class Assistant:
             if not message.get("tool_calls"):
                 answer, mood = split_mood(message["content"] or "")
                 answer = drop_notes(answer) or fallback_answer(said_goodbye)
-                asked = re.search(r"budget(?! rooms)|limit|maximum|\bmax\b|spend|how much (?:can|did) i|ausgeben|wie viel",
-                                  text, re.IGNORECASE)
+                asked = ASKED_BUDGET.search(text)
                 private = getattr(self.toolbox, "private_amounts", None)
                 answer = without_budget(answer, set() if asked or private is None else private())
                 self.bus.emit("answer", "verified", answer, detail={"mood": mood})
