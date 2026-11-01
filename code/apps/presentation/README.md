@@ -16,16 +16,23 @@ What it shows, top to bottom (short points only, little text on purpose):
 4. **Under the hood:** what is signed, for technical readers: seals (UID), signed offers and
    agreements, the delegation (never paying), the approval for one exact amount, the mandate
    (≤ CHF 10, trusted businesses), prices only from signed data. Keep it true to `code/aps/`.
-5. **For businesses:** 7 rooms vs 220 (with why the small one won in the demo: signed facts
-   and budget), the commission an agency takes on a CHF 135 night against Tuttie's fixed fee
+5. **For businesses:** "A fair chance." Matches on signed facts, needs and budget; no room-count
+   comparison cards. The commission an agency takes on a CHF 135 night against Tuttie's fixed fee
    per signed booking (amount not set yet). No invented market numbers.
-6. **Demo:** an Apple-style scroll: the phone rises and docks, then a demo of the wallet plays
+6. **The agent web:** "One web. Two layers." Existing websites remain for people to browse;
+   alongside them, business agents share signed facts and offers with people's agents.
+   A responsive diagram connects you and a website above with your agent and the business's
+   agent below; arrows show browsing and APS exchanges. Built with HTML/CSS and inline SVG,
+   with a text alternative for screen readers. **APS** follows as a nested subsection:
+   "Trust, signed." explains sender identity, offer integrity and user permission, with a
+   smaller heading, tighter spacing and a subtle divider.
+7. **Demo:** an Apple-style scroll: the phone rises and docks, then a demo of the wallet plays
    by itself (tap the phone to pause, Replay on the phone at the end). It follows the real
    wallet's screens and wording (progress lines, swipe deck, approval sheet, booking card).
    Light "behind the screen" callouts explain what happens out of sight (the context it reads
    is demo data; the budget is never sent; limits are compared in code; the signed amount).
    Only *forged* seals "never reach you": unsigned businesses are shown untrusted and never book.
-7. **Close:** throughline, "Watch it again", the honesty line, team, repo.
+8. **Close:** throughline, "Watch it again", the honesty line, team, repo.
 
 The page never links to the live wallet: people who scan the QR get the feeling, not the
 shared live system. The browser scrollbar is hidden.

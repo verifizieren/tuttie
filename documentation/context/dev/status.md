@@ -6,10 +6,21 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (QR page: baselines and what is signed; light design for wallet, QR page and pitch deck; keynote deck at `/keynote/` merged; the demo runner is open).
+Last updated: 2026-11-01 (QR page: simpler business section, APS and two-layer web explainers; light design for wallet, QR page and pitch deck; keynote deck at `/keynote/` merged; the demo runner is open).
 
 ## Done
 
+- **QR page two-layer web (1 Nov)**: added "One web. Two layers." after the business section.
+  Two short rows explain existing websites for people and the agent layer alongside them,
+  where business agents share signed facts and offers and negotiate with the user's agent.
+  A responsive diagram now shows people browsing websites above and their agents exchanging
+  signed messages through APS below, with ownership links and a screen-reader description.
+  APS is nested below the diagram and layer explanation, with an h3, smaller copy, tighter
+  spacing and a subtle divider to make it supporting detail within the same section.
+- **QR page business and APS copy (1 Nov)**: renamed the business heading to "A fair chance."
+  and removed the 7 / 220 room comparison cards. "Trust, signed." now sits within the two-layer
+  web section and explains APS (Agent Protocol Secure): sender identity, signed offer integrity and
+  user permission, using the page's existing light panels and scroll reveals.
 - **Keynote pitch deck** (merged 1 Nov, still the dark design): a static deck
   in `code/apps/keynote/`, served at `/keynote/` by the assistant's static mount (no build). Black
   stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
