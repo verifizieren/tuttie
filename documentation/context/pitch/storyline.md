@@ -105,7 +105,7 @@ addresses on screen.
 | --- | --- | --- | --- | --- |
 | blocker | The wallet shows nothing of the flow yet (status.md step 3, "human layer": in progress). The agent side is done end to end: post → offers → shortlist → negotiate → book | the wallet shows request, offers (seal colour, name, price), the refused forged business, the winner with its signed facts and the signed approval; a demo runner in `code/demo` that drives the real flow without live speech | dev member 1 | 8–12 h |
 | blocker | Verdicts must be computed, never hard-coded | server-side verdicts (1 h); JS verifier optional (4–5 h); without either, drop "The signatures are real" | dev | 1–5 h |
-| blocker | Presentation app not started (`code/apps/presentation`) | camera, tab field, face hand-off, QR, per-beat recordings | Max + pitch | ~20 h |
+| blocker | Stage presentation not started; only the QR page exists (`code/apps/presentation`, branch `presentation-site`) | camera, tab field, face hand-off, per-beat recordings | Max + pitch | ~20 h |
 | blocker | "Adobe Business Registry" is not a real Adobe product; Alpina, Rheinblick, Spalenhof, the lawyer and Tuttie carry an "adobe" seal | rename the issuer to a neutral demo platform, re-run `issue_seals.py`, tests, status.md (owner of `code/aps/` decides) | dev member 2 | 45 min |
 | high | The winner's reason must be real | Tuttie's shortlist over the signed facts (quiet, dogs, late arrival) and the private budget, with a test; shown as one line on the winner card | dev member 1 | 2 h |
 | high | face.js is not stage-ready at giant size | idle freeze, pixel ratio cap, glow off, expose eye rectangles, move to `apps/shared` | dev | 2–3 h |
