@@ -97,11 +97,20 @@ test("a tap counts only on a sheet that was on screen when the finger came down"
   // a click from code or the keyboard (detail 0) always counts: the keynote deck uses button.click()
   assert.equal(tapAccepted({ detail: 0, shownAt, downAt: null }), true);
   // a finger tap that started on the sheet before (the old sheet that slid away) never counts
-  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null }), false);
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, now: shownAt + 200 }), false);
   assert.equal(tapAccepted({ detail: 1, shownAt, downAt: 900 }), false);
   // the finger came down while the sheet was still sliding in: aimed at what was there before
   assert.equal(tapAccepted({ detail: 1, shownAt, downAt: shownAt + ARM_MS - 1 }), false);
   assert.equal(tapAccepted({ detail: 1, shownAt, downAt: shownAt + ARM_MS }), true);
+});
+
+test("a tap without a pointerdown (VoiceOver, some assistive input) counts by its own time", async () => {
+  const { tapAccepted, ARM_MS } = await import("./approval.js");
+  const shownAt = 1000;
+  // no pointerdown on this sheet: judged by when the click came, so a quick tap aimed at the old
+  // sheet still never counts, while an assistive double tap on a settled sheet does
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, now: shownAt + 250 }), false);
+  assert.equal(tapAccepted({ detail: 1, shownAt, downAt: null, now: shownAt + ARM_MS + 400 }), true);
 });
 
 test("the streamed decision finishes a sheet the user decided on, also after a timeout or a gone answer", async () => {
