@@ -99,6 +99,7 @@ class MarketDesk:
         self.last_shortlist: list[dict] = []     # its shortlisted offers, with their signed envelopes
         self.last_offers: list[dict] = []        # every checked offer for it (the user may pick any)
         self.last_budget: float | None = None    # the private budget it was shortlisted with
+        self.cards: dict[str, dict[str, dict]] = {}  # request_id -> node_id -> agent card, while collecting
 
     async def find(self, date: str, requirements: list[str] | None = None, tags: list[str] | None = None,
                    category: str = "hotel", guests: int = 1, budget_chf: float | None = None) -> dict:
@@ -157,9 +158,16 @@ class MarketDesk:
         and shown once on the timeline. Each hotel's agent card is fetched once per collect, and
         the wait ends on time even in the middle of a long list of offers.
         """
+        self.cards[request_id] = {}             # each hotel's agent card, fetched once (see check)
+        try:
+            return await self.poll(request_id, expected, invited)
+        finally:
+            self.cards.pop(request_id, None)
+
+    async def poll(self, request_id: str, expected: int, invited: dict) -> list[dict]:
+        """collect's loop: check each new relayed offer until enough hotels offered or time is up."""
         seen: set[str] = set()                  # offer ids already checked (valid or not)
         by_hotel: dict[str, dict] = {}          # node_id -> its latest offer that checked out
-        cards: dict[str, dict] = {}             # node_id -> its agent card, fetched once
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.offer_wait_s
         while True:
@@ -172,7 +180,7 @@ class MarketDesk:
                 if offer_id in seen:
                     continue
                 seen.add(offer_id)
-                checked = await self.check(item, invited.get(node_id, {}), request_id, cards)
+                checked = await self.check(item, invited.get(node_id, {}), request_id)
                 if checked:
                     by_hotel[checked["node_id"]] = checked
                 if loop.time() > deadline:
@@ -181,16 +189,15 @@ class MarketDesk:
                 return list(by_hotel.values())
             await asyncio.sleep(POLL_S)
 
-    async def check(self, item: dict, invited: dict, request_id: str,
-                    cards: dict[str, dict] | None = None) -> dict | None:
+    async def check(self, item: dict, invited: dict, request_id: str) -> dict | None:
         """Re-verify one relayed offer before Tuttie uses it.
 
         Checks the business's seals from the registry, the offer's signature (by that
         business, over exactly the offer shown), that it answers *this* request (`request_id`:
         a genuine offer from another posting has another date or other needs) and that it is
         still valid. Anything else is shown as broken and ignored, also a malformed item (an
-        unknown business, a price that is not a number). `cards` caches the businesses' agent
-        cards for one search (node_id -> card).
+        unknown business, a price that is not a number). While collect runs for this request,
+        each business's agent card is fetched only once.
         """
         try:
             node_id = item["node_id"]
@@ -216,8 +223,7 @@ class MarketDesk:
             return None
         # Name, uid, agent and profile come from signed data only (the sealed registry record and
         # the business's own signed agent card), never from the market's unsigned relay.
-        if cards is None:
-            cards = {}
+        cards = self.cards.get(request_id, {})
         if node_id not in cards:
             cards[node_id] = await self.agent_card(record)
         agent, profile = card_fields(cards[node_id])
