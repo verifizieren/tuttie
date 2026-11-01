@@ -10,6 +10,10 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
 
 ## Done
 
+- **Round 10 (closing)**: a deploy reaches every phone on its next load (`Cache-Control: no-cache`
+  on the apps' unhashed files, service worker fetches with `cache: "no-cache"`, `CACHE` v3; reload the
+  presenter phone after a deploy anyway); a hotel's malformed signed session reply skips that hotel
+  instead of sinking all bargaining (`assistant/subagents.py`); a free (CHF 0) signed add-on books.
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
@@ -18,8 +22,8 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   "Friday" for a Saturday); answers say 24-hour times as people do on screen too ("12:52 am",
   `code/speech.py`, shared with the voice).
 - **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
-  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
-  - The marketplace takes at most 120 keyless postings per requester a minute (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
+  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). Caveat: the owner page fetches `<host>:4009/owner/...` straight from the browser, so with loopback binding it only works on the server itself. The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
+  - The marketplace takes at most 10 keyless postings per requester a minute (only outsiders: wallet users post through Tuttie with the key) (429 + Retry-After) and keeps the newest 500. Tuttie's own postings carry the deployment's `X-Agent-Web-Key` and skip the cap, so an outsider with the public demo key cannot lock the wallet users out. Tuttie turns a busy (429), unreachable or non-JSON market into a calm tool error and never posts again in that turn; a market that times out while waking the hotels makes Tuttie say the hotels are slow and to ask again.
   - The action gate refuses an approval whose signed `decided_at` is over 900 s old or in the future (after a node restart an old approval no longer books again).
   - `registry_lookup` (negotiation/hotel.py) looks up only node-id-shaped ids and returns only dict records; `../search` gave a 500 on `/tools/counter_offer` and made the gate raise.
 - **Round 6 (overnight)** (branches `fix/r6-trust`, `fix/r6-approval-sheet`, `fix/r6-voice`,
