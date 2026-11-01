@@ -38,7 +38,7 @@ approve with one tap. Every message is signed, so fakes simply do not show up.
 | --- | --- | --- |
 | Wallet (phone) | The web app is the wallet itself, built for phone screens and kept minimal: an Apple Wallet-like stack of cards, the Tuttie agent card plus two generic bank cards (no real details). Agents appear as procedurally generated avatars. Swiping the agent card up opens the voice agent. Offers, negotiation and approvals appear here. | #2 |
 | Owner view | A business owner edits their agent's presence: description, offers, negotiation limits. | #5 |
-| Presentation site | The pitch as a website with a QR code. During the pitch it shows a minimal concept; a timer/counter unlocks more content afterwards; at the end an Apple-style scroll leads into the live demo. | #1, #6 |
+| Presentation site | The pitch as a website with a QR code. During the pitch it shows a minimal concept; a timer/counter unlocks more content afterwards; at the end an Apple-style scroll leads into the live demo. Built so far: the QR page (`code/apps/presentation/`), a static phone page with the numbers, the idea, the business case and a self-playing demo of the wallet. | #1, #6 |
 | Behind the scenes (to build) | Every signed step with its seals, live from the timeline (`GET /events`). Useful on the projector and for the jury's code review. | — |
 
 Brand: dark, Inter, terracotta accent (`code/apps/shared/tuttie.css`), shared by all apps.
