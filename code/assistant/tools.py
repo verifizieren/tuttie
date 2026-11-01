@@ -176,7 +176,7 @@ SCHEMAS = [
             "node_id": {"type": "string"},
             "date": {"type": "string", "description": "YYYY-MM-DD; omit with use_agreement"},
             "room_type": {"type": "string", "description": "omit with use_agreement"},
-            "guest_name": {"type": "string"},
+            "guest_name": {"type": "string", "description": "omit: the booking is in the user's name"},
             "extras": {"type": "array", "items": {"type": "string"},
                        "description": "'item' names of commitments from ask_agent to include; "
                                       "never with use_agreement"},
@@ -185,7 +185,7 @@ SCHEMAS = [
                                              "rate, extras and price (no get_availability, room_type, date or "
                                              "extras needed)"},
         },
-        ["node_id", "guest_name"],
+        ["node_id"],
     ),
     function(
         "pay",
@@ -366,7 +366,8 @@ def offered_room(offer: dict) -> str | None:
 
 # Words a private item may hold that every hotel may hear (the stay itself, the dog, the guest).
 PUBLIC_WORDS = frozenset({"basel", "sbb", "luna", "hotel", "rhine"})
-GUEST_FIRST_NAME = os.environ.get("GUEST_NAME", "Alex Muster").split()[0]
+GUEST_FULL_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
+GUEST_FIRST_NAME = GUEST_FULL_NAME.split()[0]
 
 
 def finite_price(value, free_ok: bool = False) -> bool:
@@ -784,7 +785,8 @@ class Toolbox:
 
     async def book(self, node_id: str, date: str = "", room_type: str = "", guest_name: str = "",
                    extras: list[str] | None = None, use_agreement: bool = False) -> dict:
-        """Book a room: compute the total from signed facts only, wait for the user's signed
+        """Book a room (in the user's name unless `guest_name` says otherwise): compute the total from
+        signed facts only, wait for the user's signed
         approval on the phone, then let the node confirm the booking.
 
         With `use_agreement`, the booking is the hotel's signed Agreement from the last
@@ -792,6 +794,7 @@ class Toolbox:
         redeems once (negotiation/agreement.py). Arguments that would change any of them are
         refused with an error instead of being booked.
         """
+        guest_name = guest_name.strip() if isinstance(guest_name, str) and guest_name.strip() else GUEST_FULL_NAME
         found = await self.lookup(node_id)
         # A booking takes payment, which untrusted (grey) nodes never get.
         if found is None or not {"can_book", "can_take_payment"} <= set(found[1]["capabilities"]):
