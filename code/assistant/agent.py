@@ -109,14 +109,18 @@ feels, one of: {", ".join(MOODS)}. E.g. a good deal is "excited", bad news "sorr
 
 
 # A paragraph the model wrote to itself before the answer ("The user said tomorrow ... I'll go
-# with what they said."): Tuttie talks to the user, never about "the user".
-NOTE_TO_SELF = re.compile(r"\bthe user\b|\buser's\b|\bso I'll report\b|\bI should\b", re.IGNORECASE)
+# with what they said."): Tuttie talks to the user, never about "the user". Only clear narration
+# about the conversation counts; a paragraph with a price, a hotel or a question is a real answer.
+NOTE_TO_SELF = re.compile(r"^(the user\b|the user's\b)|\bI'll go with what\b|\bso I'll report\b",
+                          re.IGNORECASE)
+REAL_ANSWER = re.compile(r"CHF|\?|\b(Hotel|Gästehaus|Guesthouse|Rheinblick|Spalenhof|Gundeli|Alpina|Budget Rooms)\b",
+                         re.IGNORECASE)
 
 
 def drop_notes(text: str) -> str:
     """Drop leading paragraphs that are the model's notes to itself; the last one always stays."""
     paragraphs = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
-    while len(paragraphs) > 1 and NOTE_TO_SELF.search(paragraphs[0]):
+    while len(paragraphs) > 1 and NOTE_TO_SELF.search(paragraphs[0]) and not REAL_ANSWER.search(paragraphs[0]):
         paragraphs.pop(0)
     return "\n\n".join(paragraphs)
 
