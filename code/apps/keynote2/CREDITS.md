@@ -12,6 +12,6 @@
   Copyright (c) 2019-2020.
 - `img/qr.svg`: generated with [segno](https://github.com/heuer/segno) for the public wallet
   address (white background for the light stage).
-- `img/owner.webp`: an unedited screenshot of the owner view (`apps/owner`, 1280x800 at 2.25x)
-  signed in to the Gästehaus am Rhein's own node, with a draft of two changes open in the review
-  dialog (not deployed).
+- `img/owner.webp`: an unedited screenshot of the light owner view (`apps/owner` build of
+  `feat/design-wl`, 1280x800 at 2.25x) with the Gästehaus am Rhein's overview as recorded from its
+  node, and a draft of two changes open in the review dialog (not deployed).

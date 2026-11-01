@@ -65,7 +65,7 @@ light wallet before relying on it. It is loaded on the first V or L; if it is mi
 - `?wallet=<url>` frames another wallet path on the same origin (layout checks only).
 
 Beat 7 shows `img/owner.webp`, a screenshot of the real owner view (Gästehaus am Rhein, review
-before deploy), so it needs no sign-in on stage. The owner view is still dark.
+before deploy), so it needs no sign-in on stage. The screenshot is the light owner view.
 
 ## Files
 
