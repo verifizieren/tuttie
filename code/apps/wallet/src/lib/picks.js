@@ -1,6 +1,7 @@
 // What the wallet asks Tuttie after the user swiped through the hotel cards: book the best
-// liked deal (the lowest agreed price), and name the other liked hotels with their prices, so
-// that if the user declines the booking on the approval sheet, Tuttie can offer the next one.
+// liked deal (the lowest agreed price), and name the other liked hotels (cheapest first, without
+// prices: a card's price is not what booking that hotel costs; its approval sheet shows the total),
+// so that if the user declines the booking on the approval sheet, Tuttie can offer the next one.
 
 // Hotel names come from the registry and the hotels' own cards, yet this text reaches Tuttie as
 // the user's words: a name is cut to one short line without brackets or quotes, and a node id
@@ -21,7 +22,7 @@ export function bookingRequest(liked) {
   const [best, ...others] = byPrice(liked);
   let text = `Book ${label(best)}${best.agreed_chf != null ? " at the agreed price" : ""}.`;
   if (others.length) {
-    text += ` If I decline it, I also liked: ${others.map(c => `${label(c)}${Number.isFinite(priceOf(c)) ? ` at CHF ${priceOf(c)}` : ""}`).join(", ")}.`;
+    text += ` If I decline it, I also liked: ${others.map(label).join(", ")}.`;
   }
   return { best, text, shown: `Book ${best.name}` };
 }

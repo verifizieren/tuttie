@@ -762,7 +762,10 @@ class Toolbox:
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
         if decision["decision"] != "approved":
-            return {"declined": True, "source_step": step}
+            # Card prices of other hotels are not what booking them costs (a flex offer vs the
+            # best rate plus extras): the next one is offered by name; its phone sheet shows the total.
+            return {"declined": True, "source_step": step,
+                    "note": "say it was declined; offer at most one other liked hotel, by name only, no price"}
 
         body = {"date": date, "room_type": room_type, "guest_name": guest_name, "extras": chosen, "approval": decision}
         if agreement is not None:

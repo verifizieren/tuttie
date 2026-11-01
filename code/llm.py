@@ -119,16 +119,25 @@ class LLM:
         return json.loads(response.output_text or "{}")
 
 
-def to_claude(messages: list[dict]) -> tuple[str, list[dict]]:
-    """Chat-style messages -> (system prompt, Messages API messages).
+CACHE = {"type": "ephemeral"}
 
-    Tool results become tool_result blocks, grouped into one user message per turn.
+
+def to_claude(messages: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Chat-style messages -> (system blocks, Messages API messages).
+
+    Tool results become tool_result blocks, grouped into one user message per turn. The first
+    system message is the fixed prompt: it is marked for prompt caching (with the tools, which
+    the API renders before it), so every round reuses it. Later system messages are per-round
+    notes (today's date, the current deal data): they follow as a second, uncached block, in the
+    same place the model always saw them (a trial with them after the chat made it ask instead of
+    searching more often).
     """
     system, out = [], []
     for message in messages:
         role, content = message["role"], message.get("content")
         if role == "system":
-            system.append(content)
+            if content:
+                system.append(content)
         elif role == "assistant":
             out.append({"role": "assistant", "content": message.get("provider_items") or content or "..."})
         elif role == "tool":
@@ -139,7 +148,10 @@ def to_claude(messages: list[dict]) -> tuple[str, list[dict]]:
                 out.append({"role": "user", "content": [block]})
         else:
             out.append({"role": "user", "content": content or ""})
-    return "\n\n".join(system), out
+    blocks = [{"type": "text", "text": system[0], "cache_control": CACHE}] if system else []
+    if len(system) > 1:
+        blocks.append({"type": "text", "text": "\n\n".join(system[1:])})
+    return blocks, out
 
 
 def to_claude_tool(schema: dict) -> dict:
