@@ -44,7 +44,10 @@ are demo, signatures are real) · 6 2000 website → 2033 signature ·
 The phone shows the real wallet in `<iframe id="wallet">` (no microphone permission, so the live
 wallet does not hear the speaker). `demo.js` supplies input and timing only: each demo click runs
 the matching step of `createDemo(iframe).steps` (open, ask, forged, like, approve, done), once
-per reset, and only when moving forward one click. Steps can wait on the wallet (offers take some
+per reset, and only when moving forward one click. Entering the demo beat runs "open": the
+wallet's microphone is muted first (the frame has no microphone permission), Tuttie's card
+opens, and the big eyes land on her awake eyes in the open card. "ask" posts the request to
+`POST /chat` for the wallet's own conversation, so Tuttie stays awake and shows her progress. Steps can wait on the wallet (offers take some
 seconds); the stage shows nothing while they wait, the presenter view shows "WAITING". If
 `demo.js` is missing or fails, the deck still runs and the demo clicks do nothing.
 
@@ -55,11 +58,10 @@ size. It is loaded on the first V or L; if it is missing, nothing changes on sta
 
 - `?owner=0` skips beat 7 (or set `OWNER_BEAT = false` in `beats.js`).
 - `?step=n` opens step n (rehearsal), without running demo steps.
-- `?wallet=<url>` and `?ownerview=<url>` frame another wallet or owner view (layout checks only;
-  the demo driver needs the same origin).
+- `?wallet=<url>` frames another wallet path on the same origin (layout checks only).
 
-Before the pitch, sign in to the owner view once inside the laptop frame (click into it, enter the
-owner token); the token stays for that browser tab.
+Beat 7 shows `img/owner.webp`, a screenshot of the real owner view (Gästehaus am Rhein, review
+before deploy), so it needs no sign-in on stage.
 
 ## Files
 
