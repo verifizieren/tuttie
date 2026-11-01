@@ -812,6 +812,12 @@ Why things are the way they are, so nobody has to rediscover them:
   nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
 - **Round 5b (1 Nov):** an offer's name/uid come from the sealed registry record and agent/profile
   from the hotel's signed agent card (never the market's relay); card photos only `hotels/<node_id>/<file>.jpg|png|webp`.
+- **Round 11 faults (1 Nov):** one slow piece no longer sinks a search: POST /postings waits
+  60 s (`marketplace/client.py` `POST_TIMEOUT_S`, above the market's 20 s card + 20 s wake), a
+  failed offer poll keeps polling, an unknown add-on id is dropped (the hotel still offers), a
+  registry blip refuses only that call and `negotiate_all` isolates each hotel, MCP calls give up
+  after 15 s (`CALL_TIMEOUT_S`). An LLM error after the cards or a confirmed booking answers from
+  code ("I found 3 hotels; swipe...", "It's booked: <hotel>, CHF 128.") instead of "try again".
 
 ## Environment
 
