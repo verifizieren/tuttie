@@ -502,6 +502,8 @@ class Toolbox:
         result["cards"] = [{"node_id": c["node_id"], "name": c["name"], "price_chf": c["price_chf"],
                             "room": offered_room(next((o["offer"] for o in self.market.last_offers
                                                        if o["node_id"] == c["node_id"]), {})),
+                            "rate": next((o["offer"].get("rate") for o in self.market.last_offers
+                                          if o["node_id"] == c["node_id"]), None),
                             "agreed_chf": c["agreed_chf"],
                             "rating": c["rating"], "shortlisted": c["shortlisted"],
                             "yes": [f["label"] for f in c["features"] if f["ok"]],
