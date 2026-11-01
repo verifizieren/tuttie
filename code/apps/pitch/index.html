@@ -723,7 +723,6 @@ html #try .try-row .qr { margin-top: 0; }
 .at-gather #cam { opacity:1; transform:translate3d(380px, 0, 0) scale(1); transition:transform .7s var(--cam) .4s, opacity .2s ease .4s; }
 .at-gather #shadow { opacity:.8; transform:translateX(380px); transition:transform .7s var(--cam) .4s, opacity .4s ease .6s; }
 .at-gather #market { transform:translateX(-430px); transition:opacity .45s ease, transform .7s var(--cam) .4s; }
-.wait-voice #cam, .wait-voice #shadow { opacity: 0; }
 </style>
 </head>
 <body>
@@ -1216,8 +1215,21 @@ function ripple(el, fx = .5, fy = .5) {
 function land() { const f = $("#float"); f.classList.remove("land"); void f.offsetWidth; f.classList.add("land"); }
 
 // ---------- Steps ----------
-function go(i, fromAuto = false) {
+let voicePending = false;
+function go(i, fromAuto = false, afterVoice = false) {
   i = Math.max(0, Math.min(STEPS.length - 1, i));
+  // #5 -> #6: "check 'em out" (1.45x) plays first; slide #6 and all its animations start when it ends.
+  // A second press during the line skips straight to the slide.
+  if (i === 6 && cur === 5 && !afterVoice) {
+    if (!voicePending) {
+      voicePending = true;
+      const next = () => { if (voicePending && cur === 5) { voicePending = false; go(6, fromAuto, true); } };
+      sfx.play("checkEmOut", { rate: 1.45, onEnd: next });
+      setTimeout(next, 3000);  // never wait longer than the line
+      return;
+    }
+  }
+  voicePending = false;
   const fwd = i === cur + 1 || (fromAuto && i > cur);
   timers.forEach(clearTimeout); timers = [];
   sfx.stopClips();
@@ -1226,13 +1238,6 @@ function go(i, fromAuto = false) {
   STEPS.forEach((n, k) => { if (k > i) delete startedAt[n]; else if (k === i) startedAt[n] = fwd ? now : now - 1e5; else if (!fwd || startedAt[n] === undefined) startedAt[n] = now - 1e5; });
   const keep = ["notes", "auto"].filter(c => stage.classList.contains(c));
   stage.className = [...STEPS.slice(0, i + 1).map(n => "has-" + n), "at-" + name, fwd ? "fwd" : "jump", ...keep].join(" ");
-  // #5 -> #6: "check 'em out" (1.45x) starts as the slide changes; the phone appears when it ends.
-  if (fwd && i === 6) {
-    stage.classList.add("wait-voice");
-    const show = () => { if (cur === 6) stage.classList.remove("wait-voice"); };
-    sfx.play("checkEmOut", { rate: 1.45, onEnd: show });
-    later(show, 3000);  // never keep the phone hidden longer than the line
-  }
   if (name === "like") stage.classList.add("at-swipe");   // the like is the second half of the swipe scene
   $("#notes").innerHTML = SHOTS[i][2] ? `<b>${i}</b>${SHOTS[i][2]}` : "";
   history.replaceState(null, "", "#" + i);
