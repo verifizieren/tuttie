@@ -13,7 +13,7 @@ def test_routes_touching_conversations_run_on_the_event_loop():
     # A plain `def` runs in a worker thread: two first requests of one browser then each created
     # a conversation (seen live: 4 ids for 6 parallel /history calls), and decisions or resets
     # woke the event loop from a foreign thread.
-    handlers = [app_module.conversation, app_module.chat, app_module.reset, app_module.pending_approvals,
+    handlers = [app_module.existing_conversation, app_module.chat, app_module.new_conversation, app_module.reset, app_module.pending_approvals,
                 app_module.decide, app_module.history, app_module.events,
                 voice.voice_token, voice.voice_say, voice.voice_events]
     assert [h.__name__ for h in handlers if not inspect.iscoroutinefunction(h)] == []
@@ -71,8 +71,10 @@ def test_cookieless_requests_cannot_push_out_peoples_chats(monkeypatch):
     store.by_session["someone-new"].bus.emit("answer", "verified", "Hi")
     for n in range(3):
         store.get(f"late-{n}").bus.emit("answer", "verified", "Hi")
-    # above twice the limit the least recently used idle chat goes; a pending approval stays
-    assert "chatting" not in store.by_session and store.by_session["waiting"] is waiting
+    # above twice the limit the most recently started idle chat goes (a burst of bots before the
+    # people already here); a pending approval stays
+    assert store.by_session["chatting"] is chatting and store.by_session["waiting"] is waiting
+    assert "late-1" not in store.by_session and len(store.by_session) == 6
 
 
 def test_voice_rooms_are_bounded(monkeypatch):

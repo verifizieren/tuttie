@@ -4,8 +4,10 @@ A browser is recognised by a session cookie (set by assistant/app.py). The hotel
 marketplace and the registry stay shared, as on the real agent web; only what Tuttie knows,
 shows and waits for belongs to one person. Conversations live in memory: a restart starts
 everyone fresh. When there are too many, empty ones go first (a request without a cookie
-makes one); chats with history go only above twice the limit, those with the fewest turns first.
-Saved chats are bounded per browser, and globally the browser with the most gives one up.
+makes one); chats with history go only above twice the limit: chats without approvals or
+agreements before those with them, the most recently started browser first. Empty chats are
+never saved; saved chats are bounded per browser, and globally the browser with the most (on a
+tie the one that saved last) gives one up, a chat without approvals or agreements first.
 """
 
 import asyncio
@@ -14,6 +16,7 @@ import hashlib
 import hmac
 import logging
 import secrets
+import itertools
 from collections import Counter, OrderedDict
 
 import httpx
@@ -69,6 +72,14 @@ class Conversation:
             self.bus.emit("answer", "broken", "I can't think right now, please try again in a moment.",
                           detail={"mood": "sorry"})
 
+    def value(self) -> int:
+        """How much is lost if this chat goes: 2 with approvals (pending, decided, mandates) or
+        signed agreements, 1 with any history (offers on screen), 0 when empty."""
+        if (self.approvals.pending or self.approvals.mandates or self.assistant.toolbox.agreements
+                or any(event.get("kind") == "approval" for event in self.bus.history)):
+            return 2
+        return 1 if self.bus.history or self.turns else 0
+
     def reset(self) -> None:
         """Start over: stop running chats, decline open approvals, clear the timeline."""
         for task in list(self.chats):
@@ -95,6 +106,11 @@ class Conversations:
         # Sessions whose conversation was dropped: their next one needs a new first id (bounded).
         self._generations: OrderedDict[str, int] = OrderedDict()
         self._dropped = 0
+        # Above every generation forgotten from _generations: an untracked session's first id
+        # uses it, so a forgotten session never gets an id it had before.
+        self._floor = 0
+        self._order = itertools.count()  # when a session's conversation (or a saved chat) began
+        self._since: dict[str, int] = {}  # session -> its order number (older sessions are kept longer)
         self._identity: Toolbox | None = None
 
     def first_id(self, session_id: str) -> str:
@@ -104,8 +120,11 @@ class Conversations:
         does not have to create (and store) a conversation. After this session's conversation was
         dropped, the next one gets a different id, so a late message for the old one is refused.
         """
-        generation = self._generations.get(session_id, 0)
-        message = f"{session_id}#{generation}" if generation else session_id
+        generation = self._generations.get(session_id)
+        if generation is not None:
+            message = f"{session_id}#{generation}"
+        else:
+            message = f"{session_id}^{self._floor}" if self._floor else session_id
         digest = hmac.new(self._secret, message.encode(), hashlib.sha256).digest()
         return base64.urlsafe_b64encode(digest[:16]).decode().rstrip("=")
 
@@ -124,15 +143,27 @@ class Conversations:
 
     def _save(self, session_id: str, conv: Conversation) -> None:
         """Keep a chat for resuming: at most SAVED_PER_SESSION per browser (its own oldest goes),
-        and MAX_CONVERSATIONS in all (the oldest of the browser that saved the most goes), so one
-        browser pressing "new chat" again and again can never push out anyone else's saved chats."""
+        and MAX_CONVERSATIONS in all, so one browser pressing "new chat" again and again can never
+        push out anyone else's saved chats. An empty chat is not kept (nothing to resume).
+
+        Above MAX_CONVERSATIONS one goes: a chat without approvals or agreements before one with
+        them; then from the browser that saved the most, on a tie the one that saved last (bots
+        come after the real user); then that browser's oldest.
+        """
+        if not conv.value():
+            conv.reset()
+            return
         self.saved[(session_id, conv.id)] = conv
         mine = [key for key in self.saved if key[0] == session_id]
         for key in mine[:max(0, len(mine) - SAVED_PER_SESSION)]:
             self.saved.pop(key).reset()
         while len(self.saved) > MAX_CONVERSATIONS:
-            greediest = Counter(key[0] for key in self.saved).most_common(1)[0][0]
-            self.saved.pop(next(key for key in self.saved if key[0] == greediest)).reset()
+            keys = list(self.saved)  # in the order of saving
+            count = Counter(sid for sid, _ in keys)
+            last = {sid: n for n, (sid, _) in enumerate(keys)}  # when each browser saved last
+            victim = min(range(len(keys)), key=lambda n: (self.saved[keys[n]].value() > 1, -count[keys[n][0]],
+                                                          -last[keys[n][0]], n))
+            self.saved.pop(keys[victim]).reset()
 
     def switch(self, session_id: str, conversation_id: str | None = None) -> Conversation:
         """Start or resume a chat without discarding its signed offers and agreements.
@@ -165,6 +196,7 @@ class Conversations:
         if session_id not in self.by_session:
             self.by_session[session_id] = Conversation(self.http, self.registry_url, self.llm,
                                                        self.first_id(session_id))
+            self._since[session_id] = next(self._order)
             while len(self.by_session) > MAX_CONVERSATIONS and (owner := self._evictable(session_id)):
                 self._drop(owner)
         self.by_session.move_to_end(session_id)
@@ -173,6 +205,7 @@ class Conversations:
     def _drop(self, session_id: str) -> None:
         """Forget a session's conversation and saved chats; its next conversation gets a new id."""
         conv = self.by_session.pop(session_id)
+        self._since.pop(session_id, None)
         saved = [key for key in self.saved if key[0] == session_id]
         if conv.bus.history or conv.turns or saved or conv.id != self.first_id(session_id):
             self._dropped += 1
@@ -180,6 +213,7 @@ class Conversations:
             self._generations.move_to_end(session_id)
             while len(self._generations) > 10 * MAX_CONVERSATIONS:
                 self._generations.popitem(last=False)
+                self._floor = self._dropped  # above the forgotten generation: its ids never return
         conv.reset()
         for key in saved:
             self.saved.pop(key).reset()
@@ -188,17 +222,23 @@ class Conversations:
         """The session to drop, or None: never a running chat or a pending approval.
 
         Every request without a cookie (a crawler, a link preview, curl) makes a new, empty
-        conversation; the least recently used empty one goes first. A chat with history goes
+        conversation; the least recently used empty one (without saved chats either) goes first.
+        A chat with history (or a session with saved chats) goes
         only above twice MAX_CONVERSATIONS (so a burst of new chats cannot push out a person
-        who is reading their offers): the one with the fewest turns, then the least recently used.
-        The store may exceed the limits for a while.
+        who is reading their offers): one without approvals or agreements before one with them,
+        then the most recently started session (bots that arrive in a burst go before the people
+        who were already here). The store may exceed the limits for a while.
         """
         idle = [sid for sid, conv in self.by_session.items()
                 if sid != keep and not conv.chats and not conv.approvals.pending]
-        empty = [sid for sid in idle if not self.by_session[sid].bus.history]
+        saving = {sid for sid, _ in self.saved}
+        empty = [sid for sid in idle if not self.by_session[sid].bus.history and sid not in saving]
         if empty:
             return empty[0]
         if len(self.by_session) <= 2 * MAX_CONVERSATIONS or not idle:
             return None
-        order = {sid: n for n, sid in enumerate(self.by_session)}
-        return min(idle, key=lambda sid: (self.by_session[sid].turns, order[sid]))
+        kept: dict[str, int] = {}  # the most valuable saved chat of each session
+        for (sid, _), conv in self.saved.items():
+            kept[sid] = max(kept.get(sid, 0), conv.value())
+        return min(idle, key=lambda sid: (max(self.by_session[sid].value(), kept.get(sid, 0)),
+                                          -self._since.get(sid, 0)))

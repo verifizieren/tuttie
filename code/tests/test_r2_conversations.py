@@ -18,6 +18,7 @@ def test_r2_one_browser_wipes_every_other_users_saved_chats_with_new_chat_clicks
     monkeypatch.setattr(conv_module, "MAX_CONVERSATIONS", 5)
     with TestClient(app) as alice, TestClient(app) as mallory:
         old = alice.get("/history").headers["X-Conversation-ID"]
+        app.state.conversations.get(alice.cookies[SESSION_COOKIE]).bus.emit("answer", "verified", "deals")
         alice.post("/conversations")  # alice starts a new chat; her first one (with its deals) is saved
         for _ in range(6):
             assert mallory.post("/conversations").status_code == 200
@@ -44,10 +45,10 @@ def test_r2_an_evicted_session_gets_the_same_conversation_id_back(monkeypatch):
     a late first_tool=book message runs in a conversation without the agreements."""
     monkeypatch.setattr(conv_module, "MAX_CONVERSATIONS", 1)
     store = Conversations(httpx.AsyncClient(), "http://registry", llm=object())
+    store.get("bob").bus.emit("answer", "verified", "y")
     old = store.get("alice")
     old.bus.emit("answer", "verified", "x")
-    store.get("bob").bus.emit("answer", "verified", "y")
-    store.get("carol")  # above twice the limit: alice (least recently used, no more turns) is dropped
+    store.get("carol")  # above twice the limit: alice (the most recently started idle chat) is dropped
     assert "alice" not in store.by_session
     assert store.get("alice").id != old.id, "a recreated conversation reuses the evicted one's id"
 
@@ -56,7 +57,10 @@ def test_a_browser_keeps_at_most_its_share_of_saved_chats(monkeypatch):
     monkeypatch.setattr(conv_module, "SAVED_PER_SESSION", 2)
     store = Conversations(httpx.AsyncClient(), "http://registry", llm=object())
     first = store.get("alice").id
-    ids = [store.switch("alice").id for _ in range(3)]
+    ids = []
+    for _ in range(3):
+        store.get("alice").bus.emit("answer", "verified", "x")  # empty chats are not kept
+        ids.append(store.switch("alice").id)
     assert [key[1] for key in store.saved] == ids[:2]  # her own oldest (the first chat) went
     assert first not in {key[1] for key in store.saved}
 

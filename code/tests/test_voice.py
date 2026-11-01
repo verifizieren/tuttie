@@ -169,6 +169,7 @@ def test_old_voice_room_cannot_send_into_a_new_chat(monkeypatch):
     with TestClient(app) as client:
         old_id = client.get('/history').headers['X-Conversation-ID']
         room = client.post('/voice/token').json()['room']
+        app.state.conversations.get(client.cookies[SESSION_COOKIE]).bus.emit('answer', 'verified', 'x')
         client.post('/conversations')
         response = client.post('/voice/say', json={'room': room, 'text': 'Book it'},
                                headers={'Authorization': 'Bearer secret-for-tests'})
