@@ -14,7 +14,8 @@ signature that is missing:
                       "book"; `pay` has no scope: paying is never delegated), not expired
     7. agreement      if the call carries one: this business's own signed Agreement, valid, unused
     8. approval       if the action needs one: the user's signed "approved" decision for this
-                      action and this business, not used before, for exactly the amount: the
+                      action and this business, decided within APPROVAL_MAX_AGE_S, not used
+                      before, for exactly the amount: the
                       agreement's price, or else the total the business computed itself (the
                       caller's own figures are never trusted); for a payment also for exactly
                       this charge (purpose and booking)
@@ -64,6 +65,10 @@ from aps.seals import evaluate_record
 
 Lookup = Callable[[str], Awaitable[dict | None]]  # node_id -> registry record, or None
 TRUSTED_TIERS = {"gold", "blue"}
+# The user approves on the phone and Tuttie waits at most 300 s for it, then books at once. An
+# older approval is refused: used approvals live in memory, so after a node restart an old one
+# would otherwise book again.
+APPROVAL_MAX_AGE_S = 900
 
 
 @dataclass(frozen=True)
@@ -177,7 +182,7 @@ class ActionGate:
             verdict.mandate, verdict.amount_chf = self._mandate(args["mandate"], body["agent_id"], needs, now)
             verdict.checks.append("mandate")
         elif needs.approval:
-            verdict.approval, verdict.amount_chf = self._approval(args.get("approval"), needs, verdict.agreement)
+            verdict.approval, verdict.amount_chf = self._approval(args.get("approval"), needs, verdict.agreement, now)
             verdict.checks.append("approval")
 
     def _mandate(self, mandate, agent_id: str, needs: Needs, now: datetime) -> tuple[dict, float]:
@@ -200,10 +205,13 @@ class ActionGate:
         except Exception as error:  # AgreementInvalid; its message is safe to send back
             raise Refused(str(error)) from None
 
-    def _approval(self, approval, needs: Needs, agreement) -> tuple[dict, float]:
-        """The user's signed approval for this action, this business and exactly this amount."""
+    def _approval(self, approval, needs: Needs, agreement, now: datetime) -> tuple[dict, float]:
+        """The user's signed approval for this action, this business and exactly this amount,
+        decided at most APPROVAL_MAX_AGE_S ago (and not in the future beyond the clock skew)."""
         if not isinstance(approval, dict) or not verify_decision(approval, self.user_public_key):
             raise Refused("the approval is not signed by the user")
+        if not is_fresh(approval["decided_at"], APPROVAL_MAX_AGE_S, now):
+            raise Refused("the approval is too old (or dated in the future); ask the user again")
         if (approval["action"], approval["payee_node_id"], approval["decision"]) != (needs.tool, self.node_id, "approved"):
             raise Refused(f"the approval does not approve {needs.tool} with this business")
         if approval["approval_id"] in self.used_approvals:
