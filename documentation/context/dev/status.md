@@ -19,6 +19,7 @@ Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not m
   decline the very next yes books the offered hotel at once, for the room of its card offer
   (the cards summary names each card's room; a room the user asks for is still bookable). The private budget amount is dropped
   from answer phrases like "your CHF 160 budget" unless the user asks about the budget (`agent.without_budget`).
+  A double tap on Send sends the words once (`lib/sendGuard.js`).
 - **Red team round 9 (overnight, last review)**: a finger held across an approval sheet swap
   never decides the new sheet (capture-phase pointerdown tracker; VoiceOver taps, which send no
   pointerdown, are judged by click time); a sealed hotel's huge or non-number price never crashes
