@@ -71,10 +71,14 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .hero h1 { margin: 34px 0 12px; font-size: clamp(38px, 11vw, 52px); line-height: 1.02; font-weight: 800; letter-spacing: -.035em; }
 .hero h1 em { font-style: normal; color: var(--purple); }
 .hero p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
-.cue { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
-       display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
-.cue i { width: 1px; height: 28px; background: linear-gradient(var(--dim), transparent); animation: cue 2s ease-in-out infinite; }
-@keyframes cue { 0%, 100% { transform: scaleY(.4); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
+/* Scroll cue: a textless chevron that gently bobs; it is a button (tap = scroll on). */
+.cue { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); width: 48px; height: 48px; margin-left: -24px; padding: 0;
+       display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; z-index: 4; }
+.cue svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+           animation: bob 1.8s var(--ease) infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(-4px); opacity: .55; } 50% { transform: translateY(5px); opacity: 1; } }
+.demo .cue { bottom: 6px; color: var(--text); opacity: 0; pointer-events: none; transition: opacity .5s var(--ease); }
+.demo-done .demo .cue { opacity: 1; pointer-events: auto; }
 
 /* ---------- Numbers: one figure per screen, pinned while you scroll ---------- */
 /* Each number owns one screen of scroll: the section is exactly N screens long (N = 3), so at
@@ -416,7 +420,7 @@ footer .gh svg { width: 18px; height: 18px; fill: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
   .rv, .fig, .call, .sw, .wc { transition-duration: .01s !important; }
-  .cue i, .edge, .steps li.active .dot, .fscan, .mk .ln, .mk .you-halo { animation: none !important; }
+  .cue svg, .edge, .steps li.active .dot, .fscan, .mk .ln, .mk .you-halo { animation: none !important; }
 }
 
 /* ---------- No browser scrollbar: the page reveals itself by scrolling ---------- */
@@ -542,7 +546,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
     <h1 class="rv">Your agent<br><em>for the web.</em></h1>
     <p class="rv">It searches, checks and bargains for you.<br>Fakes never reach you.</p>
   </div>
-  <div class="cue">Scroll<i></i></div>
+  <button class="cue" id="cueHero" type="button" aria-label="Scroll down"><svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg></button>
 </header>
 
 <!-- ============ Numbers ============ -->
@@ -636,6 +640,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
     </div>
     <button class="snav prev" id="sPrev" type="button" aria-label="Previous part"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="snav next" id="sNext" type="button" aria-label="Next part"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button class="cue" id="cueDemo" type="button" aria-label="Scroll down"><svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg></button>
     <div class="stagebox" id="stagebox">
       <div class="phone" id="phone">
         <div class="screen" id="screen">
@@ -1035,7 +1040,7 @@ function layoutPhone() {
   if (innerWidth === laidW && Math.abs(pin.clientHeight - laidH) < 120 && laidW) return;  // toolbar show/hide: keep the phone still
   laidW = innerWidth; laidH = pinH = pin.clientHeight;
   capH = $("#cap").offsetHeight + 8;
-  fit = Math.min((pinH - capH - 12) / 860, (innerWidth - 24) / 406, 1);
+  fit = Math.min((pinH - capH - 64) / 860, (innerWidth - 24) / 406, 1);  // 64: room for the scroll cue below
 }
 function onDemo() {
   const r = $("#demo").getBoundingClientRect();
@@ -1043,7 +1048,7 @@ function onDemo() {
   const enter = clamp((innerHeight - r.top) / innerHeight);  // 0..1 while the section scrolls into view
   const z = ease(clamp(p / .32));                             // the zoom: phone rises, turns flat and docks
   const s = lerp(fit * .62, fit, z);
-  const y = lerp(pinH * .55, capH + (pinH - capH - 860 * fit) / 2, z);
+  const y = lerp(pinH * .55, capH + (pinH - capH - 52 - 860 * fit) / 2, z);
   const rx = reduced ? 0 : lerp(28, 0, z);
   $("#phone").style.transform = `translateY(${y}px) perspective(1600px) rotateX(${rx}deg) scale(${s})`;
   $("#phone").style.opacity = String(clamp(enter * 1.6));
@@ -1058,6 +1063,8 @@ function onDemo() {
   if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); document.body.classList.remove("demo-done"); }
 }
 
+$("#cueHero").addEventListener("click", () => { const y = numsTarget(1); if (y !== null) glideTo(y); });
+$("#cueDemo").addEventListener("click", () => scrollTo({ top: $(".close").offsetTop, behavior: reduced ? "auto" : "smooth" }));
 $("#totop").addEventListener("click", () => scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }));
 
 // ---------- One loop for scroll and the demo clock ----------
