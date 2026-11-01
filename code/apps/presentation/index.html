@@ -78,9 +78,11 @@ a { color: inherit; }
 .fig p { margin: 18px 0 10px; font-size: 21px; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; }
 .fig p span { color: var(--muted); font-weight: 500; }
 .viz { margin: 0 0 26px; height: 96px; display: flex; align-items: flex-end; }
-.shops { display: flex; gap: 14px; }
-.shops svg { width: 70px; height: 70px; }
-.shops .no { opacity: .28; }
+.split { flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 8px; max-width: 330px; }
+.split .bar2 { display: flex; height: 22px; border-radius: 8px; overflow: hidden; background: #e2e2e8; }
+.split .bar2 i { display: block; width: 0; background: var(--accent); transition: width 1.4s var(--ease); }
+.fig.on .split .bar2 i { width: 58%; }  /* to scale: 58 % of all reports */
+.split .lab { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted); }
 .dots { display: grid; grid-template-columns: repeat(20, 1fr); gap: 5px; width: 100%; max-width: 330px; }
 .dots i { aspect-ratio: 1; border-radius: 50%; background: #dcdce3; transition: background .4s; }
 .dots i.lit { background: var(--accent); }
@@ -505,10 +507,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   <div class="pin">
     <div class="ticks" id="ticks"></div>
     <div class="fig">
-      <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--peach)"><use href="#shop"/></svg></div>
-      <div class="big"><span class="count" data-to="2">0</span><small>in 3</small></div>
-      <p>small Swiss firms have no website.</p>
-      <div class="src">localsearch &amp; HSLU, 2025</div>
+      <div class="viz split"><div class="bar2"><i></i></div><div class="lab"><span>Fraud</span><span>All 35,727 reports</span></div></div>
+      <div class="big"><span class="count" data-to="58">0</span><small>%</small></div>
+      <p>of cyber incidents reported in Switzerland were fraud. <span>Who is real is the question.</span></p>
+      <div class="src">National Cyber Security Centre (NCSC), first half of 2025 · 35,727 reports</div>
     </div>
     <div class="fig">
       <div class="viz"><div class="dots" id="dots"></div></div>

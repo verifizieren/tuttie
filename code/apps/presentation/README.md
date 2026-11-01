@@ -11,7 +11,7 @@ What it shows, top to bottom (short points only, little text on purpose):
    is one example.
 2. **Numbers:** pinned while you scroll, one figure per screen, each with its source (only
    figures from the "facts we may say" table in `documentation/context/pitch/storyline.md`).
-   Every figure has a baseline: the +539 % shows the 2024 and 2025 holidays as bars to scale.
+   Every figure has a baseline: the 58 % fraud share is of all 35,727 NCSC reports; the +539 % shows the 2024 and 2025 holidays as bars to scale.
 3. **The idea:** it searches, checks, bargains; you tap. Four steps and the seal colours.
 4. **Under the hood:** what is signed, for technical readers: seals (UID), signed offers and
    agreements, the delegation (never paying), the approval for one exact amount, the mandate
