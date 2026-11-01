@@ -178,4 +178,5 @@ test('the cards go away once a hotel is liked or a booking is under way', () => 
   assert.equal(choosing({ ...cards, picked: ['h'] }), false);
   assert.equal(choosing({ ...cards, approval: { id: 'a' } }), false);  // booked by voice, not swiped
   assert.equal(choosing({ ...cards, booking: { id: 'BK-1' } }), false);
+  assert.equal(choosing({ ...cards, phase: 'booking' }), false);  // approved, the hotel is booking it
 });
