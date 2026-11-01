@@ -53,5 +53,8 @@ def test_one_malformed_hotel_does_not_sink_the_others():
     offers = [{"node_id": SPALENHOF, "envelope": signed_offer(SPALENHOF)},
               {"node_id": RHEINBLICK, "envelope": signed_offer(RHEINBLICK)}]
     context = Context().add("max_price_chf", 500, "private")
-    outcomes = asyncio.run(negotiator.negotiate_all(offers, context))  # raises KeyError: 'agent' today
-    assert [o.status for o in outcomes][1] == "agreed"
+    outcomes = asyncio.run(negotiator.negotiate_all(offers, context))  # raised KeyError: 'agent'
+    alone = asyncio.run(TuttieNegotiator(Pool(), TUTTIE, load_signing_key(TUTTIE)).negotiate_all(offers[1:], context))
+    # The good hotel ends exactly as when it bargains alone (the stub's agreement is unsigned,
+    # so "refused: not a valid agreement" there); one bad hotel never changes it.
+    assert (outcomes[1].status, outcomes[1].reason) == (alone[0].status, alone[0].reason)
