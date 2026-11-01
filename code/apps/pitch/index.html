@@ -503,7 +503,7 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
 .deck-note { flex:none; margin:0 4px; color:var(--muted); font-size:13px; line-height:1.35; font-weight:400; text-align:center; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; letter-spacing:0; }
 .swipe-price .over-budget { color:var(--muted); font-size:11px; font-weight:400; letter-spacing:.01em; }
 
-/* ---------- Reverse marketplace (same block in pitch and QR page): step 1 you hop from shop to shop, step 2 every offer comes to you ---------- */
+/* ---------- Reverse marketplace (same block in pitch and QR page): step 1 you hop from shop to shop, step 2 you are Tuttie and the shops come to you ---------- */
 .rm { position: relative; width: 100%; aspect-ratio: 3 / 2; }
 .rm svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .rm-dot { fill: #2f6fe0; }
@@ -511,15 +511,8 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
 .rm-ring { fill: none; stroke: #2f6fe0; stroke-width: 1.2; opacity: 0; }
 .rm-you { transform-origin: 150px 100px; transition: transform 1s cubic-bezier(.22, 1, .36, 1); }
 .rm-you rect { fill: #7a5af8; }
-.rm-beams line { stroke: #2f6fe0; stroke-width: .7; stroke-linecap: round; opacity: .2; }
-.rm-beams circle { fill: #2f6fe0; }
-.rm-beams { opacity: 0; transition: opacity .5s ease; }
-.rm-glow { fill: #7a5af8; opacity: 0; transform-box: view-box; transform-origin: 150px 100px; }
 .rm.s1 .rm-you { animation: rm-tour 11s infinite; }
 .rm.s1 .rm-ask { animation: rm-ask 11s ease-out infinite; }
-.rm.s2 .rm-beams { opacity: 1; transition: opacity .9s ease .7s; }
-.rm.s2 .rm-beams circle { animation: rm-flow 2.4s linear infinite; }
-.rm.s2 .rm-glow { animation: rm-glow 2.4s ease-in-out 1s infinite; }
 @keyframes rm-tour {
   0% { transform: translate(7.1px, 58.2px) rotate(0deg); animation-timing-function: cubic-bezier(.5, 0, .3, 1); }
   6.0% { transform: translate(-83.2px, -48.0px) rotate(0deg); animation-timing-function: ease-in-out; }
@@ -545,12 +538,48 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
   100% { transform: translate(7.1px, 58.2px) rotate(0deg); }
 }
 @keyframes rm-ask { 0%, 6.0% { opacity: 0; transform: scale(1); } 8.0% { opacity: .5; } 17.0%, 100% { opacity: 0; transform: scale(2.4); } }
-@keyframes rm-flow { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: 1; } 82% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
-@keyframes rm-glow { 0%, 100% { opacity: .1; transform: scale(1); } 50% { opacity: .18; transform: scale(1.12); } }
+/* Step 2: the square becomes Tuttie's card; businesses come to it one by one: green = an offer (it stays), gray = none (it drifts away). */
+.rm-you rect { transform-box: fill-box; transform-origin: center; transition: opacity .2s, transform .2s; }
+.rm.s2 .rm-you rect { opacity: 0; transform: scale(1.7, 1.15); transition: opacity .35s ease .85s, transform .5s ease .7s; }
+.rm-card { opacity: 0; transform-box: view-box; transform-origin: 150px 100px; transform: scale(.45); transition: opacity .2s, transform .2s; }
+.rm.s2 .rm-card { opacity: 1; transform: none; transition: opacity .35s ease .85s, transform .6s cubic-bezier(.34, 1.4, .5, 1) .8s; }
+.rm-cbg { fill: #fff; stroke: #7a5af8; stroke-opacity: .28; stroke-width: .7; filter: url(#rmShadow); }
+.rm-blink rect { fill: #17171d; } .rm-blink .rm-cl { fill: #fff; }
+.rm-look, .rm-blink, .rm-biz, .rm-ok { transform-box: view-box; }
+.rm-blink { transform-origin: 150px 99.2px; }
+.rm-ok { fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.rm.s2 .rm-look { animation: rm-look 16s ease-in-out 0.8s infinite; }
+.rm.s2 .rm-blink { animation: rm-blink 4.6s ease-in-out 2s infinite; }
+.rm.s2 .rm-biz.rm-yes { animation: rm-come 16s var(--d) infinite; }
+.rm.s2 .rm-biz.rm-yes .rm-dot { animation: rm-green 16s var(--d) infinite; }
+.rm.s2 .rm-biz.rm-yes .rm-ok { animation: rm-check 16s var(--d) infinite; }
+.rm.s2 .rm-biz.rm-no { animation: rm-pass 16s var(--d) infinite; }
+.rm.s2 .rm-biz.rm-no .rm-dot { animation: rm-gray 16s var(--d) infinite; }
+@keyframes rm-look { 0% { transform: translate(0, 0); } 3.5% { transform: translate(-2.25px, -0.95px); } 12.5% { transform: translate(-2.25px, -0.95px); } 16.0% { transform: translate(2.56px, -0.31px); } 25.0% { transform: translate(2.56px, -0.31px); } 28.5% { transform: translate(0.31px, 1.89px); } 37.5% { transform: translate(0.31px, 1.89px); } 41.0% { transform: translate(-1.12px, -1.72px); } 50.0% { transform: translate(-1.12px, -1.72px); } 53.5% { transform: translate(2.24px, 0.96px); } 62.5% { transform: translate(2.24px, 0.96px); } 66.0% { transform: translate(-2.60px, 0.00px); } 75.0% { transform: translate(-2.60px, 0.00px); } 78.5% { transform: translate(1.73px, -1.42px); } 87.5% { transform: translate(1.73px, -1.42px); } 91.0% { transform: translate(-2.22px, 0.99px); } 99% { transform: translate(0, 0); } }
+@keyframes rm-blink { 0%, 44%, 52%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.08); } }
+@keyframes rm-come {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(.45, 0, .2, 1); }
+  7.5%, 11% { transform: translate(var(--ax), var(--ay)) scale(.85); animation-timing-function: cubic-bezier(.3, 1.5, .5, 1); }
+  14.5%, 46% { transform: translate(var(--gx), var(--gy)) scale(.85); opacity: 1; }
+  50% { transform: translate(var(--gx), var(--gy)) scale(.6); opacity: 0; }
+  51% { transform: translate(0, 0) scale(1); opacity: 0; }
+  58%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes rm-green { 0%, 10.5% { fill: #2f6fe0; } 12.5%, 49% { fill: #1f9d5c; } 51%, 100% { fill: #2f6fe0; } }
+@keyframes rm-check { 0%, 12% { opacity: 0; } 14.5%, 46% { opacity: 1; } 49%, 100% { opacity: 0; } }
+@keyframes rm-pass {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(.45, 0, .2, 1); }
+  7.5%, 12% { transform: translate(var(--ax), var(--ay)) scale(.85); opacity: 1; animation-timing-function: ease-in; }
+  26% { transform: translate(calc(var(--ax) * .35), calc(var(--ay) * .35)) scale(.7); opacity: 0; }
+  27% { transform: translate(0, 0) scale(1); opacity: 0; }
+  36%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes rm-gray { 0%, 10.5% { fill: #2f6fe0; } 12.5%, 26% { fill: #b9b9c4; } 27%, 100% { fill: #2f6fe0; } }
 @media (prefers-reduced-motion: reduce) {
-  .rm .rm-you, .rm .rm-ask, .rm .rm-beams circle, .rm .rm-glow { animation: none !important; transition-duration: .01s !important; }
+  .rm .rm-you, .rm .rm-ask, .rm .rm-you rect, .rm .rm-card, .rm .rm-biz, .rm .rm-biz *, .rm .rm-look, .rm .rm-blink { animation: none !important; transition-duration: .01s !important; transition-delay: 0s !important; }
   .rm.s1 .rm-you { transform: translate(-83.2px, -48.0px); }
-  .rm .rm-beams circle { display: none; } .rm.s2 .rm-beams line { opacity: .45; } .rm.s2 .rm-glow { opacity: .12; }
+  .rm.s2 .rm-biz.rm-yes { transform: translate(var(--gx), var(--gy)) scale(.85); } .rm.s2 .rm-biz.rm-yes .rm-dot { fill: #1f9d5c; } .rm.s2 .rm-biz.rm-yes .rm-ok { opacity: 1; }
+  .rm.s2 .rm-biz.rm-no .rm-dot { fill: #b9b9c4; }
 }
 
 /* ---------- Polish, 1 Nov ---------- */
@@ -733,7 +762,7 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
   <div class="words" id="ask">Quiet. Dog-friendly.<br>After midnight.<br>Under CHF 160.</div>
   <div class="words" id="knows">Hotels answer.<br><span class="dim">On their terms.</span></div>
   <div class="words" id="market"><b>A reverse marketplace.</b>
-  <div class="rm s1" id="rmPitch" aria-hidden="true"><svg viewBox="0 0 300 200"><g class="rm-beams"><line x1="46" y1="40" x2="150" y2="100"/><line x1="112" y1="20" x2="150" y2="100"/><line x1="214" y1="28" x2="150" y2="100"/><line x1="270" y1="80" x2="150" y2="100"/><line x1="252" y1="160" x2="150" y2="100"/><line x1="160" y1="182" x2="150" y2="100"/><line x1="62" y1="154" x2="150" y2="100"/><line x1="24" y1="100" x2="150" y2="100"/><circle cx="46" cy="40" r="1.7" style="--dx:89.4px;--dy:51.6px;animation-delay:-0.0s"/><circle cx="46" cy="40" r="1.7" style="--dx:89.4px;--dy:51.6px;animation-delay:-1.2s"/><circle cx="112" cy="20" r="1.7" style="--dx:32.7px;--dy:68.8px;animation-delay:-0.37s"/><circle cx="112" cy="20" r="1.7" style="--dx:32.7px;--dy:68.8px;animation-delay:-1.57s"/><circle cx="214" cy="28" r="1.7" style="--dx:-55.0px;--dy:61.9px;animation-delay:-0.74s"/><circle cx="214" cy="28" r="1.7" style="--dx:-55.0px;--dy:61.9px;animation-delay:-1.94s"/><circle cx="270" cy="80" r="1.7" style="--dx:-103.2px;--dy:17.2px;animation-delay:-1.11s"/><circle cx="270" cy="80" r="1.7" style="--dx:-103.2px;--dy:17.2px;animation-delay:-2.31s"/><circle cx="252" cy="160" r="1.7" style="--dx:-87.7px;--dy:-51.6px;animation-delay:-1.48s"/><circle cx="252" cy="160" r="1.7" style="--dx:-87.7px;--dy:-51.6px;animation-delay:-0.28s"/><circle cx="160" cy="182" r="1.7" style="--dx:-8.6px;--dy:-70.5px;animation-delay:-1.85s"/><circle cx="160" cy="182" r="1.7" style="--dx:-8.6px;--dy:-70.5px;animation-delay:-0.65s"/><circle cx="62" cy="154" r="1.7" style="--dx:75.7px;--dy:-46.4px;animation-delay:-2.22s"/><circle cx="62" cy="154" r="1.7" style="--dx:75.7px;--dy:-46.4px;animation-delay:-1.02s"/><circle cx="24" cy="100" r="1.7" style="--dx:108.4px;--dy:0.0px;animation-delay:-0.19s"/><circle cx="24" cy="100" r="1.7" style="--dx:108.4px;--dy:0.0px;animation-delay:-1.39s"/></g><circle class="rm-glow" cx="150" cy="100" r="26"/><circle class="rm-ring rm-ask" cx="46" cy="40" r="7" style="transform-origin:46px 40px;animation-delay:-11.0s"/><circle class="rm-dot" cx="46" cy="40" r="7"/><circle class="rm-dot" cx="112" cy="20" r="7"/><circle class="rm-ring rm-ask" cx="214" cy="28" r="7" style="transform-origin:214px 28px;animation-delay:-4.4s"/><circle class="rm-dot" cx="214" cy="28" r="7"/><circle class="rm-ring rm-ask" cx="270" cy="80" r="7" style="transform-origin:270px 80px;animation-delay:-8.8s"/><circle class="rm-dot" cx="270" cy="80" r="7"/><circle class="rm-dot" cx="252" cy="160" r="7"/><circle class="rm-ring rm-ask" cx="160" cy="182" r="7" style="transform-origin:160px 182px;animation-delay:-2.2s"/><circle class="rm-dot" cx="160" cy="182" r="7"/><circle class="rm-ring rm-ask" cx="62" cy="154" r="7" style="transform-origin:62px 154px;animation-delay:-6.6s"/><circle class="rm-dot" cx="62" cy="154" r="7"/><circle class="rm-dot" cx="24" cy="100" r="7"/><g class="rm-you"><rect x="137" y="87" width="26" height="26" rx="7"/></g></svg></div>
+  <div class="rm s1" id="rmPitch" aria-hidden="true"><svg viewBox="0 0 300 200"><defs><filter id="rmShadow" x="-40%" y="-40%" width="180%" height="190%"><feDropShadow dx="0" dy="2.5" stdDeviation="3.2" flood-color="#17171d" flood-opacity=".16"/></filter></defs><circle class="rm-ring rm-ask" cx="46" cy="40" r="7" style="transform-origin:46px 40px;animation-delay:-11.0s"/><g class="rm-biz rm-yes" style="transform-origin:46px 40px;--ax:60.7px;--ay:35.0px;--gx:68.5px;--gy:39.5px;--d:0.8s"><circle class="rm-dot" cx="46" cy="40" r="7"/><path class="rm-ok" d="M43.4 40.2l1.9 1.9 3.4-3.7"/></g><g class="rm-biz rm-yes" style="transform-origin:112px 20px;--ax:16.5px;--ay:34.8px;--gx:20.4px;--gy:43.0px;--d:6.8s"><circle class="rm-dot" cx="112" cy="20" r="7"/><path class="rm-ok" d="M109.4 20.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="214" cy="28" r="7" style="transform-origin:214px 28px;animation-delay:-4.4s"/><g class="rm-biz rm-yes" style="transform-origin:214px 28px;--ax:-30.8px;--ay:34.6px;--gx:-36.8px;--gy:41.4px;--d:12.8s"><circle class="rm-dot" cx="214" cy="28" r="7"/><path class="rm-ok" d="M211.4 28.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="270" cy="80" r="7" style="transform-origin:270px 80px;animation-delay:-8.8s"/><g class="rm-biz rm-no" style="transform-origin:270px 80px;--ax:-70.7px;--ay:11.8px;--gx:-79.6px;--gy:13.3px;--d:2.8s"><circle class="rm-dot" cx="270" cy="80" r="7"/></g><g class="rm-biz rm-no" style="transform-origin:252px 160px;--ax:-58.9px;--ay:-34.6px;--gx:-66.7px;--gy:-39.2px;--d:8.8s"><circle class="rm-dot" cx="252" cy="160" r="7"/></g><circle class="rm-ring rm-ask" cx="160" cy="182" r="7" style="transform-origin:160px 182px;animation-delay:-2.2s"/><g class="rm-biz rm-yes" style="transform-origin:160px 182px;--ax:-3.9px;--ay:-32.4px;--gx:-5.0px;--gy:-41.3px;--d:4.8s"><circle class="rm-dot" cx="160" cy="182" r="7"/><path class="rm-ok" d="M157.4 182.2l1.9 1.9 3.4-3.7"/></g><circle class="rm-ring rm-ask" cx="62" cy="154" r="7" style="transform-origin:62px 154px;animation-delay:-6.6s"/><g class="rm-biz rm-no" style="transform-origin:62px 154px;--ax:45.4px;--ay:-27.8px;--gx:53.1px;--gy:-32.6px;--d:14.8s"><circle class="rm-dot" cx="62" cy="154" r="7"/></g><g class="rm-biz rm-yes" style="transform-origin:24px 100px;--ax:76.0px;--ay:0.0px;--gx:85.0px;--gy:0.0px;--d:10.8s"><circle class="rm-dot" cx="24" cy="100" r="7"/><path class="rm-ok" d="M21.4 100.2l1.9 1.9 3.4-3.7"/></g><g class="rm-you"><rect x="137" y="87" width="26" height="26" rx="7"/></g><g class="rm-card"><rect class="rm-cbg" x="120" y="81" width="60" height="38" rx="7"/><g class="rm-look"><g class="rm-blink"><rect x="134.5" y="93" width="9.5" height="12.5" rx="2.6"/><rect class="rm-cl" x="136.4" y="94.9" width="2.6" height="2.6" rx=".5"/><rect x="156" y="93" width="9.5" height="12.5" rx="2.6"/><rect class="rm-cl" x="157.9" y="94.9" width="2.6" height="2.6" rx=".5"/></g></g></g></svg></div>
   </div>
   <div class="words" id="see">Hotels answer.</div>
   <div class="words" id="claim"><span class="b a">One hotel<br>fails the check.</span><span class="b dim">Not contacted.</span></div>
@@ -1057,7 +1086,7 @@ function phone(name, fwd) {
   }
 }
 
-// Reverse marketplace: step 1 the violet square hops from shop to shop, step 2 it settles in the centre and every offer flows to it.
+// Reverse marketplace: step 1 the violet square hops from shop to shop, step 2 it becomes Tuttie's card in the centre and the shops come to it.
 // The square is frozen where it is, then glides to the centre (no jump out of the animation).
 function rmStep(el, step) {
   if (!el || el.dataset.step === String(step)) return;
