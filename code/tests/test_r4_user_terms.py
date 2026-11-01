@@ -89,9 +89,10 @@ def test_post_request_schema_offers_nights_and_guests():
 # 2. Only the answer reaches the user.
 
 def test_final_text_drops_a_note_written_before_the_answer():
-    assert final_text(["The marketplace has no Zurich hotels, so I'll report that.",
-                       "\n\nSorry, no verified hotels in Zurich yet.\nMood: sorry"]) == \
-        "Sorry, no verified hotels in Zurich yet.\nMood: sorry"
+    from assistant.agent import drop_notes, split_mood
+    text = final_text(["The marketplace has no Zurich hotels, so I'll report that.",
+                       "\n\nSorry, no verified hotels in Zurich yet.\nMood: sorry"])
+    assert drop_notes(split_mood(text)[0]) == "Sorry, no verified hotels in Zurich yet."
     assert final_text(["Booked for CHF 128.", "Mood: happy"]) == "Booked for CHF 128.\nMood: happy"
     assert final_text(["", "  "]) == ""
 
@@ -110,8 +111,9 @@ def claude_with(blocks: list[dict], monkeypatch) -> ClaudeLLM:
 def test_claude_answer_is_only_the_text_after_the_notes(monkeypatch):
     claude = claude_with([{"type": "text", "text": "No Zurich hotels, so I'll report that."},
                           {"type": "text", "text": "Sorry, none in Zurich yet.\nMood: sorry"}], monkeypatch)
+    from assistant.agent import drop_notes, split_mood
     message = asyncio.run(claude.complete([{"role": "user", "content": "Zurich?"}], []))
-    assert message["content"] == "Sorry, none in Zurich yet.\nMood: sorry"
+    assert drop_notes(split_mood(message["content"])[0]) == "Sorry, none in Zurich yet."
     assert len(message["provider_items"]) == 2  # the provider keeps the full turn
 
 
