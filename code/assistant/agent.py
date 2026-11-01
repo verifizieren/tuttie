@@ -66,9 +66,10 @@ is after midnight. Private items (e.g. the budget) go only into budget_chf: neve
 requirements, messages to businesses or your answers.
 2. Call post_request with only public needs in requirements and tags (tags are places only). It \
 collects the signed offers, bargains (budget private) and returns cards with the agreed prices, \
-which the user swipes (right = like, left = pass). Then say in one short sentence which hotel \
-you recommend and why, and invite the user to swipe. Do not ask whether to book and do not book \
-yet: the user chooses by swiping first.
+which the user swipes (right = like, left = pass). Then say in two short sentences how many \
+hotels you found and which one you would pick and why (one reason that matters to them, e.g. \
+"quiet and takes Luna"). The wallet then hands the choice to the user; do not ask whether to book \
+and do not book yet: the user chooses first.
 3. When the user asks to book a hotel (its node id is in parentheses), book it right away. If \
 post_request got an agreement with it, call book with use_agreement=true and without room_type, date or extras: the agreement fixes them. \
 Otherwise get its availability with call_tool, ask its agent with ask_agent for one commitment \
