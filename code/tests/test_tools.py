@@ -21,7 +21,7 @@ NODE_REPLIES = {  # by MCP tool name or agent path
     "/agent": {"answer": "Fine.", "commitment": {"item": "late check-in with dog", "price_chf": 15,
                                                  "conditions": [], "valid_until": "2026-11-15T00:00:00Z"}},
     "book": {"status": "confirmed", "booking_id": "BK-1", "total_chf": 195, "room_type": "double",
-             "date": "2026-11-14", "rate": "x", "offer_id": None},
+             "date": "2026-11-14", "rate": "x", "offer_id": None, "extras": ["late check-in with dog"]},
     "get_policies": {"tool": "get_policies", "charges": [{"purpose": "city tax", "price_chf": 4}]},
     "pay": {"tool": "pay", "status": "paid", "amount_chf": 4, "checked": ["caller", "signature", "delegation", "mandate"]},
 }

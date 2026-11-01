@@ -204,6 +204,9 @@ def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) ->
     if terms is not None:
         differ += [key for key in ("room_type", "date", "rate", "offer_id")
                    if key in terms and confirmation.get(key) != terms[key]]
+        extras = confirmation.get("extras", [])  # no extras listed: nothing was included
+        if "includes" in terms and (not isinstance(extras, list) or sorted(map(str, extras)) != sorted(map(str, terms["includes"]))):
+            differ.append("includes")  # an approved extra dropped (or one added) is not what the user approved
     return differ
 
 
