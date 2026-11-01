@@ -21,7 +21,7 @@
   --text: #17171d; --muted: #5a5967; --dim: #8a8996;
   --accent: #7a5af8; --accent-text: #6a4ae6; --purple: #7a5af8; --pink: #e5489b;
   --tint-blue: #eaf1fd; --tint-purple: #f1edfe; --tint-pink: #fdeaf4;
-  --gold: #c9941a; --blue: #2f6fe0; --grey: #8e8e9a; --red: #e0393e; --green: #1f9d57;
+  --gold: #c9941a; --blue: #2f6fe0; --ring: var(--purple); --grey: #8e8e9a; --red: #e0393e; --green: #1f9d57;
   --shadow: 0 1px 2px rgba(23,23,29,.04), 0 8px 24px rgba(23,23,29,.06);
   --mono: "JetBrains Mono", ui-monospace, monospace;
   --ease: cubic-bezier(.22, 1, .36, 1);
@@ -89,10 +89,17 @@ em, i, cite, address, dfn, var { font-style: normal; }
 .ring { width: 96px; height: 96px; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 10; }
 .ring .bg { stroke: #e2e2e8; }
-.ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease); }
-.spark { width: 100%; max-width: 330px; height: 96px; }
-.spark path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1.6s var(--ease); }
-.fig.on .spark path { stroke-dashoffset: 0; }
+.ring .fg { stroke: var(--ring); stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease); }
+.yoy { gap: 18px; }
+.yoy div { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.yoy i { display: block; width: 34px; height: var(--h); border-radius: 8px; background: #d7d7df; transform-origin: bottom; transform: scaleY(.05);
+         transition: transform 1.2s var(--ease); }
+.yoy i.up { background: var(--pink); }
+.fig.on .yoy i { transform: none; }
+.yoy small { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.fig p.more { margin: 0 0 14px; font-size: 15px; line-height: 1.45; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.src { display: flex; align-items: center; gap: 8px; }
+.src img { width: 20px; height: 20px; border-radius: 5px; object-fit: contain; flex: none; }
 .ticks { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; z-index: 2; }
 .ticks i { width: 4px; height: 18px; border-radius: 2px; background: #d7d7df; transition: background .4s, height .4s; }
 .ticks i.on { background: var(--accent); height: 30px; }
@@ -504,25 +511,20 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--purple)"><use href="#shop"/></svg></div>
       <div class="big"><span class="count" data-to="2">0</span><small>in 3</small></div>
       <p>small Swiss firms have no website.</p>
-      <div class="src">localsearch &amp; HSLU, 2025</div>
-    </div>
-    <div class="fig">
-      <div class="viz"><div class="dots" id="dots"></div></div>
-      <div class="big"><span class="count" data-to="3">0</span><small>%</small></div>
-      <p>of Swiss SMEs take bookings online.</p>
-      <div class="src">localsearch &amp; HSLU, 2025</div>
+      <div class="src"><img src="img/sources/localsearch.svg" alt=""><img src="img/sources/hslu.png" alt="">localsearch &amp; HSLU, SME Digital Pulse 2025</div>
     </div>
     <div class="fig">
       <div class="viz"><svg class="ring" viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="fg" id="ring" cx="50" cy="50" r="42" stroke-dasharray="263.9" stroke-dashoffset="263.9"/></svg></div>
       <div class="big"><span class="count" data-to="29.6" data-dec="1">0</span><small>%</small></div>
-      <p>of European hotel bookings go through agencies.</p>
-      <div class="src">HOTREC, 2024</div>
+      <p>of European hotel bookings go through online agencies.</p>
+      <div class="src"><img src="img/sources/hotrec.png" alt="">HOTREC, European Hotel Distribution Study 2024</div>
     </div>
     <div class="fig">
-      <div class="viz"><svg class="spark" viewBox="0 0 330 96" preserveAspectRatio="none"><path d="M4 88 C 120 86, 200 80, 250 56 S 310 14, 326 6"/></svg></div>
+      <div class="viz yoy" aria-hidden="true"><div><i style="--h:15px"></i><small>2024</small></div><div><i class="up" style="--h:96px"></i><small>2025</small></div></div>
       <div class="big accent">+<span class="count" data-to="539">0</span><small>%</small></div>
-      <p>AI traffic to travel sites. <span>Agents already shop.</span></p>
-      <div class="src">Adobe Analytics, US holidays 2025 · curve illustrative</div>
+      <p>visits to US travel sites from AI assistants.</p>
+      <p class="more">Holiday season 2025 vs 2024. Clicks, not bookings: people already shop through AI.</p>
+      <div class="src"><img src="img/sources/adobe.png" alt="">Adobe Analytics, AI traffic report, Jan 2026</div>
     </div>
   </div>
 </section>
@@ -695,8 +697,6 @@ new IntersectionObserver((es, o) => es.forEach(e => {
 const figs = [...document.querySelectorAll(".fig")];
 $("#ticks").innerHTML = figs.map(() => "<i></i>").join("");
 const ticks = [...document.querySelectorAll("#ticks i")];
-$("#dots").innerHTML = Array.from({ length: 100 }, () => "<i></i>").join("");
-const dots = [...document.querySelectorAll("#dots i")];
 let figIndex = -1;
 function countUp(el) {
   const to = +el.dataset.to, dec = +(el.dataset.dec || 0), t0 = performance.now(), dur = reduced ? 1 : 1200;
@@ -710,8 +710,7 @@ function showFig(i) {
   ticks.forEach((t, k) => t.classList.toggle("on", k === i));
   const f = figs[i]; if (!f) return;
   f.querySelectorAll(".count").forEach(countUp);
-  dots.forEach((d, k) => d.classList.toggle("lit", i === 1 && k < 3));
-  $("#ring").style.strokeDashoffset = i === 2 ? 263.9 * (1 - .296) : 263.9;
+  $("#ring").style.strokeDashoffset = i === 1 ? 263.9 * (1 - .296) : 263.9;
 }
 function onNums() {
   const r = $("#nums").getBoundingClientRect();
