@@ -96,7 +96,8 @@ export function ApprovalFallback({ approval, onGone }) {
 // `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
 // booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
 // `onDecide(approval)` when the user decides: the wallet keeps the sheet while it finishes, even
-// once the server stopped waiting; `onFinished()` after the final mark was shown and the sheet left.
+// once the server stopped waiting; `onFinished(id, decided)` after the final mark was shown and the
+// sheet left (decided), or after a failed send while the approval still waits (not decided).
 export default function ApprovalSheet({ approval, onGone, note = "", onDecide, onFinished }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
   const [leaving, setLeaving] = useState(false); // sliding away after the final mark
@@ -133,13 +134,13 @@ export default function ApprovalSheet({ approval, onGone, note = "", onDecide, o
       await wait(DONE_MS);  // the checkmark (or X) is seen in full
       setLeaving(true);
       await wait(LEAVE_MS);
-      onFinished?.(approval.id);
+      onFinished?.(approval.id, true);
     } catch (e) {
       const failure = failureOf(e);
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
-      if (!failure.gone) onFinished?.(approval.id);  // still waiting: shown as the server's approval again
+      if (!failure.gone) onFinished?.(approval.id, false);  // still waiting: shown as the server's approval again
     }
   }
 

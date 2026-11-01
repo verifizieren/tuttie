@@ -70,7 +70,12 @@ export default function App() {
   const approvalId = sheetApproval?.id;
   const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
   // Only the sheet that is finishing clears it: a late finish of an older sheet leaves a newer one.
-  const sheetDone = useCallback(id => setFinishing(f => (f && f.id !== id ? f : null)), []);
+  // A decided approval is over for the wallet once its sheet finished, even if the event saying so
+  // never arrived (a dropped stream): it is not shown again and does not block New chat.
+  const sheetDone = useCallback((id, decided) => {
+    setFinishing(f => (f && f.id !== id ? f : null));
+    if (decided) setGoneApproval(id);
+  }, []);
   const [showHistory, setShowHistory] = useState(false);
   // The past chat open in the history (null = the list), why it could not be continued, and
   // whether it is being restored.
