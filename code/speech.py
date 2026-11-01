@@ -29,6 +29,15 @@ def clock(match: re.Match) -> str:
     return f"{said} {'am' if hour < 12 else 'pm'}"
 
 
+# A web address: its times ("?from=18:00") are part of it and are never rewritten.
+WEB_ADDRESS = re.compile(r"(?:https?://|www\.)\S*", re.IGNORECASE)
+
+
 def said_times(text: str) -> str:
-    """Every 24-hour clock time in `text` as it is said ("00:52" -> "12:52 am"); durations stay."""
-    return CLOCK.sub(clock, text)
+    """Every 24-hour clock time in `text` as it is said ("00:52" -> "12:52 am"); durations and
+    web addresses stay."""
+    out, last = [], 0
+    for address in WEB_ADDRESS.finditer(text):
+        out += [CLOCK.sub(clock, text[last:address.start()]), address.group(0)]
+        last = address.end()
+    return "".join(out) + CLOCK.sub(clock, text[last:])
