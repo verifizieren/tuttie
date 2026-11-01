@@ -6,10 +6,19 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
+Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open; the keynote deck at `/keynote/` is on branch `feat/keynote`).
 
 ## Done
 
+- **Keynote pitch deck** (branch `feat/keynote`, not merged or deployed yet): a static deck
+  in `code/apps/keynote/`, served at `/keynote/` by the assistant's static mount (no build). Black
+  stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
+  view (N). A clicker (PageDown/PageUp) drives the real wallet in a phone frame through
+  `demo.js`, which supplies input and timing only (same backend, same verification). Fallback
+  recording of a real run in `media/fallback.webm` + `.mp4` (V plays it in the phone, L
+  switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
+  skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
+  page in `code/apps/presentation/`. Details: `code/apps/keynote/README.md`.
 - **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
   microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
   eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for
@@ -386,6 +395,17 @@ Build order from [goals.md](goals.md):
    they have to change, tell the pitch team.
 4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
+
+**Before the pitch (keynote deck, `code/apps/keynote/`):**
+- Rehearse on the stage hardware (laptop, projector, clicker) at least once.
+- If no offers arrive on stage, press V: the fallback recording plays in the same phone.
+- Do not restart the live service (`tuttie`) during the pitch: sessions are in memory.
+- Re-record `media/fallback.webm` + `.mp4` after any seal or issuer rename, so the recording
+  matches the live wallet.
+- Rehearsals: at most ~4 runs a minute back to back (the `/chat` rate limit is about 10
+  requests a minute per browser).
+- Tuttie may speak answers aloud from the deck's wallet where the voice worker runs: mute the
+  laptop or test it beforehand.
 
 **Review of owner view and voice (dev member 2, 2026-10-31, commits 8763423..6819267):** all
 299 tests green, owner view's JS tests and build green, the pitch story still runs live
