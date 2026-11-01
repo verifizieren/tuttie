@@ -12,7 +12,7 @@ Last updated: 2026-11-01 (the keynote deck is built at `code/apps/presentation/`
 
 - **Keynote deck** (`code/apps/presentation/`, branch `feat/keynote`): the three-minute pitch
   as a static page (HTML, CSS, ES modules, no build, no CDN at runtime), served by the
-  assistant at `/presentation/` (live: https://web4.mendes.dev/presentation/). Black stage, at
+  assistant at `/presentation/` (on the server once merged to `main`). Black stage, at
   most three words per frame, one clicker (PageDown/PageUp). Beats 0-8: Anna's guesthouse,
   the cheap listing, Tuttie's eyes, the live demo, the honesty line, 2000 website → 2033
   signature, Anna's owner view in a laptop frame (optional, `?owner=0` skips it), closing
@@ -614,7 +614,7 @@ Why things are the way they are, so nobody has to rediscover them:
   marketplace 4010, weather and trains 4011-4012, assistant and apps 4040, wallet dev server
   4041, LiveKit media TCP 4042 / UDP 4043, TURN relay TCP 4044 (owner dev server also 4042:
   use it locally only).
-- **Keynote deck:** https://web4.mendes.dev/presentation/ (locally
+- **Keynote deck:** https://web4.mendes.dev/presentation/ once on `main` (locally
   <http://localhost:4040/presentation/>), served from disk: no build, no restart for deck
   changes. It must be opened on the same origin as `/wallet/`, or `demo.js` cannot drive the
   wallet. Open it in a desktop browser, press F for fullscreen and N for the presenter view on
