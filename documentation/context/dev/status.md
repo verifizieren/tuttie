@@ -723,6 +723,8 @@ Why things are the way they are, so nobody has to rediscover them:
   unless `API_DOCS=1` (`code/apidocs.py`, local development). The `tuttie_session` cookie is
   `Secure` when the request came over https (directly or `X-Forwarded-Proto: https` from
   nginx), still `HttpOnly` and `SameSite=lax`; plain-http local development keeps working.
+- **Round 5b (1 Nov):** an offer's name/uid come from the sealed registry record and agent/profile
+  from the hotel's signed agent card (never the market's relay); card photos only `hotels/<node_id>/<file>.jpg|png|webp`.
 
 ## Environment
 
