@@ -21,6 +21,7 @@ from collections import Counter, OrderedDict
 
 import httpx
 
+from assistant.card_commands import card_choice
 from assistant.agent import Assistant
 from assistant.approvals import ApprovalBook
 from assistant.events import EventBus, current_turn
@@ -42,6 +43,7 @@ class Conversation:
         self.assistant = Assistant(llm, Toolbox(http, registry_url, self.bus, self.approvals), self.bus)
         self.chats: set[asyncio.Task] = set()
         self.turns = 0  # user turns so far; their ids stay unique for the conversation's lifetime
+        self.running: dict[str, tuple[str, asyncio.Task]] = {}  # message -> its turn still running
 
     def start(self, message: str, first_tool: str | None = None, said: str | None = None,
               source: str = "text") -> str:
@@ -52,6 +54,11 @@ class Conversation:
         this request's run carries the id, the answer included. `said` is what the user sees as
         their message (default: the message itself).
         """
+        # The same words again while that turn still runs (two tabs, a double tap) join it: a
+        # second "yes" must never answer a question the user has not seen yet.
+        pending = None if card_choice(message) else self.running.get(message)  # "next", "next" are two swipes
+        if pending is not None and not pending[1].done():
+            return pending[0]
         self.turns += 1
         turn_id = f"t{self.turns}"
         self.bus.emit("turn", "pending", said or message, turn=turn_id,
@@ -59,6 +66,7 @@ class Conversation:
         task = asyncio.create_task(self._run(message, first_tool, turn_id))
         self.chats.add(task)
         task.add_done_callback(self.chats.discard)
+        self.running = {m: t for m, t in self.running.items() if not t[1].done()} | {message: (turn_id, task)}
         return turn_id
 
     async def _run(self, message: str, first_tool: str | None, turn_id: str) -> None:
