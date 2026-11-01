@@ -38,6 +38,7 @@ from aps import evaluate_record, load_signing_key, public_key_b64, verify_envelo
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh, parse_timestamp
 from aps.keys import load_public_key
+from marketplace.market import NODE_ID
 from marketplace.messages import Agreement, Counter, Offer, Rejection
 from negotiation.rules import Limits, decide, floor_total
 
@@ -62,13 +63,20 @@ def load_authorities() -> dict:
 
 
 async def registry_lookup(node_id: str) -> dict | None:
-    """A record from the registry service, or None if it is unknown or unreachable."""
+    """A record from the registry service, or None if it is unknown, unreachable or not a record.
+
+    The id goes into the URL, so only a node id shape is looked up ("../search" would reach
+    another registry route).
+    """
+    if not isinstance(node_id, str) or not NODE_ID.fullmatch(node_id) or ".." in node_id:
+        return None
     try:
         async with httpx.AsyncClient(timeout=10) as http:
             response = await http.get(f"{REGISTRY_URL}/nodes/{node_id}")
-    except httpx.HTTPError:
+        record = response.json() if response.status_code == 200 else None
+    except (httpx.HTTPError, ValueError):
         return None
-    return response.json() if response.status_code == 200 else None
+    return record if isinstance(record, dict) else None
 
 
 def message(payload: dict) -> dict:

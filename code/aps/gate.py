@@ -149,7 +149,7 @@ class ActionGate:
             raise Refused(f"the call is for {body['tool']}, not {needs.tool}")
 
         caller = await self.lookup(body["agent_id"])
-        if caller is None or caller.get("kind") != "user-agent":
+        if not isinstance(caller, dict) or caller.get("kind") != "user-agent":
             raise Refused("the caller is not a known user agent")
         tier = evaluate_record(caller, self.authorities)["tier"]
         if tier == "broken":
