@@ -20,24 +20,39 @@ const GONE_MS = 2600;   // how long "already decided or expired" is shown before
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
+/** The Face ID glyph as on an iPhone: rounded corner brackets around a simple face (eyes, an
+ *  L-shaped nose, a smile). Scanning, the face turns a little and the brackets pulse; once
+ *  approved, the face gives way to a checkmark drawn inside the same brackets. */
+function FaceId({ done = false }) {
+  return (
+    <svg className={done ? "faceid-glyph faceid-done" : "faceid-glyph"} viewBox="0 0 60 60" aria-hidden="true">
+      <g className="faceid-frame">
+        <path d="M4 18V10a6 6 0 0 1 6-6h8M42 4h8a6 6 0 0 1 6 6v8M56 42v8a6 6 0 0 1-6 6h-8M18 56h-8a6 6 0 0 1-6-6v-8" />
+      </g>
+      <g className="faceid-face">
+        <path d="M21 22v5M39 22v5M30 22v11h-2.5M22 40q8 6 16 0" />
+      </g>
+      {done && <path className="faceid-check" d="M19 31l7.5 7.5L41.5 23" />}
+    </svg>
+  );
+}
+
 function Progress({ stage, decision }) {
+  const approved = decision === "approved";
   if (stage === "done") {
-    const approved = decision === "approved";
     return (
       <div className="faceid" aria-live="polite">
-        <svg className={approved ? "faceid-ok" : "faceid-ok faceid-no"} viewBox="0 0 52 52" aria-label={doneLabel(decision)}>
-          <circle cx="26" cy="26" r="25" />
-          <path d={approved ? "M15 27l7 7 15-16" : "M18 18l16 16M34 18L18 34"} />
-        </svg>
+        {approved ? <FaceId done />
+                  : <svg className="faceid-ok faceid-no" viewBox="0 0 52 52" aria-hidden="true">
+                      <circle cx="26" cy="26" r="25" /><path d="M18 18l16 16M34 18L18 34" />
+                    </svg>}
         <span>{doneLabel(decision)}</span>
       </div>
     );
   }
-  const scanning = decision === "approved";
   return (
     <div className="faceid" aria-live="polite">
-      {scanning ? <div className="faceid-scan" aria-label="Confirming with Face ID"><i /><i /><i /><i /></div>
-                : <div className="faceid-wait" aria-hidden="true" />}
+      {approved ? <FaceId /> : <div className="faceid-wait" aria-hidden="true" />}
       <span>{stage === "scan" ? "Face ID" : sendingLabel(decision)}</span>
     </div>
   );
