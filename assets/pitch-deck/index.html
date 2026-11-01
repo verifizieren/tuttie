@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuttie · BaselHack pitch</title>
+<script>if (new URLSearchParams(location.search).get("theme") === "dark") document.documentElement.classList.add("dark-theme");</script>
+<style>
+/* Tuttie pitch: an illustrated phone flow, with a separate handoff to the working wallet.
+   → / Space / PageDown / click: next · ← / PageUp: back · A: auto-play, 2:30 target including live demo ·
+   F: fullscreen · N: speaker notes and clock · #n in the URL jumps. */
+:root {
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --cam: cubic-bezier(.65, 0, .35, 1);
+  /* The light wallet palette (apps/wallet/src/wallet.css): calm, iOS-like, readable on a projector. */
+  --bg: #f2f2f7; --panel: #ffffff; --panel2: #f6f6f9; --line: #e4e4ea; --line2: #d6d6de;
+  --text: #17171d; --muted: #5a5967; --dim: #8b8a97;
+  --accent: #d97757; --accent-text: #b4532f; --peach: #b4532f;
+  --gold: #b8860b; --blue: #2f6fe0; --red: #d93b3b; --green: #1f9d5c;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+body.idle { cursor: none; }
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; background: var(--bg); }
+#glow { position: absolute; inset: 0; opacity: 0; transition: opacity 2s ease;
+        background: radial-gradient(760px 620px at 50% 50%, rgba(246,211,194,.035), transparent 70%); }
+.has-reveal #glow { opacity: 1; }
+canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+#storm, #web { opacity: 0; transition: opacity .8s ease; }
+.at-noise #storm, .at-wallet #storm { opacity: 1; }
+.at-web #web, .at-fake #web { opacity: 1; }
+
+/* ---------- The phone: a camera rig around one floating device ---------- */
+#persp { position: absolute; inset: 0; perspective: 2600px; perspective-origin: 50% 46%; }
+#cam { position: absolute; left: 750px; top: 105px; width: 420px; height: 870px; transform-style: preserve-3d; opacity: 0;
+       transform: translate3d(0, 170px, 0) rotateX(4deg) rotateY(-16deg) scale(.94);
+       transition: transform .9s var(--ease), opacity .6s ease; }
+.has-reveal #cam    { opacity: 1; transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(-7deg) scale(.95); transition: transform 1.1s var(--ease), opacity .7s ease; }
+.has-noise #cam     { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(.86); }
+.has-wallet #cam    { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
+.has-ask #cam       { transform: translate3d(330px, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
+.has-context #cam   { transform: translate3d(0, 40px, 0) rotateX(0deg) rotateY(0deg) scale(.84); }
+.has-web #cam       { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(.4); }
+.has-negotiate #cam { opacity: 1; transform: translate3d(-330px, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
+.has-swipe #cam     { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1.06); }
+.has-approve #cam   { transform: translate3d(330px, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
+.has-live #cam      { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale(1); }
+.has-try #cam       { opacity: 1; transform: translate3d(330px, 0, 0) rotateX(0deg) rotateY(-6deg) scale(.95); }
+#float { position: absolute; inset: 0; transform-style: preserve-3d; transform: none; }
+
+.phone { position: absolute; inset: 0; transform-style: preserve-3d; }
+.phone .back { position: absolute; inset: 0; border-radius: 72px; transform: translateZ(-20px);
+               background: linear-gradient(90deg, #1b1b1e, #4d4d52 48%, #1b1b1e); box-shadow: 0 0 0 1px #0a0a0b; }
+.phone .frame { position: absolute; inset: 0; border-radius: 72px; padding: 4px; box-sizing: border-box;
+                background: linear-gradient(135deg, #a3a3a9 0%, #4a4a50 16%, #1d1d21 46%, #2c2c31 70%, #8e8e95 100%);
+                box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 0 0 1px rgba(0,0,0,.6); }
+.phone .bezel { width: 100%; height: 100%; border-radius: 68px; background: #030304; padding: 12px; box-sizing: border-box; }
+.phone .btn { position: absolute; width: 5px; border-radius: 3px; background: linear-gradient(90deg, #2c2c30, #8a8a90, #2c2c30); }
+.phone .btn.side { right: -4px; top: 250px; height: 110px; }
+.phone .btn.act { left: -4px; top: 190px; height: 44px; }
+.phone .btn.v1 { left: -4px; top: 270px; height: 74px; }
+.phone .btn.v2 { left: -4px; top: 360px; height: 74px; }
+.phone .btn.side::after { content: ""; position: absolute; inset: -8px -10px; border-radius: 10px; background: rgba(255,214,196,.9); filter: blur(10px); opacity: 0; }
+.fwd.at-wallet .phone .btn.side::after { animation: dbl .9s 1.1s both; }
+@keyframes dbl { 0%, 100% { opacity: 0; } 12%, 30% { opacity: .9; } 42% { opacity: 0; } 56%, 74% { opacity: .9; } 88% { opacity: 0; } }
+#shadow { position: absolute; left: 760px; top: 975px; width: 400px; height: 60px; border-radius: 50%; opacity: 0;
+          background: radial-gradient(closest-side, rgba(0,0,0,.9), transparent); filter: blur(18px); transition: opacity 1.4s ease, transform 1.7s var(--cam); }
+.has-reveal #shadow { opacity: .8; }
+.has-ask #shadow { transform: translateX(330px); }
+.has-context #shadow { transform: none; }
+.has-web #shadow { opacity: 0; }
+.has-negotiate #shadow { opacity: .8; transform: translateX(-330px); }
+.has-swipe #shadow { transform: none; }
+.has-approve #shadow { transform: translateX(330px); }
+.has-live #shadow { transform: none; }
+.has-try #shadow { opacity: .8; transform: translateX(330px); }
+
+/* ---------- The screen: 388 × 838, the wallet's own layout ---------- */
+.screen { position: relative; width: 388px; height: 838px; border-radius: 56px; overflow: hidden; background: var(--bg); color: var(--text); isolation: isolate; }
+.island { position: absolute; top: 11px; left: 50%; width: 120px; height: 35px; margin-left: -60px; border-radius: 20px; background: #000; z-index: 60; }
+.sbar { position: absolute; top: 18px; left: 36px; right: 28px; display: flex; justify-content: space-between; align-items: center;
+        font-size: 16px; font-weight: 600; z-index: 59; }
+.sbar b { display: flex; gap: 4px; align-items: flex-end; }
+.sbar b i { display: block; width: 4px; border-radius: 1px; background: currentColor; }
+.sbar b em { display: block; width: 25px; height: 12px; border-radius: 4px; border: 1.5px solid rgba(23,23,29,.4); position: relative; margin-left: 4px; }
+.sbar b em::after { content: ""; position: absolute; inset: 1.5px; right: 5px; border-radius: 2px; background: currentColor; }
+/* No glare on the light screen: a white sheen is invisible there and bands when the phone is scaled. */
+.glare { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 70; border-radius: inherit;
+         background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.018) 45%, transparent 62%);
+         background-size: 100% 100%; }
+.homebar { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: rgba(23,23,29,.85); z-index: 58; }
+
+/* Lock screen */
+.ls { position: absolute; inset: 0; transition: opacity .7s ease, filter .9s ease, transform .9s var(--ease); }
+.ls .wp { position: absolute; inset: 0;
+          background: radial-gradient(300px 260px at 18% 82%, rgba(217,119,87,.42), transparent 70%),
+                      radial-gradient(320px 280px at 92% 96%, rgba(246,211,194,.8), transparent 70%),
+                      radial-gradient(360px 320px at 78% 16%, rgba(178,186,232,.55), transparent 70%),
+                      linear-gradient(#fbfbfd, #f2f2f7 50%, #f6ece6); }
+.ls .date { position: absolute; top: 86px; width: 100%; text-align: center; font-size: 19px; font-weight: 600; color: rgba(23,23,29,.72); }
+.ls .time { position: absolute; top: 102px; width: 100%; text-align: center; font-size: 96px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+.ls .bt { position: absolute; bottom: 32px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.6); box-shadow: 0 0 0 1px rgba(23,23,29,.06); backdrop-filter: blur(8px); display: grid; place-items: center; }
+.ls .bt svg { width: 21px; height: 21px; fill: none; stroke: var(--text); stroke-width: 1.8; }
+.ls .bt.l { left: 44px; } .ls .bt.r { right: 44px; }
+.hint { position: absolute; right: 0; top: 238px; display: flex; align-items: center; gap: 12px; opacity: 0; z-index: 55; }
+.hint span { font-size: 17px; font-weight: 600; color: #fff; }
+.hint i { width: 5px; height: 110px; border-radius: 4px 0 0 4px; background: #fff; box-shadow: 0 0 12px #fff; }
+.fwd.at-wallet .hint { animation: hint 1.9s .1s both; }
+@keyframes hint { 0% { opacity: 0; transform: translateX(12px); } 18%, 70% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.has-wallet .ls { opacity: 0; filter: blur(16px); transform: scale(1.08); }
+.fwd.at-wallet .ls { transition-delay: 2s; }
+
+/* Wallet (apps/wallet/src/wallet.css, at a 388 px wide screen) */
+.wl { position: absolute; inset: 0; background: var(--bg); opacity: 0; transition: opacity .6s ease;
+      --top: 54px; --peek: 58px; --card-h: 224px; --stack: 122px; }
+.has-wallet .wl { opacity: 1; }
+.fwd.at-wallet .wl { transition-delay: 2.05s; }
+.whead { position: absolute; left: 20px; top: var(--top); height: 56px; display: flex; align-items: center; transition: opacity .4s var(--ease), transform .5s var(--ease); }
+.whead h1 { margin: 0; font-size: 33px; font-weight: 700; letter-spacing: -.01em; }
+.card { position: absolute; left: 16px; right: 16px; top: calc(var(--stack) + var(--i) * var(--peek)); height: var(--card-h);
+        border-radius: 16px; overflow: hidden; transform: translateY(110%);
+        box-shadow: 0 -1px 0 rgba(255,255,255,.12) inset, 0 -6px 20px rgba(23,23,40,.16);
+        transition: top .7s var(--ease), height .7s var(--ease), transform .7s var(--ease), opacity .5s var(--ease), border-radius .7s var(--ease); }
+.has-wallet .card { transform: none; }
+.fwd.at-wallet .card.b0 { transition-delay: 2.15s; } .fwd.at-wallet .card.b1 { transition-delay: 2.25s; } .fwd.at-wallet .card.agent { transition-delay: 2.35s; }
+.b0 { --i: 0; background: linear-gradient(135deg, #1487d4, #07529b 58%, #04356e); }
+.b1 { --i: 1; background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
+.chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px; overflow: hidden; background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
+.chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90,68,28,.55); stroke-width: 1; }
+/* Swiss bank marks, as BankCard.jsx draws them: ZKB (blue, Swiss cross) and UBS (black, keys). */
+.bank-brand { position: absolute; top: 18px; right: 20px; height: 34px; display: flex; align-items: center; color: #fff; line-height: 1; }
+.ubs-brand { gap: 8px; }
+.ubs-brand b { font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 700; letter-spacing: -.06em; }
+.ubs-keys { width: 39px; height: 28px; overflow: visible; }
+.zkb-brand { gap: 9px; text-align: left; }
+.zkb-brand b { display: block; font-size: 21px; font-weight: 800; letter-spacing: .02em; }
+.zkb-brand small { display: block; margin-top: 3px; font-size: 8px; font-weight: 650; letter-spacing: .015em; opacity: .9; }
+.swiss-mark { position: relative; display: block; width: 27px; height: 27px; box-sizing: border-box; border: 1.5px solid rgba(255,255,255,.9); border-radius: 7px; }
+.swiss-mark i { position: absolute; left: 50%; top: 50%; display: block; background: #fff; transform: translate(-50%, -50%); }
+.swiss-mark i:first-child { width: 13px; height: 4px; }
+.swiss-mark i:last-child { width: 4px; height: 13px; }
+.agent { --i: 2; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.05), 0 8px 28px rgba(23,23,40,.10), 0 -4px 16px rgba(23,23,40,.06); }
+.agent canvas { position: absolute; left: 0; width: 356px; height: 178px; top: 50%; display: block;
+                transform: translateY(-50%) scale(.92); transition: top .7s var(--ease), transform .7s var(--ease); }
+.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1.5px rgba(217,119,87,.45); }
+.grabber { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(0,0,0,.22); opacity: 0; transition: opacity .3s; z-index: 2; }
+/* open: the bank cards drop away and the face takes the screen */
+.has-ask .whead { opacity: 0; transform: translateY(-14px); }
+.has-ask .bank { transform: translateY(110vh); opacity: 0; }
+.has-ask .agent { top: var(--top); height: calc(838px - var(--top) - 16px); border-radius: 32px; }
+.has-ask .agent canvas { top: 42%; transform: translateY(-50%) scale(1); }
+.has-ask .grabber { opacity: 1; }
+.at-ask .edge { opacity: 1; animation: listen 3s ease-in-out infinite; }
+@keyframes listen { 50% { opacity: .45; } }
+.controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 64px 24px; display: flex; flex-direction: column; align-items: center;
+            opacity: 0; transform: translateY(16px); transition: opacity .4s var(--ease) .25s, transform .5s var(--ease) .25s; }
+.has-ask .controls { opacity: 1; transform: none; }
+.cstatus { font-size: 15px; font-weight: 500; color: var(--muted); text-align: center; min-height: 20px; }
+.kbd { position: absolute; right: 18px; bottom: 18px; width: 40px; height: 40px; padding: 8px; box-sizing: border-box; color: var(--dim); }
+/* busy: the eyes get small and move up, the conversation fills the card */
+.has-context .agent canvas { top: 12%; transform: translateY(-50%) scale(.42); }
+.has-live .agent canvas { top: 42%; transform: translateY(-50%) scale(1); }
+.activity { position: absolute; left: 0; right: 0; top: 19%; bottom: 84px; overflow: hidden; padding: 22px 16px 16px;
+            display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .4s var(--ease) .2s;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 30px, #000 calc(100% - 18px), transparent);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 30px, #000 calc(100% - 18px), transparent); }
+.has-context .activity { opacity: 1; }
+.has-live .activity { opacity: 0; }
+.steps { list-style: none; margin: 0; padding: 2px 4px; display: grid; gap: 10px; }
+.steps li { position: relative; display: flex; align-items: flex-start; gap: 12px; line-height: 1.35; font-size: 14px; color: var(--muted); min-height: 20px; }
+.steps li:empty, .steps li.off { display: none; }
+.steps li span { min-width: 0; overflow-wrap: anywhere; }
+.steps .dot { flex: none; width: 9px; height: 9px; margin: 5px 3px 0; border-radius: 50%; background: var(--accent); }
+.steps li.active .dot { animation: breathe 1.4s ease-in-out infinite; }
+.steps li.done .dot { background: #c4c3cc; }
+.steps li.done.latest .dot { background: var(--green); }
+.steps li + li::before { content: ""; position: absolute; left: 7px; top: -14px; width: 1px; height: 16px; background: var(--line2); }
+@keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+.rise { animation: rise .4s var(--ease) both; }
+
+/* Seal marks: issuer tiles with a small shield */
+.marks { display: inline-flex; flex: none; gap: 8px; min-width: 38px; }
+.marks i { position: relative; width: 22px; height: 22px; border-radius: 6px; }
+.marks svg, .seal-mark svg { display: block; width: 100%; height: 100%; }
+.marks .mini-shield { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; filter: drop-shadow(0 0 1px rgba(255,255,255,.95)); }
+.mini-shield.gold path:first-child, .seal-badge.gold path:first-child { fill: var(--gold); }
+.mini-shield.blue path:first-child, .seal-badge.blue path:first-child { fill: var(--blue); }
+
+/* The hotel cards: swipe right to like, left to pass */
+.deck { display: none; flex-direction: column; gap: 8px; }
+.at-swipe .deck { display: flex; }
+.deck-stack { position: relative; height: 392px; }
+.swipe-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--panel); border: 1px solid var(--line);
+              box-shadow: 0 10px 28px rgba(23,23,40,.14); transition: transform .5s var(--ease), opacity .4s; }
+.swipe-photo { position: absolute; inset: 0 0 76px; }
+.swipe-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #e4e4ea; }
+.swipe-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.3), transparent 22%, transparent 55%, rgba(0,0,0,.62)); }
+.hotel-bars { position: absolute; top: 8px; left: 10px; right: 10px; z-index: 2; display: flex; gap: 4px; }
+.hotel-bars i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.35); }
+.hotel-bars i.on { background: #fff; }
+.swipe-top { position: absolute; top: 20px; left: 14px; right: 12px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+.rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b; background: rgba(255,255,255,.92); }
+.swipe-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.35); letter-spacing: -.01em; line-height: 1.15; }
+.swipe-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.feature-icons { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+.feature-icons li { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; }
+.feature-icons svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.feature-icons .yes { color: var(--green); background: rgba(31,157,92,.12); }
+.feature-icons .no { color: var(--red); background: rgba(217,59,59,.10); }
+.swipe-price { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.swipe-price b { font-size: 24px; font-weight: 750; letter-spacing: -.02em; }
+.swipe-price s { font-size: 13px; color: var(--dim); }
+.stamp { position: absolute; top: 60px; z-index: 3; padding: 4px 12px; border: 3px solid; border-radius: 10px; font-size: 24px; font-weight: 800;
+         text-transform: uppercase; letter-spacing: .04em; opacity: 0; transition: opacity .2s; }
+.stamp.like { left: 18px; color: #fff; background: var(--green); border-color: var(--green); transform: rotate(-12deg); }
+.stamp.pass { right: 18px; color: #fff; background: var(--red); border-color: var(--red); transform: rotate(12deg); }
+.deck-count { text-align: center; font-size: 12px; color: var(--dim); }
+.c-back { transform: scale(.95) translateY(10px); opacity: .6; }
+.lean-l .c-top { transform: translateX(-60px) rotate(-3.3deg); transition-duration: .7s; }
+.lean-l .c-top .stamp.pass { opacity: 1; }
+.sw1 .c-top { transform: translate(-520px, 40px) rotate(-29deg); }
+.sw1 .c-back { transform: none; opacity: 1; }
+.lean-r .c-back { transform: translateX(60px) rotate(3.3deg); transition-duration: .7s; }
+.lean-r .c-back .stamp.like { opacity: 1; }
+.sw2 .c-back { transform: translate(520px, 40px) rotate(29deg); }
+.sw2 .deck { display: none; }
+/* the chosen hotel */
+.hotel { display: none; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.hotel.agreed { border-color: var(--green); }
+.hotel-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.hotel-name small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.price { font-size: 15px; white-space: nowrap; color: var(--text); }
+.price s { color: var(--dim); margin-right: 2px; }
+.sw2 .hotel, .has-approve .hotel { display: flex; animation: rise .45s var(--ease) both; }
+.booked .hotel { display: none; }
+
+/* Illustrated approval and confirmation. No biometric authentication is claimed. */
+.sheet { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 40; padding: 18px 18px 20px; border-radius: 26px; background: var(--panel);
+         border: 1px solid var(--line); box-shadow: 0 -10px 40px rgba(23,23,40,.18); transform: translateY(115%); transition: transform .5s var(--ease); }
+.at-approve .sheet { transform: none; }
+.fwd.at-approve .sheet { transition-delay: .9s; }
+.at-approve.booked .sheet { transform: translateY(115%); transition-delay: 0s; }
+.sheet-hotel { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.sheet-amount { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 4px 0; }
+.sheet-summary { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.seal-list { border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
+.sheet .seal-list { margin-bottom: 16px; background: var(--panel2); }
+.seal-head { font-size: 12px; font-weight: 500; color: var(--dim); padding: 9px 12px 2px; letter-spacing: .02em; }
+.seal-row { display: flex; align-items: center; gap: 11px; padding: 9px 12px; position: relative; }
+.seal-row + .seal-row::before { content: ""; position: absolute; top: 0; left: 53px; right: 0; height: 1px; background: var(--line); }
+.seal-mark { flex: none; width: 30px; height: 30px; border-radius: 8px; overflow: hidden; }
+.seal-text { flex: 1; min-width: 0; }
+.seal-text b { display: block; font-size: 14px; font-weight: 600; }
+.seal-text small { display: block; font-size: 12px; color: var(--muted); }
+.seal-badge { flex: none; width: 22px; height: 22px; }
+.sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sheet-buttons span { padding: 15px; border-radius: 16px; font-size: 16px; font-weight: 600; text-align: center; }
+.sheet-buttons .approve { background: var(--text); color: #fff; transition: transform .15s; }
+.sheet-buttons .decline { background: #ececf1; color: var(--text); border: 1px solid var(--line); }
+.tapped .sheet-buttons .approve { transform: scale(.95); }
+.faceid { height: 92px; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.scan .sheet-buttons { display: none; }
+.scan .faceid { display: flex; }
+.faceid-scan { width: 34px; height: 34px; border: 3px solid var(--line2);
+  border-top-color: var(--muted); border-radius: 50%; animation: confirm-spin .8s linear infinite; }
+.faceid-scan i { display: none; }
+@keyframes confirm-spin { to { transform: rotate(360deg); } }
+.faceid-ok { width: 52px; height: 52px; display: none; }
+.faceid-ok circle { fill: var(--green); }
+.faceid-ok path { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.approved .faceid-scan { display: none; }
+.approved .faceid-ok { display: block; }
+.approved .faceid-ok path { animation: draw .35s var(--ease) .1s forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+/* The confirmed booking and what Tuttie checked */
+.booking { display: none; padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--green); }
+.booked .booking, .has-live .booking { display: block; animation: rise .45s var(--ease) both; }
+.booking-top { display: flex; align-items: center; gap: 10px; }
+.booking-hotel { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+.booking-hotel small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.booking-total { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.booking-id { font-size: 13px; color: var(--muted); margin: 8px 0 12px 48px; }
+.booking-id b { font-family: var(--mono); font-weight: 500; color: var(--text); }
+.check-ok { flex: none; width: 18px; height: 18px; }
+.check-ok circle { fill: var(--green); }
+.check-ok path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.checks .seal-row { padding: 7px 12px; }
+.checks .seal-row + .seal-row::before { left: 45px; }
+
+/* ---------- Around the phone: what Tuttie reads (calendar, mail, context) ---------- */
+.info { position: absolute; width: 400px; padding: 24px 26px; box-sizing: border-box; border-radius: 28px; background: rgba(22,22,28,.88);
+        border: 1px solid rgba(255,255,255,.08); opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.15);
+        transition: transform 1.1s var(--ease), opacity .6s ease, border-color .4s ease, box-shadow .4s ease; }
+.at-context .info { opacity: 1; transform: none; }
+.fwd.at-context .info { transition-delay: calc(.5s + var(--i) * .14s); }
+.info.look { border-color: rgba(246,211,194,.55); box-shadow: 0 0 70px rgba(217,119,87,.25); }
+.info h4 { margin: 0 0 16px; font-size: 21px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+.info h4 svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.info .ev { display: flex; gap: 12px; align-items: center; padding: 10px 12px; margin: 0 -12px; border-radius: 14px; font-size: 19px; transition: background .4s, color .4s; }
+.info .ev i { width: 4px; height: 26px; border-radius: 2px; background: var(--blue); flex: none; }
+.info .ev small { margin-left: auto; color: var(--muted); font-size: 16px; }
+.info .ev.hit { background: rgba(246,211,194,.12); color: var(--peach); }
+.info .ev.hit i { background: var(--accent); }
+.info .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.info .chips span { padding: 9px 16px; border-radius: 22px; font-size: 18px; font-weight: 500; color: #d0d0d6; background: rgba(255,255,255,.07); transition: background .4s, color .4s; }
+.info.hit .chips span { background: rgba(246,211,194,.16); color: var(--peach); }
+.cal { left: 160px; top: 150px; --dx: 600px; --dy: 300px; --i: 0; }
+.mail { left: 160px; top: 600px; --dx: 600px; --dy: -150px; --i: 1; }
+.ctx { left: 1360px; top: 300px; --dx: -600px; --dy: 140px; --i: 2; }
+
+/* ---------- Words ---------- */
+.words { position: absolute; opacity: 0; transform: translateY(12px); filter: none; pointer-events: none;
+         transition: opacity .45s ease, transform .65s var(--ease); font-weight: 600; letter-spacing: -.028em; }
+.words .dim { color: #a5a5ad; }
+.in { opacity: 1; transform: none; filter: none; }
+#count { left: 150px; top: 430px; font-size: 128px; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: 0 0 40px #000, 0 0 80px #000; }
+#count small { display: block; margin-top: 8px; font-size: 44px; font-weight: 500; color: rgba(236,235,244,.55); letter-spacing: 0; }
+.at-noise #count { opacity: 1; transform: none; filter: none; }
+#intro { left: 150px; top: 420px; font-size: 96px; line-height: 1.04; }
+.at-wallet #intro { opacity: 1; transform: none; filter: none; transition-delay: .8s; }
+#opening { left: 150px; top: 350px; font-size: 86px; line-height: 1.08; }
+.at-reveal #opening { opacity: 1; transform: none; }
+#ask { left: 150px; top: 330px; width: 820px; font-size: 76px; line-height: 1.06; }
+#ask .w { display: inline-block; opacity: 0; filter: none; transform: translateY(6px); transition: opacity .4s, filter .4s, transform .5s var(--ease); }
+.at-ask #ask { opacity: 1; transform: none; filter: none; }
+.at-ask #ask .w { opacity: 1; filter: none; transform: none; transition-delay: calc(.3s + var(--i) * .075s); }
+#knows { left: 0; right: 0; top: 960px; text-align: center; font-size: 46px; }
+.at-context #knows { opacity: 1; transform: none; filter: none; transition-delay: 1s; }
+#see { left: 0; right: 0; top: 70px; text-align: center; font-size: 46px; }
+.at-web #see { opacity: 1; transform: none; filter: none; transition-delay: .6s; }
+#claim { left: 0; right: 0; top: 960px; text-align: center; font-size: 52px; }
+#claim .b { display: inline-block; opacity: 0; transition: opacity .9s var(--ease); }
+.at-web #claim, .at-fake #claim { opacity: 1; transform: none; filter: none; }
+.fwd.at-web #claim { transition-delay: 3.2s; }
+#claim .a { opacity: 1; }
+.at-fake #claim .dim { opacity: 1; color: #ffb0a1; }
+.fwd.at-fake #claim .dim { transition-delay: 2.3s; }
+#deal { left: 1130px; top: 380px; }
+#deal small { display: block; font-size: 40px; font-weight: 500; color: #b5b5bd; letter-spacing: -.01em; }
+#deal s { display: block; margin-top: 18px; font-size: 54px; font-weight: 500; color: #85858f; text-decoration-thickness: 3px; }
+#deal b { display: block; font-size: 132px; font-weight: 650; line-height: 1.1; letter-spacing: -.045em; font-variant-numeric: tabular-nums;
+          color: var(--peach); }
+.at-negotiate #deal { opacity: 1; transform: none; filter: none; transition-delay: 1.4s; }
+#deal .currency { font-size: 38px; font-weight: 500; letter-spacing: -.02em; }
+.arrows { position: absolute; top: 520px; width: 140px; height: 40px; opacity: 0; transition: opacity .6s; }
+.arrows svg { width: 100%; height: 100%; fill: none; stroke: rgba(236,235,244,.5); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.arrows.l { left: 560px; } .arrows.r { left: 1220px; }
+.at-swipe .arrows { opacity: 1; }
+#onetap { left: 150px; top: 430px; font-size: 76px; line-height: 1.04; }
+.at-approve #onetap { opacity: 1; transform: none; filter: none; transition-delay: .5s; }
+#live { left: 150px; top: 390px; width: 500px; font-size: 64px; line-height: 1.1; letter-spacing: -.035em; }
+#live a { color: var(--text); text-decoration: none; pointer-events: auto; }
+#live a:hover { color: var(--peach); }
+#live small { display: block; margin-top: 24px; color: #a5a5ad; font-size: 27px; line-height: 1.4; letter-spacing: 0; }
+.at-live #live { opacity: 1; transform: none; filter: none; transition-delay: .8s; }
+#try { left: 150px; top: 250px; }
+#try b { display: block; font-size: 96px; line-height: 1.02; }
+#try .qr { display: inline-block; margin-top: 50px; padding: 22px; border-radius: 30px; background: #fff; line-height: 0; }
+#try .qr svg { width: 280px; height: 280px; }
+#try small { display: block; margin-top: 22px; font-size: 30px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.at-try #try { opacity: 1; transform: none; filter: none; transition-delay: .15s; }
+
+/* ---------- Presenter clock and notes ---------- */
+#hud { position: absolute; right: 36px; top: 30px; font: 600 26px/1 var(--mono); color: rgba(236,235,244,.55); display: none; z-index: 98; }
+#hud i { display: block; margin-top: 10px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; }
+#hud i::after { content: ""; display: block; height: 100%; width: var(--p, 0%); background: var(--accent); }
+.notes #hud, .auto #hud { display: block; }
+.auto:not(.notes) #hud { opacity: .0; }
+#notes { position: absolute; left: 40px; right: 40px; bottom: 30px; padding: 18px 26px; border-radius: 18px; background: #fff;
+         border: 1px solid var(--line); box-shadow: 0 10px 40px rgba(23,23,40,.12);
+         font-size: 26px; line-height: 1.35; font-weight: 500; color: var(--text); display: none; z-index: 99; }
+#notes b { color: var(--accent-text); font-weight: 600; margin-right: 10px; }
+.notes #notes { display: block; }
+.demo-caption { position: absolute; left: 64px; bottom: 26px; color: #a5a5ad; font-size: 20px; letter-spacing: .01em; }
+.at-reveal .demo-caption, .at-noise .demo-caption, .at-try .demo-caption { opacity: 0; }
+#hud.over { color: #ff8a8a; }
+@media (prefers-reduced-motion: reduce) { #cam, .words, .info, .card, #ask .w { transition-duration: .01s !important; transition-delay: 0s !important; } .glare, #float { animation: none !important; } }
+.jump * { transition-delay: 0s !important; }
+
+/* Local story experiment: the same device and gestures, with one traveller's task. */
+#storm, #web, .info { display: none; }
+.has-reveal #cam { transform: translate3d(330px, 0, 0) rotateY(-6deg) scale(.95); }
+.has-wallet #cam, .has-ask #cam, .has-context #cam, .has-negotiate #cam { transform: translate3d(330px, 0, 0) scale(1); }
+.has-swipe #cam { transform: translate3d(0, 0, 0) scale(1.06); }
+.has-approve #cam { transform: translate3d(330px, 0, 0) scale(1); }
+#opening { width: 850px; }
+#intro { top: 340px; width: 820px; font-size: 84px; }
+#knows { left: 150px; right: auto; top: 350px; width: 780px; text-align: left; font-size: 66px; line-height: 1.15; }
+#claim { left: 150px; right: auto; top: 350px; width: 780px; text-align: left; font-size: 72px; line-height: 1.1; }
+#claim .b { display: block; }
+#claim .dim { font-size: 36px; margin-top: 28px; }
+#deal { left: 150px; top: 340px; width: 780px; }
+#deal small { color: var(--text); font-size: 64px; line-height: 1.1; }
+#deal .story-fit { color: #a5a5ad; font-size: 42px; line-height: 1.3; margin: 28px 0; }
+#deal .story-price { color: #a5a5ad; font-size: 44px; font-weight: 500; margin: 0; }
+#deal .story-price span { color: var(--peach); font-weight: 600; }
+#try b { font-size: 80px; line-height: 1.1; }
+.story-verdict { display: none; padding: 18px; border-radius: 18px; background: #21191b; border: 1px solid #5b383b; color: #edc7c7; }
+.story-verdict b { font-size: 17px; font-weight: 600; display: block; margin-bottom: 8px; }
+.story-verdict span { font-size: 14px; line-height: 1.5; color: #c3acaf; }
+.at-fake .story-verdict { display: block; }
+
+/* A light, calm stage around the light wallet; ?theme=dark keeps the comparison. */
+html:not(.dark-theme), html:not(.dark-theme) body,
+html:not(.dark-theme) #stage { background: var(--bg); }
+html:not(.dark-theme) #glow { display: none; }
+html:not(.dark-theme) .words {
+  --text: #17171d; --muted: #5a5967; --peach: #b4532f;
+  color: var(--text);
+}
+html:not(.dark-theme) .words .dim,
+html:not(.dark-theme) #deal .story-fit,
+html:not(.dark-theme) #deal .story-price,
+html:not(.dark-theme) #live small { color: #5a5967; }
+html:not(.dark-theme) .at-fake #claim .dim { color: #b4532f; }
+html:not(.dark-theme) .arrows svg { stroke: #8b8a97; }
+html:not(.dark-theme) .demo-caption { color: #5a5967; }
+html:not(.dark-theme) #hud { color: #5a5967; }
+html:not(.dark-theme) #hud.over { color: #d93b3b; }
+html:not(.dark-theme) #hud i { background: #e4e4ea; }
+html:not(.dark-theme) #try .qr { border-radius: 20px; box-shadow: 0 0 0 1px #e4e4ea, 0 10px 30px rgba(23,23,40,.06); }
+/* ?theme=dark: the old black stage around the same light wallet. */
+html.dark-theme, html.dark-theme body, html.dark-theme #stage { background: #08080b; }
+html.dark-theme .words { --text: #ecebf4; --muted: #8d8c9e; --peach: #f6d3c2; color: var(--text); }
+html.dark-theme #hud { color: rgba(236,235,244,.55); }
+html:not(.dark-theme) #shadow {
+  background: radial-gradient(closest-side, rgba(23,23,40,.2), transparent);
+}
+/* Keep the grounding shadow underneath the device as the camera moves. */
+.has-reveal #shadow, .has-wallet #shadow, .has-context #shadow,
+.has-negotiate #shadow { transform: translateX(330px); }
+.has-swipe #shadow, .has-live #shadow { transform: none; }
+.has-approve #shadow, .has-try #shadow { transform: translateX(330px); }
+
+/* Final pitch composition: light stage, light wallet in a dark device, deliberate emphasis. */
+#intro { top: 348px; width: 810px; font-size: 104px; font-weight: 650; }
+.intro-sub { display: block; margin-top: 24px; font-size: 38px; line-height: 1.3; font-weight: 450; color: #5a5967; letter-spacing: -.02em; }
+#opening { top: 350px; font-size: 102px; line-height: 1.1; }
+#ask { top: 322px; font-size: 76px; width: 820px; line-height: 1.15; }
+#knows { top: 366px; font-size: 80px; width: 800px; }
+#deal { top: 350px; }
+#deal small { font-size: 70px; font-weight: 600; }
+#deal .story-fit { font-size: 38px; margin: 30px 0 42px; line-height: 1.4; }
+#deal .story-price { font-size: 64px; letter-spacing: -.035em; }
+#deal .story-price span { font-size: 88px; font-variant-numeric: tabular-nums; }
+#onetap { top: 380px; font-size: 84px; width: 850px; line-height: 1.12; }
+#try { top: 248px; }
+#try b { font-size: 76px; }
+#try .qr { margin-top: 44px; }
+#try small { font-size: 27px; }
+.at-wallet #cam { transform: translate3d(330px, 0, 0) scale(1); }
+.at-proof #cam, .at-owner #cam { opacity:0; transition:opacity .25s ease; }
+.at-proof #shadow, .at-owner #shadow { opacity: 0; }
+#proof, #owner { inset: 0; letter-spacing: -.025em; --text:#20201f; --muted:#64615e; --peach:#a64b32; color:var(--text); }
+.at-proof #proof, .at-owner #owner { opacity:1; transform:none; }
+.proof-copy { position:absolute; left:150px; top:320px; width:780px; }
+.eyebrow { font-size:24px; font-weight:550; letter-spacing:.01em; color:#6b6660; }
+#proof h2, #owner h2 { font-size:82px; line-height:1.07; font-weight:620; margin:28px 0; letter-spacing:-.045em; }
+#proof p, #owner p { font-size:34px; line-height:1.5; color:#64615e; font-weight:450; margin:28px 0; }
+.proof-paper { color:#20201f; position:absolute; left:1060px; top:230px; width:620px; padding:48px; box-sizing:border-box; background:white; border:1px solid #e4ded5; border-radius:22px; box-shadow:0 20px 60px rgba(55,40,20,.05); }
+.paper-brand { font-size:33px; font-weight:600; letter-spacing:-.025em; }
+.paper-date { margin-top:12px; color:#6b6660; font-size:23px; font-weight:450; }
+.paper-price { margin:36px 0 14px; font-size:92px; font-weight:650; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
+.paper-includes { font-size:24px; color:#64615e; font-weight:450; line-height:1.5; max-width:480px; }
+.proof-status { margin-top:36px; padding-top:28px; border-top:1px solid #e8e3dc; font-size:28px; font-weight:600; color:#6b6660; }
+.proof-status.valid { color:#247449; }.proof-status.invalid { color:#a04432; }
+#tamper { margin:24px 0 0; padding:0; border:0; background:none; color:#a64b32; font:500 22px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif; cursor:pointer; pointer-events:auto; text-align:left; }
+#tamper:focus-visible { outline:2px solid #a64b32; outline-offset:8px; }
+.receipt-check { margin-top:22px; font-size:19px; font-weight:450; line-height:1.4; color:#6b6660; }
+.proof-disclosure { position:absolute; left:150px; bottom:76px; font-size:21px; color:#6b6660; font-weight:450; letter-spacing:0; }
+#owner img { position:absolute; left:150px; top:200px; width:740px; height:680px; border-radius:18px; object-fit:cover; }
+.owner-copy { position:absolute; left:1060px; top:250px; width:700px; }
+#owner h2 { font-size:94px; }
+#owner small { font-size:21px; color:#6b6660; font-weight:450; letter-spacing:0; }
+.at-proof .demo-caption, .at-owner .demo-caption { opacity:0; }
+#notes { max-height:170px; overflow:auto; }
+html.dark-theme #proof, html.dark-theme #owner { --text:#ecebf4; color:var(--text); }
+html.dark-theme #proof p, html.dark-theme #owner p,
+html.dark-theme .eyebrow, html.dark-theme #owner small,
+html.dark-theme .proof-disclosure { color:#aaa69f; }
+@media print {
+ html, body { overflow:visible!important; background:#f2f2f7!important; }
+}
+
+
+/* Show the physical action before the wallet opens. */
+.phone .btn.side { width:7px; right:-5px; transform-origin:right center; }
+.fwd.at-wallet .phone .btn.side { animation:side-press 1.15s 1s both; }
+@keyframes side-press {
+  0%, 12%, 38%, 58%, 90%, 100% { transform:none; }
+  20%, 30%, 68%, 80% { transform:translateX(-3px) scaleX(.65); }
+}
+.phone .btn.side::after { inset:-4px -5px; filter:none; background:rgba(217,119,87,.25); box-shadow:0 0 0 2px #d97757; }
+.fwd.at-wallet .phone .btn.side::after { animation:press-highlight 1.15s 1s both; }
+@keyframes press-highlight { 0%,12%,38%,58%,90%,100%{opacity:0} 20%,30%,68%,80%{opacity:1} }
+.side-press-cue { position:absolute; left:470px; top:275px; width:250px; color:#5a5967; font-size:28px; font-weight:500; line-height:1.3; opacity:0; transform:translateX(8px); }
+.side-press-cue::before { content:""; position:absolute; left:-47px; top:27px; width:32px; height:2px; background:#b4532f; }
+.fwd.at-wallet .side-press-cue { animation:side-cue 3.15s .15s both; }
+@keyframes side-cue { 0%,100%{opacity:0;transform:translateX(8px)} 15%,82%{opacity:1;transform:none} }
+.fwd.at-wallet .hint { animation:none; }
+.fwd.at-wallet .ls { transition-delay:2.65s; }
+.fwd.at-wallet .wl { transition-delay:2.7s; }
+.fwd.at-wallet .card.b0 { transition-delay:2.8s; }
+.fwd.at-wallet .card.b1 { transition-delay:2.9s; }
+.fwd.at-wallet .card.agent { transition-delay:3s; }
+html.dark-theme .side-press-cue { color:#aaa69f; }
+/* Let the offer and the verification result do the explaining. */
+#proof .proof-copy, #proof .proof-disclosure, #proof .receipt-check { display:none; }
+#proof .proof-paper { left:590px; top:170px; width:740px; padding:56px; box-shadow:none; border:0; border-radius:0; background:transparent; }
+#proof .paper-brand { font-size:42px; }
+#proof .paper-date { font-size:26px; }
+#proof .paper-price { font-size:144px; margin:52px 0 24px; }
+#proof .paper-includes { font-size:28px; max-width:640px; }
+#proof .proof-status { margin-top:44px; padding-top:30px; font-size:34px; }
+#proof #tamper { font-size:23px; margin-top:28px; }
+html.dark-theme #proof .proof-paper { color:#ecebf4; }
+@media (prefers-reduced-motion:reduce) {
+ .fwd.at-wallet .phone .btn.side { animation:none; }
+ .fwd.at-wallet .side-press-cue { animation:none; opacity:1;transform:none; }
+ .fwd.at-wallet .phone .btn.side::after { animation:none;opacity:1; }
+}
+
+
+/* Match the current wallet design fetched at origin/fix/conversation-state f47e0f5. */
+.at-swipe .activity { overflow:hidden; -webkit-mask-image:none; mask-image:none; }
+.at-swipe .steps { display:none; }
+.at-swipe .deck { flex:1; min-height:0; }
+.at-swipe .deck-stack { flex:1; min-height:230px; max-height:440px; height:auto; }
+.deck-note { flex:none; margin:0 4px; color:var(--muted); font-size:13px; line-height:1.35; font-weight:400; text-align:center; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; letter-spacing:0; }
+.swipe-price .over-budget { color:var(--muted); font-size:11px; font-weight:400; letter-spacing:.01em; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="swiss" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#ff1f1f"/><path d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z" fill="#fff"/></symbol>
+    <symbol id="generic" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3a3a3f"/><path d="M16 7l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10v-5z" fill="none" stroke="#fff" stroke-width="2"/></symbol>
+    <symbol id="mshield" viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.4 12.2l2.5 2.5 4.8-5.2" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="stage" aria-label="Tuttie presentation">
+  <div id="glow"></div>
+  <div id="shadow"></div>
+
+  <div id="persp"><div id="cam"><div id="float"><div class="phone" aria-label="Illustrated wallet on an iPhone">
+    <div class="back"></div>
+    <div class="frame"><div class="bezel"><div class="screen">
+      <div class="island"></div>
+      <div class="sbar"><span>1:07</span><b><i style="height:5px"></i><i style="height:8px"></i><i style="height:11px"></i><em></em></b></div>
+
+      <div class="ls">
+        <div class="wp"></div>
+        <div class="date">Basel · after midnight</div>
+        <div class="time">1:07</div>
+        <div class="bt l"><svg viewBox="0 0 24 24"><path d="M8 3h8l-1 6h-6zM9 9h6v11a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></svg></div>
+        <div class="bt r"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+      </div>
+      <div class="hint" aria-hidden="true"><span></span><i></i></div>
+
+      <div class="wl">
+        <div class="whead"><h1>Wallet</h1></div>
+        <div class="card bank b0" aria-label="ZKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+          <span class="bank-brand zkb-brand" aria-hidden="true"><span class="swiss-mark"><i></i><i></i></span><span><b>ZKB</b><small>Zürcher Kantonalbank</small></span></span></div>
+        <div class="card bank b1" aria-label="UBS card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+          <span class="bank-brand ubs-brand" aria-hidden="true"><svg class="ubs-keys" viewBox="0 0 42 30"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="15" r="4.5"/><path d="M11.5 15h24l4-4M31 15l4 4M26 15v4"/><circle cx="13" cy="6" r="3.5"/><path d="M16 8l18 13 5-1M31 19l-1 4"/>
+            <circle cx="13" cy="24" r="3.5"/><path d="M16 22L34 9l5 1M31 11l-1-4"/></g></svg><b>UBS</b></span></div>
+        <div class="card agent">
+          <canvas id="face"></canvas>
+          <div class="edge"></div><div class="grabber"></div>
+          <div class="activity">
+            <ol class="steps"><li id="lnCtx"><i class="dot"></i><span></span></li><li id="lnTool"><i class="dot"></i><span></span></li></ol>
+            <section class="deck">
+              <div class="deck-stack">
+                <article class="swipe-card c-back">
+                  <div class="swipe-photo"><img src="hotels/ch.basel.gaestehaus-am-rhein/1.jpg" alt=""><div class="hotel-bars"><i></i><i class="on"></i></div></div>
+                  <div class="swipe-top"><span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i></span><span class="rating">★ 4.8</span></div>
+                  <span class="stamp like">Like</span><span class="stamp pass">Pass</span>
+                  <div class="swipe-name">Gästehaus am Rhein</div>
+                  <div class="swipe-foot"><ul class="feature-icons" data-f="dog quiet late small station" data-ok="1 1 1 1 0"></ul>
+                    <div class="swipe-price"><s>CHF 135</s><b>CHF 128</b></div></div>
+                </article>
+                <article class="swipe-card c-top">
+                  <div class="swipe-photo"><img src="hotels/ch.basel.alpina-grand/1.jpg" alt=""><div class="hotel-bars"><i class="on"></i><i></i></div></div>
+                  <div class="swipe-top"><span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i><i><svg><use href="#generic"/></svg><svg class="mini-shield blue"><use href="#mshield"/></svg></i></span><span class="rating">★ 4.2</span></div>
+                  <span class="stamp like">Like</span><span class="stamp pass">Pass</span>
+                  <div class="swipe-name">Alpina Grand Basel</div>
+                  <div class="swipe-foot"><ul class="feature-icons" data-f="dog quiet late station cancel" data-ok="1 0 1 1 1"></ul>
+                    <div class="swipe-price"><b>CHF 270</b><small class="over-budget">over your budget</small></div></div>
+                </article>
+              </div>
+              <div class="deck-count" id="deckCount">1 of 2</div>
+              <p class="deck-note">Anna’s place fits: quiet, dogs welcome, late arrival.</p>
+            </section>
+            <div class="hotel agreed">
+              <span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i></span>
+              <span class="hotel-name">Gästehaus am Rhein<small>agreed</small></span>
+              <span class="price"><s>CHF 135</s> <b>CHF 128</b></span>
+            </div>
+            <div class="booking">
+              <div class="booking-top"><span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i></span>
+                <span class="booking-hotel">Gästehaus am Rhein<small>14 Nov · double room</small></span><span class="booking-total">CHF 128</span></div>
+              <div class="booking-id">Booking <b>BK-2E726C</b></div>
+              <div class="seal-list checks">
+                <div class="seal-head">Checked by Tuttie</div>
+                <div class="seal-row"><svg class="check-ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg><span class="seal-text"><b>Verified by the demo registry</b></span></div>
+                <div class="seal-row"><svg class="check-ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg><span class="seal-text"><b>The hotel signed the agreed price</b></span></div>
+                <div class="seal-row"><svg class="check-ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg><span class="seal-text"><b>The hotel signed the booking</b></span></div>
+                <div class="seal-row"><svg class="check-ok" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.4l2.7 2.7 5.7-6"/></svg><span class="seal-text"><b>Approved by you</b></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="controls"><div class="cstatus" id="cstatus">Listening…</div>
+            <span class="kbd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9"/></svg></span></div>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="sheet-hotel"><span class="marks"><i><svg><use href="#generic"/></svg><svg class="mini-shield gold"><use href="#mshield"/></svg></i></span>Gästehaus am Rhein</div>
+        <div class="sheet-amount">CHF 128</div>
+        <div class="sheet-summary">14 Nov · double room · late arrival · dog free</div>
+        <div class="seal-list">
+          <div class="seal-head">Signed and verified by</div>
+          <div class="seal-row"><i class="seal-mark"><svg><use href="#generic"/></svg></i><span class="seal-text"><b>Demo registry</b><small>Prototype identity issuer</small></span>
+            <svg class="seal-badge gold" viewBox="0 0 24 24"><path d="M12 2.2l7.6 2.9v6.1c0 4.7-3.2 8.9-7.6 10.6-4.4-1.7-7.6-5.9-7.6-10.6V5.1z"/><path d="M8.2 12.2l2.6 2.6 5-5.4" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+        <div class="sheet-buttons"><span class="decline">Decline</span><span class="approve">Approve</span></div>
+        <div class="faceid"><div class="faceid-scan"><i></i><i></i><i></i><i></i></div>
+          <svg class="faceid-ok" viewBox="0 0 52 52"><circle cx="26" cy="26" r="25"/><path d="M15 27l7 7 15-16"/></svg><span id="fidText">Confirming</span></div>
+      </div>
+
+      <div class="homebar"></div>
+      <div class="glare"></div>
+    </div></div></div>
+    <div class="btn act"></div><div class="btn v1"></div><div class="btn v2"></div><div class="btn side"></div><div class="side-press-cue" aria-hidden="true">Double-press<br>the side button</div>
+  </div></div></div></div>
+
+  <!-- One clear point per scene. -->
+  <div class="words" id="opening">Basel. 1 a.m.<br><span class="dim">Dog in tow.</span></div>
+  <div class="words" id="count"><span>Too many</span><small>tabs. Still no room.</small></div>
+  <div class="words" id="intro">Meet Tuttie.<br><span class="intro-sub">Your agent, in your wallet.</span></div>
+  <div class="words" id="ask">Quiet. Dog-friendly.<br>After midnight.<br>Under CHF 160.</div>
+  <div class="words" id="knows">Hotels answer.<br><span class="dim">On their terms.</span></div>
+  <div class="words" id="see">Hotels answer.</div>
+  <div class="words" id="claim"><span class="b a">One hotel<br>fails the check.</span><span class="b dim">Not contacted.</span></div>
+  <div class="words" id="deal"><small>Anna’s guesthouse.</small><p class="story-fit">Quiet. Dogs stay free.<br>Late arrival by door code.</p><p class="story-price">CHF 135 → <span id="dealN">128</span></p></div>
+  <div class="arrows l"><svg viewBox="0 0 140 40"><path d="M136 20H8M24 6L8 20l16 14"/></svg></div>
+  <div class="arrows r"><svg viewBox="0 0 140 40"><path d="M4 20h128M116 6l16 14-16 14"/></svg></div>
+  <div class="words" id="onetap">I approve<br><span class="dim">the agreed amount.</span></div>
+  <div class="words" id="live"><a href="https://web4.mendes.dev/wallet/" target="_blank" rel="noopener">Open the<br>live wallet ↗</a><small>Demo hotels.<br>Real signature checks.</small></div>
+  <div class="words" id="try"><b>Let the business<br>speak for itself.</b><span class="qr"><svg viewBox="-1 -1 31 31" shape-rendering="crispEdges"><path fill="#000" d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM10 0h1v1h-1zM15 0h1v1h-1zM16 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM22 0h1v1h-1zM23 0h1v1h-1zM24 0h1v1h-1zM25 0h1v1h-1zM26 0h1v1h-1zM27 0h1v1h-1zM28 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM12 1h1v1h-1zM17 1h1v1h-1zM20 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM10 2h1v1h-1zM11 2h1v1h-1zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM22 2h1v1h-1zM24 2h1v1h-1zM25 2h1v1h-1zM26 2h1v1h-1zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM12 3h1v1h-1zM16 3h1v1h-1zM17 3h1v1h-1zM18 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM25 3h1v1h-1zM26 3h1v1h-1zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM8 4h1v1h-1zM11 4h1v1h-1zM13 4h1v1h-1zM14 4h1v1h-1zM15 4h1v1h-1zM17 4h1v1h-1zM18 4h1v1h-1zM19 4h1v1h-1zM20 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM25 4h1v1h-1zM26 4h1v1h-1zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM9 5h1v1h-1zM12 5h1v1h-1zM13 5h1v1h-1zM14 5h1v1h-1zM15 5h1v1h-1zM16 5h1v1h-1zM17 5h1v1h-1zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM23 6h1v1h-1zM24 6h1v1h-1zM25 6h1v1h-1zM26 6h1v1h-1zM27 6h1v1h-1zM28 6h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM13 7h1v1h-1zM15 7h1v1h-1zM20 7h1v1h-1zM0 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM9 8h1v1h-1zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM15 8h1v1h-1zM17 8h1v1h-1zM22 8h1v1h-1zM23 8h1v1h-1zM24 8h1v1h-1zM25 8h1v1h-1zM26 8h1v1h-1zM0 9h1v1h-1zM2 9h1v1h-1zM4 9h1v1h-1zM9 9h1v1h-1zM11 9h1v1h-1zM15 9h1v1h-1zM16 9h1v1h-1zM19 9h1v1h-1zM20 9h1v1h-1zM21 9h1v1h-1zM22 9h1v1h-1zM24 9h1v1h-1zM28 9h1v1h-1zM0 10h1v1h-1zM1 10h1v1h-1zM3 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM10 10h1v1h-1zM12 10h1v1h-1zM17 10h1v1h-1zM22 10h1v1h-1zM24 10h1v1h-1zM7 11h1v1h-1zM10 11h1v1h-1zM11 11h1v1h-1zM14 11h1v1h-1zM16 11h1v1h-1zM19 11h1v1h-1zM20 11h1v1h-1zM21 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM24 11h1v1h-1zM25 11h1v1h-1zM27 11h1v1h-1zM0 12h1v1h-1zM1 12h1v1h-1zM3 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM8 12h1v1h-1zM9 12h1v1h-1zM16 12h1v1h-1zM17 12h1v1h-1zM19 12h1v1h-1zM23 12h1v1h-1zM25 12h1v1h-1zM26 12h1v1h-1zM2 13h1v1h-1zM3 13h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM10 13h1v1h-1zM11 13h1v1h-1zM13 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM18 13h1v1h-1zM19 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM24 13h1v1h-1zM28 13h1v1h-1zM2 14h1v1h-1zM4 14h1v1h-1zM6 14h1v1h-1zM7 14h1v1h-1zM8 14h1v1h-1zM13 14h1v1h-1zM14 14h1v1h-1zM15 14h1v1h-1zM16 14h1v1h-1zM18 14h1v1h-1zM20 14h1v1h-1zM22 14h1v1h-1zM25 14h1v1h-1zM26 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM10 15h1v1h-1zM13 15h1v1h-1zM15 15h1v1h-1zM19 15h1v1h-1zM24 15h1v1h-1zM27 15h1v1h-1zM2 16h1v1h-1zM3 16h1v1h-1zM4 16h1v1h-1zM5 16h1v1h-1zM6 16h1v1h-1zM9 16h1v1h-1zM14 16h1v1h-1zM15 16h1v1h-1zM17 16h1v1h-1zM20 16h1v1h-1zM25 16h1v1h-1zM26 16h1v1h-1zM0 17h1v1h-1zM1 17h1v1h-1zM2 17h1v1h-1zM5 17h1v1h-1zM7 17h1v1h-1zM10 17h1v1h-1zM12 17h1v1h-1zM15 17h1v1h-1zM16 17h1v1h-1zM17 17h1v1h-1zM18 17h1v1h-1zM19 17h1v1h-1zM20 17h1v1h-1zM21 17h1v1h-1zM22 17h1v1h-1zM23 17h1v1h-1zM24 17h1v1h-1zM26 17h1v1h-1zM28 17h1v1h-1zM0 18h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM7 18h1v1h-1zM8 18h1v1h-1zM11 18h1v1h-1zM20 18h1v1h-1zM23 18h1v1h-1zM24 18h1v1h-1zM26 18h1v1h-1zM0 19h1v1h-1zM2 19h1v1h-1zM3 19h1v1h-1zM8 19h1v1h-1zM11 19h1v1h-1zM14 19h1v1h-1zM16 19h1v1h-1zM18 19h1v1h-1zM20 19h1v1h-1zM23 19h1v1h-1zM24 19h1v1h-1zM27 19h1v1h-1zM0 20h1v1h-1zM2 20h1v1h-1zM6 20h1v1h-1zM7 20h1v1h-1zM8 20h1v1h-1zM10 20h1v1h-1zM11 20h1v1h-1zM12 20h1v1h-1zM17 20h1v1h-1zM20 20h1v1h-1zM21 20h1v1h-1zM22 20h1v1h-1zM23 20h1v1h-1zM24 20h1v1h-1zM26 20h1v1h-1zM27 20h1v1h-1zM28 20h1v1h-1zM8 21h1v1h-1zM10 21h1v1h-1zM12 21h1v1h-1zM13 21h1v1h-1zM14 21h1v1h-1zM15 21h1v1h-1zM17 21h1v1h-1zM18 21h1v1h-1zM20 21h1v1h-1zM24 21h1v1h-1zM25 21h1v1h-1zM26 21h1v1h-1zM27 21h1v1h-1zM28 21h1v1h-1zM0 22h1v1h-1zM1 22h1v1h-1zM2 22h1v1h-1zM3 22h1v1h-1zM4 22h1v1h-1zM5 22h1v1h-1zM6 22h1v1h-1zM11 22h1v1h-1zM13 22h1v1h-1zM14 22h1v1h-1zM15 22h1v1h-1zM16 22h1v1h-1zM19 22h1v1h-1zM20 22h1v1h-1zM22 22h1v1h-1zM24 22h1v1h-1zM25 22h1v1h-1zM26 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h1v1h-1zM9 23h1v1h-1zM11 23h1v1h-1zM13 23h1v1h-1zM16 23h1v1h-1zM18 23h1v1h-1zM19 23h1v1h-1zM20 23h1v1h-1zM24 23h1v1h-1zM28 23h1v1h-1zM0 24h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM4 24h1v1h-1zM6 24h1v1h-1zM8 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM14 24h1v1h-1zM17 24h1v1h-1zM20 24h1v1h-1zM21 24h1v1h-1zM22 24h1v1h-1zM23 24h1v1h-1zM24 24h1v1h-1zM26 24h1v1h-1zM28 24h1v1h-1zM0 25h1v1h-1zM2 25h1v1h-1zM3 25h1v1h-1zM4 25h1v1h-1zM6 25h1v1h-1zM8 25h1v1h-1zM9 25h1v1h-1zM11 25h1v1h-1zM12 25h1v1h-1zM18 25h1v1h-1zM25 25h1v1h-1zM26 25h1v1h-1zM0 26h1v1h-1zM2 26h1v1h-1zM3 26h1v1h-1zM4 26h1v1h-1zM6 26h1v1h-1zM8 26h1v1h-1zM9 26h1v1h-1zM10 26h1v1h-1zM13 26h1v1h-1zM15 26h1v1h-1zM19 26h1v1h-1zM21 26h1v1h-1zM22 26h1v1h-1zM23 26h1v1h-1zM24 26h1v1h-1zM25 26h1v1h-1zM26 26h1v1h-1zM27 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM9 27h1v1h-1zM12 27h1v1h-1zM15 27h1v1h-1zM16 27h1v1h-1zM20 27h1v1h-1zM22 27h1v1h-1zM23 27h1v1h-1zM25 27h1v1h-1zM27 27h1v1h-1zM0 28h1v1h-1zM1 28h1v1h-1zM2 28h1v1h-1zM3 28h1v1h-1zM4 28h1v1h-1zM5 28h1v1h-1zM6 28h1v1h-1zM8 28h1v1h-1zM9 28h1v1h-1zM10 28h1v1h-1zM12 28h1v1h-1zM15 28h1v1h-1zM16 28h1v1h-1zM17 28h1v1h-1zM19 28h1v1h-1zM21 28h1v1h-1zM22 28h1v1h-1zM23 28h1v1h-1zM24 28h1v1h-1zM25 28h1v1h-1zM26 28h1v1h-1z"/></svg></span><small>Tuttie · explore the prototype</small></div>
+
+
+  <div id="hud"><span id="clock">0:00</span> / 3:00<i></i></div>
+  <div id="notes"></div>
+  <div class="demo-caption">Prototype walkthrough · demo data</div>
+</div>
+
+<script>
+// ---------- Tuttie's eyes: canvas port of pycozmo's procedural face (same drawing as the wallet's lib/face.js:
+// black glossy eyes with a square catchlight on the white card; inlined so the deck also opens from file://) ----------
+// Port of pycozmo/procedural_face.py and expressions (https://github.com/zayfod/pycozmo, MIT License,
+// Copyright (c) 2019-2020), based on "Expressive Eyes" by Catherine Chambers.
+const TuttieFace = (() => {
+  const EYE_FIELDS = { center_x: 0, center_y: 1, scale_x: 2, scale_y: 3, angle: 4,
+    lower_inner_radius_x: 5, lower_inner_radius_y: 6, lower_outer_radius_x: 7, lower_outer_radius_y: 8,
+    upper_inner_radius_x: 9, upper_inner_radius_y: 10, upper_outer_radius_x: 11, upper_outer_radius_y: 12 };
+  const LID_FIELDS = { y: 0, angle: 1, bend: 2 };
+  const EYE_OFFSETS = [5, 24];
+  const W = 128, H = 64, EYE_W = 32, EYE_H = 44, X_FACTOR = .55, Y_FACTOR = .25;
+  // Small, calm gaze shifts while awake (negative y looks upward), as in the wallet.
+  const IDLE_LOOKS = [[-.34, -.05], [.34, -.05], [-.22, -.18], [.22, -.18], [0, -.24], [0, 0]];
+  const CORNER = W / 20 + H / 10, LID_HALF_W = 1.2 * EYE_W, LID_BEND_HALF_W = 1.2 * EYE_W / 2;
+  const defaultParams = () => { const eye = [0, 0, 1, 1, 0, .72, .72, .72, .72, .72, .72, .72, .72, 0, 0, 0, 0, 0, 0]; return [0, 0, 1, 1, 0, ...eye, ...eye]; };
+  const both = (l, r) => ({ eyes: [l, r] });
+  const EXPRESSIONS = {
+    neutral: both({ scale_x: .86, scale_y: .86 }, { scale_x: .86, scale_y: .86 }),
+    happiness: both({ upper_outer_radius_x: 1, upper_inner_radius_x: 1, lower: { y: .4, bend: .4 } },
+                    { upper_outer_radius_x: 1, upper_inner_radius_x: 1, lower: { y: .4, bend: .4 } }),
+    surprise: both({ scale_x: 1.25, scale_y: 1.25 }, { scale_x: 1.25, scale_y: 1.25 }),
+    excitement: both({ lower: { y: .3, bend: .2 } }, { lower: { y: .3, bend: .2 } }),
+    suspicion: both({ upper: { angle: -10, y: .4 }, lower: { y: .5 } }, { upper: { angle: 10, y: .4 }, lower: { y: .5 } }),
+    asleep: both({ center_y: 50, upper: { y: .45 }, lower: { y: .5 } }, { center_y: 50, upper: { y: .45 }, lower: { y: .5 } }),
+  };
+  function expressionParams(name) {
+    const p = defaultParams();
+    EXPRESSIONS[name].eyes.forEach((eye, i) => {
+      const base = EYE_OFFSETS[i];
+      for (const [k, v] of Object.entries(eye)) {
+        if (k === "upper" || k === "lower") { const lb = base + (k === "upper" ? 13 : 16); for (const [f, x] of Object.entries(v)) p[lb + LID_FIELDS[f]] = x; }
+        else p[base + EYE_FIELDS[k]] = v;
+      }
+    });
+    return p;
+  }
+  const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+  const easeInOut = t => (t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  const rad = d => d * Math.PI / 180;
+  function eyePath(ctx, p, e) {
+    const r = i => CORNER * p[e + i];
+    const x1 = -EYE_W / 2, y1 = -EYE_H / 2, x2 = EYE_W / 2, y2 = EYE_H / 2;
+    const [lirx, liry, lorx, lory, uirx, uiry, uorx, uory] = [5, 6, 7, 8, 9, 10, 11, 12].map(r);
+    ctx.beginPath(); ctx.moveTo(x1 + uorx, y1); ctx.lineTo(x2 - uirx, y1);
+    ctx.ellipse(x2 - uirx, y1 + uiry, uirx, uiry, 0, -Math.PI / 2, 0); ctx.lineTo(x2, y2 - liry);
+    ctx.ellipse(x2 - lirx, y2 - liry, lirx, liry, 0, 0, Math.PI / 2); ctx.lineTo(x1 + lorx, y2);
+    ctx.ellipse(x1 + lorx, y2 - lory, lorx, lory, 0, Math.PI / 2, Math.PI); ctx.lineTo(x1, y1 + uory);
+    ctx.ellipse(x1 + uorx, y1 + uory, uorx, uory, 0, Math.PI, Math.PI * 1.5); ctx.closePath();
+  }
+  // A crisp square catchlight, painted before the lids are cut so it blinks and hides with them.
+  function drawCatchlight(ctx) {
+    const x = -EYE_W * .15, y = -EYE_H * .17, size = EYE_W * .334;
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.roundRect(x - size / 2, y - size / 2, size, size, size * .22); ctx.fill();
+  }
+  function cutLid(ctx, p, lb, yOff, aOff) {
+    const y = p[lb], angle = p[lb + 1], bend = p[lb + 2];
+    const lidH = EYE_H * y, bendH = EYE_H * (1 - y) * bend;
+    ctx.save(); ctx.translate(0, yOff); ctx.rotate(-rad(angle + aOff)); ctx.beginPath();
+    ctx.rect(-LID_HALF_W, -1 - EYE_H / 2, 2 * LID_HALF_W, EYE_H / 2 + lidH);
+    ctx.moveTo(LID_BEND_HALF_W, -1 + lidH); ctx.ellipse(0, -1 + lidH, LID_BEND_HALF_W, Math.max(bendH, 0), 0, 0, Math.PI);
+    ctx.fill(); ctx.restore();
+  }
+  return class {
+    constructor(canvas, { color = "#000", glow = "transparent" } = {}) {
+      Object.assign(this, { canvas, ctx: canvas.getContext("2d"), layer: document.createElement("canvas"), color, glow });
+      this.base = expressionParams("asleep"); this.current = this.base.slice();
+      this.from = this.current; this.to = this.current; this.start = 0; this.duration = 1;
+      this.gaze = [0, 0]; this.nextSaccade = 0; this.nextBlink = performance.now() + 2500; this.blinking = 0;
+      this.asleep = true; this.hold = false;  // hold: no idle saccades while the deck steers the gaze
+      this.resize(); this.raf = requestAnimationFrame(t => this.frame(t));
+    }
+    set(name, ms = 450) { this.base = expressionParams(name); this.animateTo(this.withGaze(this.base), ms); }
+    sleep(ms = 600) { this.asleep = true; this.gaze = [0, 0]; this.set("asleep", ms); }
+    wake(name = "neutral", ms = 350) { this.asleep = false; this.nextSaccade = performance.now() + 1200; this.set(name, ms); }
+    lookAt(x, y, ms = 260) { this.gaze = [x, y]; this.animateTo(this.withGaze(this.base), ms); }
+    blink() { this.blinking = performance.now(); this.nextBlink = this.blinking + 2200 + Math.random() * 3800; }
+    withGaze(p0) { const p = p0.slice(); p[0] += this.gaze[0] * 10; p[1] += this.gaze[1] * 40; return p; }
+    animateTo(p, ms) { this.from = this.current.slice(); this.to = p; this.start = performance.now(); this.duration = Math.max(1, ms); }
+    resize(scale = 1) {
+      const ratio = Math.min(4, (window.devicePixelRatio || 1) * scale * 1.6);
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+      for (const c of [this.canvas, this.layer]) { c.width = Math.max(1, w * ratio); c.height = Math.max(1, h * ratio); }
+    }
+    frame(now) {
+      // A frame can share its timestamp with the transition start; never divide 0 by 0.
+      const t = this.duration <= 0 ? 1 : Math.max(0, Math.min(1, (now - this.start) / this.duration));
+      this.current = lerp(this.from, this.to, easeInOut(t));
+      if (!this.asleep && !this.hold && t >= 1 && now > this.nextSaccade) {
+        this.nextSaccade = now + 1800 + Math.random() * 3200;
+        const [x, y] = IDLE_LOOKS[Math.floor(Math.random() * IDLE_LOOKS.length)];
+        this.lookAt(x, y, 500);
+      }
+      if (!this.asleep && now > this.nextBlink) this.blink();
+      this.draw(now); this.raf = requestAnimationFrame(n => this.frame(n));
+    }
+    draw(now) {
+      const p = this.current.slice();
+      if (this.asleep) p[1] += Math.sin(now / 900) * 3;
+      const blink = this.blinking ? Math.min(1, (now - this.blinking) / 180) : 1;
+      const closed = 1 - Math.abs(Math.sin(Math.PI * blink));
+      const { ctx, canvas, layer } = this, lctx = layer.getContext("2d");
+      const unit = Math.min(canvas.width / W, canvas.height / H);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      EYE_OFFSETS.forEach((e, i) => {
+        lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.clearRect(0, 0, layer.width, layer.height);
+        lctx.translate(canvas.width / 2 + p[0] * X_FACTOR * unit, canvas.height / 2 + p[1] * Y_FACTOR * unit);
+        lctx.scale(p[2] * unit, p[3] * unit); lctx.rotate(-rad(p[4]));
+        lctx.translate(p[e] * X_FACTOR + (i === 0 ? -W / 5 : W / 5), p[e + 1] * Y_FACTOR);
+        lctx.scale(p[e + 2], Math.max(p[e + 3] * Math.max(closed, .06), .001)); lctx.rotate(-rad(p[e + 4]));
+        lctx.fillStyle = this.color; eyePath(lctx, p, e); lctx.fill();
+        if (!this.asleep) { lctx.globalCompositeOperation = "source-atop"; drawCatchlight(lctx); }  // closed eyes: no catchlight
+        lctx.globalCompositeOperation = "destination-out";
+        cutLid(lctx, p, e + 13, -EYE_H / 2, 0); cutLid(lctx, p, e + 16, EYE_H / 2 + 1, 180);
+        lctx.globalCompositeOperation = "source-over";
+        ctx.save(); ctx.shadowColor = this.glow; ctx.shadowBlur = 3 * unit; ctx.drawImage(layer, 0, 0); ctx.restore();
+      });
+    }
+  };
+})();
+
+// ---------- Story timing: 2:30 including the offline verification demo, with 30 seconds of buffer ----------
+const SHOTS = [
+  [
+    "reveal",
+    12,
+    "Imagine stepping off the train in Basel after midnight. Your dog is with you. You need a quiet room, and somewhere that will still let you in."
+  ],
+  [
+    "wallet",
+    12,
+    "This is Tuttie, your agent in your wallet. You tell her what you need. She asks the businesses themselves."
+  ],
+  [
+    "ask",
+    14,
+    "For the fourteenth of November: quiet, dogs welcome, arrival at one in the morning. Under a hundred and sixty francs. The budget stays with Tuttie."
+  ],
+  [
+    "context",
+    14,
+    "The hotels answer with their own offers. They set the rooms, prices and rules. Tuttie compares those offers against what I asked for."
+  ],
+  [
+    "negotiate",
+    18,
+    "Anna runs a seven-room guesthouse. It is quiet, dogs stay free, and a door code solves the late arrival. Her offer is 135 francs. Her agent agrees on 128, within her limits."
+  ],
+  [
+    "swipe",
+    16,
+    "I still choose. A hotel that misses what matters to me: pass. Anna's guesthouse fits: keep it. The agent has done the legwork; this decision is mine."
+  ],
+  [
+    "approve",
+    14,
+    "The approval names the room, the date, the extras and the amount. I approve 128 francs. These are demo hotels. The signed booking workflow runs in the prototype."
+  ],
+  [
+    "try",
+    14,
+    "This is our vision for the next five years: a business speaks through its own agent. Its owner sets the rules. The customer chooses."
+  ]
+];
+const TARGET = SHOTS.reduce((sum, shot) => sum + shot[1], 0); // 114 seconds; optional rehearsed live handoff adds up to 30 seconds
+const STEPS = SHOTS.map(s => s[0]);
+const TOTAL = 180;
+const SPEED = Number(new URLSearchParams(location.search).get("speed")) || 1;   // ?speed=10 rehearses the auto run faster
+const $ = s => document.querySelector(s);
+const stage = $("#stage");
+const face = new TuttieFace($("#face"));
+let cur = -1, timers = [];
+const startedAt = {};
+const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+const clamp = t => Math.max(0, Math.min(1, t));
+const ease = t => 1 - Math.pow(1 - clamp(t), 3);
+const since = (name, delay = 0) => (performance.now() - (startedAt[name] ?? Infinity) - delay) / 1000;
+const at = name => STEPS[cur] === name;
+const has = name => STEPS.indexOf(name) >= 0 && STEPS.indexOf(name) <= cur;
+const idx = name => STEPS.indexOf(name);
+
+let requestWord = 0;
+$("#ask").innerHTML = $("#ask").innerHTML.split(/<br\s*\/?>/i)
+  .map(line => line.trim().split(/\s+/).map(word => `<span class="w" style="--i:${requestWord++}">${word}</span>`).join(" "))
+  .join("<br>");
+
+// Feature icons as the wallet draws them (apps/wallet/src/components/FeatureIcon.jsx).
+const ICONS = {
+  dog: "M8 6.5 5 5.2 4 10.5l2.4.9M16 6.5l3-1.3 1 5.3-2.4.9M8 6.5h8l1.6 5v3.3a5.6 5.6 0 0 1-11.2 0v-3.3zM10 11.5h.01M14 11.5h.01M11 15.2h2l-1 1.2z",
+  quiet: "M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z",
+  late: "M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2",
+  station: "M7 4h10a2 2 0 0 1 2 2v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2zM5 11h14M9 15h.01M15 15h.01M8 18l-2 2.5M16 18l2 2.5",
+  cancel: "M5 6h14v13H5zM5 10h14M9 4v4M15 4v4M9.5 14.5l1.8 1.8 3.4-3.6",
+  small: "M4 11l8-6.5 8 6.5M6 9.5V19h12V9.5M12 16.5s-2.6-1.6-2.6-3.2a1.4 1.4 0 0 1 2.6-.7 1.4 1.4 0 0 1 2.6.7c0 1.6-2.6 3.2-2.6 3.2z",
+};
+document.querySelectorAll(".feature-icons").forEach(ul => {
+  const oks = ul.dataset.ok.split(" ");
+  ul.innerHTML = ul.dataset.f.split(" ").map((k, i) => `<li class="${oks[i] === "1" ? "yes" : "no"}"><svg viewBox="0 0 24 24"><path d="${ICONS[k]}"/></svg></li>`).join("");
+});
+
+// ---------- Auto-play: keep the final QR visible; never black out the stage ----------
+let clockStarted = null, clockElapsed = 0;
+let auto = null;   // { t0, timer }
+function autoStart() {
+  autoStop();
+  clockElapsed = 0; clockStarted = performance.now();
+  auto = { t0: clockStarted, timer: 0 };
+  // If rehearsal runs over, return to the QR instead of blanking the screen.
+  auto.deadline = setTimeout(() => { autoStop(); go(STEPS.length - 1); }, TOTAL * 1000 / SPEED);
+  stage.classList.add("auto");
+  go(0); autoNext();
+}
+function autoStop() { if (auto) { clearTimeout(auto.timer); clearTimeout(auto.deadline); } auto = null; stage.classList.remove("auto"); }
+function autoNext() {
+  if (!auto) return;
+  const i = cur + 1; // The 30-second live handoff is part of the rehearsal schedule.
+  if (i >= STEPS.length) return;
+  const wait = SHOTS[cur][1] * 1000 / SPEED;
+  auto.timer = setTimeout(() => { go(i, true); autoNext(); }, wait);
+}
+function tick(now) {
+  const t = clockElapsed + (clockStarted === null ? 0 : (now - clockStarted) / 1000 * SPEED);
+  const s = Math.min(TOTAL, t);
+  $("#clock").textContent = `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  $("#hud i").style.setProperty("--p", `${s / TOTAL * 100}%`);
+  $("#hud").classList.toggle("over", t >= TOTAL);
+}
+function loop(now) { tick(now); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+// ---------- What the phone shows: the wallet's progress lines, the deck, the approval ----------
+function line(el, text, cls) { el.querySelector("span").textContent = text; el.className = text ? cls : "off"; }
+function phone(name, fwd) {
+  const ctx = $("#lnCtx"), tool = $("#lnTool");
+  const after = n => idx(n) >= 0 && cur > idx(n);
+  const CTX = "Free on 14 Nov · travels with a dog · likes quiet rooms";
+  // context line
+  if (cur < idx("context")) line(ctx, "", "");
+  else if (at("context") && fwd) { line(ctx, "Reading your calendar, mail and preferences…", "active"); later(() => line(ctx, CTX, "done latest"), 6200); }
+  else line(ctx, CTX, cur >= idx("web") ? "done" : "done latest");
+  // tool line
+  const T = {
+    context: ["Comparing signed hotel offers", "active"], web: ["Asked demo hotels", "active"], fake: ["3 offers in · checking seals", "active"],
+    negotiate: ["Agreed with Gästehaus am Rhein · CHF 128", "done latest"],
+    swipe: ["2 hotels for you", "done latest"], approve: ["Booked · BK-2E726C", "done latest"],
+  };
+  const last = ["approve", "swipe", "negotiate", "fake", "web", "context"].find(n => has(n));
+  if (!last) line(tool, "", "");
+  else if (fwd && at("web")) { line(tool, "Asked 7 hotels", "active"); }
+  else if (fwd && at("fake")) { line(tool, "Asked 7 hotels", "active"); later(() => line(tool, "3 offers in · checking seals", "active"), 1600); }
+  else if (fwd && at("negotiate")) {
+    line(tool, "Bargaining with Gästehaus am Rhein · CHF 135", "active");
+    later(() => line(tool, "Bargaining with Gästehaus am Rhein · CHF 135 → CHF 131", "active"), 2200);
+    later(() => line(tool, "Bargaining with Gästehaus am Rhein · CHF 135 → CHF 131 → CHF 128", "active"), 4000);
+    later(() => line(tool, "Agreed with Gästehaus am Rhein · CHF 128", "done latest"), 5600);
+  }
+  else if (fwd && at("approve")) { line(tool, "Waiting for your approval", "active"); later(() => line(tool, "Booked · BK-2E726C", "done latest"), 5200); }
+  else line(tool, ...T[last]);
+  if (after("approve") || (at("approve") && !fwd)) stage.classList.add("booked");
+
+  // the status line under the card, as the wallet's statusLine() reads it
+  const STATUS = { context: "Comparing hotel offers…", web: "Asked 7 hotels…", fake: "3 offers in", negotiate: "Bargaining…",
+                   swipe: "Swipe right to like", approve: "Waiting for you", live: "Ready for the live demo" };
+  $("#cstatus").textContent = STATUS[name] || "Listening…";
+
+  // Let the agreed price stand; the phone still shows its bargaining trail.
+  $("#dealN").textContent = "128";
+
+  // swipe: pass on the loud chain hotel, like the guesthouse
+  if (at("swipe") && fwd) {
+    $("#deckCount").textContent = "1 of 2";
+    later(() => stage.classList.add("lean-l"), 1400);
+    later(() => { stage.classList.add("sw1"); $("#deckCount").textContent = "2 of 2"; }, 2600);
+    later(() => stage.classList.add("lean-r"), 5000);
+    later(() => stage.classList.add("sw2"), 6200);
+  } else if (after("swipe")) stage.classList.add("sw1", "sw2");
+  else if (at("swipe")) stage.classList.add("sw1", "sw2");
+
+  // approve: tap, confirming, approved, booked
+  if (at("approve") && fwd) {
+    later(() => stage.classList.add("tapped"), 2600);
+    later(() => { stage.classList.add("scan"); $("#fidText").textContent = "Confirming"; }, 2800);
+    later(() => { stage.classList.add("approved"); $("#fidText").textContent = "Approved"; }, 3900);
+    later(() => stage.classList.add("booked"), 4700);
+  }
+}
+
+// ---------- Steps ----------
+function go(i, fromAuto = false) {
+  i = Math.max(0, Math.min(STEPS.length - 1, i));
+  const fwd = i === cur + 1 || (fromAuto && i > cur);
+  timers.forEach(clearTimeout); timers = [];
+  cur = i;
+  const name = STEPS[i], now = performance.now();
+  STEPS.forEach((n, k) => { if (k > i) delete startedAt[n]; else if (k === i) startedAt[n] = fwd ? now : now - 1e5; else if (!fwd || startedAt[n] === undefined) startedAt[n] = now - 1e5; });
+  const keep = ["notes", "auto"].filter(c => stage.classList.contains(c));
+  stage.className = [...STEPS.slice(0, i + 1).map(n => "has-" + n), "at-" + name, fwd ? "fwd" : "jump", ...keep].join(" ");
+  $("#notes").innerHTML = SHOTS[i][2] ? `<b>${i}</b>${SHOTS[i][2]}` : "";
+  history.replaceState(null, "", "#" + i);
+  phone(name, fwd);
+
+  face.hold = false;
+  if (i < idx("wallet")) face.sleep(1);
+  else if (name === "wallet") { if (fwd) { face.sleep(1); later(() => face.wake("happiness", 600), 3300); later(() => face.set("neutral", 700), 4600); } else face.wake("neutral", 1); }
+  else if (name === "ask") { face.wake("surprise", fwd ? 350 : 1); face.hold = true; face.lookAt(0, -.3); later(() => { face.set("neutral", 500); face.hold = false; }, fwd ? 3200 : 0); }
+  else if (name === "context") { face.wake("neutral", 300); face.hold = false; }
+  else if (name === "web") { face.wake("neutral", 300); face.hold = true; const scan = k => { face.lookAt(Math.cos(k) * 2, Math.sin(k) * .9, 380); later(() => scan(k + 1.3), 520); }; later(() => scan(0), 900); }
+  else if (name === "fake") {
+    face.wake("neutral", 1); face.hold = true;
+    if (fwd) { later(() => face.lookAt(1.8, -1.2, 300), 300); later(() => face.set("suspicion", 250), 1250); later(() => { face.lookAt(0, 0, 500); face.set("neutral", 600); face.hold = false; }, 3600); }
+    else face.hold = false;
+  }
+  else if (name === "negotiate") { face.wake("neutral", 1); face.hold = true; face.lookAt(0, .8, 400); later(() => { face.set("happiness", 500); face.lookAt(0, 0, 400); face.hold = false; }, fwd ? 5600 : 0); }
+  else if (name === "swipe") {
+    face.wake("neutral", 1); face.hold = true;
+    if (fwd) { later(() => face.lookAt(-2, .4, 400), 1400); later(() => face.lookAt(0, .4, 400), 2800); later(() => face.lookAt(2, .4, 400), 5000);
+               later(() => { face.lookAt(0, 0, 400); face.set("happiness", 500); face.hold = false; }, 6400); }
+    else { face.set("happiness", 1); face.hold = false; }
+  }
+  else if (name === "approve") { face.wake("neutral", 1); later(() => face.set("happiness", 400), fwd ? 4700 : 0); }
+  else if (name === "live") face.wake("happiness", 300);
+  else if (name === "try") { if (fwd) { face.sleep(1); later(() => face.wake("happiness", 700), 900); } else face.wake("happiness", 1); }
+}
+
+// ---------- Stage fit, keys, idle cursor ----------
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
+  face.resize(s);
+}
+addEventListener("resize", fit); fit();
+addEventListener("keydown", e => {
+  if (e.target.closest("a, button, input, select")) return;
+  if (e.key.toLowerCase() === "r") { autoStop(); clockStarted = null; clockElapsed = 0; go(0); return; }
+  if (e.key.toLowerCase() === "t") { if (clockStarted === null) clockStarted = performance.now(); else { clockElapsed += (performance.now() - clockStarted) / 1000 * SPEED; clockStarted = null; } return; }
+  if (["ArrowRight", "PageDown", " ", "Enter", "ArrowDown"].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  else if (["ArrowLeft", "PageUp", "Backspace", "ArrowUp"].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+  else if (e.key === "Home") go(0);
+  else if (e.key === "End") go(STEPS.length - 1);
+  else if (e.key === "a" || e.key === "A") auto ? autoStop() : autoStart();
+  else if (e.key === "n" || e.key === "N") stage.classList.toggle("notes");
+  else if (e.key === "f" || e.key === "F") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+addEventListener("click", e => { if (!e.target.closest("a, button, input, select") && !auto) go(cur + 1); });
+addEventListener("contextmenu", e => { e.preventDefault(); if (!auto) go(cur - 1); });
+let idleTimer; addEventListener("mousemove", () => { document.body.classList.remove("idle"); clearTimeout(idleTimer); idleTimer = setTimeout(() => document.body.classList.add("idle"), 2000); });
+
+
+// Optional live handoff: use only after rehearsing the actual app.
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "l") window.open("https://web4.mendes.dev/wallet/", "_blank", "noopener");
+});
+
+const startStep = parseInt(location.hash.slice(1), 10);
+go(Number.isFinite(startStep) ? startStep : 0);
+if (new URLSearchParams(location.search).has("auto")) autoStart();
+</script>
+</body>
+</html>
