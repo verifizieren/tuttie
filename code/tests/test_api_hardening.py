@@ -13,7 +13,7 @@ def test_routes_touching_conversations_run_on_the_event_loop():
     # A plain `def` runs in a worker thread: two first requests of one browser then each created
     # a conversation (seen live: 4 ids for 6 parallel /history calls), and decisions or resets
     # woke the event loop from a foreign thread.
-    handlers = [app_module.conversation, app_module.chat, app_module.reset, app_module.pending_approvals,
+    handlers = [app_module.existing_conversation, app_module.chat, app_module.new_conversation, app_module.reset, app_module.pending_approvals,
                 app_module.decide, app_module.history, app_module.events,
                 voice.voice_token, voice.voice_say, voice.voice_events]
     assert [h.__name__ for h in handlers if not inspect.iscoroutinefunction(h)] == []
@@ -66,8 +66,15 @@ def test_cookieless_requests_cannot_push_out_peoples_chats(monkeypatch):
     assert store.by_session["chatting"] is chatting and store.by_session["waiting"] is waiting
     assert len(store.by_session) == 3
     store.by_session["anonymous-9"].bus.emit("answer", "verified", "Hi")  # now all three are used
-    store.get("someone-new")  # the least recently used idle chat goes; a pending approval stays
-    assert "chatting" not in store.by_session and store.by_session["waiting"] is waiting
+    store.get("someone-new")  # chats with history stay up to twice the limit
+    assert store.by_session["chatting"] is chatting and len(store.by_session) == 4
+    store.by_session["someone-new"].bus.emit("answer", "verified", "Hi")
+    for n in range(3):
+        store.get(f"late-{n}").bus.emit("answer", "verified", "Hi")
+    # above twice the limit the most recently started idle chat goes (a burst of bots before the
+    # people already here); a pending approval stays
+    assert store.by_session["chatting"] is chatting and store.by_session["waiting"] is waiting
+    assert "late-1" not in store.by_session and len(store.by_session) == 6
 
 
 def test_voice_rooms_are_bounded(monkeypatch):
@@ -78,10 +85,18 @@ def test_voice_rooms_are_bounded(monkeypatch):
     monkeypatch.setattr(voice, "API_KEY", "key")
     monkeypatch.setattr(voice, "API_SECRET", "secret-for-tests")
     monkeypatch.setattr(voice, "MAX_VOICE_ROOMS", 3)
+    monkeypatch.setattr(voice, "VOICE_ROOM_GRACE_S", 0)  # every unused room may go at once
     with TestClient(app):  # runs the service (lifespan) once
         # One browser each: a single conversation would get its newest room again.
         rooms = [TestClient(app).post("/voice/token").json()["room"] for _ in range(5)]
         assert list(app.state.voice_rooms) == rooms[-3:]
+        # Rooms in use (followed, or new and not yet joined) may push the total up to twice the
+        # limit; then new rooms wait (429).
+        app.state.voice_rooms.live.update(app.state.voice_rooms)
+        monkeypatch.setattr(voice, "VOICE_ROOM_GRACE_S", 120)
+        more = [TestClient(app).post("/voice/token") for _ in range(4)]
+        assert [r.status_code for r in more] == [200, 200, 200, 429]
+        assert set(rooms[-3:]) <= set(app.state.voice_rooms) and len(app.state.voice_rooms) == 6
 
 
 def test_api_docs_are_off_unless_asked_for(monkeypatch):

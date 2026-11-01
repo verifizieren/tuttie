@@ -40,6 +40,21 @@ def to_input(messages: list[dict]) -> list[dict]:
     return items
 
 
+def final_text(texts: list[str]) -> str:
+    """The answer among a response's text parts, in order: the last non-empty one.
+
+    Models sometimes write a note to themselves first ("... so I'll report that.") as its own
+    part, then the answer; only the answer may reach the user. A last part that is only the
+    "Mood: x" line keeps the part before it.
+    """
+    texts = [t.strip() for t in texts if t and t.strip()]
+    if not texts:
+        return ""
+    if len(texts) > 1 and texts[-1].lower().startswith("mood:"):
+        return f"{texts[-2]}\n{texts[-1]}"
+    return texts[-1]
+
+
 def to_tool(schema: dict) -> dict:
     """Chat-completions tool schema -> Responses API tool."""
     return {"type": "function", **schema["function"]}
@@ -82,7 +97,11 @@ class LLM:
         items = [item.model_dump(exclude_none=True) for item in response.output]
         summaries = [part["text"] for item in items if item["type"] == "reasoning"
                      for part in item.get("summary", []) if part.get("text")]
-        result = {"role": "assistant", "content": response.output_text or None,
+        # Only the last message's text: earlier ones are commentary between tool calls.
+        last =next((i for i in reversed(items) if i["type"] == "message"), None)
+        texts = [part.get("text", "") for part in (last or {}).get("content", [])
+                 if part.get("type") == "output_text"]
+        result = {"role": "assistant", "content": "".join(texts).strip() or None,
                   "reasoning": summaries, "provider_items": items}
         calls = [item for item in items if item["type"] == "function_call"]
         if calls:
@@ -152,7 +171,9 @@ class ClaudeLLM:
             model=self.model, max_tokens=CLAUDE_MAX_TOKENS, system=system, messages=chat,
             tools=[to_claude_tool(t) for t in tools], **self.options, **forced)
         blocks = [block.model_dump(exclude_none=True) for block in response.content]
-        text = "".join(b["text"] for b in blocks if b["type"] == "text").strip()
+        # Text after the last tool call, and of that only the answer (final_text).
+        tail = blocks[max((i + 1 for i, b in enumerate(blocks) if b["type"] == "tool_use"), default=0):]
+        text = final_text([b["text"] for b in tail if b["type"] == "text"])
         result = {"role": "assistant", "content": text or None, "reasoning": [], "provider_items": blocks}
         calls = [b for b in blocks if b["type"] == "tool_use"]
         if calls:

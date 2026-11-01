@@ -24,6 +24,7 @@ import re
 from pathlib import Path
 
 from assistant.card_commands import card_choice
+from assistant.inputs import MAX_MESSAGE_CHARS
 
 import httpx
 from dotenv import load_dotenv
@@ -60,6 +61,11 @@ QUESTION_WORDS = ("what", "how", "why", "when", "where", "who", "which", "can", 
 ENDPOINTING = {"min_delay": .3, "max_delay": 2.0}
 # The only update in between: the user has to act. The answers themselves come from Tuttie.
 UPDATES = {"approval": "Please confirm with Face ID."}
+# When what the user said did not reach Tuttie: never silence.
+BUSY = "One moment please."  # too many turns a minute (429): the user can say it again shortly
+NOT_PASSED = "Sorry, that did not go through. Could you say it again?"
+# After Tuttie recommends a hotel, the choice goes to the user (said once, after the answer).
+HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 
 def francs(match: re.Match) -> str:
@@ -68,28 +74,80 @@ def francs(match: re.Match) -> str:
     return f"{amount} {'franc' if amount == '1' else 'francs'}"
 
 
-LINK = re.compile(r"\[([^\]\n]*)\]\([^)\n]*\)")          # a markdown link: keep its text only
-NOTE = re.compile(r"[ \t]?\[([^\]\n]{0,60})\]")             # a note the model put in square brackets
-# Notes that carry nothing to say: citations ([3], [3, 4]), one-word labels ([confirmed]) and ids
-# ([receipt RC-A14786]: the wallet shows those). Any other note may be a fact (a fee, a
-# condition), so only its brackets go.
-EMPTY_NOTE = re.compile(r"\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*")
-# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration:
-# "18:00", "00:52" yes; "8:30 pm", "1:30 hours", "18:00:30" no.
-CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))",
-                   re.IGNORECASE)
+# What the model may put in square brackets, cleaned the same way as the wallet's screen
+# (apps/wallet/src/lib/activity.js withoutNotes; shared cases in tests/fixtures/answer_notes.json).
+# Only what carries nothing to say goes: citations ([3], [3, 4]), a few labels ([confirmed]),
+# booking and receipt ids, node ids. Any other note may be a fact (a fee, "cancelled"), so it is
+# kept and only its brackets go. Markdown links keep their text.
+LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
+NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
+CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
+LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
+NODE_ID = re.compile(r"[a-z]{2}(?:\.[a-z0-9-]+){2,}")          # ch.basel.hotel-rheinblick, not booking.com
+ID_TOKEN = r"\b(?:BK|RC)-[0-9A-F]{6}\b"  # booking and receipt ids (node/server.py): one pattern for all uses
+ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?" + ID_TOKEN, re.IGNORECASE)
+BARE_ID = re.compile(r"[ \t]?" + ID_TOKEN, re.IGNORECASE)
+URL = re.compile(r"\s*(?:https?://|www\.)\S*\s*", re.IGNORECASE)
+GONE = "\x00"   # where a note was taken out: the spaces around it are tidied there only
+# "Ignored: <business>." when it starts a line (also as "1.", "•", "- **Ignored:**") or a sentence:
+# dropped up to the end of its sentence. A lowercase "was ignored: ..." inside a sentence stays.
+IGNORED_LINE = re.compile(r"^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)[ \t]*|$)",
+                          re.MULTILINE)
+IGNORED_SENTENCE = re.compile(r"(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)", re.MULTILINE)
+LINES = re.compile(r"\r\n?|\n|\u2028|\u2029")  # line breaks, split the same way as the wallet
+EMPTY_ANSWER = "Done."  # an answer that cleans to nothing
+# 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration; a
+# trailing "hrs"/"Uhr" is part of the time: "18:00", "00:52", "14:00 hrs" yes; "8:30 pm",
+# "1:30 hours", "18:00:30" no.
+CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)(?:[ \t]*(?:hrs?|uhr)\b)?\b"
+                   r"(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))", re.IGNORECASE)
+
+
+def link(match: re.Match) -> str:
+    """A markdown link: its text; a citation link ("[3](...)") keeps only a parenthesis that is not a URL."""
+    text, target = match.group(1).strip(), match.group(2)
+    if text and not CITATION.fullmatch(text):
+        return text
+    return GONE if not target.strip() or URL.fullmatch(target) else f"({target})"
 
 
 def note(match: re.Match) -> str:
-    """A bracketed note: dropped if it says nothing, else kept without its brackets."""
-    inner = match.group(1).strip()
-    if not inner or EMPTY_NOTE.fullmatch(inner):
-        return ""
-    return (" " if match.group(0)[0] in " \t" else "") + inner
+    """A bracketed note: dropped if it says nothing, else its words without the brackets."""
+    inner = re.sub(r"^[\s,;]+|[\s,;]+$", "", ID.sub("", match.group(1)))
+    if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
+            or inner.lower().startswith("ignored:")):
+        return GONE
+    glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
+    return (" " if glued else "") + inner
+
+
+def without_notes(raw: str) -> str:
+    """Links and bracketed notes cleaned (see above), lines starting with "Ignored:" dropped, and
+    the spaces tidied only where something was taken out. Same rules as the wallet's
+    withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
+    text = LINK.sub(link, re.sub(r"\r\n?", "\n", raw))
+    for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
+        text = NOTE.sub(note, text)
+    text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
+    text = re.sub(r"[ \t]?\x00(?=[.,;:!?)\]'\"’]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\x00[ \t]?", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[ \t]?\x00[ \t]?", " ", text)
+    lines = LINES.split(text)
+    text = "\n".join(cut for line in lines if (cut := IGNORED_SENTENCE.sub("", IGNORED_LINE.sub("", line))).strip(" \t-*_#>•")
+                     or not line.strip())
+    # A non-empty answer never cleans to nothing (nor to raw links or forged names): a neutral line.
+    return EMPTY_ANSWER if not text.strip() and raw.strip() else text
+
+
+DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts|for|in)(?:\s+(?:about|around|approx\.?))?\s+$",
+                            re.IGNORECASE)
 
 
 def clock(match: re.Match) -> str:
-    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight"."""
+    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight".
+    After "takes", "for", "in" ... it is a length of time ("takes 01:15 hrs") and stays."""
+    if DURATION_WORDS.search(match.string[max(0, match.start() - 12):match.start()]):
+        return match.group(0)
     hour, minute = int(match.group(1)), int(match.group(2))
     if minute == 0 and hour in (0, 12):
         return "midnight" if hour == 0 else "noon"
@@ -100,7 +158,9 @@ def clock(match: re.Match) -> str:
 def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
-    text = NOTE.sub(note, LINK.sub(r"\1", answer))
+    text = without_notes(answer)
+    text = BARE_ID.sub("", text)  # ids are never spoken: the wallet shows them
+    text = re.sub(r"[ \t]?(?:\([ \t]*\)|\[[ \t]*\])", "", text)  # "Booking (BK-…)" leaves no "()"
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)
@@ -108,13 +168,22 @@ def spoken(answer: str) -> str:
     text = re.sub(r"(\d)\s?%", r"\1 percent", text)
     text = re.sub(r"[*_`#]", "", text)
     text = re.sub(r"[\U0001F000-\U0001FFFF☀-➿]", "", text)
-    return " ".join(line for line in text.splitlines() if not line.strip().lower().startswith("ignored:")).strip()
+    return " ".join(line.strip() for line in LINES.split(text) if line.strip()).strip()
 
 
 def meaningful(text: str) -> bool:
     """A real request, not a noise tag like "(laughs)" or a stray word from the room."""
     words = re.findall(r"[A-Za-zÀ-ÿ']+", re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", text))
     return card_choice(text) is not None or len(words) >= MIN_WORDS
+
+
+def fitted(text: str) -> str:
+    """Long dictation cut to what Tuttie takes (MAX_MESSAGE_CHARS), at a word boundary."""
+    if len(text) <= MAX_MESSAGE_CHARS:
+        return text
+    cut = text[:MAX_MESSAGE_CHARS]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > MAX_MESSAGE_CHARS // 2 else cut).rstrip()
 
 
 def filler_kind(text: str) -> str:
@@ -124,6 +193,19 @@ def filler_kind(text: str) -> str:
         return "task"
     first = lowered.split()[0] if lowered.split() else ""
     return "question" if lowered.endswith("?") or first in QUESTION_WORDS else "other"
+
+
+PICKED = re.compile(r"^Book (.+?)\.?$")  # what the wallet shows when the user swiped a hotel to book
+
+
+def pick_ack(event: dict) -> str | None:
+    """A short line when the user picked a hotel on the cards (a turn the wallet started, not
+    speech): "Nice pick. Let me book Gästehaus am Rhein." Else None."""
+    detail = event.get("detail") or {}
+    if event.get("kind") != "turn" or detail.get("source") == "voice":
+        return None
+    match = PICKED.match((detail.get("said") or "").strip())
+    return f"Nice pick. Let me book {match.group(1)}." if match else None
 
 
 def update_for(event: dict, said: set[str]) -> str | None:
@@ -151,8 +233,27 @@ class Tuttie(Agent):
         if meaningful(text):  # noise and stray words are not requests
             self.turns += 1
             self.asked = text
-            await self.http.post("/voice/say", json={"room": self.room, "text": text})
+            if trouble := await self.pass_on(fitted(text)):
+                self.asked = None  # no filler for a request Tuttie never got
+                self.speak(trouble)
         raise StopResponse()  # Tuttie answers through the timeline, spoken by follow()
+
+    async def pass_on(self, text: str) -> str | None:
+        """Send the user's words to Tuttie (POST /voice/say); None if it took them, else the line
+        to speak instead (too many turns: BUSY; refused or unreachable: NOT_PASSED)."""
+        try:
+            response = await self.http.post("/voice/say", json={"room": self.room, "text": text})
+        except httpx.HTTPError as error:
+            print(f"voice: /voice/say failed: {type(error).__name__}", flush=True)
+            return NOT_PASSED
+        if response.is_success:
+            return None
+        print(f"voice: /voice/say answered {response.status_code}", flush=True)
+        return BUSY if response.status_code == 429 else NOT_PASSED
+
+    def speak(self, text: str) -> None:
+        """Say a short line of the voice layer's own (not one of Tuttie's answers)."""
+        self.session.say(text)
 
     def filler(self) -> str | None:
         """A filler fitting the last request, once, when Tuttie starts a tool for it."""
@@ -175,22 +276,33 @@ def voice_on(room: rtc.Room) -> bool:
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
     """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
     said: set[str] = set()
+    cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
     def say(text: str) -> None:
-        if voice_on(room):
+        if text.strip() and voice_on(room):
             session.say(text)
 
     async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
         async for line in stream.aiter_lines():
             if line.startswith("event: reset"):
                 said.clear()
+                cards = None
             if not line.startswith("data:"):
                 continue
             event = json.loads(line[5:])
+            if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
+                cards = event.get("turn") or "?"
             if event["kind"] == "answer":
                 said.clear()  # the next turn may prompt again
                 agent.asked = None  # answered without (or after) a tool: no filler any more
                 say(spoken(event["summary"]))
+                if cards is not None and event.get("turn", "?") == cards:
+                    say(HANDOFF)
+                    cards = None
+                continue
+            if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
+                agent.asked = None
+                say(ack)
                 continue
             # The first tool for the request gets a filler; opening the turn, thinking and closing the
             # card do not (a goodbye follows).

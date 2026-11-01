@@ -6,10 +6,104 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view and the wallet's swipe deck are done; presentation site and demo runner are open).
+Last updated: 2026-11-01 (the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
 
 ## Done
 
+- **Wallet real-user test round 4** (branch `wip/r4d-wallet`, not deployed): a refused
+  microphone (denied, missing, busy) now says "Microphone blocked — type instead" under the
+  eyes and shows the dock mic as off; typing works, and a tap on the face or the mic asks for
+  it again (no prompt loop; `lib/recovery.js` `micRefused`, `hooks/useVoice.js` `micBlocked`).
+  A server restart that lost an unfinished chat (open question, approval or cards) archives it
+  to History and says "Tuttie restarted — please ask again" until the next message
+  (`lostOnRestart`). A booking approval puts the hotel cards away in every tab (it sets
+  `picked`), so a second tab can no longer swipe a second booking after a Decline.
+- **Real-user test round 4, Tuttie's turn** (branch `wip/r4d-backend`, not deployed): the
+  user's own date, nights and party size beat the calendar ("tomorrow for 2 people" posts
+  2 November, guests 2; the calendar only fills in what was not said, "I want to book
+  something" still posts 14 Nov). `post_request` takes `guests` and `nights` and refuses in code
+  a past night (Swiss today), a bad party size and more than one night (hotels book one night
+  per booking), so Tuttie asks instead of booking something else. Only the answer reaches the
+  user: `llm.py` keeps the text after the last tool call (last block / last message item) and
+  `agent.py` `drop_notes` drops a leading paragraph about "the user". `negotiate` right after
+  `post_request` in the same message returns its signed outcomes instead of bargaining twice;
+  a new message or another budget bargains again. Open: hotels still offer a "double room" to
+  5 guests (node side ignores `guests`).
+
+- **Wallet red-team round 2 holes closed** (branch `wip/r2-wallet`, not deployed): booking
+  terms (room, night, rate, included items) are short plain text before the user signs them
+  (`aps/approval.py` `plain_term`, max 120 chars, same on hotel and assistant side), so a
+  verified hotel's odd `rate` (an object) no longer reaches the phone; the wallet keeps only
+  plain text and numbers in an approval and its seals (`lib/activity.js` `approvalOf`,
+  `sealsOf`), and the approval sheet sits in an error boundary whose fallback still offers
+  Decline. A stored deck / pick / turns in the wrong shape is dropped on restore
+  (`validDeck`). "Tuttie is unreachable" from a failed send goes once the stream connects
+  again. A broken stream frame is ignored (`lib/stream.js` `parseFrame`). The note under the
+  hotel cards shows markdown as plain text (`plainMarkdown`). Hotel names in the book request
+  (`lib/picks.js`) are one short line without brackets or quotes. Open: landscape layout of
+  the hotel card (name overlaps the photo bars, "1 of 2" cut off).
+
+- **Red team round 4, conversation store and throttle** (branch `wip/r4-conv`, not deployed):
+  empty chats are never saved; above 200 saved chats one without approvals or agreements goes
+  first, from the browser with the most, on a tie the one that saved last (bots, not the user
+  who saved first). Above 400 active chats: offers-only before approvals/agreements (saved chats
+  count), the most recently started session first; a session with saved chats is never
+  "empty". `POST /conversations` is throttled (10/min per browser, 120 per address, 429). The
+  per-address key of an IPv6 client is its /64. `/chat` counts a turn only after a valid body
+  (422/409 no longer cost a turn). Conversation ids of dropped sessions never come back (the
+  bounded memory raises a floor), and the throttle sweeps idle keys amortised. **Tell the team
+  (formats.md):** `/conversations` 429; resuming an empty chat is a 410. Remaining: a patient
+  bot can still create sessions early and use them later (N3 cannot be fully solved).
+  Tests: `tests/test_r4_conversations.py`.
+- **Red team round 4, hotel sessions** (branch `wip/r4-sessions`, not deployed): Tuttie never
+  closed the hotel sessions it opened, so after 200 negotiations a hotel answered 500 to every
+  user until restart. Now Tuttie closes them when a negotiation ends, a full store closes its
+  least recently used idle session (429 only if all are busy), closed sessions are freed (50
+  kept) and turns are capped (100). Sessions are bound to their opener (`session_token`, header
+  `X-Session-Token`, else 403; 128-bit ids); message/context sizes are capped (422); a close
+  waits for a reply in progress. Tuttie sends the agent key only to gold/blue nodes (grey nodes
+  could replay it). A signed commitment books once; the LLM's arrival date is bounded.
+  **Tell the team (formats.md):** the session table and the agent key note.
+  Regression tests: `tests/test_r4c_sessions.py`.
+- **Red team round 3, approvals, booking and payments** (branch `wip/r3-pay`, not deployed):
+  an approval is signed before it leaves the pending list, so a failing mandate no longer loses
+  the decision (a CHF 0 charge used to 500 the approve call and hang the booking 300 s); a
+  decision landing at the timeout still counts; Tuttie handles a dropped approval. Charges are
+  CHF 1 or more and mandates are offered only above zero. `book` refuses an extra whose
+  commitment has expired or ends before the booked night. **Tell the team (formats.md):** a
+  `pay` approval now carries a signed `charge = {purpose, booking_id}` and the gate refuses an
+  approval for another charge or booking (book approvals unchanged). Tuttie flags a
+  confirmation whose extras differ from the approved `includes` (`mismatch: ["includes"]`).
+  Regression tests: `tests/test_r3_approvals.py`, `tests/test_r3_booking.py`.
+- **Tell the team: the seal body changed (red team round 4, trust core; branch
+  `wip/r4-trust`, not deployed).** Seals now also sign `name`, `kind` and `endpoint`
+  (`aps/seals.py` `seal_body`, `documentation/formats.md`), and `data/registry.json` is
+  re-signed. Pull it and run `scripts/issue_seals.py` after any change to a node config's
+  name, kind or port; the live service must be restarted to load the new registry. Also fixed:
+  a node whose `node_id` equals an authority id (e.g. "bar-association-ch") and self-seals
+  stays grey with no licence or vouched UID (issue_seals refuses such ids); hotels answer a
+  posting only if the requester holds the user's `post_requests` delegation; a delegation
+  whose `scopes` is a string never verifies; the marketplace refuses an agent card older than
+  300 s. Tiers unchanged (Rheinblick gold+blue, Spalenhof blue, scam broken, fake lawyer grey,
+  Budget Rooms grey, Gästehaus gold, Alpina gold+blue, Tuttie blue).
+- **Red team round 2, hotel side** (branch `wip/r2-node`, not deployed): `/agent/invoke`
+  answers only posting events, and `posting.updated` now gets the same checks as
+  `posting.created` (valid posting, the market's offer door, a fresh request signed by a
+  verified user agent that is itself a valid Request) before any LLM runs. A request already
+  handled is answered "already handled" without the LLM or a second offer (kept in memory per
+  node, bounded, 10 min). An offer's `valid_until` comes from the signed request's
+  `expires_at`, at most 24 h ahead and never past noon after the stay night (it came from the
+  unsigned posting). The offer-door check compares the effective port (443 for https) and
+  refuses any user info. Tuttie accepts an agreement only at a real price (finite, above zero,
+  not a bool) and only if it is a valid `Agreement`; a counter without a real price ends the
+  negotiation.
+- **Presentation QR page** (branch `presentation-site`, not merged or deployed yet): a
+  static, phone-first page in `code/apps/presentation/`, served at `/presentation/` (e.g.
+  <https://web4.mendes.dev/presentation/>) by the assistant's static mount of `code/apps/`; no
+  build step. Hero with the Tuttie card, the pitch numbers with sources, the idea, the business
+  case, a self-playing demo of the wallet in a phone, and links to the live wallet and the repo.
+  It replaces the `assets/qr-landing` idea on the unmerged branch `pitch-deck-and-qr`. Details:
+  `code/apps/presentation/README.md`.
 - **Wallet stays in step with the server** (branch `wip/live-edge`, not deployed): the
   timeline stream (`hooks/useAgentStream.js`, rules in `lib/stream.js`) no longer dies
   silently. On a stream error the line under the eyes says "Reconnecting…" (after 3 failed
@@ -96,6 +190,26 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   10 new rooms a minute per conversation and 300 per client address, else 429 (the wallet
   retries on its own); rooms are not reused because the voice agent closes its session when
   the wallet disconnects. Tests: `test_agent_key.py`, `test_voice.py`.
+- Conversation store, red team round 2 (2026-11-01, branch wip/r2-conv; many visitors share
+  the live site via the QR code): saved chats are capped at 20 per browser (its own oldest go)
+  and 200 in all (the browser with the most gives one up), so one browser pressing "new chat"
+  cannot expire anyone else's chats. Active conversations: empty ones are dropped first; one
+  with history only above 400, the fewest turns first. A browser whose conversation was dropped
+  gets a new id for its next one (no longer the same HMAC), so a late "book" for the old chat
+  is a 409. `POST /chat` (and spoken turns, `POST /voice/say`): at most 10 turns a minute per
+  browser and 600 per client address, else 429 with `Retry-After` (the wallet shows the
+  server's sentence). `POST /voice/token` throttles before it creates a conversation. A
+  TypeError inside a tool is reported as a failure, not as "bad arguments" (the LLM retried
+  correct calls). Tests: `test_r2_conversations.py`, `test_book_args.py`.
+- Voice, red team round 3 (2026-11-01, branch wip/r3-voice): a flood of anonymous
+  `POST /voice/token` calls no longer unmaps live users' rooms. Above 1000 rooms only unused
+  ones are forgotten: first rooms whose conversation is gone, then rooms unused for 2 min
+  (least recently used first); a room the voice agent follows (open `/voice/events`) never goes.
+  Rooms in use may reach 2000; beyond that new rooms get 429 "Voice is busy" (the wallet
+  retries). The voice agent's secret is compared in constant time. The voice agent cuts long
+  dictation to 2000 characters (at a word) and never stays silent when `/voice/say` fails: 429
+  is spoken as "One moment please.", other refusals and transport errors as "Sorry, that did
+  not go through. Could you say it again?". Tests: `test_r3_voice.py`.
 
 - Demo-story polish (2026-10-31, branch wip/story-polish), from live runs: (1) the facts note
   Tuttie gets every round (`current_deals`) now carries each card hotel's signed policies
@@ -256,8 +370,8 @@ Build order from [goals.md](goals.md):
 
 ### Where to start next
 
-1. **dev member 1:** voice is done; next the demo runner (`code/demo/`) and the presentation
-   site (`code/apps/presentation/`), whichever the pitch needs first; confirm voice on a real
+1. **dev member 1:** voice is done; next the demo runner (`code/demo/`); the presentation QR page
+   (`code/apps/presentation/`) is on branch `presentation-site`, to merge; confirm voice on a real
    iPhone.
 2. **dev member 1:** done: M1–M5 and `pay` (see step 5 above); the double-charge race in
    `pay` is fixed (64197e9, `test_node_pay.py`).
@@ -289,7 +403,7 @@ the owner's limits live, once per answer (fine). Open points, none blocking:
   limits. Fine for the demo; real owners would sign deploys with their own key (APS).
 - `assistant/voice.py`: `agent_only` compares the secret with `!=`; use
   `secrets.compare_digest` like `node/owner.py`. `voice_rooms` grows with every
-  `POST /voice/token` (no login needed) and is never pruned.
+  `POST /voice/token` (no login needed) and is never pruned. (Both fixed: round 3 voice.)
 - `requirements.txt` gained `livekit`: run `uv pip install -r requirements.txt` (or pip)
   after pulling, or the assistant and three test files fail to import.
 
@@ -316,8 +430,8 @@ Coverage (`pytest --cov`, with `pytest-cov` installed locally): 92 % overall; `a
 `negotiation/` 100 %, `marketplace/` 97 %, `node/` 93 %. Lowest: `llm.py` 44 %, `assistant/agent.py`
 56 %, `assistant/events.py` 56 % (the real LLM loop and SSE streaming, not run in tests; checked by `demo_headless.py`).
 
-Other open items: the demo runner (`code/demo/`), the presentation site and QR code
-(`code/apps/presentation/`), voice confirmed on a real iPhone, a
+Other open items: the demo runner (`code/demo/`), merging the presentation QR page
+(`code/apps/presentation/`, branch `presentation-site`), voice confirmed on a real iPhone, a
 behind-the-scenes view of the signed timeline, team names in `license.txt` and the team
 profiles in the readme.
 
@@ -493,8 +607,8 @@ Why things are the way they are, so nobody has to rediscover them:
   History → Continue chat selects the retained server assistant (`POST /conversations/{id}/resume`);
   the keyboard in an open past chat resumes that chat before typing, and the dock's History
   button always returns to the list. Old or expired entries stay read-only: a 404/410 shows
-  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 200
-  globally in addition to the 200 active browser conversations; a restart expires them. The
+  "This chat has expired" inline in the history, nothing starts elsewhere. Saved conversations are in memory, capped at 20
+  per browser and 200 globally, in addition to the active browser conversations; a restart expires them. The
   user's own words are not shown; businesses with forged or missing seals are never shown either.
 - **Voice** (`code/voice/`, `assistant/voice.py`, wallet `hooks/useVoice.js`): self-hosted
   LiveKit 1.13.11 + LiveKit Agents 1.8.10 with ElevenLabs (Scribe v2 realtime, Flash v2.5).
@@ -558,14 +672,36 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
+- **Choosing a hotel is guided:** after the cards, Tuttie says how many hotels it found and which
+  it would pick and why; the voice then adds "It's your choice: swipe right on the ones you like,
+  or just tell me" (`HANDOFF`, once per cards turn); a swiped pick is acknowledged ("Nice pick.
+  Let me book …", `pick_ack` on the wallet's turn event) before the Face ID prompt. The cards go
+  away once a hotel is liked or a booking is under way (`choosing()` in lib/activity.js), so
+  booking by voice while the cards are up also leads to the approval and the booked block.
+- **Approval sheet finishes before it goes:** the decided approval stays on screen until the
+  checkmark (or X) was shown ~1.4 s, then the sheet slides down (App `finishing`, sheet
+  `onDecide`/`onFinished`), even though the server stopped waiting for it.
+- **Face ID glyph in the approval sheet** (`ApprovalSheet.jsx` `FaceId`, `wallet.css`): rounded
+  corner brackets around a simple face (eyes, L-shaped nose, smile) like the iPhone's; while
+  scanning the face turns a little and the brackets pulse; on approval the face fades and a
+  checkmark is drawn inside the brackets as the glyph turns green. A decline keeps the grey X.
 - **Answers are written to be heard** (`assistant/agent.py`): one to three short sentences, no
   lists, markdown, emoji or square brackets, no ids or codes (node ids, booking ids, receipt
   numbers: the wallet shows them), numbers as people say them ("CHF 128", "6 pm", "14
   November", "about 9 degrees", "25 percent"); no "[3]" step citations any more (results still
-  carry `source_step`); a booking is confirmed as "booked" plus the total. The voice
-  (`spoken()` in `voice/agent.py`) drops any [...] note and says 24-hour times as "6 pm",
-  "12:52 am", "midnight", "noon"; the wallet (`cleanAnswer`, `lib/history.js`) hides any [...]
-  note. Reason: "18:00" was read as "1800", and "[confirmed]" / "[receipt RC-...]" showed up.
+  carry `source_step`); a booking is confirmed as "booked" plus the total. Bracketed notes
+  the model still writes are cleaned the same on screen (`withoutNotes`/`cleanAnswer` in
+  `apps/wallet/src/lib/activity.js`) and in voice (`spoken()` in `voice/agent.py`): citations,
+  a few labels ([confirmed]), booking/receipt ids and node ids are dropped; any other note keeps
+  its words without the brackets, so a fee or "cancelled" is never hidden. Shared cases:
+  `code/tests/fixtures/answer_notes.json`. The voice says two-digit 24-hour times as "6 pm",
+  "12:52 am", "midnight", "noon" (also "14:00 hrs" / "18:00 Uhr") and leaves "8:30 pm",
+  durations ("1:30 hours") and "18:00:30" alone. Only whole lines starting with "Ignored:" are
+  dropped, and a non-empty answer never cleans to nothing (its words stay, unbracketed); a time
+  after "takes"/"for"/"in" is a duration and stays; booking and receipt ids are never spoken;
+  citation links never read out a URL; spaces are tidied only where a note was removed. Both
+  sides are tested against the same "screen" column of the fixture. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
+  showed up. Found and checked by a bug hunter and two attacker rounds.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.
 - **Broken vs untrusted:** a forged or invalid seal is broken (red); self-signed or unsigned

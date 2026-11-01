@@ -31,7 +31,11 @@ Implementation: `aps/canonical.py`.
 ```
 
 Each seal signature = issuer's key over canonical
-`{"node_id", "uid", "public_key", "capabilities", "issuer", "tier"}`.
+`{"node_id", "name", "kind", "endpoint", "uid", "public_key", "capabilities", "issuer", "tier"}`
+(changed 1 Nov 2026: `name`, `kind` and `endpoint` were added, so a sealed record can no longer
+be renamed, relabelled as a user agent or pointed at another host; all records were re-signed).
+`tags` and `delegation` are not sealed (the delegation carries the user's own signature).
+`scripts/issue_seals.py` refuses a `node_id` equal to an authority's issuer id.
 
 `uid` is the Swiss business identification number, `CHE-ddd.ddd.ddd` with a mod-11 check
 digit (eCH-0097, `aps/uid.py`), or `null` for nodes without one. It is always signed, so it
@@ -71,7 +75,9 @@ replays. Envelopes kept on purpose (commitments redeemed at `book`) are checked 
   highest tier among its seals; a node with no seals at all is `grey` (unsigned).
 - Licensed capabilities (listed under an authority's `licenses`, e.g.
   `licensed_legal_ch` for `bar-association-ch`) are granted only with a valid seal
-  from that authority. `can_take_payment` needs tier blue or higher.
+  from that authority. Only an authority's seal on someone else's record counts: a node
+  whose `node_id` equals an authority id and self-seals stays grey, with no licence and
+  no vouched `uid`. `can_take_payment` needs tier blue or higher.
 - A seal from an authority with `"vouches_for_uid": true` (the commercial register) is
   valid only if the record has a valid `uid`. The verdict's `uid` is set only through such
   a seal; any other `uid` in a record is just a claim.
@@ -179,6 +185,13 @@ creates a conversation: for a browser without one, `/history` answers `[]` with 
 first conversation will have, `/approvals/pending` `[]`, `/reset` `{ok}` and a decision 404.
 `POST /voice/token` answers 429 (`Retry-After: 60`) after 10 new rooms a minute for one
 conversation or 300 for one client address; a room is never handed out twice.
+`POST /chat` answers 429 (`Retry-After` in seconds, a `detail` sentence for the user) after
+10 turns a minute for one browser or 600 for one client address (an IPv6 address counts by
+its /64); spoken turns (`POST /voice/say`) count towards the browser's 10. A refused body
+(422, or 409 for a stale `conversation_id`) does not count as a turn. `POST /conversations`
+(new chat) answers the same 429 after 10 a minute for one browser or 120 for one client
+address; an empty chat is not kept, so resuming its id is a 410. A browser whose conversation
+was dropped from memory gets a new id for its next one, so an old id is a 409.
 Acting creates it (`POST /chat`, `POST /voice/token`, `POST /conversations`), and so does
 following the promised id on `GET /events?conversation_id=<id>`; another id there is a 409. Answers no longer list ignored businesses; the wallet shows them.
 `answer` events carry `detail.mood`, how the answer feels (one of `MOODS` in
@@ -221,7 +234,8 @@ signed by the `user` key:
 ```
 
 A delegation is valid only for the agent id and key in its own registry record, until
-`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`, `book`).
+`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`, `book`; `scopes` must be
+a list, a string never verifies).
 `book` lets the agent call the book action for the user (checked by the action gate); each
 booking still needs the user's signed approval for its exact amount (below). Paying is not a
 scope. The
@@ -248,6 +262,16 @@ redeemed). The wallet shows them under the amount, and the signed decision inclu
 equal the terms it is about to book, so an approval for the non-refundable double cannot
 book the flexible rate. The pending `approval` event carries `detail.terms`.
 
+A payment approval carries `charge` (`aps/approval.py`, `payment_charge`):
+`{purpose, booking_id}`, signed with the decision like `terms`. The gate pays with an approval
+only if its `charge` is exactly this charge of this booking (refusal: `the approval is not for
+the <purpose> of this booking`), so a "city tax for BK-1" approval cannot pay another charge or
+booking of the same amount. Book approvals are unchanged (no `charge`).
+
+`offer_mandate` is only offered for a charge above CHF 0 (`facts.charges[].price_chf` is a
+whole number from 1). If the offered mandate cannot be signed, the decision still counts
+without it, and Tuttie asks for that charge on the phone later.
+
 ## Business tools over MCP (`node/mcp_tools.py`)
 
 Every node serves its tools as an MCP server (Model Context Protocol, Streamable HTTP,
@@ -263,7 +287,13 @@ call (below) and run only through the action gate (`aps/gate.py`):
   `date` the same way.
 - `book`: `args` are the `BookRequest` fields. The node computes the total (room plus its own
   signed commitments, or its own signed agreement) and asks the gate with
-  `Needs("book", scope="book", approval=True, amount_chf=total)`. With an agreement the
+  `Needs("book", scope="book", approval=True, amount_chf=total)`. An extra whose commitment's
+  `valid_until` has passed, or ends before the booked night, is refused (`the commitment for
+  <item> has expired: ask the hotel again`). Each commitment (known by its envelope signature) is
+  redeemed in one booking only: a second use is refused (`a commitment was already used for
+  another booking: ask the hotel again`), and so is the same one twice in one call. The arrival
+  date the agent's LLM picks for `valid_until` is ignored when past or beyond 365 days and never
+  lies after the session context's `date`. With an agreement the
   call must name the agreement's `room_type`, `date` and a room with its `rate`, and carry no
   `extras` (refusals: `the agreement is for a <room> room, not <x>` / `... for the night of
   <date>, not <x>` / `... for the rate ..., not ...` / `an agreement fixes what is included:
@@ -275,7 +305,8 @@ call (below) and run only through the action gate (`aps/gate.py`):
   when extras were redeemed.
 - `pay`: `args = {purpose, booking_id, mandate | approval}`. The amount is the charge's
   `price_chf` from `facts.charges`; each charge is paid once per booking at this business.
-  Gate: `Needs("pay", scope=None, approval=True, mandate=True, amount_chf, purpose)`. Receipt:
+  Gate: `Needs("pay", scope=None, approval=True, mandate=True, amount_chf, purpose,
+  booking_id)`; an approval must carry `charge = {purpose, booking_id}` (see Approval). Receipt:
   `{status: "paid", receipt_id, booking_id, purpose, amount_chf, paid_with: "mandate" |
   "approval", checked}`.
 
@@ -360,7 +391,7 @@ approval, agreement, amount_chf}`:
 | 5 | nonce not seen | `the call was already used (replayed nonce)` |
 | 6 | `delegation` with the scope, signed by the user, not expired | `the user has not delegated <scope> to this agent (...)` |
 | 7 | `agreement` (only if `args.agreement`): own signature, valid, unused | `the agreement is not signed by this hotel` / `... has expired` / `... was already booked` / `this business does not negotiate, ...` |
-| 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` |
+| 8 | `approval` (if needed): user-signed, approved, this tool and business, unused, exact amount | `the approval is not signed by the user` / `the approval does not approve <tool> with this business` / `the approval was already used` / `approved CHF a does not match the total CHF b` / for `pay`: `the approval is not for the <purpose> of this booking` |
 | 8b | or `mandate` (only `pay`, `Needs(mandate=True)`, call has `mandate` and no `approval`) | `the mandate is not signed by the user` / `... is for another agent` / `... for another payee` / `... is for <x>, not <purpose>` / `... has expired` / `CHF a is above the CHF 10 a mandate covers; the user must approve it` / `the mandate's amount is used up` |
 
 `pay` uses `Needs("pay", scope=None, approval=True, mandate=True, amount_chf=<charge>,
@@ -425,8 +456,9 @@ The business can verify the requester itself from `request` (seals, signature, d
 A node checks before its agent thinks: the event must be a valid `PostingCreated` and
 `offer_url` exactly `<MARKETPLACE_URL>/postings/<request_id>/offers` (default
 `http://localhost:4010`, any loopback name counts) or the answer is 422; `request` must be
-signed by `requester_id`, a registered user agent with gold or blue seals, at most 5 minutes
-old and for this `request_id`, or the answer is 403.
+signed by `requester_id`, a registered user agent with gold or blue seals and a valid user
+delegation with the `post_requests` scope, at most 5 minutes old and for this `request_id`,
+or the answer is 403.
 Its answer, e.g. `{"interested": true, "next_tool": "make_offer"}` (plain or as the payload
 of a signed envelope), is recorded but advisory; only a signed offer counts.
 
@@ -610,11 +642,13 @@ Endpoints of every node (all answers are signed envelopes). Every endpoint below
 `GET /agent/card` makes the agent think (an LLM call on the business's account), so when the
 deployment sets `AGENT_WEB_KEY` (`aps/agent_key.py`; `scripts/run_all.py` makes one per run)
 it answers HTTP 401 unless the request carries the key in `X-Agent-Web-Key`. The marketplace
-and Tuttie send it; tools over MCP and `counter_offer` are not affected.
+and Tuttie send it; tools over MCP and `counter_offer` are not affected. Tuttie sends it only to gold or blue nodes:
+it holds no agent conversation with a grey node. `question` and session `message` are at most
+2000 characters, `peer` and `purpose` 200, `context` 8000 bytes as JSON (else HTTP 422).
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}`; the marketplace reads it to check the subscription |
+| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}`; the marketplace reads it to check the subscription, from the sealed `endpoint`, and refuses a card signed more than 300 s ago |
 | `POST /agent` `{question, context}` | A2A reply `{answer, commitment}` (see above) |
 | `POST /agent/invoke` with the event itself as body | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to. If interested in a `posting.created` with `next_tool: make_offer`, the node then sends a signed `Offer` to the posting's `offer_url` in the background |
 
@@ -631,10 +665,16 @@ sessions run in parallel without mixing. Endpoints of every node (answers are si
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `POST /agent/sessions` `{peer, purpose, context}` | `{session_id, agent, purpose}` |
+| `POST /agent/sessions` `{peer, purpose, context}` | `{session_id, session_token, agent, purpose}`; HTTP 429 when every session slot is busy |
 | `POST /agent/sessions/{id}/messages` `{message}` | `{session_id, turn, answer, commitment}`; the agent sees the session's history |
 | `GET /agent/sessions/{id}` | the whole session: `{session_id, owner, peer, purpose, status, context, state, turns: [{author, kind, content, at}]}` |
 | `POST /agent/sessions/{id}/close` | `{session_id, status: "closed"}`; later messages get HTTP 409 |
+
+Every call on a session after the open must send the opener's `session_token` in the
+`X-Session-Token` header (HTTP 403 otherwise, 404 for an unknown id). A close waits for a
+reply being written. A session takes at most 100 turns (then 409); a node keeps at most 200
+open sessions (when full, it closes the least recently used idle one) and the 50 most recently
+closed ones. Tuttie closes its session when a negotiation ends.
 
 `context` is what the opening agent chose to share. Every item an agent holds has a
 visibility (`code/sessions/context.py`): `public` (may go into a posting), `negotiation` (may

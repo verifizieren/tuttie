@@ -16,7 +16,8 @@ signature that is missing:
     8. approval       if the action needs one: the user's signed "approved" decision for this
                       action and this business, not used before, for exactly the amount: the
                       agreement's price, or else the total the business computed itself (the
-                      caller's own figures are never trusted)
+                      caller's own figures are never trusted); for a payment also for exactly
+                      this charge (purpose and booking)
        or mandate     for a payment (Needs.mandate) without an approval: the user's signed
                       mandate (aps/mandate.py) for this agent, payee and purpose, at most
                       CHF 10 per payment and within its total (the gate counts what was paid)
@@ -46,14 +47,15 @@ Hook for an action tool (owner of node/server.py), e.g. `book`:
 
 For `pay` (the business computes what it charges):
 
-    Needs("pay", scope=None, approval=True, mandate=True, amount_chf=charge, purpose="city tax")
+    Needs("pay", scope=None, approval=True, mandate=True, amount_chf=charge, purpose="city tax",
+          booking_id=booking_id)
 """
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from aps.approval import verify_decision
+from aps.approval import payment_charge, verify_decision
 from aps.call import CALL_MAX_AGE_S, NonceBook, call_body, verify_call
 from aps.delegation import verify_delegation
 from aps.envelope import is_fresh
@@ -73,6 +75,8 @@ class Needs:
     tool and this business, for exactly `amount_chf` (the total the business computed; an
     agreement in the call replaces it with the agreed price). With `mandate` as well, a
     user-signed mandate for `purpose` may stand in for the approval of a small payment.
+    A payment (`purpose` set) also needs an approval for exactly that charge: its signed
+    `charge` must be {purpose, booking_id} (aps/approval.py, payment_charge).
     """
 
     tool: str
@@ -81,6 +85,7 @@ class Needs:
     amount_chf: float | None = None
     mandate: bool = False
     purpose: str | None = None
+    booking_id: str | None = None
 
 
 @dataclass
@@ -208,6 +213,8 @@ class ActionGate:
             raise Refused("there is no amount to approve")
         if round(amount, 2) != round(approval["amount_chf"], 2):
             raise Refused(f"approved CHF {approval['amount_chf']:g} does not match the total CHF {amount:g}")
+        if needs.purpose is not None and approval.get("charge") != payment_charge(needs.purpose, needs.booking_id):
+            raise Refused(f"the approval is not for the {needs.purpose} of this booking")
         return approval, amount
 
     def commit(self, verdict: Verdict) -> None:

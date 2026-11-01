@@ -11,9 +11,12 @@
 // When the wallet is hidden (another app, locked phone) the room is left; it rejoins on return.
 // A failed join (token or connection) is "unavailable": while voice mode is on it is tried again
 // with a growing wait (lib/recovery.js), and at once on retry() or when voice mode starts again.
+// A microphone the browser refuses (permission denied, none there, busy) is "micBlocked": the
+// wallet says so and stays usable by typing; it is asked for again only when the user taps the
+// face or the microphone button (retry(), toggleMute()), never in a loop of permission prompts.
 import { useEffect, useRef, useState } from "react";
 import { report, watchIce } from "../lib/iceReport.js";
-import { voiceRetryDelay } from "../lib/recovery.js";
+import { micRefused, voiceRetryDelay } from "../lib/recovery.js";
 
 const LEVEL_MS = 50;       // how often the voice levels go to the presence (and so to the eyes)
 const RETRY_MS = 2000;     // rejoin after a dropped connection
@@ -31,12 +34,13 @@ function visible() {
  * @param onLevels  (speaking, hearing) => void: both voice levels (0..1), every LEVEL_MS while live,
  *                  and (0, 0) when voice stops; feeds Tuttie's presence (hooks/usePresence.js)
  * @param conversationId  the conversation on screen (null while loading): the room belongs to it
- * @returns { state, unlockAudio, muted, toggleMute, retry }: state is "off" | "connecting" |
+ * @returns { state, unlockAudio, muted, micBlocked, toggleMute, retry }: state is "off" | "connecting" |
  *          "ready" (joined, waiting in the background) | "live" (voice mode on) | "unavailable"
  *          (the join failed; tried again) | "disabled" (the server has no voice: text only);
  *          call unlockAudio() from a tap if the browser blocked Tuttie's voice; muted keeps the
- *          microphone off (e.g. in a noisy room) until toggled again; retry() joins again now
- *          if voice is unavailable
+ *          microphone off (e.g. in a noisy room) until toggled again; micBlocked: the browser
+ *          refused the microphone (toggleMute() and retry() then ask for it once more);
+ *          retry() joins again now if voice is unavailable
  */
 export default function useVoice(active, onSpeech, onLevels, conversationId) {
   const speech = useRef(onSpeech);
@@ -53,6 +57,15 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const [micBlocked, setMicBlocked] = useState(false);
+  const micBlockedRef = useRef(micBlocked);
+  micBlockedRef.current = micBlocked;
+  // A refused microphone is remembered (no new prompt by itself); any other failure just
+  // leaves the microphone out of this try.
+  const refused = error => {
+    if (micRefused(error)) setMicBlocked(true);
+    report({ state: "microphone failed", error: String(error?.name || error).slice(0, 100) });
+  };
   const [attempt, setAttempt] = useState(0);
   const [shown, setShown] = useState(visible());
 
@@ -84,7 +97,8 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
         await Promise.all([response.json(), import("livekit-client")]);
       if (closed) return;
       // The microphone first, then the connection (see above). Muted: connect without it.
-      const mic = activeRef.current && !mutedRef.current ? await createLocalAudioTrack(MIC).catch(() => null) : null;
+      const mic = activeRef.current && !mutedRef.current && !micBlockedRef.current
+        ? await createLocalAudioTrack(MIC).catch(error => { refused(error); return null; }) : null;
       if (closed) { mic?.stop(); return; }
       watchIce();  // a failed connection on a phone is reported to the server's log
       // The classic two connections (publish, subscribe), not the newer single one: phones'
@@ -158,7 +172,7 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
   // Voice mode: microphone on (unless muted), Tuttie's voice audible, levels to the presence.
   useEffect(() => {
     if (!joined) return undefined;
-    joined.localParticipant.setMicrophoneEnabled(active && !muted, MIC).catch(() => {});
+    joined.localParticipant.setMicrophoneEnabled(active && !muted && !micBlocked, MIC).catch(refused);
     // Tells the voice agent whether to speak: with the card closed or typing, Tuttie stays quiet.
     joined.localParticipant.setAttributes({ voice: active ? "on" : "off" }).catch(() => {});
     document.querySelectorAll("audio[data-tuttie]").forEach(el => { el.muted = !active; });
@@ -174,22 +188,29 @@ export default function useVoice(active, onSpeech, onLevels, conversationId) {
       clearInterval(levels);
       levelsTo.current?.(0, 0);
     };
-  }, [joined, active, muted]);
+  }, [joined, active, muted, micBlocked]);
 
   /** Browsers may hold back audio until a tap: start Tuttie's voice from one. */
   function unlockAudio() {
     joined?.startAudio().catch(() => {});
   }
 
-  /** Turn the microphone off or on again; Tuttie keeps talking and listening to taps. */
+  /** Turn the microphone off or on again; Tuttie keeps talking and listening to taps. A blocked
+   *  microphone is asked for once more instead (the user may have allowed it meanwhile). */
   function toggleMute() {
+    if (micBlockedRef.current) return retry();
     setMuted(m => !m);
   }
 
-  /** Join again now if voice is unavailable (e.g. the user tapped "tap to retry"). */
+  /** Ask for a blocked microphone again, and join again now if voice is unavailable (e.g. the
+   *  user tapped "tap to retry" or Tuttie's face). */
   function retry() {
+    if (micBlockedRef.current) {
+      setMuted(false);
+      setMicBlocked(false);
+    }
     if (stateRef.current === "unavailable") setAttempt(n => n + 1);
   }
 
-  return { state, unlockAudio, muted, toggleMute, retry };
+  return { state, unlockAudio, muted, micBlocked, toggleMute, retry };
 }

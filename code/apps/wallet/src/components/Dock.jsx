@@ -41,16 +41,19 @@ function KeyboardIcon() {
  * @param onNewChat   start a new conversation (the current one goes into the history)
  * @param onKeyboard  switch to typing (in a past chat open in the history: continue that chat first)
  * @param muted       the microphone is off
- * @param onMute      turn the microphone off or on
+ * @param blocked     the browser refused the microphone: shown off, a tap asks for it again
+ * @param onMute      turn the microphone off or on (blocked: ask for it again)
  */
-export default function Dock({ onHistory, onNewChat, onKeyboard, muted, onMute }) {
+export default function Dock({ onHistory, onNewChat, onKeyboard, muted, blocked = false, onMute }) {
+  const off = muted || blocked;
   return (
     <nav className="dock" aria-label="Tuttie">
       <button type="button" onClick={onHistory} aria-label="History"><HistoryIcon /></button>
       <button type="button" onClick={onNewChat} aria-label="New chat"><NewChatIcon /></button>
       <button type="button" onClick={onKeyboard} aria-label="Type instead"><KeyboardIcon /></button>
-      <button type="button" className={muted ? "muted" : ""} onClick={onMute} aria-pressed={muted}
-              aria-label={muted ? "Unmute microphone" : "Mute microphone"}><MicIcon muted={muted} /></button>
+      <button type="button" className={off ? "muted" : ""} onClick={onMute} aria-pressed={off}
+              aria-label={blocked ? "Microphone blocked, tap to try again" : muted ? "Unmute microphone" : "Mute microphone"}>
+        <MicIcon muted={off} /></button>
     </nav>
   );
 }

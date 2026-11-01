@@ -16,37 +16,91 @@ import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs before an approval is sent
 const GONE_MS = 2600;   // how long "already decided or expired" is shown before the sheet goes
+const DONE_MS = 1400;   // how long the final mark (checkmark or X) is shown before the sheet slides away
+const LEAVE_MS = 350;   // the slide down (wallet.css .sheet.leaving)
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const day = date => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+// The night as "14 Nov"; a date in another form is shown as it came.
+function day(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** The Face ID glyph as on an iPhone: rounded corner brackets around a simple face (eyes, an
+ *  L-shaped nose, a smile). Scanning, the face turns a little and the brackets pulse; once
+ *  approved, the face gives way to a checkmark drawn inside the same brackets. */
+function FaceId({ done = false }) {
+  return (
+    <svg className={done ? "faceid-glyph faceid-done" : "faceid-glyph"} viewBox="0 0 60 60" aria-hidden="true">
+      <g className="faceid-frame">
+        <path d="M4 18V10a6 6 0 0 1 6-6h8M42 4h8a6 6 0 0 1 6 6v8M56 42v8a6 6 0 0 1-6 6h-8M18 56h-8a6 6 0 0 1-6-6v-8" />
+      </g>
+      <g className="faceid-face">
+        <path d="M21 22v5M39 22v5M30 22v11h-2.5M22 40q8 6 16 0" />
+      </g>
+      {done && <path className="faceid-check" d="M19 31l7.5 7.5L41.5 23" />}
+    </svg>
+  );
+}
 
 function Progress({ stage, decision }) {
+  const approved = decision === "approved";
   if (stage === "done") {
-    const approved = decision === "approved";
     return (
       <div className="faceid" aria-live="polite">
-        <svg className={approved ? "faceid-ok" : "faceid-ok faceid-no"} viewBox="0 0 52 52" aria-label={doneLabel(decision)}>
-          <circle cx="26" cy="26" r="25" />
-          <path d={approved ? "M15 27l7 7 15-16" : "M18 18l16 16M34 18L18 34"} />
-        </svg>
+        {approved ? <FaceId done />
+                  : <svg className="faceid-ok faceid-no" viewBox="0 0 52 52" aria-hidden="true">
+                      <circle cx="26" cy="26" r="25" /><path d="M18 18l16 16M34 18L18 34" />
+                    </svg>}
         <span>{doneLabel(decision)}</span>
       </div>
     );
   }
-  const scanning = decision === "approved";
   return (
     <div className="faceid" aria-live="polite">
-      {scanning ? <div className="faceid-scan" aria-label="Confirming with Face ID"><i /><i /><i /><i /></div>
-                : <div className="faceid-wait" aria-hidden="true" />}
+      {approved ? <FaceId /> : <div className="faceid-wait" aria-hidden="true" />}
       <span>{stage === "scan" ? "Face ID" : sendingLabel(decision)}</span>
+    </div>
+  );
+}
+
+/** What replaces the sheet if it cannot be shown (an approval in a shape this version does not
+ *  expect): the user can still decline, so nothing waits on a sheet nobody can see. */
+export function ApprovalFallback({ approval, onGone }) {
+  const [state, setState] = useState("ask");  // ask | sending | failed | done
+  if (!approval) return null;
+  async function decline() {
+    setState("sending");
+    try {
+      await decide(approval.id, "declined", false);
+      setState("done");
+    } catch (e) {
+      if (failureOf(e).gone) return setState("done");
+      setState("failed");
+    }
+  }
+  return (
+    <div className="sheet" role="dialog" aria-label="Approve payment">
+      <p className="sheet-error" role="alert">
+        {state === "done" ? "Declined." : "This payment request cannot be shown, so it cannot be approved here."}
+        {state === "failed" && " Declining did not work, please try again."}
+      </p>
+      <div className="sheet-buttons sheet-close">
+        {state === "done" ? <button type="button" className="decline" onClick={onGone}>Close</button>
+          : <button type="button" className="decline" disabled={state === "sending"} onClick={decline}>Decline</button>}
+      </div>
     </div>
   );
 }
 
 // `note`: a passing line from the wallet while the sheet covers the card (e.g. "Decide on the
 // booking first" after the user tapped New chat); the line under Tuttie's eyes is hidden then.
-export default function ApprovalSheet({ approval, onGone, note = "" }) {
+// `onDecide(approval)` when the user decides: the wallet keeps the sheet while it finishes, even
+// once the server stopped waiting; `onFinished(id, decided)` after the final mark was shown and the
+// sheet left (decided), or after a failed send while the approval still waits (not decided).
+export default function ApprovalSheet({ approval, onGone, note = "", onDecide, onFinished }) {
   const [stage, setStage] = useState("ask");     // ask | scan | sending | done | gone
+  const [leaving, setLeaving] = useState(false); // sliding away after the final mark
   const [decision, setDecision] = useState(null); // the chosen decision, then the recorded one
   const [error, setError] = useState("");
   const [allow, setAllow] = useState(true);      // sign the offered mandate as well
@@ -67,6 +121,7 @@ export default function ApprovalSheet({ approval, onGone, note = "" }) {
     busy.current = true;
     setError("");
     setDecision(chosen);
+    onDecide?.(approval);
     if (chosen === "approved") {
       setStage("scan");
       await wait(SCAN_MS);
@@ -76,16 +131,21 @@ export default function ApprovalSheet({ approval, onGone, note = "" }) {
       const result = await decide(approval.id, chosen, chosen === "approved" && Boolean(offer) && allow);
       setDecision(recordedDecision(result, chosen));
       setStage("done");
+      await wait(DONE_MS);  // the checkmark (or X) is seen in full
+      setLeaving(true);
+      await wait(LEAVE_MS);
+      onFinished?.(approval.id, true);
     } catch (e) {
       const failure = failureOf(e);
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
+      if (!failure.gone) onFinished?.(approval.id, false);  // still waiting: shown as the server's approval again
     }
   }
 
   return (
-    <div className="sheet" role="dialog" aria-label="Approve payment" data-scroll>
+    <div className={leaving ? "sheet leaving" : "sheet"} role="dialog" aria-label="Approve payment" data-scroll>
       <div className="sheet-hotel">
         <SealMarks seals={approval.seals} />
         {approval.hotel}

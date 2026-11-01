@@ -56,6 +56,8 @@ def verify_delegation(delegation: dict, user_public_key: str, agent_id: str, age
     expires = parse_timestamp(body["expires_at"])
     if expires is None or expires <= (now or datetime.now(expires.tzinfo)):
         return False
+    if not isinstance(body["scopes"], list):
+        return False  # a string would turn `scope in scopes` into a substring test
     if scope is not None and scope not in body["scopes"]:
         return False
     return verify_bytes(user_public_key, body, delegation.get("signature", ""))

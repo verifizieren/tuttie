@@ -14,15 +14,18 @@ Results carry "source_step", the timeline step that proves them, so every fact T
 can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 """
 
+import inspect
 import json
 import re
 from dataclasses import dataclass
+from datetime import date as Date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from aps import agent_key, evaluate_record, load_signing_key, verify_envelope
-from aps.approval import booking_terms
+from aps.approval import booking_terms, payment_charge, plain_term
 from aps.call import sign_call
 from aps.mandate import AUTO_PAY_LIMIT_CHF, may_auto_pay
 from aps.delegation import verify_delegation
@@ -43,6 +46,37 @@ NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 READ_TOOLS = {"get_availability", "get_policies", "get_forecast", "get_connections"}  # the last two: services/server.py
 # Node replies must be this fresh, so an old signed reply (e.g. an outdated price) cannot be replayed.
 MAX_REPLY_AGE_S = 300
+MAX_GUESTS = 10  # what a business node takes (node/server.py)
+SWISS_TIME = ZoneInfo("Europe/Zurich")
+
+
+def swiss_today() -> Date:
+    """Today's date in Switzerland, where the user lives (the same day today_note gives the LLM)."""
+    return datetime.now(SWISS_TIME).date()
+
+
+def stay_error(day, guests, nights) -> str | None:
+    """Why a hotel request cannot be posted as asked, or None. The error tells the LLM to ask the
+    user, so a past night, a wrong party size or a longer stay is never silently changed."""
+    try:
+        night = Date.fromisoformat(day) if isinstance(day, str) and len(day) == 10 else None
+    except ValueError:
+        night = None
+    if night is None:
+        return "date must be YYYY-MM-DD"
+    today = swiss_today()
+    if night < today:
+        return (f"{day} is in the past (today is {today}). Do not post it: tell the user and ask "
+                "which night they mean.")
+    if isinstance(guests, bool) or not isinstance(guests, int) or not 1 <= guests <= MAX_GUESTS:
+        return f"guests must be a whole number from 1 to {MAX_GUESTS}: ask the user how many people are coming"
+    if isinstance(nights, bool) or not isinstance(nights, int) or nights < 1:
+        return "nights must be a whole number of at least 1"
+    if nights > 1:
+        return (f"Hotels on the agent web take one night per booking so far, so {nights} nights cannot be "
+                "booked here. Tell the user honestly and ask whether to book just the first night "
+                f"({day}); if yes, post again with nights=1.")
+    return None
 
 
 def function(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:
@@ -70,8 +104,12 @@ SCHEMAS = [
         "send signed offers; returns the shortlist (verified, within budget, cheapest first). "
         "Use this first when the user looks for a hotel.",
         {
-            "date": {"type": "string", "description": "YYYY-MM-DD"},
-            "guests": {"type": "integer"},
+            "date": {"type": "string",
+                     "description": "YYYY-MM-DD, the check-in night: the one the user names, else the calendar's"},
+            "guests": {"type": "integer",
+                       "description": "how many people: the number the user names, else the calendar's, else 1"},
+            "nights": {"type": "integer",
+                       "description": "how many nights: the number the user names, else the calendar's, else 1"},
             "requirements": {"type": "array", "items": {"type": "string"},
                              "description": "public needs, e.g. [\"quiet\", \"dog\", \"arrival around 01:00\"]"},
             # Only the city: an area tag left out every hotel outside it (the train to Basel SBB once
@@ -200,9 +238,14 @@ def agreement_conflicts(deal: dict, booked_date: str, room_type: str, date: str,
 def booked_other_terms(confirmation: dict, amount: float, terms: dict | None) -> list[str]:
     """Where a signed confirmation differs from what the user approved (empty: it matches)."""
     differ = [] if round(confirmation.get("total_chf", -1), 2) == round(amount, 2) else ["total_chf"]
-    if terms is not None:
-        differ += [key for key in ("room_type", "date", "rate", "offer_id")
-                   if key in terms and confirmation.get(key) != terms[key]]
+    if terms is not None:  # room, night and rate were approved as plain text (plain_term)
+        plain = {key: None if confirmation.get(key) is None else plain_term(confirmation[key])
+                 for key in ("room_type", "date", "rate")}
+        plain["offer_id"] = confirmation.get("offer_id")
+        differ += [key for key in ("room_type", "date", "rate", "offer_id") if key in terms and plain[key] != terms[key]]
+        extras = confirmation.get("extras", [])  # no extras listed: nothing was included
+        if "includes" in terms and (not isinstance(extras, list) or sorted(map(plain_term, extras)) != sorted(terms["includes"])):
+            differ.append("includes")  # an approved extra dropped (or one added) is not what the user approved
     return differ
 
 
@@ -316,14 +359,23 @@ class Toolbox:
         self.agreements: dict[str, dict] = {}  # node_id -> the hotel's signed Agreement from the last negotiation
         self.seen: dict[str, int] = {}  # node_id -> timeline step of its registry check, shown once
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
+        self.new_turn()
+
+    def new_turn(self) -> None:
+        """A new user message: the next negotiate call may bargain again (e.g. "try for less")."""
+        self.bargained: dict | None = None  # this turn's negotiation: request_id, budget, outcomes
 
     async def dispatch(self, name: str, args: dict) -> dict:
-        """Run a tool by name with the LLM's arguments."""
+        """Run a tool by name with the LLM's arguments; arguments that do not fit the tool are an error for the LLM."""
         tools = {"recall_context": self.recall_context, "post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay,
                  "end_conversation": self.end_conversation, "current_deals": self.current_deals, "swipe_card": self.swipe_card}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
+        try:  # only the call itself: a TypeError inside a tool is a failure, not the LLM's mistake
+            inspect.signature(tools[name]).bind(**args)
+        except TypeError as error:
+            return {"error": f"bad arguments for {name}: {error}"}
         return await tools[name](**args)
 
     async def current_deals(self) -> dict:
@@ -362,15 +414,20 @@ class Toolbox:
         """The user's calendar, mail, messages and preferences (assistant/context.py)."""
         return await self.user.recall(self.bus)
 
-    async def post_request(self, **request) -> dict:
+    async def post_request(self, date: str, guests: int = 1, nights: int = 1, **request) -> dict:
         """Post the request on the market (MarketDesk.find), bargain with the hotels, then show
         them as cards with the agreed prices.
 
+        A past night, a bad party size or more than one night is refused before anything is
+        posted, so the LLM asks the user instead of booking something else silently.
         The wallet lets the user swipe through the cards; Tuttie then books the best liked deal.
         """
-        result = await self.market.find(**request)
+        if problem := stay_error(date, guests, nights):
+            return {"error": problem}
+        result = await self.market.find(date=date, guests=guests, **request)
         if "error" in result:
             return result
+        self.bargained = None
         self.agreements.clear()
         self.availability.clear()
         self.commitments.clear()
@@ -415,6 +472,17 @@ class Toolbox:
             chosen = self.market.last_shortlist
         if not chosen:
             return {"error": "post a request first: there is no shortlist to negotiate"}
+        request_id = self.market.last_request["request_id"]
+        names = {o["node_id"]: o["name"] for o in chosen}
+        done = self.bargained
+        if (done and done["request_id"] == request_id and budget_chf in (None, done["budget"])
+                and names.keys() <= done["outcomes"].keys()):
+            # The model often calls negotiate right after post_request, which already bargained:
+            # a second round would only replay the same haggling. A new user message resets this.
+            repeat = self.negotiation_result([done["outcomes"][n] for n in names], names)
+            repeat["note"] = ("Already negotiated for this request in this turn (post_request did it): "
+                              "these are its signed agreements. Do not negotiate again; use them.")
+            return repeat
         needs = self.market.last_request["constraints"]
         context = Context().add("date", needs["date"], "public").add("requirements", needs["requirements"], "negotiation")
         if budget_chf is not None:
@@ -423,11 +491,22 @@ class Toolbox:
         outcomes = await negotiator.negotiate_all(chosen, context)
         winner = best(outcomes)
         self.agreements.update({o.node_id: o.agreement for o in outcomes if o.status == "agreed"})
-        names = {o["node_id"]: o["name"] for o in chosen}
+        same = done and done["request_id"] == request_id and done["budget"] == budget_chf
+        earlier = done["outcomes"] if same else {}
+        self.bargained = {"request_id": request_id, "budget": budget_chf,
+                          "outcomes": {**earlier, **{o.node_id: o for o in outcomes}}}
         summary = (f"Best agreement: {names[winner.node_id]} at CHF {winner.price_chf:g} "
                    f"(offered CHF {winner.offer_price_chf:g})") if winner else "No hotel agreed within the budget"
         self.bus.emit("marketplace", "verified" if winner else "declined", summary,
                       detail={"phase": "agreement", "agreement": winner.agreement if winner else None})
+        return self.negotiation_result(outcomes, names)
+
+    @staticmethod
+    def negotiation_result(outcomes: list, names: dict[str, str]) -> dict:
+        """What negotiate returns to the LLM: each hotel's outcome and the cheapest agreement."""
+        from negotiation.tuttie import best
+
+        winner = best(outcomes)
         return {
             "outcomes": [{"node_id": o.node_id, "hotel": names[o.node_id], "status": o.status,
                           "agreement": o.agreement["payload"] if o.agreement else None, "offered_chf": o.offer_price_chf,
@@ -497,14 +576,19 @@ class Toolbox:
         record = response.json()
         return record, evaluate_record(record, self.authorities)
 
-    async def verified_post(self, node_id: str, path: str, body: dict, kind: str, label: str) -> Verified | dict:
+    async def verified_post(self, node_id: str, path: str, body: dict, kind: str, label: str,
+                            headers: dict | None = None) -> Verified | dict:
         """Check the node's seals, POST to one of its agent endpoints, and verify the signed reply.
 
+        Agent conversations are only held with gold or blue nodes: the deployment's agent key
+        (aps/agent_key.py) must never reach a grey node, which could replay it elsewhere.
         Returns Verified, or a rejection dict for the LLM (already shown on the timeline).
         """
         async def send(record: dict) -> dict:
-            return (await self.http.post(f"{record['endpoint']}{path}", json=body, headers=agent_key.headers())).json()
-        return await self.verified(node_id, send, kind, label)
+            response = await self.http.post(f"{record['endpoint']}{path}", json=body,
+                                            headers={**agent_key.headers(), **(headers or {})})
+            return response.json()
+        return await self.verified(node_id, send, kind, label, tiers=("gold", "blue"))
 
     async def verified_mcp(self, node_id: str, tool: str, args: dict, kind: str, label: str) -> Verified | dict:
         """Check the node's seals, call one of its MCP tools, and verify the signed reply."""
@@ -512,8 +596,10 @@ class Toolbox:
             return await self.mcp.call(record["endpoint"], tool, args)
         return await self.verified(node_id, send, kind, label)
 
-    async def verified(self, node_id: str, send, kind: str, label: str) -> Verified | dict:
-        """The trust gate around one call: seals first, then `send(record)`, then the envelope."""
+    async def verified(self, node_id: str, send, kind: str, label: str,
+                       tiers: tuple[str, ...] = ("gold", "blue", "grey")) -> Verified | dict:
+        """The trust gate around one call: seals first (the node's tier must be in `tiers`),
+        then `send(record)`, then the envelope."""
         found = await self.lookup(node_id)
         if found is None:
             return {"node_id": node_id, "rejected": True, "reason": "not in the registry"}
@@ -522,6 +608,10 @@ class Toolbox:
             reason = broken_reason(verdict)
             self.bus.emit(kind, "broken", f"{label} refused: {reason}", record, verdict["seals"])
             return rejected(record, reason)
+        if verdict["tier"] not in tiers:
+            self.bus.emit(kind, "untrusted", f"{label} not sent: {record['name']} has no verified seal",
+                          record, verdict["seals"])
+            return rejected(record, "agent conversations need a verified (gold or blue) seal")
 
         try:
             envelope = await send(record)
@@ -663,6 +753,8 @@ class Toolbox:
         self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                       {"approval_id": approval["id"], "amount_chf": amount, "offer_mandate": offer, "terms": terms})
         decision = await self.approvals.wait(approval["id"])
+        if decision is None:  # the approval was dropped (e.g. a new demo started): nothing is approved
+            return {"declined": True, "reason": "the approval is no longer open"}
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
         if decision["decision"] != "approved":
@@ -702,8 +794,10 @@ class Toolbox:
         return answer
 
     async def mandate_offer(self, node_id: str) -> dict | None:
-        """A mandate to offer with a booking: for the hotel's small charge (e.g. the city tax), if any."""
-        small = [c for c in await self.load_charges(node_id) if c["price_chf"] <= AUTO_PAY_LIMIT_CHF]
+        """A mandate to offer with a booking: for the hotel's small charge (e.g. the city tax), if any.
+
+        Only for a charge above CHF 0: a mandate is for a positive amount (aps/mandate.py)."""
+        small = [c for c in await self.load_charges(node_id) if 0 < c["price_chf"] <= AUTO_PAY_LIMIT_CHF]
         if not small:
             return None
         charge = small[0]
@@ -741,10 +835,13 @@ class Toolbox:
             how = "with your mandate, no phone needed"
         else:
             summary = f"Pay {record['name']}: {purpose} for {booking_id} = CHF {amount:g}"
-            approval = self.approvals.create("pay", record, amount, summary, verdict["seals"])
+            approval = self.approvals.create("pay", record, amount, summary, verdict["seals"],
+                                             charge=payment_charge(purpose, booking_id))
             self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                           {"approval_id": approval["id"], "amount_chf": amount})
             decision = await self.approvals.wait(approval["id"])
+            if decision is None:  # the approval was dropped (e.g. a new demo started): nothing is approved
+                return {"declined": True, "reason": "the approval is no longer open"}
             step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                                  " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
             if decision["decision"] != "approved":
