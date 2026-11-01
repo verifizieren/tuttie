@@ -65,6 +65,7 @@ UPDATES = {"approval": "Please confirm with Face ID."}
 BUSY = "One moment please."  # too many turns a minute (429): the user can say it again shortly
 NOT_PASSED = "Sorry, that did not go through. Could you say it again?"
 # After Tuttie recommends a hotel, the choice goes to the user (said once, after the answer).
+RECONNECT_S = (0.5, 10.0)  # wait before following the timeline again: first, and at most (doubling)
 HANDOFF = "It's your choice: swipe right on the ones you like, or just tell me."
 
 
@@ -295,7 +296,12 @@ def voice_on(room: rtc.Room) -> bool:
 
 
 async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, room: rtc.Room) -> None:
-    """Speak every answer and the approval prompt from the conversation's timeline, in voice mode."""
+    """Speak every answer and the approval prompt from the conversation's timeline, in voice mode.
+
+    When the timeline stream ends (the assistant restarted, a dropped connection) it connects
+    again after RECONNECT_S[0] s, doubling up to RECONNECT_S[1] s while it keeps failing; it stops
+    for good when the room is unknown (404) or its conversation is no longer active (409).
+    """
     said: set[str] = set()
     cards = None  # the turn that showed the hotel cards: its answer hands the choice to the user
 
@@ -303,34 +309,58 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
         if text.strip() and voice_on(room):
             session.say(text)
 
-    async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
-        async for line in stream.aiter_lines():
-            if line.startswith("event: reset"):
-                said.clear()
-                cards = None
-            if not line.startswith("data:"):
-                continue
+    def handle(line: str) -> None:
+        nonlocal cards
+        if line.startswith("event: reset"):
+            said.clear()
+            cards = None
+        if not line.startswith("data:"):
+            return
+        try:
             event = json.loads(line[5:])
-            if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
-                cards = event.get("turn") or "?"
-            if event["kind"] == "answer":
-                said.clear()  # the next turn may prompt again
-                agent.asked = None  # answered without (or after) a tool: no filler any more
-                say(spoken(event["summary"]))
-                if cards is not None and event.get("turn", "?") == cards:
-                    say(HANDOFF)
-                    cards = None
-                continue
-            if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
-                agent.asked = None
-                say(ack)
-                continue
-            # The first tool for the request gets a filler; opening the turn, thinking, closing the
-            # card (a goodbye follows) and a swipe on the cards (it already happened) do not.
-            if event["kind"] not in ("turn", "thinking", "close", "wallet") and (line := agent.filler()):
-                say(line)
-            if prompt := update_for(event, said):
-                say(prompt)
+        except ValueError:
+            return
+        if not isinstance(event, dict) or "kind" not in event:
+            return
+        if event["kind"] == "marketplace" and (event.get("detail") or {}).get("phase") == "cards":
+            cards = event.get("turn") or "?"
+        if event["kind"] == "answer":
+            said.clear()  # the next turn may prompt again
+            agent.asked = None  # answered without (or after) a tool: no filler any more
+            say(spoken(str(event.get("summary") or "")))
+            if cards is not None and event.get("turn", "?") == cards:
+                say(HANDOFF)
+                cards = None
+            return
+        if ack := pick_ack(event):  # the user swiped a hotel: say what happens next
+            agent.asked = None
+            say(ack)
+            return
+        # The first tool for the request gets a filler; opening the turn, thinking, closing the
+        # card (a goodbye follows) and a swipe on the cards (it already happened) do not.
+        if event["kind"] not in ("turn", "thinking", "close", "wallet") and (filler := agent.filler()):
+            say(filler)
+        if prompt := update_for(event, said):
+            say(prompt)
+
+    delay = RECONNECT_S[0]
+    while True:
+        try:
+            async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
+                if stream.status_code in (404, 409):
+                    print(f"voice: /voice/events answered {stream.status_code}, room {room.name} stops", flush=True)
+                    return
+                if not stream.is_success:
+                    print(f"voice: /voice/events answered {stream.status_code}", flush=True)
+                else:
+                    async for line in stream.aiter_lines():
+                        delay = RECONNECT_S[0]  # the stream works: a later drop reconnects quickly
+                        handle(line)
+                    print("voice: /voice/events ended, connecting again", flush=True)
+        except httpx.HTTPError as error:
+            print(f"voice: /voice/events failed: {type(error).__name__}", flush=True)
+        await asyncio.sleep(delay)
+        delay = min(2 * delay, RECONNECT_S[1])
 
 
 def prewarm(proc: JobProcess) -> None:
