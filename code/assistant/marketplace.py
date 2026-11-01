@@ -199,8 +199,13 @@ class MarketDesk:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.offer_wait_s
         while True:
-            response = await self.http.get(f"{self.market_url}/postings/{request_id}")
-            for item in response.json().get("offers", []):
+            try:                                # a market hiccup costs one poll, not the offers
+                response = await self.http.get(f"{self.market_url}/postings/{request_id}")
+                response.raise_for_status()
+                items = response.json().get("offers", [])
+            except (httpx.HTTPError, ValueError, AttributeError):
+                items = []
+            for item in items:
                 try:
                     offer_id, node_id = str(item["offer"]["offer_id"]), str(item["node_id"])
                 except (KeyError, TypeError):
