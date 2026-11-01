@@ -61,7 +61,7 @@ channel.postMessage({ type: "hello" });
 setInterval(tick, 250);
 
 addEventListener("keydown", e => {
-  if (e.metaKey || e.ctrlKey || e.altKey || e.key === "n" || e.key === "N" || e.key === "f" || e.key === "F") return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.key === "n" || e.key === "N" || e.key === "f" || e.key === "F" || e.key === "r" || e.key === "R") return;  // no stray reset from the presenter laptop
   channel.postMessage({ type: "key", key: e.key });
   if ([" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) e.preventDefault();
 });
