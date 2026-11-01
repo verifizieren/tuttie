@@ -15,6 +15,7 @@ answers. All logic, tools and signatures stay in the assistant.
 """
 
 import asyncio
+import hmac
 import os
 import secrets
 import time
@@ -71,8 +72,10 @@ def passed_headers(headers) -> dict:
 
 
 def agent_only(request: Request) -> None:
-    """The voice agent's endpoints need the LiveKit secret (it runs on this server, next to us)."""
-    if not configured() or request.headers.get("authorization") != f"Bearer {API_SECRET}":
+    """The voice agent's endpoints need the LiveKit secret (it runs on this server, next to us),
+    compared in constant time."""
+    sent = request.headers.get("authorization", "").encode()
+    if not configured() or not hmac.compare_digest(sent, f"Bearer {API_SECRET}".encode()):
         raise HTTPException(status_code=401, detail="voice agent only")
 
 
