@@ -331,6 +331,7 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
     When the timeline stream ends (the assistant restarted, a dropped connection) it connects
     again after RECONNECT_S[0] s, doubling up to RECONNECT_S[1] s while it keeps failing; it stops
     for good when the room is unknown (404) or its conversation is no longer active (409).
+    Pending approvals are forgotten on every (re)connect and when it stops.
     """
     said: set[str] = set()
     pending: set[str] = getattr(agent, "pending_approvals", set())  # shared with the agent's turns
@@ -378,10 +379,14 @@ async def follow(session: AgentSession, agent: Tuttie, http: httpx.AsyncClient, 
 
     delay = RECONNECT_S[0]
     while True:
+        # A new stream replays no history: a decision made while it was down would never arrive,
+        # so nothing counts as pending from before (at worst a spoken line queues, never mute).
+        pending.clear()
         try:
             async with http.stream("GET", "/voice/events", params={"room": room.name}, timeout=None) as stream:
                 if stream.status_code in (404, 409):
                     print(f"voice: /voice/events answered {stream.status_code}, room {room.name} stops", flush=True)
+                    pending.clear()  # no timeline any more: never block what the user says
                     return
                 if not stream.is_success:
                     print(f"voice: /voice/events answered {stream.status_code}", flush=True)

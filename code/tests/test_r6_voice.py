@@ -259,12 +259,17 @@ def test_while_the_phone_asks_spoken_lines_wait_for_the_decision(monkeypatch):
                "detail": {"approval_id": "ap-0000000a", "amount_chf": 128}}
     decided = {"kind": "approval", "status": "declined", "summary": "You declined CHF 128", "turn": "t1",
                "detail": {"decision": {"approval_id": "ap-0000000a", "decision": "declined"}}}
-    streams = [frames(pending)]
-    calls = {"n": 0}
+    timeline: asyncio.Queue = asyncio.Queue()
+
+    class Live(httpx.AsyncByteStream):
+        """One open /voice/events stream that sends what the test puts on the timeline."""
+
+        async def __aiter__(self):
+            while True:
+                yield frames(await timeline.get()).encode()
 
     def handler(request):
-        calls["n"] += 1
-        return httpx.Response(200, text=streams.pop(0)) if streams else httpx.Response(409)
+        return httpx.Response(200, stream=Live())
 
     lines, sent = [], []
     monkeypatch.setattr(Tuttie, "session", property(lambda self: Session(lines)), raising=False)
@@ -279,6 +284,12 @@ def test_while_the_phone_asks_spoken_lines_wait_for_the_decision(monkeypatch):
         except StopResponse:
             pass
 
+    async def settle(agent, want):
+        for _ in range(200):
+            if bool(agent.pending_approvals) == want:
+                return
+            await asyncio.sleep(0.005)
+
     async def run():
         async with httpx.AsyncClient(base_url="http://a", transport=httpx.MockTransport(handler)) as http:
             agent = Tuttie("tuttie-x", http)
@@ -286,16 +297,21 @@ def test_while_the_phone_asks_spoken_lines_wait_for_the_decision(monkeypatch):
             async def pass_on(text):
                 sent.append(text)
             agent.pass_on = pass_on
-            await asyncio.wait_for(follow(Session(lines), agent, http, Room()), 2)
-            assert agent.pending_approvals
-            await turn(agent, "yes book it")
-            await turn(agent, "ok thanks bye")
-            assert sent == [] and lines == [UPDATES["approval"], "Please approve or decline on your phone first."], lines
-            streams.append(frames(decided))
-            await asyncio.wait_for(follow(Session(lines), agent, http, Room()), 2)
-            assert not agent.pending_approvals
-            await turn(agent, "ok thanks bye")
-            assert sent == ["ok thanks bye"]
+            follower = asyncio.create_task(follow(Session(lines), agent, http, Room()))
+            try:
+                timeline.put_nowait(pending)
+                await settle(agent, True)
+                assert agent.pending_approvals
+                await turn(agent, "yes book it")
+                await turn(agent, "ok thanks bye")
+                assert sent == [] and lines == [UPDATES["approval"], "Please approve or decline on your phone first."], lines
+                timeline.put_nowait(decided)
+                await settle(agent, False)
+                assert not agent.pending_approvals
+                await turn(agent, "ok thanks bye")
+                assert sent == ["ok thanks bye"]
+            finally:
+                follower.cancel()
     asyncio.run(run())
 
 
