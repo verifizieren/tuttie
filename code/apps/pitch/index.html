@@ -134,7 +134,7 @@ canvas.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; }
 .b1 { --i: 1; background: linear-gradient(135deg, #2e2e33, #0d0d0e 70%); }
 .chip { position: absolute; left: 20px; top: 20px; width: 40px; height: 30px; border-radius: 7px; overflow: hidden; background: linear-gradient(135deg, #e8d6a8, #b39a5e); opacity: .85; }
 .chip svg { width: 100%; height: 100%; display: block; fill: none; stroke: rgba(90,68,28,.55); stroke-width: 1; }
-/* Swiss bank marks, as BankCard.jsx draws them: ZKB (blue, Swiss cross) and UBS (black, keys). */
+/* Swiss bank marks, as BankCard.jsx draws them: BKB (blue) and UBS (black), their real logos. */
 .bank-brand { position: absolute; top: 18px; right: 20px; height: 34px; display: flex; align-items: center; color: #fff; line-height: 1; }
 .ubs-brand { gap: 8px; }
 .ubs-brand b { font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 700; letter-spacing: -.06em; }
@@ -616,7 +616,7 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
 /* The real bank marks, drawn white on the card. */
 .bank-brand { top: 20px; }
 .bank-logo { display: block; filter: brightness(0) invert(1); }
-.bank-logo.zkb { height: 24px; }
+.bank-logo.bkb { height: 30px; }
 .bank-logo.ubs { height: 36px; margin-top: -4px; }
 /* Scene 3: the camera comes close, the top half of the phone, so Tuttie's progress lines are readable. */
 .at-context #cam { transform: translate3d(390px, 400px, 0) scale(2.05); transition: transform 1.1s var(--cam), opacity .6s ease; }
@@ -685,8 +685,8 @@ html.dark-theme .side-press-cue { color:#a5a5ad; }
 
       <div class="wl">
         <div class="whead"><h1>Wallet</h1></div>
-        <div class="card bank b0" aria-label="ZKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
-          <span class="bank-brand" aria-hidden="true"><img class="bank-logo zkb" src="img/zkb-logo.svg" alt=""></span></div>
+        <div class="card bank b0" aria-label="BKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+          <span class="bank-brand" aria-hidden="true"><img class="bank-logo bkb" src="img/bkb-logo.svg" alt=""></span></div>
         <div class="card bank b1" aria-label="UBS card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
           <span class="bank-brand" aria-hidden="true"><img class="bank-logo ubs" src="img/ubs-logo.svg" alt=""></span></div>
         <div class="card agent">

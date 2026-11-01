@@ -39,7 +39,7 @@ that fit their label. The page never links to the live wallet: people who scan t
 feeling, not the shared live system. The browser scrollbar is hidden.
 
 The demo is a mock that copies the wallet's look (`apps/wallet/src/wallet.css`) at the wallet's
-native 390 x 844 size; the live product is the wallet itself. The bank cards are UBS and ZKB as
+native 390 x 844 size; the live product is the wallet itself. The bank cards are UBS and BKB as
 in `apps/wallet/src/components/BankCard.jsx`. `face.js` is a copy of
 `apps/wallet/src/lib/face.js`: keep it in sync. Photos: `img/` (copied from
 `apps/wallet/public/hotels`, credits in `apps/wallet/public/hotels/CREDITS.md`).

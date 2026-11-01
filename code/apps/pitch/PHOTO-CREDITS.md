@@ -17,7 +17,7 @@ used to illustrate the demo hotels (the hotels themselves are fictional).
 Trademarks of their owners, shown on the illustrated bank cards (drawn white on the card).
 
 - `img/ubs-logo.svg`: UBS logo, https://en.wikipedia.org/wiki/File:UBS_Logo.svg
-- `img/zkb-logo.svg`: Zürcher Kantonalbank logo, https://commons.wikimedia.org/wiki/File:Zürcher_Kantonalbank_logo.svg
+- `img/bkb-logo.svg`: Basler Kantonalbank logo, https://commons.wikimedia.org/wiki/File:Logo_Basler_Kantonalbank_ab_2016.svg
 
 ## Lock screen
 

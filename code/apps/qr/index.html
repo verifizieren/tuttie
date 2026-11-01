@@ -564,7 +564,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .model b { font-size: 16px; }
 .honest { text-align: center; font-size: 15px; }
 
-/* Swiss bank cards, as in apps/wallet/src/components/BankCard.jsx (UBS keys, ZKB Swiss cross). */
+/* Swiss bank cards, as in apps/wallet/src/components/BankCard.jsx (real BKB and UBS logos). */
 .bank-brand { position: absolute; top: 18px; right: 20px; height: 34px; display: flex; align-items: center; color: #fff; line-height: 1; }
 .ubs-brand { gap: 8px; }
 .ubs-brand b { font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 700; letter-spacing: -.06em; }
@@ -583,6 +583,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .rm-cap span { display: none; }
 .rm.s1 + .rm-cap .c1, .rm.s2 + .rm-cap .c2 { display: inline; animation: rmcap .5s ease both; }
 @keyframes rmcap { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.bank-logo { display: block; filter: brightness(0) invert(1); }
+.bank-logo.bkb { height: 30px; }
+.bank-logo.ubs { height: 36px; margin-top: -4px; }
 </style>
 </head>
 <body>
@@ -724,10 +727,10 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
           <div class="island"></div>
           <div class="sbar"><span>23:52</span><svg viewBox="0 0 64 14"><rect x="0" y="9" width="3" height="5" rx="1"/><rect x="5" y="6" width="3" height="8" rx="1"/><rect x="10" y="3" width="3" height="11" rx="1"/><rect x="15" y="0" width="3" height="14" rx="1"/><rect x="36" y="1" width="24" height="12" rx="3.5" fill="none" stroke="currentColor" stroke-opacity=".45"/><rect x="38" y="3" width="17" height="8" rx="2"/><rect x="61" y="5" width="2" height="4" rx="1" fill-opacity=".45"/></svg></div>
           <div class="whead">Wallet</div>
-          <div class="wc bank bank-blue" style="--i:0" aria-label="ZKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
-            <span class="bank-brand zkb-brand" aria-hidden="true"><span class="swiss-mark"><i></i><i></i></span><span><b>ZKB</b><small>Zürcher Kantonalbank</small></span></span></div>
+          <div class="wc bank bank-blue" style="--i:0" aria-label="BKB card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
+            <span class="bank-brand" aria-hidden="true"><img class="bank-logo bkb" src="img/bkb-logo.svg" alt=""></span></div>
           <div class="wc bank bank-black" style="--i:1" aria-label="UBS card"><span class="chip"><svg viewBox="0 0 40 30"><path d="M0 10h13M0 20h13M27 10h13M27 20h13M13 0v30M27 0v30M13 15h14"/></svg></span>
-            <span class="bank-brand ubs-brand" aria-hidden="true"><svg class="ubs-keys" viewBox="0 0 42 30"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="15" r="4.5"/><path d="M11.5 15h24l4-4M31 15l4 4M26 15v4"/><circle cx="13" cy="6" r="3.5"/><path d="M16 8l18 13 5-1M31 19l-1 4"/><circle cx="13" cy="24" r="3.5"/><path d="M16 22L34 9l5 1M31 11l-1-4"/></g></svg><b>UBS</b></span></div>
+            <span class="bank-brand" aria-hidden="true"><img class="bank-logo ubs" src="img/ubs-logo.svg" alt=""></span></div>
           <div class="wc agent" id="agent" style="--i:2">
             <canvas id="demoFace"></canvas><div class="edge"></div><div class="grab"></div>
             <div class="act" id="act">
