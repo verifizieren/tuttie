@@ -22,7 +22,7 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import date as Date
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
@@ -37,7 +37,7 @@ from aps import agent_key
 from aps import evaluate_record, load_signing_key, public_key_b64, sign_envelope, verify_envelope
 from aps.approval import booking_terms
 from aps.call import call_body
-from aps.envelope import is_fresh
+from aps.envelope import is_fresh, parse_timestamp
 from aps.gate import ActionGate, Needs
 from aps.keys import load_public_key
 from marketplace.messages import PostingCreated
@@ -79,6 +79,15 @@ def stay_problem(day, guests=1, today: Date | None = None) -> str | None:
     if isinstance(guests, bool) or not isinstance(guests, int) or not 1 <= guests <= MAX_GUESTS:
         return f"guests must be a whole number from 1 to {MAX_GUESTS}"
     return None
+
+
+def commitment_expired(commitment: dict, night: str, now: datetime | None = None) -> bool:
+    """True if a signed commitment no longer holds for this booking: its valid_until is missing,
+    has passed, or ends before the booked night (a promise for one arrival is not one for later)."""
+    valid_until = parse_timestamp(commitment.get("valid_until"))
+    if valid_until is None or valid_until <= (now or datetime.now(timezone.utc)):
+        return True
+    return Date.fromisoformat(night) >= valid_until.date()
 
 
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
@@ -305,6 +314,8 @@ def create_app(config: dict, http: httpx.AsyncClient | None = None, lookup=regis
                 commitment = extra.get("payload", {}).get("commitment") if isinstance(extra, dict) else None
                 if not commitment or not verify_envelope(extra, own_public_key, expected_node_id=node_id):
                     return refuse("an extra is not a commitment signed by this hotel")
+                if commitment_expired(commitment, req.date):
+                    return refuse(f"the commitment for {commitment.get('item')!r} has expired: ask the hotel again")
                 total += commitment["price_chf"]
                 items.append(commitment["item"])
 
