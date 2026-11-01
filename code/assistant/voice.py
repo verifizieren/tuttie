@@ -32,6 +32,7 @@ from pydantic import BaseModel
 
 from assistant.card_commands import card_choice
 from assistant.inputs import UserText
+from assistant.tools import swipeable
 from assistant.throttle import TURNS_PER_SESSION_PER_MIN, address_key
 
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
@@ -46,8 +47,8 @@ VOICE_ROOM_GRACE_S = 120
 # turns, so room noise never blocks the wallet's swipe-to-book, nor typing the voice. It is
 # higher than typing: fragments from the room count as turns too. A flood still stops at this.
 VOICE_TURNS_PER_SESSION_PER_MIN = 2 * TURNS_PER_SESSION_PER_MIN
-# Exact card commands ("next", "like") move a card without the LLM, so they do not count as
-# turns; their own cap stops a flood (without cards on screen they fall through to the LLM).
+# Exact card commands ("next", "like") while hotel cards are on screen move a card without the
+# LLM, so they count only here (without cards they reach the LLM: a normal voice turn).
 CARD_COMMANDS_PER_SESSION_PER_MIN = 30
 DIAGS_PER_CLIENT_PER_MIN = 10  # /voice/diag is open to anyone: a few reports a minute per address  # a new room is kept this long before it is used (the wallet joins within seconds)
 
@@ -223,12 +224,12 @@ async def voice_say(said: Said, request: Request) -> dict:
     """What the user said, as a new turn in the room's conversation (like typing it).
 
     Spoken turns count on their own per browser, up to VOICE_TURNS_PER_SESSION_PER_MIN (429);
-    exact card commands count only towards CARD_COMMANDS_PER_SESSION_PER_MIN.
+    exact card commands while cards are on screen count only towards CARD_COMMANDS_PER_SESSION_PER_MIN.
     """
     conv = room_conversation(request, said.room)
     session_id = request.app.state.voice_rooms[said.room][0]
     request.app.state.voice_rooms.touch(said.room, time.monotonic())
-    if card_choice(said.text):
+    if card_choice(said.text) and swipeable(conv.bus.history):
         limits = {("card", session_id): CARD_COMMANDS_PER_SESSION_PER_MIN}
     else:
         limits = {("voice", session_id): VOICE_TURNS_PER_SESSION_PER_MIN}
