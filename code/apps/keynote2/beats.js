@@ -12,7 +12,7 @@ export const BEATS = [
   {
     id: "dark", title: "Walk on", from: null, to: 0,
     steps: [
-      { cue: "Black. Walk on, hold the phone, two seconds of silence.", spoken: "" },
+      { cue: "Empty. Walk on, hold the phone, two seconds of silence.", spoken: "" },
     ],
   },
   {
@@ -25,7 +25,7 @@ export const BEATS = [
   {
     id: "scam", title: "The scam", from: 14, to: 30,
     steps: [
-      { cue: "Black.",
+      { cue: "Empty.",
         spoken: "Tonight more people won't search for her. Their AI will. And the AI sees what we all see:" },
       { cue: "Click: the cheap listing appears.",
         spoken: "page nine, behind a scam. Super quiet, CHF 99, pay by bank transfer." },
@@ -48,7 +48,7 @@ export const BEATS = [
         spoken: "[pause] Forged seal. Never asked." },
       { demo: "like", cue: "Click: swipe the cards, like Gästehaus am Rhein, pass the others.",
         spoken: "[pause] Anna's agent offered 135. Tuttie already bargained: 128. I still choose." },
-      { demo: "approve", cue: "Click on \"One tap\": Approve is tapped, side word One tap. (accent)",
+      { demo: "approve", cue: "Click on \"One tap\": Approve is tapped, side word One tap. (blue)",
         spoken: "And nothing happens without me. One tap, signed with my key, for exactly that price." },
       { demo: "done", cue: "Click: hold on the booking card. Two seconds of silence.", spoken: "" },
     ],
@@ -56,15 +56,15 @@ export const BEATS = [
   {
     id: "honest", title: "What is demo", from: 115, to: 125,
     steps: [
-      { cue: "Click: black.",
+      { cue: "Click: empty.",
         spoken: "The hotels and the register are demo. The signatures are real." },
     ],
   },
   {
     id: "signature", title: "Website to signature", from: 125, to: 145,
     steps: [
-      { cue: "Click: 2000, website.", spoken: "In 2000 a business needed a website." },
-      { cue: "Click: 2033, signature.",
+      { cue: "Click: website.", spoken: "In 2000 a business needed a website." },
+      { cue: "Click: signature.",
         spoken: "In five to ten years, it needs a signature: a signed agent that answers for it. Anna sets her prices and limits once. Her agent does the rest." },
     ],
   },

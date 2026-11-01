@@ -7,11 +7,11 @@
   guesthouse and Anna are demo personas.
 - `fonts/InterVariable.woff2`: [Inter](https://rsms.me/inter/) 4.1 by Rasmus Andersson, SIL Open
   Font License 1.1 (`fonts/OFL.txt`).
-- `eyes.js`: geometry of Tuttie's eyes matched to the wallet's face (`apps/wallet/src/lib/face.js`,
-  a port of [pycozmo](https://github.com/zayfod/pycozmo)'s procedural face, MIT License,
-  Copyright (c) 2019-2020).
-- `img/qr.svg`: generated with [segno](https://github.com/heuer/segno) for
-  https://web4.mendes.dev/wallet/.
-- `img/owner.webp`: an unedited screenshot of the owner view (`apps/owner`, 1280x800 at 2.25x)
-  signed in to the Gästehaus am Rhein's own node, with a draft of two changes open in the review
-  dialog (not deployed).
+- `face.js`: a copy of the wallet's face (`apps/wallet/src/lib/face.js`), a port of
+  [pycozmo](https://github.com/zayfod/pycozmo)'s procedural face, MIT License,
+  Copyright (c) 2019-2020.
+- `img/qr.svg`: generated with [segno](https://github.com/heuer/segno) for the public wallet
+  address (white background for the light stage).
+- `img/owner.webp`: an unedited screenshot of the light owner view (`apps/owner` build of
+  `feat/design-wl`, 1280x800 at 2.25x) with the Gästehaus am Rhein's overview as recorded from its
+  node, and a draft of two changes open in the review dialog (not deployed).

@@ -1,5 +1,5 @@
 // The demo driver: lets the presentation clicker drive the REAL Tuttie wallet shown in the
-// deck's iframe (same origin: /keynote/ next to /wallet/).
+// deck's iframe (same origin: /keynote2/ next to /wallet/).
 //
 // It only supplies input and timing, the way a person holding the phone would: it taps the
 // Tuttie card, sends the request to Tuttie as the wallet does (POST /chat), swipes the

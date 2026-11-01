@@ -1,5 +1,6 @@
-/* Tuttie keynote. One 1920x1080 stage, scaled to the window and letterboxed on black.
-   Spacing on an 8 px grid; the left margin is 192 px. */
+/* Tuttie keynote. One 1920x1080 stage, scaled to the window and letterboxed on the page colour.
+   The wallet's light design (apps/wallet/src/wallet.css): black on a calm light grey, accents
+   blue, purple and pink only. Spacing on an 8 px grid; the left margin is 192 px. */
 
 @font-face {
   font-family: "Inter";
@@ -10,14 +11,17 @@
 }
 
 :root {
-  --ink: #f5f5f7;
-  --ink-2: #86868b;
-  --accent: #d97757;
-  --eye: #f6d3c2;       /* the wallet's eye colour (lib/face.js) */
-  --gold: #e3b341;
-  --red: #ff453a;
+  --bg: #f2f2f7;         /* the wallet's page */
+  --panel: #fff;
+  --ink: #17171d;
+  --ink-2: #5a5967;
+  --dim: #8b8a97;
+  --blue: #2f6fe0;
+  --purple: #7a5af8;
+  --pink: #e5489b;
+  --red: #d93b3b;        /* status only: forged, declined */
   --ease: cubic-bezier(.22, 1, .36, 1);
-  --out: 450ms;          /* a beat fades out to black ... */
+  --out: 450ms;          /* a beat fades out to the empty page ... */
   --in: 800ms;           /* ... and the next one fades in */
   --margin: 192px;
 }
@@ -26,7 +30,7 @@
 
 html, body {
   height: 100%;
-  background: #000;
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -44,12 +48,12 @@ body.idle { cursor: none; }
   left: 0; top: 0;
   width: 1920px; height: 1080px;
   transform-origin: 0 0;
-  background: #000;
+  background: var(--bg);
   overflow: hidden;
   outline: none;
 }
 
-/* ---------- beats: fade through black ---------- */
+/* ---------- beats: fade through the empty page ---------- */
 
 .beat {
   position: absolute; inset: 0;
@@ -89,7 +93,7 @@ body.idle { cursor: none; }
   object-fit: cover;
   object-position: 50% 100%;
   transform: scale(1);
-  transition: transform 0s linear 1s;      /* back to 1 only once it is dark */
+  transition: transform 0s linear 1s;      /* back to 1 only once it is gone */
 }
 .beat.active .photo {
   transform: scale(1.03);
@@ -114,25 +118,32 @@ body.idle { cursor: none; }
   font-size: 44px;
   font-weight: 700;
   letter-spacing: 0;
-  color: #ff5a4f;
+  color: var(--red);
 }
 .ad b {
   margin-left: 16px;
   padding: 0 12px;
-  background: #ff5a4f;
-  color: #000;
+  background: var(--red);
+  color: #fff;
 }
 
-/* ---------- Tuttie's eyes ---------- */
+/* ---------- 3 · Tuttie's card and eyes ---------- */
 
+/* The wallet's Tuttie card, big: white, bank-card shape (1.586), no text. */
+.tuttie-card {
+  position: absolute;
+  left: 400px; top: 187px;
+  width: 1120px; height: 706px;
+  border-radius: 50px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .05), 0 24px 72px rgba(23, 23, 40, .10);
+}
+/* The eyes: the wallet's face canvas (eyes.js), placed and scaled by deck.js with a transform. */
 .face {
   position: absolute;
-  pointer-events: none;
-}
-.face .eye {
-  position: absolute;
   display: block;
-  background: var(--eye);
+  transform-origin: 0 0;
+  pointer-events: none;
 }
 #face {
   z-index: 5;
@@ -165,18 +176,19 @@ body.idle { cursor: none; }
   width: 390px; height: 844px;
   border-radius: 55px;
   overflow: hidden;
-  background: #000;
+  background: var(--bg);
   isolation: isolate;
 }
 #wallet, #fallback {
   position: absolute; inset: 0;
   width: 390px; height: 844px;
   border: 0;
-  background: #000;
+  background: var(--bg);
 }
 #fallback { display: none; object-fit: cover; }
 .phone.fallback #fallback { display: block; }
 .phone.fallback #wallet { visibility: hidden; }
+.phone.fallback .statusbar { color: #fff; }   /* the recording was made on the dark wallet */
 
 .island {
   position: absolute;
@@ -192,7 +204,7 @@ body.idle { cursor: none; }
   left: 0; right: 0; top: 0;
   height: 54px;
   pointer-events: none;
-  color: #fff;
+  color: var(--ink);                  /* the light wallet: dark status bar text */
 }
 .statusbar .time {
   position: absolute;
@@ -217,26 +229,16 @@ body.idle { cursor: none; }
   line-height: 1;
 }
 .side.never { color: var(--red); }
-.side.tap { color: var(--accent); }
+.side.tap { color: var(--blue); }
 
 /* ---------- 6 · website → signature ---------- */
 
 .era {
   position: absolute;
-  top: 432px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
+  top: 504px;                              /* one line, the arrow centred on it; years are spoken only */
 }
 .era.then { left: var(--margin); }
 .era.now { left: 1000px; }
-.year {
-  font-size: 40px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ink-2);
-  font-feature-settings: "tnum";
-}
 .word {
   font-size: 176px;
   font-weight: 650;
@@ -280,12 +282,12 @@ body.idle { cursor: none; }
   width: 1280px; height: 800px;
   border: 0;
   border-radius: 6px;
-  background: #0b0b0d;
+  background: var(--bg);
 }
 .base {
   height: 20px;
   border-radius: 2px 2px 14px 14px;
-  background: #1d1d1f;
+  background: #d6d6de;                     /* aluminium, for the light stage */
   position: relative;
 }
 .base::before {                            /* the thumb notch */
@@ -295,7 +297,7 @@ body.idle { cursor: none; }
   width: 200px; height: 8px;
   margin-left: -100px;
   border-radius: 0 0 8px 8px;
-  background: #111113;
+  background: #b9b8c2;
 }
 
 /* ---------- 8 · close ---------- */
@@ -311,22 +313,17 @@ body.idle { cursor: none; }
 
 .wake .hero {
   position: absolute;
-  left: var(--margin); top: 400px;
+  left: var(--margin); top: 456px;         /* centred on the QR code */
   font-size: 200px;
-}
-.wake .url {
-  position: absolute;
-  left: calc(var(--margin) + 4px); top: 648px;
-  font-size: 40px;
-  font-weight: 450;
-  letter-spacing: -0.01em;
-  color: var(--ink-2);
 }
 .wake .qr {
   position: absolute;
   left: 1368px; top: 376px;               /* centred on the text block, right margin 192 */
   width: 360px; height: 360px;
-  border-radius: 16px;
+  padding: 24px;                          /* a wider quiet zone around the code */
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .05);
   image-rendering: pixelated;
 }
 
@@ -346,5 +343,5 @@ body.idle { cursor: none; }
 .passive body::after {
   content: "passive";
   position: fixed; right: 16px; bottom: 12px;
-  font: 500 12px/1 Inter, sans-serif; letter-spacing: .04em; color: #86868b;
+  font: 500 12px/1 Inter, sans-serif; letter-spacing: .04em; color: var(--dim);
 }
