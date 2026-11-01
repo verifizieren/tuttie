@@ -361,7 +361,7 @@ def swipeable(history: list[dict]) -> bool:
 
 
 # Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
-TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch", "night"})
+TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch", "night", "hotel_name"})
 
 
 def night_said(date) -> str | None:
@@ -940,7 +940,7 @@ class Toolbox:
         else:
             text = f"book refused by hotel: {confirmation.get('reason')}"
         step = self.emit_verified("a2t", text, result)
-        answer = {**confirmation, "node_id": node_id, "source_step": step}
+        answer = {**confirmation, "node_id": node_id, "source_step": step, "hotel_name": record["name"]}
         if said := night_said(confirmation.get("date")):
             answer["night"] = said
         if confirmation.get("status") == "confirmed":

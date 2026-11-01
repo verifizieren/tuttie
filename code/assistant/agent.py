@@ -180,7 +180,8 @@ def done_answer(tool: str, result) -> str | None:
         hotels = "1 hotel" if count == 1 else f"{count} hotels"
         return f"I found {hotels}; swipe through them and pick the ones you like."
     if tool == "book" and result.get("status") == "confirmed":
-        hotel = " ".join(str(result.get("hotel") or "the hotel").split())[:60]
+        # The registry's name (set by Tuttie), never the hotel's own signed "hotel" text.
+        hotel = " ".join(str(result.get("hotel_name") or "the hotel").split())[:60]
         total = chf(result.get("total_chf"))
         answer = f"It's booked: {hotel}" + (f", CHF {total}." if total != "?" else ".")
         if result.get("mismatch"):
@@ -305,6 +306,9 @@ class Assistant:
                     "tool_call_id": call["id"],
                     "content": json.dumps(result, ensure_ascii=False),
                 })
+        if self.done:  # the work got done (cards shown, booking signed); only the talk ran out
+            self.bus.emit("answer", "verified", self.done, detail={"mood": "happy"})
+            return self.done
         answer = "Sorry, I could not finish this request."
         self.bus.emit("answer", "broken", answer, detail={"mood": "sorry"})
         return answer

@@ -12,6 +12,9 @@ from collections.abc import Callable
 from mcp import Client
 
 CALL_TIMEOUT_S = 15  # the SDK waits up to 300 s; a hung hotel must not hold the turn that long
+# book and pay commit at the hotel: they get longer than the node's own registry lookup (20 s),
+# so Tuttie never reports a failure while the hotel still finishes the booking.
+COMMIT_TIMEOUT_S = 30
 
 
 class McpCallFailed(Exception):
@@ -48,7 +51,7 @@ class McpLink:
             async with self.connect(endpoint) as client:
                 return await client.call_tool(tool, args)
         try:
-            result = await asyncio.wait_for(once(), CALL_TIMEOUT_S)
+            result = await asyncio.wait_for(once(), COMMIT_TIMEOUT_S if tool in ("book", "pay") else CALL_TIMEOUT_S)
         except Exception as error:  # the SDK raises transport and protocol errors of many kinds (and TimeoutError)
             raise McpCallFailed(f"{type(error).__name__}: {error}") from error
         text = result.content[0].text if result.content and result.content[0].type == "text" else ""
