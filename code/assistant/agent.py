@@ -24,9 +24,6 @@ MOODS = ("happy", "excited", "proud", "thoughtful", "surprised", "confused", "sa
 MOOD_LINE = re.compile(r"\n?\s*Mood:\s*(\w+)\s*\.?\s*$", re.IGNORECASE)
 
 GUEST_NAME = os.environ.get("GUEST_NAME", "Alex Muster")
-# Said at once to a line that arrives while an earlier turn waits for the phone's approval: the
-# turn holds the lock until the phone decides (up to minutes), and voice must never go silent.
-WAIT_FOR_PHONE = "Please approve or decline on your phone first."
 SWISS_TIME = ZoneInfo("Europe/Zurich")
 
 
@@ -169,10 +166,6 @@ class Assistant:
         `first_tool` makes the LLM start with that tool, for messages whose next step is fixed
         (the user swiped the cards: negotiate with the liked hotels). After it, the LLM decides.
         """
-        if self.lock.locked() and getattr(getattr(self.toolbox, "approvals", None), "pending", None):
-            # Not queued: after the decision it could act on a stale moment (a "yes, book it").
-            self.bus.emit("answer", "verified", WAIT_FOR_PHONE, detail={"mood": "neutral"})
-            return WAIT_FOR_PHONE
         async with self.lock:
             if not text.strip():  # the LLM APIs refuse empty messages; nothing to answer either
                 answer = "I didn't catch that. What can I do for you?"
