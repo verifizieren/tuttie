@@ -14,6 +14,7 @@ Results carry "source_step", the timeline step that proves them, so every fact T
 can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 """
 
+import inspect
 import json
 import re
 from dataclasses import dataclass
@@ -318,12 +319,16 @@ class Toolbox:
         self.policies: dict[str, dict] = {}  # node_id -> payload of its signed get_policies
 
     async def dispatch(self, name: str, args: dict) -> dict:
-        """Run a tool by name with the LLM's arguments."""
+        """Run a tool by name with the LLM's arguments; arguments that do not fit the tool are an error for the LLM."""
         tools = {"recall_context": self.recall_context, "post_request": self.post_request, "negotiate": self.negotiate, "search_registry": self.search_registry,
                  "call_tool": self.call_tool, "ask_agent": self.ask_agent, "book": self.book, "pay": self.pay,
                  "end_conversation": self.end_conversation, "current_deals": self.current_deals, "swipe_card": self.swipe_card}
         if name not in tools:
             return {"error": f"unknown tool {name}"}
+        try:  # only the call itself: a TypeError inside a tool is a failure, not the LLM's mistake
+            inspect.signature(tools[name]).bind(**args)
+        except TypeError as error:
+            return {"error": f"bad arguments for {name}: {error}"}
         return await tools[name](**args)
 
     async def current_deals(self) -> dict:

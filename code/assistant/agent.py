@@ -206,7 +206,7 @@ class Assistant:
         try:
             args = json.loads(raw_args or "{}")
             return await self.toolbox.dispatch(name, args)
-        except (json.JSONDecodeError, TypeError) as error:
+        except json.JSONDecodeError as error:
             return {"error": f"bad arguments for {name}: {error}"}
         except httpx.HTTPError as error:
             return {"error": f"{name} failed: node unreachable ({type(error).__name__})"}
