@@ -29,6 +29,7 @@ from livekit import api
 from pydantic import BaseModel
 
 from assistant.inputs import UserText
+from assistant.throttle import TURNS_PER_SESSION_PER_MIN
 
 LIVEKIT_URL = os.environ.get("LIVEKIT_URL", "ws://127.0.0.1:7880")
 API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
@@ -120,12 +121,15 @@ async def voice_token(request: Request) -> dict:
     """
     if not configured():
         raise HTTPException(status_code=503, detail="voice is not configured")
-    conv = request.app.state.conversations.get(request.state.session_id)
-    owner = (request.state.session_id, conv.id)
+    store, session_id = request.app.state.conversations, request.state.session_id
+    current = store.find(session_id)  # throttle first: a refused request must not create a conversation
+    owner = (session_id, current.id if current else store.first_id(session_id))
     client = request.client.host if request.client else "unknown"  # uvicorn takes it from nginx's header
     if not request.app.state.voice_throttle.allow(owner, client, time.monotonic()):
         raise HTTPException(status_code=429, detail="Too many voice connections. Please try again in a minute.",
                             headers={"Retry-After": "60"})
+    conv = store.get(session_id)
+    owner = (session_id, conv.id)
     room = f"tuttie-{secrets.token_urlsafe(12)}"
     rooms = request.app.state.voice_rooms
     rooms[room] = owner
@@ -148,8 +152,17 @@ class Said(BaseModel):
 
 @router.post("/voice/say", status_code=202, dependencies=[Depends(agent_only)])
 async def voice_say(said: Said, request: Request) -> dict:
-    """What the user said, as a new turn in the room's conversation (like typing it)."""
-    turn_id = room_conversation(request, said.room).start(said.text, source="voice")
+    """What the user said, as a new turn in the room's conversation (like typing it).
+
+    Spoken turns count towards the browser's TURNS_PER_SESSION_PER_MIN, like typed ones (429).
+    """
+    conv = room_conversation(request, said.room)
+    session_id = request.app.state.voice_rooms[said.room][0]
+    wait = request.app.state.turn_throttle.wait({("session", session_id): TURNS_PER_SESSION_PER_MIN},
+                                                time.monotonic())
+    if wait:
+        raise HTTPException(status_code=429, detail="too many turns", headers={"Retry-After": str(wait)})
+    turn_id = conv.start(said.text, source="voice")
     return {"accepted": True, "turn_id": turn_id}
 
 

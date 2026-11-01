@@ -10,6 +10,7 @@ Run from code/: python -m assistant.app
 
 import os
 import secrets
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -26,6 +27,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from apidocs import api_docs  # noqa: E402
 from assistant.conversations import Conversation, Conversations  # noqa: E402
 from assistant.inputs import UserText  # noqa: E402
+from assistant.throttle import TURNS_PER_CLIENT_PER_MIN, TURNS_PER_SESSION_PER_MIN, Throttle  # noqa: E402
 from assistant.voice import RoomThrottle, router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
@@ -46,6 +48,7 @@ async def lifespan(app: FastAPI):
         app.state.conversations = Conversations(http, REGISTRY_URL)
         app.state.voice_throttle = RoomThrottle()  # new voice rooms per conversation and client
         app.state.voice_rooms = {}  # LiveKit room -> (session id, conversation id)
+        app.state.turn_throttle = Throttle()  # new chat turns per session and client address
         yield
 
 
@@ -113,9 +116,34 @@ class DecisionRequest(BaseModel):
     allow_mandate: bool = False  # also sign the mandate the approval offered (e.g. for the city tax)
 
 
-@app.post("/chat", status_code=202)
+def client_address(request: Request) -> str:
+    """The caller's address: uvicorn takes it from nginx's X-Forwarded-For (proxy headers)."""
+    return request.client.host if request.client else "unknown"
+
+
+def throttle_turn(request: Request, limits: dict) -> None:
+    """429 with Retry-After when a new turn would exceed a per-minute limit (see assistant/throttle.py).
+
+    Checked before the conversation is looked up, so a refused request creates nothing.
+    """
+    wait = request.app.state.turn_throttle.wait(limits, time.monotonic())
+    if wait:
+        raise HTTPException(status_code=429, headers={"Retry-After": str(wait)},
+                            detail="You are sending requests very fast. Please wait a moment and try again.")
+
+
+async def chat_turn_allowed(request: Request) -> None:
+    """At most TURNS_PER_SESSION_PER_MIN turns per browser and TURNS_PER_CLIENT_PER_MIN per address."""
+    throttle_turn(request, {("session", request.state.session_id): TURNS_PER_SESSION_PER_MIN,
+                            ("client", client_address(request)): TURNS_PER_CLIENT_PER_MIN})
+
+
+@app.post("/chat", status_code=202, dependencies=[Depends(chat_turn_allowed)])
 async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
-    """Start answering a message as a new turn; its events and answer carry the returned turn id."""
+    """Start answering a message as a new turn; its events and answer carry the returned turn id.
+
+    429 (with Retry-After) when this browser or its address sends too many turns a minute.
+    """
     if req.conversation_id is not None and req.conversation_id != conv.id:
         raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
     if req.first_tool is not None and req.first_tool not in FIRST_TOOLS:
