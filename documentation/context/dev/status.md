@@ -6,10 +6,19 @@ something big, or make a decision others need to know. Goals and build order:
 [goals.md](goals.md); concept: `documentation/concept.md`; work areas:
 `documentation/architecture.md`; formats: `documentation/formats.md`.
 
-Last updated: 2026-11-01 (overnight rounds 6-8 on `overnight/integration`, not merged; the presentation QR page exists on branch `presentation-site`, not merged yet; the demo runner is open).
+Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; keynote deck at `/keynote/` merged; the demo runner is open).
 
 ## Done
 
+- **Keynote pitch deck** (merged 1 Nov, still the dark design): a static deck
+  in `code/apps/keynote/`, served at `/keynote/` by the assistant's static mount (no build). Black
+  stage with at most three words; the spoken lines are in `SPEAKER-NOTES.md` and the presenter
+  view (N). A clicker (PageDown/PageUp) drives the real wallet in a phone frame through
+  `demo.js`, which supplies input and timing only (same backend, same verification). Fallback
+  recording of a real run in `media/fallback.webm` + `.mp4` (V plays it in the phone, L
+  switches back). The owner beat is a screenshot of the real owner view (`img/owner.webp`,
+  skip with `?owner=0`). R resets (`POST /reset`, fresh conversation). Separate from the QR
+  page in `code/apps/presentation/`. Details: `code/apps/keynote/README.md`.
 - **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie
   card, black glossy eyes with a catchlight, idle glances, ZKB and UBS bank cards) on a full light theme
   (page #f2f2f7, white panels, ink #17171d, Approve = dark button); a closed card rests awake with a
@@ -483,6 +492,17 @@ Build order from [goals.md](goals.md):
    they have to change, tell the pitch team.
 4. **Check-in with the pitch and design team** after these steps; agree the marketplace
    formats as a team and update formats.md + `marketplace/messages.py` together.
+
+**Before the pitch (keynote deck, `code/apps/keynote/`):**
+- Rehearse on the stage hardware (laptop, projector, clicker) at least once.
+- If no offers arrive on stage, press V: the fallback recording plays in the same phone.
+- Do not restart the live service (`tuttie`) during the pitch: sessions are in memory.
+- Re-record `media/fallback.webm` + `.mp4` after any seal or issuer rename, so the recording
+  matches the live wallet.
+- Rehearsals: at most ~4 runs a minute back to back (the `/chat` rate limit is about 10
+  requests a minute per browser).
+- Tuttie may speak answers aloud from the deck's wallet where the voice worker runs: mute the
+  laptop or test it beforehand.
 
 **Review of owner view and voice (dev member 2, 2026-10-31, commits 8763423..6819267):** all
 299 tests green, owner view's JS tests and build green, the pitch story still runs live

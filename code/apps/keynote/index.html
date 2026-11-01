@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tuttie</title>
+  <link rel="preload" href="fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="deck.css">
+</head>
+<body>
+  <main id="stage" tabindex="-1">
+
+    <!-- 0 · walk on: black -->
+    <section class="beat" data-beat="dark"></section>
+
+    <!-- 1 · Anna's guesthouse -->
+    <section class="beat" data-beat="anna">
+      <img class="photo" src="img/anna.jpg" alt="Gästehaus am Rhein, Basel">
+      <p class="caption">Gästehaus am Rhein <span>· 7 rooms</span></p>
+    </section>
+
+    <!-- 2 · what an AI finds today -->
+    <section class="beat" data-beat="scam">
+      <p class="s ad" data-at="1">Super quiet!!! <b>CHF 99</b></p>
+    </section>
+
+    <!-- 3 · Tuttie (the eyes live in #face, shared with beat 4 for the move into the phone) -->
+    <section class="beat" data-beat="tuttie"></section>
+
+    <!-- 4 · the live demo -->
+    <section class="beat" data-beat="demo">
+      <div class="phone" id="phone">
+        <div class="screen">
+          <iframe id="wallet" tabindex="-1" title="Tuttie wallet" src="about:blank" allow="autoplay; microphone 'none'"></iframe>
+          <video id="fallback" muted playsinline preload="auto"></video>
+          <div class="statusbar" aria-hidden="true">
+            <span class="time">9:41</span>
+            <svg class="signal" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg class="battery" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.8" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2.5"/><path d="M25 4.5v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z" opacity=".4"/></svg>
+          </div>
+          <div class="island"></div>
+        </div>
+      </div>
+      <p class="s side never" data-at="forged" data-until="like">Never asked.</p>
+      <p class="s side tap" data-at="approve">One tap.</p>
+    </section>
+
+    <!-- 5 · what is demo, what is real: black -->
+    <section class="beat" data-beat="honest"></section>
+
+    <!-- 6 · website → signature -->
+    <section class="beat" data-beat="signature">
+      <div class="era then">
+        <span class="year">2000</span>
+        <span class="word">website</span>
+      </div>
+      <span class="s arrow" data-at="1">→</span>
+      <div class="s era now" data-at="1">
+        <span class="year">2033</span>
+        <span class="word">signature</span>
+      </div>
+    </section>
+
+    <!-- 7 · one more thing: Anna's side (optional, see beats.js OWNER_BEAT) -->
+    <section class="beat" data-beat="owner">
+      <h2 class="s hero more" data-at="0" data-until="1">One more thing.</h2>
+      <div class="s laptop" data-at="1">
+        <div class="lid"><img id="owner-shot" src="img/owner.webp" width="1280" height="800"
+             alt="Anna's owner view of Gästehaus am Rhein: before deploying, her agent's changes in plain words, breakfast CHF 15 to 12 and lowest price CHF 125 to 120"></div>
+        <div class="base"></div>
+      </div>
+    </section>
+
+    <!-- 8 · close -->
+    <section class="beat" data-beat="close">
+      <div class="s lines" data-at="0" data-until="2">
+        <p class="hero line">Signed businesses reach you.</p>
+        <p class="s hero line" data-at="1" data-until="2">Fakes never do.</p>
+      </div>
+      <div class="s wake" data-at="2">
+        <p class="hero">Wake yours.</p>
+        <p class="url">web4.mendes.dev</p>
+        <img class="qr" src="img/qr.svg" alt="QR code: https://web4.mendes.dev/wallet/">
+      </div>
+    </section>
+
+    <div class="face" id="face" aria-hidden="true"></div>
+    <div id="black"></div>
+  </main>
+
+  <script type="module" src="deck.js"></script>
+</body>
+</html>

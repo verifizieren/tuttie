@@ -1,4 +1,8 @@
-# Demo (issues #3, #2) — not started
+# Demo (issues #3, #2)
+
+The stage demo is driven by `code/apps/keynote/demo.js`: the keynote deck at `/keynote/`
+frames the real wallet and supplies input and timing only (see `code/apps/keynote/README.md`).
+This folder has no runner of its own.
 
 Runs the stage demo: the storyline as a list of steps (user line, expected agent action,
 timing) that drives the real components, so the demo is predictable but nothing is faked.
