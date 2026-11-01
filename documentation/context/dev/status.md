@@ -23,6 +23,18 @@ Last updated: 2026-10-31 (docs brought in line with the code: voice, owner view 
   (`lib/picks.js`) are one short line without brackets or quotes. Open: landscape layout of
   the hotel card (name overlaps the photo bars, "1 of 2" cut off).
 
+- **Red team round 4, conversation store and throttle** (branch `wip/r4-conv`, not deployed):
+  empty chats are never saved; above 200 saved chats one without approvals or agreements goes
+  first, from the browser with the most, on a tie the one that saved last (bots, not the user
+  who saved first). Above 400 active chats: offers-only before approvals/agreements (saved chats
+  count), the most recently started session first; a session with saved chats is never
+  "empty". `POST /conversations` is throttled (10/min per browser, 120 per address, 429). The
+  per-address key of an IPv6 client is its /64. `/chat` counts a turn only after a valid body
+  (422/409 no longer cost a turn). Conversation ids of dropped sessions never come back (the
+  bounded memory raises a floor), and the throttle sweeps idle keys amortised. **Tell the team
+  (formats.md):** `/conversations` 429; resuming an empty chat is a 410. Remaining: a patient
+  bot can still create sessions early and use them later (N3 cannot be fully solved).
+  Tests: `tests/test_r4_conversations.py`.
 - **Red team round 3, approvals, booking and payments** (branch `wip/r3-pay`, not deployed):
   an approval is signed before it leaves the pending list, so a failing mandate no longer loses
   the decision (a CHF 0 charge used to 500 the approve call and hang the booking 300 s); a
