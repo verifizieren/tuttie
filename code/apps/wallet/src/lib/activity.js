@@ -123,7 +123,12 @@ const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rhe
 const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
 const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
 const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
-const IGNORED_LINE = /^[ \t*_#>-]*ignored:/i;  // a line about a business Tuttie ignored
+// "Ignored: <business>." when it starts a line (also as "1.", "•", "- **Ignored:**") or a sentence:
+// dropped up to the end of its sentence. A lowercase "was ignored: ..." inside a sentence stays.
+const IGNORED_LINE = /^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)[ \t]*|$)/;
+const IGNORED_SENTENCE = /(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)/g;
+const LINES = /\r\n?|\n|\u2028|\u2029/;  // line breaks, split the same way as the voice
+const EMPTY_ANSWER = "Done.";  // an answer that cleans to nothing
 
 function link(all, label, target) {
   const text = label.trim();
@@ -138,15 +143,16 @@ function note(all, inner, offset, text) {
 }
 
 export function withoutNotes(value) {
-  const raw = String(value ?? "").replace(/\r\n?/g, "\n");
-  let text = raw.replace(LINK, link);
+  const raw = String(value ?? "");
+  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link);
   for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
   text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
     .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")
     .replace(/[ \t]?\u0000[ \t]?/g, " ");
-  text = text.split("\n").filter(line => !IGNORED_LINE.test(line)).join("\n");
-  // A non-empty answer never cleans to nothing: then its words stay, without brackets.
-  return !text.trim() && raw.trim() ? raw.replace(/[[\]]/g, "") : text;
+  text = text.split(LINES).map(line => [line, line.replace(IGNORED_LINE, "").replace(IGNORED_SENTENCE, "")])
+    .filter(([line, cut]) => cut.replace(/[ \t\-*_#>•]/g, "") || !line.trim()).map(([, cut]) => cut).join("\n");
+  // A non-empty answer never cleans to nothing (nor to raw links or forged names): a neutral line.
+  return !text.trim() && raw.trim() ? EMPTY_ANSWER : text;
 }
 
 /** Tuttie's answer without bracketed notes or lines starting with "Ignored:" (see above). */
