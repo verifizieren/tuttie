@@ -15,7 +15,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import app  # noqa: E402
 from assistant.conversations import Conversation  # noqa: E402
-from voice.agent import UPDATES, Tuttie, follow, spoken, update_for  # noqa: E402
+from voice.agent import UPDATES, handoff_needed, Tuttie, follow, spoken, update_for  # noqa: E402
 
 AGENT = {"Authorization": "Bearer secret-for-tests"}
 
@@ -378,9 +378,10 @@ def test_spoken_keeps_ordinary_dotted_words_and_hosts():
 
 
 def test_spoken_says_a_space_grouped_price_as_one_amount():
-    """"CHF 1 280" with a space, a no-break space or a narrow no-break space is 1280 francs."""
-    for answer in ("The suite is CHF 1 280 in total.", "The suite is CHF 1\u00a0280 in total.",
-                   "The suite is CHF 1\u202f280 in total.", "The suite is 1 280 CHF in total."):
+    """"CHF 1 280" with a no-break space or a narrow no-break space is 1280 francs (a plain space
+    is not a separator: "CHF 128 100 percent refundable" is two numbers)."""
+    for answer in ("The suite is CHF 1\u00a0280 in total.",
+                   "The suite is CHF 1\u202f280 in total.", "The suite is 1\u00a0280 CHF in total."):
         said = spoken(answer)
         assert "1280 francs" in said and "1 franc" not in said, said
     assert spoken("Rooms 2 and 3 cost CHF 128 each.") == "Rooms 2 and 3 cost 128 francs each."
@@ -390,3 +391,13 @@ def test_spoken_leaves_no_dangling_parenthesis_after_an_id():
     """An id first in a parenthesis with more inside goes with its separator."""
     assert spoken("Rheinblick (ch.basel.hotel-rheinblick, CHF 128) is free tonight.") == \
         "Rheinblick (128 francs) is free tonight."
+
+
+def test_a_plain_space_after_an_amount_does_not_glue_the_next_number_on():
+    assert "128 francs" in spoken("It is CHF 128 100 percent refundable.")
+    assert "220 francs" in spoken("Rheinblick is CHF 220 300 metres from the station.")
+
+
+def test_the_choice_handoff_is_not_said_when_the_answer_already_says_to_swipe():
+    assert handoff_needed("I'd pick Gästehaus am Rhein: quiet and takes Luna.")
+    assert not handoff_needed("I'd pick Gästehaus am Rhein. Swipe right on its card if you like it.")
