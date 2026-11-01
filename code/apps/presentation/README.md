@@ -1,8 +1,61 @@
-# Presentation site and QR code (issues #1, #6) — not started
+# Presentation: the pitch deck
 
-The pitch as a website, served at `/presentation/`.
+The three-minute pitch as a static web page, served by the assistant at `/presentation/`, on the
+same origin as the wallet (`/wallet/`) and the owner view (`/owner/`). Plain HTML, CSS and ES
+modules: no build step, no CDN at runtime. Only the live wallet, the owner view and the QR target
+need the network.
 
-- During the pitch: minimal concept, a QR code on the page.
-- A timer/counter unlocks more content after the pitch (issue #6).
-- At the end an Apple-style scroll leads into the live demo (the wallet).
-- The QR code points to the live site: <https://web4.mendes.dev>.
+The speaker is the star: the screen is black most of the time, shows at most three words, and
+never shows the spoken sentence. The spoken lines are in `SPEAKER-NOTES.md` and the presenter view.
+
+## Controls (a clicker sends PageDown/PageUp)
+
+| Key | Action |
+|---|---|
+| → Space PageDown ↓ | next step |
+| ← PageUp ↑ | previous step |
+| Home / End | first / last step |
+| B or . | black screen on/off |
+| F | fullscreen |
+| N | presenter view in a second window (current and next line, cue, clock, time against plan) |
+| V | play the fallback recording in the phone, from the start (again: back to live) |
+| L | switch between live wallet and recording without restarting it |
+| R | reset: back to the start, fresh demo conversation, wallet reloaded |
+
+Keys also work while a framed page has focus, except while typing in one of its fields.
+
+## Beats
+
+0 black · 1 Anna's guesthouse (photo, slow 1.03 push) · 2 black, then the cheap listing ·
+3 Tuttie's eyes · 4 demo: the eyes move into the phone and the real wallet takes over, side
+words "Never asked." and "One tap." · 5 black · 6 2000 website → 2033 signature ·
+7 one more thing: Anna's owner view in a laptop frame (optional) · 8 closing lines, then QR code.
+
+## The demo (beat 4)
+
+The phone shows the real wallet in `<iframe id="wallet">` (no microphone permission, so the live
+wallet does not hear the speaker). `demo.js` supplies input and timing only: each demo click runs
+the matching step of `createDemo(iframe).steps` (open, ask, forged, like, approve, done), once
+per reset, and only when moving forward one click. Steps can wait on the wallet (offers take some
+seconds); the stage shows nothing while they wait, the presenter view shows "WAITING". If
+`demo.js` is missing or fails, the deck still runs and the demo clicks do nothing.
+
+The fallback recording is `media/fallback.webm` (390x844 at 2x), shown at exactly the iframe's
+size. It is loaded on the first V or L; if it is missing, nothing changes on stage.
+
+## Options
+
+- `?owner=0` skips beat 7 (or set `OWNER_BEAT = false` in `beats.js`).
+- `?step=n` opens step n (rehearsal), without running demo steps.
+- `?wallet=<url>` and `?ownerview=<url>` frame another wallet or owner view (layout checks only;
+  the demo driver needs the same origin).
+
+Before the pitch, sign in to the owner view once inside the laptop frame (click into it, enter the
+owner token); the token stays for that browser tab.
+
+## Files
+
+`index.html`, `deck.css`, `deck.js` (stage, step machine, phone, keys), `beats.js` (beats, steps,
+spoken lines and cues; shared with the presenter view), `eyes.js` (Tuttie's eyes),
+`presenter.html` + `presenter.js`, `demo.js` (demo driver), `img/` (photo, QR code),
+`fonts/` (Inter), `media/` (fallback recording). Credits: `CREDITS.md`.
