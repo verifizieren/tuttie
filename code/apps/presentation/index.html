@@ -213,6 +213,11 @@ section.block { padding: 90px 0; }
 .snav.prev { left: calc(50% - 330px); } .snav.next { right: calc(50% - 330px); }
 .story .snav { opacity: 1; pointer-events: auto; }
 @media (min-width: 760px) and (hover: hover) { .snav { display: grid; } }
+/* On a phone the next arrow shows once, nudging, so people learn the stage is tappable. */
+@media (max-width: 759px), (hover: none) {
+  .hint .snav.next { display: grid; right: 10px; width: 44px; height: 44px; margin-top: -22px; animation: nudge 1s var(--ease) 3; }
+}
+@keyframes nudge { 50% { transform: translateX(6px); } }
 .bars i.done b { width: 100% !important; }
 .held .bars { opacity: .5; }
 .cap h3 { padding-right: 84px; }
@@ -1020,7 +1025,7 @@ addEventListener("keydown", e => {
 });
 
 // ---------- Scroll into the demo ----------
-let started = false, fit = 1;
+let started = false, fit = 1, hinted = false;
 let capH = 120, pinH = innerHeight, laidW = 0, laidH = 0;
 // Sized from the pinned stage (100svh), not innerHeight: on iOS the toolbar collapsing grows
 // innerHeight but not the stage, which would push the phone's bottom out of view.
@@ -1047,7 +1052,10 @@ function onDemo() {
   const docked = z > .985, visible = r.bottom > innerHeight * .4 && r.top < innerHeight * .4;
   $("#cap").classList.toggle("show", z > .9);
   document.body.classList.toggle("in-demo", r.top <= 0 && r.bottom > innerHeight * .5);
-  if (docked && visible && !started) { started = true; restart(); playing = true; }
+  if (docked && visible && !started) {
+    started = true; restart(); playing = true;
+    if (!hinted) { hinted = true; demoPin.classList.add("hint"); setTimeout(() => demoPin.classList.remove("hint"), 3200); }
+  }
   demoPin.classList.toggle("story", started && docked && visible);
   if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); document.body.classList.remove("demo-done"); }
 }
