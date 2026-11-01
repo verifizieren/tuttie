@@ -668,7 +668,11 @@ class Toolbox:
         A question that names the private budget is not sent: code checks it, not the prompt."""
         if any(re.search(rf"(?<![\d.]){n}(?!\d)", question) for n in self.private_amounts()):
             return {"error": "not sent: the question names the user's private budget; ask without it"}
-        result = await self.verified_post(node_id, "/agent", {"question": question, "context": {}}, "a2a", "ask_agent")
+        # Only the posted night (public: it is in the signed request) so the hotel's commitment
+        # holds for that night; never the budget or other private context.
+        posted = self.market.last_request["constraints"].get("date") if self.market.last_request else None
+        context = {"date": posted} if isinstance(posted, str) else {}
+        result = await self.verified_post(node_id, "/agent", {"question": question, "context": context}, "a2a", "ask_agent")
         if not isinstance(result, Verified):
             return result
         reply = result.payload
