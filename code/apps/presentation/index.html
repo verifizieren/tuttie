@@ -51,6 +51,16 @@ em, i, cite, address, dfn, var { font-style: normal; }
 
 .in-demo .top { opacity: 0; }
 
+/* Back to top: a small arrow, no text, once you are past the hero. */
+.totop { position: fixed; z-index: 21; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 48px; height: 48px; border-radius: 50%;
+         display: grid; place-items: center; padding: 0; cursor: pointer; color: var(--text); background: rgba(255,255,255,.9);
+         border: 1px solid var(--line2); box-shadow: var(--shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+         opacity: 0; transform: translateY(12px) scale(.9); pointer-events: none; transition: opacity .3s var(--ease), transform .4s var(--ease); }
+.totop svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.totop.show { opacity: 1; transform: none; pointer-events: auto; }
+.totop:active { transform: scale(.92); }
+.in-demo .totop { opacity: 0; pointer-events: none; }
+
 /* ---------- Hero: the Tuttie card, asleep, then awake ---------- */
 .hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 80px 0 40px; position: relative;
         background: radial-gradient(600px 420px at 50% 30%, rgba(122,90,248,.10), transparent 70%); }
@@ -67,7 +77,11 @@ em, i, cite, address, dfn, var { font-style: normal; }
 @keyframes cue { 0%, 100% { transform: scaleY(.4); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } }
 
 /* ---------- Numbers: one figure per screen, pinned while you scroll ---------- */
-.nums { position: relative; height: 420svh; }
+/* Each number owns one screen-high slot; the pin sits on top of the slots (negative margin), so
+   the section is exactly N screens long and slot k shows number k. One scroll gesture = one step. */
+.nums { position: relative; }
+.nums .pin { margin-bottom: -100svh; }
+.slot { height: 100svh; }
 .pin { position: sticky; top: 0; height: 100svh; overflow: hidden; display: flex; align-items: center; }
 .fig { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 70px var(--gut) 60px;
        max-width: 520px; margin: 0 auto; opacity: 0; transform: translateY(46px); transition: opacity .7s var(--ease), transform .8s var(--ease);
@@ -492,6 +506,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 </svg>
 
 <div class="top"><b>Tuttie</b><a href="#demo">Watch the demo</a></div>
+<button class="totop" id="totop" type="button" aria-label="Back to top"><svg viewBox="0 0 24 24"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></button>
 
 <!-- ============ Hero ============ -->
 <header class="hero">
@@ -527,6 +542,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <div class="src"><img src="img/sources/adobe.png" alt="">Adobe Analytics, AI traffic report, Jan 2026</div>
     </div>
   </div>
+  <div class="slot"></div><div class="slot"></div><div class="slot"></div>
 </section>
 
 <!-- ============ The idea ============ -->
@@ -712,12 +728,76 @@ function showFig(i) {
   f.querySelectorAll(".count").forEach(countUp);
   $("#ring").style.strokeDashoffset = i === 1 ? 263.9 * (1 - .296) : 263.9;
 }
+const slotH = () => document.querySelector("#nums .slot").offsetHeight;
 function onNums() {
-  const r = $("#nums").getBoundingClientRect();
-  if (r.top > innerHeight * .35) return;  // not on screen yet: the first count-up waits for it
-  const p = clamp(-r.top / (r.height - innerHeight));
-  showFig(Math.min(figs.length - 1, Math.floor(p * figs.length * .999)));
+  const r = $("#nums").getBoundingClientRect(), h = slotH();
+  if (r.top > h * .5) return;  // not on screen yet: the first count-up waits for it
+  showFig(Math.round(clamp(-r.top / h, 0, figs.length - 1)));
 }
+
+// One scroll gesture (wheel, trackpad flick, swipe or key), however far, moves exactly one
+// number. Entering from above lands on the first number, leaving goes on to the next section.
+// Outside the section the page scrolls natively.
+function numsTarget(dir) {
+  const r = $("#nums").getBoundingClientRect(), h = slotH(), top = scrollY + r.top, n = figs.length;
+  if (r.top > 2) return dir > 0 && r.top <= h + 10 ? top : null;                 // just above: enter
+  if (r.bottom < h - 2) return dir < 0 && r.bottom >= -10 ? top + (n - 1) * h : null;  // just below: back in
+  const next = Math.round(-r.top / h) + dir;
+  if (next < 0) return Math.max(0, top - h);
+  if (next >= n) return top + n * h;
+  return top + next * h;
+}
+let animating = false;
+function glideTo(y) {
+  const y0 = scrollY, dur = reduced ? 1 : 650, t0 = performance.now();
+  animating = true;
+  const step = now => {
+    const t = clamp((now - t0) / dur), e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    scrollTo(0, y0 + (y - y0) * e);
+    if (t < 1) requestAnimationFrame(step); else animating = false;
+  };
+  requestAnimationFrame(step);
+}
+// Wheel: a gesture ends after 180 ms without wheel events, so a trackpad's inertia tail never
+// counts as a second step.
+let lastWheel = 0, gestureLocked = false;
+addEventListener("wheel", e => {
+  const now = performance.now(), gap = now - lastWheel;
+  lastWheel = now;
+  if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || !e.deltaY) return;
+  if (gap > 180) gestureLocked = false;
+  if (gestureLocked || animating) { e.preventDefault(); return; }
+  const y = numsTarget(Math.sign(e.deltaY));
+  if (y === null) return;
+  e.preventDefault(); gestureLocked = true; glideTo(y);
+}, { passive: false });
+// Touch: the first move decides; a swipe that stays in the section is held and becomes one step.
+let touch = null;
+addEventListener("touchstart", e => { touch = e.touches.length === 1 ? { y0: e.touches[0].clientY, dir: 0, target: null, held: false } : null; }, { passive: true });
+addEventListener("touchmove", e => {
+  if (!touch) return;
+  const dy = touch.y0 - e.touches[0].clientY;
+  if (!touch.dir && Math.abs(dy) > 6) {
+    touch.dir = Math.sign(dy);
+    touch.target = animating ? null : numsTarget(touch.dir);
+    touch.held = animating || touch.target !== null;
+  }
+  touch.dy = dy;
+  if (touch.held && e.cancelable) e.preventDefault();
+}, { passive: false });
+addEventListener("touchend", () => {
+  if (touch && touch.held && touch.target !== null && Math.abs(touch.dy) > 24) glideTo(touch.target);
+  touch = null;
+});
+addEventListener("touchcancel", () => { touch = null; });
+addEventListener("keydown", e => {
+  if (e.altKey || e.ctrlKey || e.metaKey || /input|textarea/i.test(e.target.tagName)) return;
+  const dir = { ArrowDown: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1, ArrowUp: -1, PageUp: -1 }[e.key];
+  if (!dir || document.body.classList.contains("in-demo")) return;
+  const y = animating ? null : numsTarget(dir);
+  if (y === null) return;
+  e.preventDefault(); glideTo(y);
+});
 
 // ---------- Demo: the wallet mock and its timeline ----------
 const screen = $("#screen"), face = new TuttieFace($("#demoFace"));
@@ -904,6 +984,8 @@ function onDemo() {
   if (started && z < .4) { started = false; playing = false; restart(); $("#cap").classList.remove("show"); }
 }
 
+$("#totop").addEventListener("click", () => scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }));
+
 // ---------- One loop for scroll and the demo clock ----------
 let dirty = true;
 addEventListener("scroll", () => { dirty = true; }, { passive: true });
@@ -911,7 +993,7 @@ addEventListener("resize", () => { layoutPhone(); dirty = true; });
 layoutPhone();
 function loop(now) {
   const dt = last ? Math.min(100, now - last) : 0; last = now;
-  if (dirty) { dirty = false; onNums(); onDemo(); }
+  if (dirty) { dirty = false; onNums(); onDemo(); $("#totop").classList.toggle("show", scrollY > innerHeight * 1.2); }
   tickDemo(dt);
   requestAnimationFrame(loop);
 }
