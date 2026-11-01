@@ -12,6 +12,7 @@ import pytest
 from nacl.signing import SigningKey
 
 from aps import load_signing_key
+from aps.approval import payment_charge, sign_decision
 from aps.call import sign_call
 from aps.gate import Needs
 from aps.keys import load_public_key
@@ -110,7 +111,12 @@ def test_pay_above_the_limit_needs_the_users_approval():
     big = Needs("pay", scope=None, approval=True, mandate=True, amount_chf=40, purpose="city tax")
     refused = check(make_gate(), pay_call({"mandate": mandate(max_chf=100)}), big)
     assert "the user must approve it" in refused.reason
-    approved = check(make_gate(), pay_call({"approval": approval(40, action="pay")}), big)
+    big = Needs("pay", scope=None, approval=True, mandate=True, amount_chf=40, purpose="city tax", booking_id="BK-1")
+    unbound = check(make_gate(), pay_call({"approval": approval(40, action="pay")}), big)
+    assert unbound.reason == "the approval is not for the city tax of this booking"
+    for_charge = sign_decision({"id": "ap-1", "action": "pay", "payee_node_id": HOTEL, "amount_chf": 40,
+                                "charge": payment_charge("city tax", "BK-1")}, "approved", load_signing_key("user"))
+    approved = check(make_gate(), pay_call({"approval": for_charge}), big)
     assert approved.ok and approved.checks[-1] == "approval"
 
 

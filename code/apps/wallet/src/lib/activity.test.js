@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, cleanAnswer, deckStart, EMPTY, startTurn, withDeck } from './activity.js';
+import { applyEvent, choosing, cleanAnswer, deckStart, plainMarkdown, EMPTY, startTurn, withDeck } from './activity.js';
 import { restoreConversation } from './conversation.js';
 
 const bye = [{ step: 1, kind: 'close', summary: 'Closing the card', detail: {} },
@@ -112,11 +112,81 @@ test('facts in square brackets stay, without the brackets', () => {
 });
 
 test('an "Ignored:" line is dropped even behind a bracket note', () => {
-  assert.equal(cleanAnswer('Booked.\n[a] Ignored: Scam hotel says hi'), 'Booked.');
+  assert.equal(cleanAnswer('Booked.\n[3] Ignored: Scam hotel says hi'), 'Booked.');
 });
 
 test('long runs of spaces are fast', () => {
   const start = performance.now();
   cleanAnswer(' '.repeat(50000) + 'x');
   assert.ok(performance.now() - start < 200);
+});
+
+test('answer notes: the same cases as the voice (code/tests/fixtures/answer_notes.json)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const cases = JSON.parse(readFileSync(new URL('../../../../tests/fixtures/answer_notes.json', import.meta.url)));
+  for (const c of cases) assert.equal(cleanAnswer(c.in), c.screen, c.in);
+});
+
+test('runs of "[" are fast', () => {
+  const start = performance.now();
+  cleanAnswer('['.repeat(50000));
+  assert.ok(performance.now() - start < 300);
+});
+
+test('the indentation of untouched lines is kept', () => {
+  assert.equal(cleanAnswer('Rooms:\n  - double CHF 180\n  - single CHF 120'), 'Rooms:\n  - double CHF 180\n  - single CHF 120');
+});
+
+test('an approval in an odd shape becomes plain text and numbers the sheet can always show', () => {
+  const odd = { step: 1, kind: 'approval', status: 'pending', node_name: { x: 1 }, uid: ['CHE'], seals: [null, 'gold', { issuer: { a: 1 }, tier: 'gold', valid: 'yes' }],
+                detail: { approval_id: 'a1', amount_chf: { n: 1 }, terms: { room_type: { a: 1 }, date: 'x', rate: { x: 1 } },
+                          offer_mandate: { purpose: ['tax'], price_chf: 4 } } };
+  const { approval } = applyEvent(startTurn(EMPTY, 'book'), odd);
+  assert.deepEqual(approval, { id: 'a1', amount: '', hotel: '', summary: '', uid: null,
+    seals: [{ issuer: '', tier: 'gold', valid: false }],
+    offerMandate: { purpose: 'the next charge', price_chf: 4 }, terms: { room_type: '', date: 'x', rate: '' } });
+  const word = applyEvent(startTurn(EMPTY, 'book'), { ...odd, seals: 'gold' });
+  assert.deepEqual(word.approval.seals, []);
+});
+
+test('a normal approval keeps its amount, hotel, seals and terms', () => {
+  const seals = [{ issuer: 'handelsregister-bs', tier: 'gold', valid: true }];
+  const { approval } = applyEvent(startTurn(EMPTY, 'book'), { step: 1, kind: 'approval', status: 'pending', node_name: 'Rheinblick',
+    uid: 'CHE-1', seals, summary: 'Book', detail: { approval_id: 'a1', amount_chf: 172, offer_mandate: null,
+      terms: { room_type: 'double', date: '2026-11-14', rate: 'flexible', includes: [] } } });
+  assert.deepEqual(approval, { id: 'a1', amount: 172, hotel: 'Rheinblick', summary: 'Book', seals, uid: 'CHE-1', offerMandate: null,
+    terms: { room_type: 'double', date: '2026-11-14', rate: 'flexible' } });
+});
+
+test('a deck position in the wrong shape never starts the deck', () => {
+  const state = { ...EMPTY, cards: [{ node_id: 'a' }, { node_id: 'b' }], cardsStep: 3 };
+  assert.deepEqual(deckStart({ ...state, deck: { step: 3, index: 1, liked: ['a'] } }), { index: 1, liked: ['a'] });
+  assert.equal(deckStart({ ...state, deck: { step: 3, index: 1 } }), null);
+  assert.equal(deckStart({ ...state, deck: { step: 3, index: -1, liked: [] } }), null);
+});
+
+test('the note under the cards shows simple markdown as plain text', () => {
+  assert.equal(plainMarkdown('I recommend Hotel 1 **strongly**'), 'I recommend Hotel 1 strongly');
+  assert.equal(plainMarkdown('*Rheinblick* or _Spalenhof_, use `book`'), 'Rheinblick or Spalenhof, use book');
+  assert.equal(plainMarkdown('room_type double_flex stays, 2 * 3 too'), 'room_type double_flex stays, 2 * 3 too');
+  assert.equal(plainMarkdown(cleanAnswer('Take **Hotel 1** [3]')), 'Take Hotel 1');
+});
+
+test('the cards go away once a hotel is liked or a booking is under way', () => {
+  const cards = { ...EMPTY, cards: [{ node_id: 'h' }] };
+  assert.equal(choosing(cards), true);
+  assert.equal(choosing({ ...cards, picked: ['h'] }), false);
+  assert.equal(choosing({ ...cards, approval: { id: 'a' } }), false);  // booked by voice, not swiped
+  assert.equal(choosing({ ...cards, booking: { id: 'BK-1' } }), false);
+  assert.equal(choosing({ ...cards, phase: 'booking' }), false);  // approved, the hotel is booking it
+});
+
+test('a booking decided in another tab keeps the cards away here too (no second swipe)', () => {
+  let s = { ...EMPTY, turns: [{ id: 't1', said: 'room', answer: 'Here they are' }] };
+  s = applyEvent(s, { step: 5, kind: 'marketplace', detail: { phase: 'cards', cards: [{ node_id: 'h1' }, { node_id: 'h2' }] } });
+  assert.equal(choosing(s), true);
+  s = applyEvent(s, { step: 6, kind: 'approval', status: 'pending', node_id: 'h1', node_name: 'Rheinblick', detail: { approval_id: 'a1' } });
+  s = applyEvent(s, { step: 7, kind: 'approval', status: 'declined', node_id: 'h1', detail: { approval_id: 'a1' } });
+  assert.equal(choosing(s), false);
+  assert.deepEqual(s.picked, ['h1']);
 });

@@ -29,6 +29,7 @@ class Subagent:
         self.memory = memory          # the subagent's own memory (Tuttie side)
         self.node_id = node_id
         self.remote_session: str | None = None  # the business's session id (its side of the memory)
+        self.session_token: str = ""  # the business's secret for this session; only the opener has it
 
     @property
     def id(self) -> str:
@@ -42,6 +43,7 @@ class Subagent:
             self.memory.add("system", "refused", result)
             return result
         self.remote_session = result.payload["session_id"]
+        self.session_token = str(result.payload.get("session_token", ""))
         self.memory.add("system", "opened", {"node_id": self.node_id, "remote_session": self.remote_session})
         self.toolbox.emit_verified("a2a", f"Subagent opened a session with {result.payload['agent']}", result)
         return result.payload
@@ -51,7 +53,8 @@ class Subagent:
         if self.remote_session is None:
             return {"error": "session is not open"}
         path = f"/agent/sessions/{self.remote_session}/messages"
-        result = await self.toolbox.verified_post(self.node_id, path, {"message": message}, "a2a", "session message")
+        result = await self.toolbox.verified_post(self.node_id, path, {"message": message}, "a2a", "session message",
+                                                  headers=self.token_header())
         self.memory.add("self", "message", {"text": message})
         if not isinstance(result, Verified):
             self.memory.add("system", "refused", result)
@@ -59,6 +62,24 @@ class Subagent:
         self.memory.add("peer", "reply", result.payload)
         self.toolbox.emit_verified("a2a", f"Q: {message}  A: {result.payload.get('answer', '')}", result)
         return result.payload
+
+    def token_header(self) -> dict:
+        """The header that proves to the business that this subagent opened the session."""
+        return {"X-Session-Token": self.session_token}
+
+    async def close(self) -> None:
+        """Close the business's session (frees its slot there); see SubagentPool.close.
+
+        Never raises: a business that does not answer the close frees the slot itself later.
+        """
+        if self.remote_session is not None:
+            path = f"/agent/sessions/{self.remote_session}/close"
+            try:
+                await self.toolbox.verified_post(self.node_id, path, {}, "a2a", "close session",
+                                                 headers=self.token_header())
+            except Exception:  # noqa: BLE001 - closing is best effort
+                pass
+            self.remote_session = None
 
 
 class SubagentPool:
@@ -73,8 +94,16 @@ class SubagentPool:
         """A new subagent for one business; it only receives the context that business may see."""
         memory = self.memories.open(peer=node_id, purpose=task, context=context.share(SHARE_LEVEL))
         subagent = Subagent(self.toolbox, memory, node_id)
+        self.subagents = {sid: s for sid, s in self.subagents.items() if sid in self.memories.sessions}  # freed
         self.subagents[subagent.id] = subagent
         return subagent
+
+    async def close(self, subagent: Subagent) -> None:
+        """The subagent is done: close its session with the business and its own memory
+        (which stays readable until newer closed memories push it out)."""
+        await subagent.close()
+        if subagent.id in self.memories.sessions and subagent.memory.status == "open":
+            self.memories.close(subagent.id)
 
     async def open_all(self, subagents: list[Subagent]) -> list[dict]:
         """Open all their sessions at once."""

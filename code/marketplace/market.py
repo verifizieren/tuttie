@@ -31,6 +31,7 @@ from marketplace.messages import Offer, Posting, PostingCreated, Request
 
 NODE_ID = re.compile(r"^[a-z0-9.-]{1,80}$")
 MAX_MESSAGE_AGE_S = 300  # signed postings and offers must be this fresh (replay protection)
+MAX_CARD_AGE_S = 300  # a node signs its agent card on every GET; an older card is a replay
 INVOKE_TIMEOUT_S = 20  # a business agent may run an LLM before it answers the wake-up
 TRUSTED_TIERS = ("gold", "blue")  # untrusted (grey) and broken businesses are never woken
 EVENT = "posting.created"
@@ -158,7 +159,11 @@ class Market:
             entry["invited"][record["node_id"]].update(reply)
 
     async def agent_card(self, record: dict) -> dict | None:
-        """The business agent's card, if it is signed by the business; None otherwise."""
+        """The business agent's card, if it is signed by the business and fresh; None otherwise.
+
+        The endpoint it is fetched from is sealed in the record (aps/seals.py), and the card
+        must be at most MAX_CARD_AGE_S old, so an old card replayed by another host is refused.
+        """
         try:
             response = await self.http.get(f"{record['endpoint']}/agent/card", timeout=INVOKE_TIMEOUT_S)
             envelope = response.json()
@@ -166,6 +171,8 @@ class Market:
             return None
         if response.status_code != 200 or not verify_envelope(envelope, record["public_key"],
                                                               expected_node_id=record["node_id"]):
+            return None
+        if not is_fresh(envelope["timestamp"], MAX_CARD_AGE_S):
             return None
         return envelope["payload"]
 

@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Activity from "./components/Activity.jsx";
 import AgentCard from "./components/AgentCard.jsx";
-import ApprovalSheet from "./components/ApprovalSheet.jsx";
+import ApprovalSheet, { ApprovalFallback } from "./components/ApprovalSheet.jsx";
 import BankCard from "./components/BankCard.jsx";
 import Boundary from "./components/Boundary.jsx";
 import Dock from "./components/Dock.jsx";
@@ -38,7 +38,7 @@ import { currentTask } from "./lib/activity.js";
 import { linkStatus } from "./lib/stream.js";
 import { resumeFailure, startsFresh, viewedChat } from "./lib/history.js";
 import { bookingRequest } from "./lib/picks.js";
-import { newChatFailure, shouldResend, voiceNote } from "./lib/recovery.js";
+import { clearsOnReconnect, newChatFailure, PICK_UNREACHABLE, shouldResend, voiceNote } from "./lib/recovery.js";
 
 // Taps on the controls right after opening are ignored, so the tap that opens the card can
 // never land on the keyboard icon.
@@ -58,13 +58,24 @@ export default function App() {
   const openedAt = useRef(0);
   const closedOnce = useRef(false);  // the user swiped Tuttie down: the next opening starts fresh
   const face = useFace(canvas);
-  const [agent, actions, history, lastChange, switching, connectionError, link] = useAgentStream();
+  const [agent, actions, history, lastChange, switching, connectionError, link, opened, lost] = useAgentStream();
   // An approval the server no longer knows (already decided or expired): the sheet said so and
   // went; the wallet stops waiting for it even if no event about it arrives.
   const [goneApproval, setGoneApproval] = useState(null);
   const approval = agent.approval && agent.approval.id !== goneApproval ? agent.approval : null;
-  const approvalId = approval?.id;
-  const dropApproval = useCallback(() => setGoneApproval(approvalId), [approvalId]);
+  // A decided approval stays on screen until its sheet has shown the final mark (the Face ID
+  // checkmark or the X) and slid away, even though the server already stopped waiting for it.
+  const [finishing, setFinishing] = useState(null);
+  const sheetApproval = approval || finishing;
+  const approvalId = sheetApproval?.id;
+  const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
+  // Only the sheet that is finishing clears it: a late finish of an older sheet leaves a newer one.
+  // A decided approval is over for the wallet once its sheet finished, even if the event saying so
+  // never arrived (a dropped stream): it is not shown again and does not block New chat.
+  const sheetDone = useCallback((id, decided) => {
+    setFinishing(f => (f && f.id !== id ? f : null));
+    if (decided) setGoneApproval(id);
+  }, []);
   const [showHistory, setShowHistory] = useState(false);
   // The past chat open in the history (null = the list), why it could not be continued, and
   // whether it is being restored.
@@ -75,7 +86,7 @@ export default function App() {
   // What Tuttie is doing, and the eyes following it (lib/presence.js, lib/faceDirector.js).
   const presence = usePresenceSource({ mode, agent, error, lastChange }, face);
   useFaceDirector(presence, face);
-  const { state: voice, unlockAudio, muted, toggleMute, retry: retryVoice } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
+  const { state: voice, unlockAudio, muted, micBlocked, toggleMute, retry: retryVoice } = useVoice(mode === "voice" && !quiet && !switching, onSpeech,
                                                                     presence.levels, agent.id);
 
   // Only a speech stream that starts after the answer arrived is the answer being read out.
@@ -96,15 +107,19 @@ export default function App() {
   // The user said goodbye (Tuttie's end_conversation): once the goodbye is shown and spoken, the
   // card closes itself, as if swiped down.
   useEffect(() => {
-    if (agent.closing !== "ready" || reveal || mode === "closed" || approval) return undefined;  // never away from an approval
+    if (agent.closing !== "ready" || reveal || mode === "closed" || sheetApproval) return undefined;  // never away from an approval sheet
     const timer = setTimeout(close, CLOSE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [agent.closing, reveal, mode, approval]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agent.closing, reveal, mode, sheetApproval]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!notice) return undefined;
     const timer = setTimeout(() => setNotice(""), NOTICE_MS);
     return () => clearTimeout(timer);
   }, [notice]);
+  // "Tuttie is unreachable" from a failed send goes once the stream has connected again.
+  useEffect(() => {
+    if (opened) setError(e => (clearsOnReconnect(e) ? "" : e));
+  }, [opened]);
   useVisibleViewport();
   const busy = Boolean(agent.turns.length || agent.request);
 
@@ -237,7 +252,7 @@ export default function App() {
     const sent = await send(text, "book", shown, false, true);
     if (sent) return;
     actions.pick(null);
-    setError("Tuttie could not be reached — swipe again to book");
+    setError(PICK_UNREACHABLE);
   }
 
   // While a hotel card is dragged, Tuttie looks the same way (the face director follows `lean`).
@@ -253,8 +268,8 @@ export default function App() {
       <div className="head"><h1>Wallet</h1></div>
       <BankCard index={0} color="blue" />
       <BankCard index={1} color="black" />
-      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
-                                                     || (mode === "voice" && !quiet ? voiceNote(voice) : "")}
+      <AgentCard canvasRef={canvas} mode={mode} status={error || connectionError || lost || notice || (switching ? "Loading conversation…" : linkStatus(link) || currentTask(agent))
+                                                     || (mode === "voice" && !quiet ? voiceNote(voice, micBlocked) : "")}
                  onOpen={startVoice} onClose={close} onTap={tapWhileOpen} onSend={text => send(text, null, text, true)}>
         <Boundary key={agent.id} message="Something went wrong showing this chat. Start a new chat from the dock.">
           <Activity state={agent} onPick={switching ? undefined : pick} onLean={lean} onDeck={actions.deck} reveal={reveal} />
@@ -266,10 +281,13 @@ export default function App() {
             onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
-        <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} note={notice} />
+        {sheetApproval && <Boundary key={approvalId} fallback={<ApprovalFallback approval={sheetApproval} onGone={() => { dropApproval(); sheetDone(); }} />}>
+          <ApprovalSheet approval={sheetApproval} onGone={dropApproval} note={notice}
+                         onDecide={setFinishing} onFinished={sheetDone} />
+        </Boundary>}
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
-            muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />
+            muted={muted || quiet} blocked={micBlocked && voice !== "disabled"} onMute={quiet ? () => setQuiet(false) : toggleMute} />
     </div>
     </PresenceProvider>
   );

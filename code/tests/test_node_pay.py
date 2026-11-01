@@ -55,7 +55,8 @@ def test_city_tax_is_paid_once_with_the_users_mandate():
 def test_a_charge_can_be_paid_with_an_approval_for_exactly_its_amount():
     app, booking_id = booked()
     def approval(amount):
-        return sign_decision({"id": f"ap-{amount}", "action": "pay", "payee_node_id": NODE_ID, "amount_chf": amount},
+        return sign_decision({"id": f"ap-{amount}", "action": "pay", "payee_node_id": NODE_ID, "amount_chf": amount,
+                              "charge": {"purpose": "city tax", "booking_id": booking_id}},
                              "approved", load_signing_key("user"))
     assert "does not match" in pay(app, {"purpose": "city tax", "booking_id": booking_id, "approval": approval(1)})["reason"]
     receipt = pay(app, {"purpose": "city tax", "booking_id": booking_id, "approval": approval(4)})
@@ -90,3 +91,15 @@ def test_two_simultaneous_payments_with_one_mandate_charge_only_once():
 
     statuses = sorted(r["payload"]["status"] for r in asyncio.run(both()))
     assert statuses == ["paid", "refused"]
+
+
+def test_a_pay_approval_pays_only_the_charge_and_booking_it_names():
+    app, booking_id = booked()
+    def approval(charge):
+        return sign_decision({"id": "ap-x", "action": "pay", "payee_node_id": NODE_ID, "amount_chf": 4, "charge": charge},
+                             "approved", load_signing_key("user"))
+    other = pay(app, {"purpose": "city tax", "booking_id": booking_id,
+                      "approval": approval({"purpose": "city tax", "booking_id": "BK-OTHER"})})
+    assert other["reason"] == "the approval is not for the city tax of this booking"
+    unbound = pay(app, {"purpose": "city tax", "booking_id": booking_id, "approval": approval(None)})
+    assert unbound["status"] == "refused"

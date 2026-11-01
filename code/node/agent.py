@@ -36,6 +36,7 @@ from anthropic import AnthropicError
 from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
 
+from aps.envelope import parse_timestamp
 from llm import LLM as ChatLLM
 from node.catalog import AVAILABLE, tools_for
 
@@ -45,7 +46,9 @@ LLM_ERRORS = (ValidationError, json.JSONDecodeError, OpenAIError, AnthropicError
 # Tools a business uses when its config has no "agent" section yet.
 DEFAULT_TOOLS = ["get_availability", "get_policies", "book"]
 DEFAULT_WAKES_ON = ["posting.created", "posting.updated"]
+OFFER_MAX_VALID_H = 24  # an offer never stays open longer than this
 COMMITMENT_DAYS = 30  # validity of a commitment when the arrival date is unknown
+MAX_DAYS_AHEAD = 365  # how far ahead a business takes bookings (and a commitment may reach)
 # The company agents' decisions are small (interested?, which room and add-ons, a short answer),
 # so they use a fast model without reasoning (AGENT_LLM_MODEL, e.g. claude-haiku-5-5).
 DEFAULT_AGENT_MODEL = "gpt-4.1-mini"
@@ -163,6 +166,42 @@ class WakeDecision(BaseModel):
     add_ons: list[str] = []
 
 
+def bounded_arrival(arrival: date | None, stay_night, today: date | None = None) -> date | None:
+    """The LLM's arrival date if it is plausible: from today up to MAX_DAYS_AHEAD, and not after
+    the stay's night (`stay_night`, YYYY-MM-DD, when known); else None or that night."""
+    today = today or datetime.now(timezone.utc).date()
+    if arrival is None or not today <= arrival <= today + timedelta(days=MAX_DAYS_AHEAD):
+        return None
+    try:
+        night = date.fromisoformat(stay_night) if isinstance(stay_night, str) else None
+    except ValueError:
+        night = None
+    return min(arrival, night) if night and night >= today else arrival
+
+
+def offer_valid_until(request: dict, now: datetime | None = None) -> str | None:
+    """How long an offer for this signed request stays valid, or None if it cannot be made.
+
+    Taken from the signed request's expires_at (never from the unsigned posting around it),
+    capped at OFFER_MAX_VALID_H hours from now and at noon after the stay night. None when
+    the request has no readable expiry or it has already passed.
+    """
+    now = now or datetime.now(timezone.utc)
+    expires = parse_timestamp(request.get("expires_at"))
+    if expires is None:
+        return None
+    cap = now + timedelta(hours=OFFER_MAX_VALID_H)
+    try:
+        night = date.fromisoformat(request.get("constraints", {}).get("date", ""))
+        cap = min(cap, datetime.combine(night + timedelta(days=1), time(12), timezone.utc))
+    except (TypeError, ValueError, AttributeError):
+        pass
+    valid_until = min(expires, cap)
+    if valid_until <= now:
+        return None
+    return valid_until.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 class BusinessAgent:
     """The agent of one company: persona, tools and facts from its node config."""
 
@@ -217,11 +256,17 @@ class BusinessAgent:
 
     # ---------- Answering other agents (A2A) ----------
 
-    def commitment(self, add_on_id: str | None, arrival: date | None) -> dict | None:
-        """The signed promise for one add-on, valid until noon after the arrival night."""
+    def commitment(self, add_on_id: str | None, arrival: date | None, context: dict | None = None) -> dict | None:
+        """The signed promise for one add-on, valid until noon after the arrival night.
+
+        The arrival comes from the LLM, so code bounds it: a past one or one beyond
+        MAX_DAYS_AHEAD is ignored (then COMMITMENT_DAYS apply), and it never lies after the
+        stay's night when the shared context names one ("date").
+        """
         add_on = self.add_ons.get(add_on_id or "")
         if add_on is None:
             return None
+        arrival = bounded_arrival(arrival, (context or {}).get("date"))
         if arrival:
             valid_until = datetime.combine(arrival + timedelta(days=1), time(12), timezone.utc)
         else:
@@ -247,7 +292,7 @@ class BusinessAgent:
             reply = AgentReply.model_validate(await self._llm().complete_json(system, user))
         except LLM_ERRORS:
             return FALLBACK
-        return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, reply.arrival_date)}
+        return {"answer": reply.answer, "commitment": self.commitment(reply.add_on, reply.arrival_date, context)}
 
     # ---------- Being woken by the marketplace ----------
 
@@ -320,6 +365,9 @@ class BusinessAgent:
         if room is None or None in chosen:
             return None
         date_text = request.get("constraints", {}).get("date", "")
+        valid_until = offer_valid_until(request)
+        if valid_until is None:
+            return None
         return {
             "type": "offer",
             "request_id": posting["request_id"],
@@ -331,7 +379,7 @@ class BusinessAgent:
             "price_chf": room["price_chf"] + sum(a["price_chf"] for a in chosen),
             "includes": [a["item"] for a in chosen],
             "conditions": [room["rate"], *[c for a in chosen for c in a["conditions"]]],
-            "valid_until": posting["expires_at"],
+            "valid_until": valid_until,
         }
 
     def room_for(self, room_type: str, needs: set[str]) -> dict | None:

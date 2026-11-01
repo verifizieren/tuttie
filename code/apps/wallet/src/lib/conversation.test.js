@@ -32,3 +32,18 @@ test('browser-only offers and approvals are not restored without server events',
   assert.deepEqual(state.hotels, {});
   assert.equal(state.approval, null);
 });
+
+test('a stored deck, pick or turns in the wrong shape are dropped, never crash the chat', () => {
+  const cards = [{ step: 1, kind: 'marketplace', detail: { phase: 'cards', cards: [{ node_id: 'a' }, { node_id: 'b' }] } }];
+  const keep = restoreConversation(cards, 'c1', { id: 'c1', turns: [], deck: { step: 1, index: 1, liked: ['a'] }, picked: ['a'] });
+  assert.deepEqual(keep.deck, { step: 1, index: 1, liked: ['a'] });
+  assert.deepEqual(keep.picked, ['a']);
+  for (const deck of [{ step: 1, index: 1 }, { step: 1, index: -1, liked: [] }, { step: 1, index: 0.5, liked: [] },
+                      { step: 1, index: 0, liked: [3] }, { step: 1, index: '1', liked: [] }, 'deck']) {
+    assert.equal(restoreConversation(cards, 'c1', { id: 'c1', turns: [], deck }).deck, null, JSON.stringify(deck));
+  }
+  const odd = restoreConversation([], 'c1', { id: 'c1', turns: 'x', picked: 5 });
+  assert.deepEqual(odd.turns, []);
+  assert.equal(odd.picked, null);
+  assert.deepEqual(restoreConversation([], 'c1', { id: 'c1', turns: [null, { said: 'hi' }, { said: {} }] }).turns, [{ said: 'hi' }]);
+});

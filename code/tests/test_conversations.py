@@ -71,7 +71,7 @@ def test_new_chat_then_resume_keeps_signed_booking_context():
         assert store.get(client.cookies[SESSION_COOKIE]) is original
         assert original.assistant.toolbox.agreements['hotel'] is agreement
         assert original.assistant.messages[-1]['content'] == 'Find a quiet hotel'
-        assert client.post(f"/conversations/{fresh['id']}/resume").status_code == 200
+        assert client.post(f"/conversations/{fresh['id']}/resume").status_code == 410  # it was empty: not kept
 
 
 def test_resume_cannot_access_another_browsers_conversation():
@@ -107,9 +107,9 @@ def test_saved_conversations_have_a_bounded_lifetime(monkeypatch):
     monkeypatch.setattr(conv_module, 'MAX_CONVERSATIONS', 2)
     store = Conversations(httpx.AsyncClient(), 'http://registry', llm=object())
     oldest = store.get('alice')
-    store.switch('alice')
-    store.switch('alice')
-    store.switch('alice')
+    for _ in range(3):
+        store.get('alice').bus.emit('answer', 'verified', 'x')  # empty chats are not kept
+        store.switch('alice')
     assert len(store.saved) == 2
     import pytest
     with pytest.raises(KeyError):

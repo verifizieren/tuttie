@@ -53,6 +53,10 @@ class ScriptedPool:
     def __init__(self, replies, open_ok=True):
         self.toolbox, self.open_ok = ScriptedToolbox(list(replies)), open_ok
         self.memories = SessionStore("tuttie")
+        self.closed = []
+
+    async def close(self, subagent):
+        self.closed.append(subagent.id)
 
     def spawn(self, node_id, task, context):
         return ScriptedSubagent(self.toolbox, self.memories.open(node_id, task, context.share("negotiation")),
@@ -208,3 +212,22 @@ def test_an_agreement_without_a_budget_is_capped_by_the_offer_price():
 def test_an_agreement_with_other_terms_than_the_offer_is_refused(changes):
     outcome = negotiate([agreement(162, **changes)], limit=180)
     assert outcome.status == "refused" and "does not match the offer" in outcome.reason
+
+
+@pytest.mark.parametrize("price", [float("nan"), float("inf"), 0, -50, True, "162", None])
+def test_an_agreement_at_a_price_that_is_not_a_real_price_is_refused(price):
+    """Red team R9: a signed agreement at NaN, 0, -50 or true was accepted as agreed."""
+    outcome = negotiate([agreement(price)], limit=180)
+    assert outcome.status == "refused" and outcome.agreement is None and outcome.price_chf is None
+
+
+@pytest.mark.parametrize("changes", [{"round": 0}, {"valid_until": "soon"}, {"item": ""}, {"unknown": 1}])
+def test_an_agreement_that_is_not_a_valid_agreement_is_refused(changes):
+    outcome = negotiate([agreement(162, **changes)], limit=180)
+    assert outcome.status == "refused" and outcome.agreement is None
+
+
+@pytest.mark.parametrize("price", [float("nan"), -5, True, "150"])
+def test_a_counter_without_a_real_price_ends_the_negotiation(price):
+    outcome = negotiate([counter(price)], limit=180)
+    assert outcome.status == "refused" and outcome.agreement is None

@@ -68,7 +68,7 @@ class Room(Strict):
 
 class Charge(Strict):
     purpose: Short
-    price_chf: Francs
+    price_chf: Annotated[StrictInt, Field(ge=1, le=100_000)]  # a charge of CHF 0 is not a charge
     note: OptShort = None
 
 

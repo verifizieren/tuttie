@@ -1,8 +1,10 @@
 """Tests for the shared session, memory and context module (code/sessions)."""
 
+import asyncio
+
 import pytest
 
-from sessions import Context, ContextItem, SessionClosed, SessionStore
+from sessions import Context, ContextItem, SessionClosed, SessionFull, SessionStore, StoreFull
 
 
 def test_unclassified_context_is_private_and_never_shared():
@@ -42,3 +44,36 @@ def test_sessions_of_one_store_are_isolated():
     assert {s.id for s in store.open_sessions()} == {a.id, b.id}
     with pytest.raises(KeyError):
         store.get("se-unknown")
+
+
+def test_a_full_store_closes_its_least_recently_used_idle_session():
+    store = SessionStore(owner="hotel", max_open=2)
+    old, busy = store.open("a", "negotiation"), store.open("b", "negotiation")
+    busy.add("peer", "message", {"text": "newer"})
+    old.used_at = busy.used_at - 10
+    new = store.open("c", "negotiation")
+    assert old.status == "closed" and busy.status == "open" and new.status == "open"
+
+
+def test_a_store_whose_sessions_are_all_busy_refuses_with_store_full():
+    async def scenario():
+        store = SessionStore(owner="hotel", max_open=1)
+        session = store.open("a", "negotiation")
+        async with session.lock:
+            with pytest.raises(StoreFull):
+                store.open("b", "negotiation")
+    asyncio.run(scenario())
+
+
+def test_closed_sessions_are_freed_beyond_keep_closed_and_turns_are_capped():
+    store = SessionStore(owner="hotel", keep_closed=3)
+    ids = [store.open(f"p{i}", "negotiation").id for i in range(10)]
+    for sid in ids:
+        store.close(sid)
+    assert list(store.sessions) == ids[-3:]
+    session = store.open("x", "negotiation")
+    assert len(session.id) >= 3 + 32 and session.token and "token" not in session.to_dict()
+    for _ in range(session.max_turns):
+        session.add("peer", "message", {"text": "hi"})
+    with pytest.raises(SessionFull):
+        session.add("peer", "message", {"text": "one too many"})

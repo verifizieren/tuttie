@@ -28,7 +28,32 @@ export const EMPTY = {
   closing: null,        // the user said goodbye: "asked" (end_conversation), "ready" once Tuttie answered
 };
 
-const validTiers = (seals = []) => (seals || []).filter(s => s?.valid).map(s => s.tier);
+const validTiers = (seals = []) => sealsOf(seals).filter(s => s.valid).map(s => s.tier);
+
+/** A value the wallet shows as text: a string or a number, anything else (an object, null) is "". */
+export const plain = value => (typeof value === "string" ? value
+  : typeof value === "number" && Number.isFinite(value) ? String(value) : "");
+
+/** An event's seals as a list of seal objects with a plain issuer and tier; anything else in an
+ *  event (null, a word) is dropped. */
+export const sealsOf = seals => (Array.isArray(seals) ? seals : [])
+  .filter(s => s && typeof s === "object" && !Array.isArray(s))
+  .map(s => ({ ...s, issuer: plain(s.issuer), tier: plain(s.tier), valid: s.valid === true }));
+
+/** A booking approval as the sheet shows it: only plain text and numbers, never an object
+ *  (a hotel's signed facts flow into it, and the sheet must always be able to render). */
+const amountOf = value => (typeof value === "number" && Number.isFinite(value) ? value : plain(value));
+
+export function approvalOf(event, detail) {
+  const terms = detail.terms && typeof detail.terms === "object" ? detail.terms : null;
+  const offer = detail.offer_mandate && typeof detail.offer_mandate === "object" ? detail.offer_mandate : null;
+  return {
+    id: plain(detail.approval_id), amount: amountOf(detail.amount_chf), hotel: plain(event.node_name),
+    summary: plain(event.summary), seals: sealsOf(event.seals), uid: plain(event.uid) || null,
+    offerMandate: offer && { purpose: plain(offer.purpose) || "the next charge", price_chf: amountOf(offer.price_chf) },
+    terms: terms && { room_type: plain(terms.room_type), date: plain(terms.date), rate: plain(terms.rate) },
+  };
+}
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 /** The turn events belong to: the first one still waiting for an answer, else the last. */
@@ -85,19 +110,67 @@ function openTurn(state, { turn_id: id, said = "", source = "text" }) {
   return { ...state, turns, phase: "thinking", closing: null };
 }
 
-// Notes the model put in square brackets (as voice/agent.py spoken() does for the voice): a
-// citation ([3]), a one-word label ([confirmed]) or an id ([receipt RC-A14786]) is dropped; any
-// other note may be a fact (a fee, a condition), so only its brackets go. Links keep their text.
-const NOTE = /[ \t]?\[([^\]\n]{0,60})\]/g;
-const EMPTY_NOTE = /^(?:\d+(?:\s*,\s*\d+)*|[a-z]+|.*\b[A-Z]{2,}-[A-Z0-9]{3,}\b.*)$/;
-export const withoutNotes = text => String(text ?? "").replace(/\[([^\]\n]*)\]\([^)\n]*\)/g, "$1").replace(NOTE, (all, inner) => {
-  const note = inner.trim();
-  return !note || EMPTY_NOTE.test(note) ? "" : (/^[ \t]/.test(all) ? " " : "") + note;
-});
+// Notes the model put in square brackets, cleaned the same way as the voice (voice/agent.py
+// spoken(); shared cases in code/tests/fixtures/answer_notes.json). Only what carries nothing to
+// say goes: citations ([3], [3, 4]), a few labels ([confirmed]), booking and receipt ids, node
+// ids. Any other note may be a fact (a fee, "cancelled"), so it stays without its brackets.
+// Markdown links keep their text. All patterns run in linear time.
+const LINK = /\[([^[\]\n]*)\]\(([^()\n]*)\)/g;
+const NOTE = /\[([^[\]\n]{0,60})\]/g;
+const CITATION = /^\d+(?:\s*,\s*\d+)*$/;
+const LABEL = /^(?:confirmed|verified|signed|sources?)$/i;
+const NODE_ID = /^[a-z]{2}(?:\.[a-z0-9-]+){2,}$/;          // ch.basel.hotel-rheinblick, not booking.com
+const ID = /,?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b/gi;
+const WEB_ADDRESS = /^\s*(?:https?:\/\/|www\.)\S*\s*$/i;
+const GONE = "\u0000";  // where a note was taken out: the spaces around it are tidied there only
+// "Ignored: <business>." when it starts a line (also as "1.", "•", "- **Ignored:**") or a sentence:
+// dropped up to the end of its sentence. A lowercase "was ignored: ..." inside a sentence stays.
+const IGNORED_LINE = /^[ \t]*(?:(?:[-*•>#]|\d+[.)])[ \t]*)?[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)[ \t]*|$)/;
+const IGNORED_SENTENCE = /(?<=[.!?])[ \t]+[*_]*Ignored:[^\n]*?(?:[.!?](?=[ \t]|$)|$)/g;
+const LINES = /\r\n?|\n|\u2028|\u2029/;  // line breaks, split the same way as the voice
+const EMPTY_ANSWER = "Done.";  // an answer that cleans to nothing
 
-/** Tuttie's answer without bracketed notes (see above) or lines about ignored businesses. */
-export const cleanAnswer = text => withoutNotes(text).split("\n")
-  .filter(line => !/^\s*Ignored:/i.test(line)).join("\n").trim();
+function link(all, label, target) {
+  const text = label.trim();
+  if (text && !CITATION.test(text)) return text;
+  return !target.trim() || WEB_ADDRESS.test(target) ? GONE : `(${target})`;
+}
+
+function note(all, inner, offset, text) {
+  const words = inner.replace(ID, "").replace(/^[\s,;]+|[\s,;]+$/g, "");
+  if (!words || CITATION.test(words) || LABEL.test(words) || NODE_ID.test(words) || /^ignored:/i.test(words)) return GONE;
+  return (offset > 0 && /[\p{L}\p{N}]/u.test(text[offset - 1]) ? " " : "") + words;
+}
+
+export function withoutNotes(value) {
+  const raw = String(value ?? "");
+  let text = raw.replace(/\r\n?/g, "\n").replace(LINK, link);
+  for (let i = 0; i < 3; i++) text = text.replace(NOTE, note);  // nested: "[[3]]" leaves "[]" after one pass
+  text = text.replace(/\u0000(?:[ \t]*\u0000)+/g, GONE)       // notes in a row count as one
+    .replace(/[ \t]?\u0000(?=[.,;:!?)\]'"’]|$)/gm, "").replace(/^\u0000[ \t]?/gm, "")
+    .replace(/[ \t]?\u0000[ \t]?/g, " ");
+  text = text.split(LINES).map(line => [line, line.replace(IGNORED_LINE, "").replace(IGNORED_SENTENCE, "")])
+    .filter(([line, cut]) => cut.replace(/[ \t\-*_#>•]/g, "") || !line.trim()).map(([, cut]) => cut).join("\n");
+  // A non-empty answer never cleans to nothing (nor to raw links or forged names): a neutral line.
+  return !text.trim() && raw.trim() ? EMPTY_ANSWER : text;
+}
+
+/** Tuttie's answer without bracketed notes or lines starting with "Ignored:" (see above). */
+export const cleanAnswer = text => withoutNotes(text).trim();
+
+/** Simple markdown (**bold**, *italic*, _italic_, `code`) as plain text, for a line that shows
+ *  no formatting (the note under the hotel cards). Underscores inside words stay. */
+export const plainMarkdown = text => String(text ?? "")
+  .replace(/\*\*([^*\n]+?)\*\*/g, "$1")
+  .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g, "$1$2")
+  .replace(/(^|[^\w])_(?=\S)([^_\n]*?\S)_(?!\w)/g, "$1$2")
+  .replace(/`([^`\n]+)`/g, "$1");
+
+/** The hotel cards are swiped only while the user still chooses: not once a hotel was liked, and
+ *  not once a booking is under way (the user named a hotel instead of swiping): then the
+ *  approval and the booked block take their place. */
+export const choosing = state => Boolean(state.cards && !state.picked && !state.approval && !state.booking
+  && state.phase !== "booking");  // approved: the hotel is booking it, the confirmation follows
 
 /** Events need a turn to belong to; a timeline without the user's messages gets an empty one. */
 const withTurn = state => (state.turns.length ? state : { ...state, turns: [{ said: "" }] });
@@ -182,7 +255,7 @@ export function applyEvent(state, event) {
     }
     if (detail.phase === "offer" && event.node_id) {
       const next = withHotel(state, event.node_id, event.node_name, {
-        offer: detail.offer, tiers: validTiers(event.seals), seals: event.seals || [], uid: event.uid, status: "offered",
+        offer: detail.offer, tiers: validTiers(event.seals), seals: sealsOf(event.seals), uid: event.uid, status: "offered",
         size: detail.profile?.size || hotel(state, event.node_id).size,
       });
       const n = offerCount(next);
@@ -225,15 +298,18 @@ export function applyEvent(state, event) {
     const base = progress(state, "tool", `Booked · ${detail.payload.booking_id}`, true, at);
     return withBooking({ ...base, phase: "booked", bookingTurn: turnOf(base, at) },
                        { id: b.booking_id, hotel: b.hotel, total: b.total_chf, date: b.date, room: b.room_type,
-                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: event.seals || [], uid: event.uid,
+                         rate: b.rate || null, extras: b.extras || [], checked: b.checked || [], seals: sealsOf(event.seals), uid: event.uid,
                          payments: [] });
   }
 
   if (event.kind === "approval") {
     if (event.status === "pending") {
-      return { ...progress(state, "tool", "Waiting for your approval", false, at), phase: "approval", approval: { id: detail.approval_id, amount: detail.amount_chf,
-        hotel: event.node_name, summary: event.summary, seals: event.seals || [], uid: event.uid,
-        offerMandate: detail.offer_mandate || null, terms: detail.terms || null } };
+      // A booking under way means the hotel was chosen, also when another tab (or the voice)
+      // chose it: these cards are done here too, so a swipe here never starts a second booking.
+      const chosen = state.cards && !state.picked
+        ? { picked: state.cards.some(c => c.node_id === event.node_id) ? [event.node_id] : [] } : {};
+      return { ...progress(state, "tool", "Waiting for your approval", false, at), ...chosen, phase: "approval",
+               approval: approvalOf(event, detail) };
     }
     // Only a decision the user made is named; any other end (e.g. expired) just closes it.
     const approved = event.status === "approved";
@@ -248,10 +324,15 @@ export function applyEvent(state, event) {
 export const withDeck = (state, { index, liked }) =>
   (state.cards ? { ...state, deck: { step: state.cardsStep, index, liked } } : state);
 
+/** A saved deck position in the shape the deck needs: a whole card index from 0 and the liked
+ *  hotels' node ids. A stored copy can be anything (an old version, a hand-edited browser). */
+export const validDeck = deck => Boolean(deck) && typeof deck === "object" && Number.isInteger(deck.index)
+  && deck.index >= 0 && Array.isArray(deck.liked) && deck.liked.every(id => typeof id === "string");
+
 /** Where the deck starts: the saved position if it belongs to these cards and some are left. */
 export function deckStart(state) {
   const deck = state.deck;
-  if (!deck || !state.cards || deck.step !== state.cardsStep || deck.index >= state.cards.length) return null;
+  if (!validDeck(deck) || !state.cards || deck.step !== state.cardsStep || deck.index >= state.cards.length) return null;
   return { index: deck.index, liked: deck.liked };
 }
 

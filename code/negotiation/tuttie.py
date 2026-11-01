@@ -34,11 +34,12 @@ import math
 from dataclasses import dataclass, field
 
 from nacl.signing import SigningKey
+from pydantic import ValidationError
 
 from aps import sign_envelope
 from assistant.subagents import SubagentPool
 from assistant.tools import Verified
-from marketplace.messages import Counter, Offer
+from marketplace.messages import Agreement, Counter, Offer
 from negotiation.hotel import message
 from negotiation.rules import CLOSE_CHF
 from sessions import Context
@@ -109,13 +110,22 @@ class TuttieNegotiator:
         offer = Offer.model_validate(message(offer_envelope["payload"]))
         limit = float(context.items[BUDGET_LIMIT].value) if BUDGET_LIMIT in context.items else offer.price_chf
         outcome = Outcome(node_id, offer.offer_id, "walked_away", offer.price_chf)
-        own, last = opening_price(offer.price_chf, limit), None
+        own = opening_price(offer.price_chf, limit)
         if own is None:  # walk away before talking: no counter could stay below the budget
             outcome.reason = "the offer is far above the budget"
             return outcome
 
         subagent = self.pool.spawn(node_id, f"negotiate {offer.offer_id}", context)
         outcome.subagent_id = subagent.id
+        try:
+            return await self.bargain(subagent, node_id, offer, offer_envelope, limit, own, outcome)
+        finally:
+            await self.pool.close(subagent)  # free the hotel's session slot, whatever happened
+
+    async def bargain(self, subagent, node_id: str, offer: Offer, offer_envelope: dict, limit: float,
+                      own: float, outcome: Outcome) -> Outcome:
+        """The rounds of one negotiation, through `subagent` (negotiate opens and closes it)."""
+        last = None
         opened = await subagent.open()
         if subagent.remote_session is None:
             outcome.status, outcome.reason = "refused", opened.get("reason", "session refused")
@@ -150,6 +160,9 @@ class TuttieNegotiator:
                 outcome.status, outcome.reason = "rejected", reply.get("reason", "")
                 return outcome
 
+            if not is_price(reply.get("price_chf")):
+                outcome.status, outcome.reason = "refused", "the hotel's counter has no valid price"
+                return outcome
             hotel_price, last = reply["price_chf"], result.envelope
             if hotel_price <= limit and (reply.get("final") or hotel_price - own <= CLOSE_CHF):
                 own = hotel_price  # accept: the next counter matches the hotel's price
@@ -181,12 +194,24 @@ def agreement_problem(offer: Offer, reply: dict, ceiling: float) -> str:
     are the offer's, unchanged: only the price was negotiated.
     """
     price = reply.get("price_chf")
-    if not isinstance(price, (int, float)) or price > ceiling:
+    if not is_price(price):
+        return "the agreement's price is not a valid price"
+    if price > ceiling:
         return "the agreement's price is above what Tuttie offered"
+    try:
+        Agreement.model_validate(message(reply))
+    except (ValidationError, TypeError):
+        return "not a valid agreement"
     changed = [key for key in TERMS if reply.get(key) != getattr(offer, key)]
     if changed:
         return f"the agreement does not match the offer ({', '.join(changed)})"
     return ""
+
+
+def is_price(value) -> bool:
+    """A real price in CHF: a finite number above zero (a bool is not a number here)."""
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value > 0)
 
 
 def best(outcomes: list[Outcome]) -> Outcome | None:
@@ -197,9 +222,10 @@ def best(outcomes: list[Outcome]) -> Outcome | None:
 
 def summary(hotel: str, round_: int, own: float, reply: dict) -> str:
     """One timeline line per round, without any limit (Tuttie's or the hotel's)."""
+    price = f"{reply['price_chf']:g}" if is_price(reply.get("price_chf")) else "?"
     if reply.get("type") == "agreement":
-        return f"{hotel}: agreed at CHF {reply['price_chf']:g} (round {round_})"
+        return f"{hotel}: agreed at CHF {price} (round {round_})"
     if reply.get("type") == "counter":
         final = ", final" if reply.get("final") else ""
-        return f"{hotel}: Tuttie CHF {own:g} → hotel CHF {reply['price_chf']:g}{final} (round {round_})"
+        return f"{hotel}: Tuttie CHF {own:g} → hotel CHF {price}{final} (round {round_})"
     return f"{hotel}: {reply.get('reason', 'no agreement')} (round {round_})"

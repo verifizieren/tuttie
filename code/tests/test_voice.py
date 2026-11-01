@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -13,7 +14,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import SESSION_COOKIE, app  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for, voice_on  # noqa: E402
+from voice.agent import UPDATES, filler_kind, meaningful, pick_ack, spoken, update_for, voice_on, without_notes  # noqa: E402
 
 
 def configure(monkeypatch):
@@ -49,6 +50,8 @@ class Participant:
 
 
 class Room:
+    name = "tuttie-test"
+
     def __init__(self, *attrs):
         self.remote_participants = {str(i): Participant(a) for i, a in enumerate(attrs)}
 
@@ -71,13 +74,20 @@ def test_the_agent_only_gets_new_events():
     bus.emit("answer", "verified", "old")
 
     async def first_frame():
-        stream = voice.live_only(bus)
+        rooms = voice.VoiceRooms()
+        rooms.add("room", ("session", "conv"), 0)
+        stream = voice.live_only(bus, rooms, "room")
         task = asyncio.ensure_future(stream.__anext__())
         await asyncio.sleep(0.05)
         bus.emit("answer", "verified", "new")
-        return await asyncio.wait_for(task, 1)
+        frame = await asyncio.wait_for(task, 1)
+        live = rooms.live["room"]
+        await stream.aclose()
+        return frame, live, rooms.live["room"]
 
-    assert '"summary": "new"' in asyncio.run(first_frame())
+    frame, live, after = asyncio.run(first_frame())
+    assert '"summary": "new"' in frame
+    assert (live, after) == (1, 0)  # live while the agent follows the room, not after
 
 
 def test_answers_are_spoken_without_citations_markdown_or_emoji():
@@ -159,6 +169,7 @@ def test_old_voice_room_cannot_send_into_a_new_chat(monkeypatch):
     with TestClient(app) as client:
         old_id = client.get('/history').headers['X-Conversation-ID']
         room = client.post('/voice/token').json()['room']
+        app.state.conversations.get(client.cookies[SESSION_COOKIE]).bus.emit('answer', 'verified', 'x')
         client.post('/conversations')
         response = client.post('/voice/say', json={'room': room, 'text': 'Book it'},
                                headers={'Authorization': 'Bearer secret-for-tests'})
@@ -204,3 +215,61 @@ def test_the_room_counter_forgets_after_a_minute():
         assert counter.allow(owner, "1.2.3.4", now=0)
     assert not counter.allow(owner, "1.2.3.4", now=1)
     assert counter.allow(owner, "1.2.3.4", now=61)
+
+
+def test_answer_notes_shared_with_the_wallet():
+    """The same cases as the wallet's cleanAnswer (tests/fixtures/answer_notes.json): screen and voice agree."""
+    cases = json.loads((Path(__file__).parent / "fixtures" / "answer_notes.json").read_text())
+    for case in cases:
+        assert spoken(case["in"]) == case["spoken"], case["in"]
+        # The same "screen" column the wallet's cleanAnswer is tested against (activity.test.js):
+        # the voice and the screen clean notes with the same rules.
+        assert without_notes(case["in"]).strip() == case["screen"], case["in"]
+
+
+def test_a_swiped_pick_is_acknowledged_but_speech_and_questions_are_not():
+    turn = lambda said, source: {"kind": "turn", "detail": {"said": said, "source": source}}
+    assert pick_ack(turn("Book Gästehaus am Rhein", "text")) == "Nice pick. Let me book Gästehaus am Rhein."
+    assert pick_ack(turn("Book Gästehaus am Rhein", "voice")) is None  # said aloud: Tuttie's own filler
+    assert pick_ack(turn("What about breakfast?", "text")) is None
+    assert pick_ack({"kind": "answer", "summary": "Book it"}) is None
+
+
+def test_after_the_cards_the_voice_hands_the_choice_to_the_user():
+    from contextlib import asynccontextmanager
+    from voice.agent import HANDOFF, follow
+
+    events = [{"kind": "marketplace", "turn": "t1", "detail": {"phase": "cards"}},
+              {"kind": "answer", "turn": "t2", "summary": "Sure."},          # another turn answers first
+              {"kind": "answer", "turn": "t1", "summary": "Two hotels; I'd pick Gästehaus am Rhein."},
+              {"kind": "marketplace", "turn": "t3", "detail": {"phase": "cards"}},
+              "reset",                                                         # the chat was reset
+              {"kind": "answer", "turn": "t1", "summary": "Hello again."}]
+
+    class Stream:
+        async def aiter_lines(self):
+            for event in events:
+                yield "event: reset" if event == "reset" else "data: " + json.dumps(event)
+
+    class Http:
+        @asynccontextmanager
+        async def stream(self, *args, **kwargs):
+            yield Stream()
+
+    class Session:
+        def __init__(self):
+            self.lines = []
+
+        def say(self, text):
+            self.lines.append(text)
+
+    class Agent:
+        asked = None
+
+        def filler(self):
+            return None
+
+    session = Session()
+    asyncio.run(follow(session, Agent(), Http(), Room("on")))
+    # Once, after the answer of the turn that showed the cards; never after a reset.
+    assert session.lines == ["Sure.", "Two hotels; I'd pick Gästehaus am Rhein.", HANDOFF, "Hello again."]

@@ -3,7 +3,9 @@
 Each seal in a node config names its issuer and tier. The issuer's key signs it,
 except where the config says "signed_by": "self" (the scam hotel forging a
 government seal with its own key). "issuer": "self" means a self-signed grey seal.
-The node's Swiss business number ("uid", optional) goes into the record and every seal.
+The node's Swiss business number ("uid", optional) goes into the record and every seal,
+like its name, kind and endpoint (see aps/seals.py seal_body). A node_id equal to an
+authority's issuer id is refused.
 
 User agents (data/agents/, e.g. Tuttie) also get a "delegation": the user's key signs
 which scopes the agent may use for them (see aps/delegation.py).
@@ -27,11 +29,19 @@ AGENTS_DIR = ROOT / "data" / "agents"
 SERVICES_DIR = ROOT / "data" / "services"  # public information services (weather, trains): services/server.py
 USER_KEY_ID = "user"
 REGISTRY_PATH = ROOT / "data" / "registry.json"
+AUTHORITIES_PATH = ROOT / "data" / "authorities.json"
+
+
+def authority_ids() -> set[str]:
+    """The issuer ids of the trusted authorities; no node may use one as its node_id."""
+    return {a["issuer"] for a in json.loads(AUTHORITIES_PATH.read_text())}
 
 
 def build_record(config: dict) -> dict:
     """The signed registry record for one node config."""
     node_id = config["node_id"]
+    if node_id in authority_ids():
+        raise ValueError(f"node_id {node_id!r} is an authority's issuer id; pick another node_id")
     record = {
         "node_id": node_id,
         "name": config["name"],

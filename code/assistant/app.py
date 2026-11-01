@@ -10,6 +10,7 @@ Run from code/: python -m assistant.app
 
 import os
 import secrets
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -26,7 +27,9 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from apidocs import api_docs  # noqa: E402
 from assistant.conversations import Conversation, Conversations  # noqa: E402
 from assistant.inputs import UserText  # noqa: E402
-from assistant.voice import RoomThrottle, router as voice_router  # noqa: E402
+from assistant.throttle import (NEW_CHATS_PER_CLIENT_PER_MIN, NEW_CHATS_PER_SESSION_PER_MIN,  # noqa: E402
+                                TURNS_PER_CLIENT_PER_MIN, TURNS_PER_SESSION_PER_MIN, Throttle, address_key)
+from assistant.voice import RoomThrottle, VoiceRooms, router as voice_router  # noqa: E402
 
 APPS_DIR = Path(__file__).resolve().parent.parent / "apps"  # static apps and shared files (shared/)
 # The wallet is a React app; serve its production build (`npm run build` in apps/wallet).
@@ -45,7 +48,8 @@ async def lifespan(app: FastAPI):
     async with httpx.AsyncClient(timeout=20) as http:
         app.state.conversations = Conversations(http, REGISTRY_URL)
         app.state.voice_throttle = RoomThrottle()  # new voice rooms per conversation and client
-        app.state.voice_rooms = {}  # LiveKit room -> (session id, conversation id)
+        app.state.voice_rooms = VoiceRooms()  # LiveKit room -> (session id, conversation id), and use
+        app.state.turn_throttle = Throttle()  # new chat turns per session and client address
         yield
 
 
@@ -81,19 +85,14 @@ def over_https(request: Request) -> bool:
     return request.url.scheme == "https" or forwarded == "https"
 
 
-async def conversation(request: Request) -> Conversation:
-    """The calling browser's conversation.
+async def existing_conversation(request: Request) -> Conversation | None:
+    """The calling browser's conversation, or None: endpoints that only read never create one.
 
     Async on purpose, like every route that touches conversations: FastAPI runs plain `def`
     dependencies and routes in worker threads, where two first requests of one browser could
     each create a conversation (one silently lost), and approvals or cancels would wake the
     event loop from a foreign thread.
     """
-    return request.app.state.conversations.get(request.state.session_id)
-
-
-async def existing_conversation(request: Request) -> Conversation | None:
-    """The calling browser's conversation, or None: endpoints that only read never create one."""
     return request.app.state.conversations.find(request.state.session_id)
 
 
@@ -113,13 +112,45 @@ class DecisionRequest(BaseModel):
     allow_mandate: bool = False  # also sign the mandate the approval offered (e.g. for the city tax)
 
 
+def client_address(request: Request) -> str:
+    """The caller's address: uvicorn takes it from nginx's X-Forwarded-For (proxy headers)."""
+    return request.client.host if request.client else "unknown"
+
+
+def throttle_turn(request: Request, limits: dict) -> None:
+    """429 with Retry-After when a new turn would exceed a per-minute limit (see assistant/throttle.py).
+
+    Checked before the conversation is looked up, so a refused request creates nothing.
+    """
+    wait = request.app.state.turn_throttle.wait(limits, time.monotonic())
+    if wait:
+        raise HTTPException(status_code=429, headers={"Retry-After": str(wait)},
+                            detail="You are sending requests very fast. Please wait a moment and try again.")
+
+
+def chat_turn_allowed(request: Request) -> None:
+    """At most TURNS_PER_SESSION_PER_MIN turns per browser and TURNS_PER_CLIENT_PER_MIN per address
+    (an IPv6 address counts by its /64)."""
+    throttle_turn(request, {("session", request.state.session_id): TURNS_PER_SESSION_PER_MIN,
+                            ("client", address_key(client_address(request))): TURNS_PER_CLIENT_PER_MIN})
+
+
 @app.post("/chat", status_code=202)
-async def chat(req: ChatRequest, conv: Conversation = Depends(conversation)) -> dict:
-    """Start answering a message as a new turn; its events and answer carry the returned turn id."""
-    if req.conversation_id is not None and req.conversation_id != conv.id:
-        raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
+async def chat(req: ChatRequest, request: Request) -> dict:
+    """Start answering a message as a new turn; its events and answer carry the returned turn id.
+
+    A refused request (422, 409) does not count as a turn; 429 (with Retry-After) when this
+    browser or its address sends too many turns a minute. Nothing is created before both checks.
+    """
     if req.first_tool is not None and req.first_tool not in FIRST_TOOLS:
         raise HTTPException(status_code=422, detail=f"first_tool must be one of {sorted(FIRST_TOOLS)}")
+    store, session_id = request.app.state.conversations, request.state.session_id
+    current = store.find(session_id)
+    current_id = current.id if current else store.first_id(session_id)  # what get() will create
+    if req.conversation_id is not None and req.conversation_id != current_id:
+        raise HTTPException(status_code=409, detail="The active chat changed. Reload the wallet before continuing.")
+    chat_turn_allowed(request)
+    conv = store.get(session_id)
     turn_id = conv.start(req.message, req.first_tool, said=req.said)
     return {"accepted": True, "turn_id": turn_id}
 
@@ -145,7 +176,13 @@ def switch_conversation(request: Request, conversation_id: str | None = None) ->
 
 @app.post("/conversations")
 async def new_conversation(request: Request) -> dict:
-    """Keep the previous assistant and its verified facts available for resuming."""
+    """Keep the previous assistant and its verified facts available for resuming.
+
+    429 (with Retry-After) above NEW_CHATS_PER_SESSION_PER_MIN per browser or
+    NEW_CHATS_PER_CLIENT_PER_MIN per address (an IPv6 address by its /64).
+    """
+    throttle_turn(request, {("new chat", request.state.session_id): NEW_CHATS_PER_SESSION_PER_MIN,
+                            ("new chat client", address_key(client_address(request))): NEW_CHATS_PER_CLIENT_PER_MIN})
     return switch_conversation(request)
 
 
