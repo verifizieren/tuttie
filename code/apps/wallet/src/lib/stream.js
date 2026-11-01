@@ -21,3 +21,13 @@ export const OFFLINE_AFTER = 3;
 
 /** The line under Tuttie's eyes for the stream's state ("" while it is live). */
 export const linkStatus = link => ({ reconnecting: "Reconnecting…", offline: "Connection lost · retrying" }[link] || "");
+
+/** One stream frame as an event object, or null if it is not one (bad JSON, a bare value). */
+export function parseFrame(data) {
+  try {
+    const event = JSON.parse(data);
+    return event && typeof event === "object" && !Array.isArray(event) ? event : null;
+  } catch {
+    return null;
+  }
+}

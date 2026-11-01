@@ -5,7 +5,7 @@
 // answer the server finished meanwhile still shows up.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { applyEvent, bindTurn, dropTurn, EMPTY, startTurn, withDeck } from "../lib/activity.js";
-import { catchUp, OFFLINE_AFTER, retryDelay } from "../lib/stream.js";
+import { catchUp, OFFLINE_AFTER, parseFrame, retryDelay } from "../lib/stream.js";
 import { newConversation, resumeConversation, UNREACHABLE } from "../lib/api.js";
 import { archive, CURRENT_KEY, HISTORY_KEY, loadCurrent, loadHistory, saveCurrent } from "../lib/history.js";
 import { restoreConversation } from "../lib/conversation.js";
@@ -101,7 +101,8 @@ export default function useAgentStream() {
     });
     source.addEventListener("message", e => {
       if (stream.current !== source) return;
-      const event = JSON.parse(e.data);
+      const event = parseFrame(e.data);
+      if (!event) return;  // a broken frame is ignored, never an error on the page
       if (event.step <= lastStep.current) return;
       lastStep.current = event.step;
       dispatch({ type: "event", event });

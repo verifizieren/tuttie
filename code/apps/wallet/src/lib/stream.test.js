@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { catchUp, linkStatus, retryDelay } from './stream.js';
+import { catchUp, linkStatus, parseFrame, retryDelay } from './stream.js';
 
 const timeline = n => Array.from({ length: n }, (_, i) => ({ step: i + 1, kind: 'context' }));
 
@@ -22,4 +22,9 @@ test('reconnecting backs off to 10 s and says so under the eyes', () => {
   assert.equal(linkStatus('live'), '');
   assert.equal(linkStatus('reconnecting'), 'Reconnecting…');
   assert.match(linkStatus('offline'), /lost/);
+});
+
+test('a broken stream frame is ignored, not thrown', () => {
+  assert.deepEqual(parseFrame('{"step":1,"kind":"answer"}'), { step: 1, kind: 'answer' });
+  for (const bad of ['{oops', '', 'null', '5', '"x"', '[1]']) assert.equal(parseFrame(bad), null, bad);
 });
