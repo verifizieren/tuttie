@@ -45,7 +45,8 @@ cp .env.example .env             # add an LLM key: ANTHROPIC_API_KEY (default mo
 
 <http://localhost:4040> opens the Tuttie wallet (phone-first), connected to Tuttie: type a
 request, or talk to it when voice is configured (LiveKit and ElevenLabs keys in `.env`, see
-[`code/voice/README.md`](code/voice/README.md)). The owner view is at `/owner/`. The same
+[`code/voice/README.md`](code/voice/README.md)). The owner view is at `/owner/`, the pitch deck at
+`/presentation/` ([`code/apps/presentation/README.md`](code/apps/presentation/README.md)). The same
 flow also runs without a browser:
 
 ```bash
