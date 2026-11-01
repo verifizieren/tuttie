@@ -32,11 +32,17 @@ export function createDemo(iframe) {
   const doc = () => iframe.contentDocument;
   const win = () => iframe.contentWindow;
   const $ = selector => doc()?.querySelector(selector) || null;
+  // Each reset starts a new generation; steps still waiting from an older one give up, so a
+  // pending Approve or swipe never acts in the next run.
+  let generation = 0;
 
-  /** Poll until `find()` returns something truthy; null after `timeout` ms (never throws). */
+  /** Poll until `find()` returns something truthy; null after `timeout` ms or after a reset
+   *  (never throws). */
   async function waitFor(find, timeout = 10000, every = 100) {
+    const mine = generation;
     const end = performance.now() + timeout;
     for (;;) {
+      if (mine !== generation) return null;
       try {
         const found = find();
         if (found) return found;
@@ -167,6 +173,7 @@ export function createDemo(iframe) {
 
   /** Start over: a fresh conversation on the server, then the wallet reloads from it. */
   async function reset() {
+    generation++;
     try {
       await fetch("/reset", { method: "POST" });
     } catch (e) {
