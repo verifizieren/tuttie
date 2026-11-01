@@ -26,8 +26,10 @@ self.addEventListener("fetch", event => {
     // "no-cache": revalidate with the server, never take a stale copy from the HTTP cache.
     fetch(request, { cache: "no-cache" })
       .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(request, copy));
+        if (response.ok) {  // never let an error page (e.g. a 502 during a restart) replace the offline copy
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(request)));
