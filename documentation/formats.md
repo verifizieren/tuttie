@@ -289,7 +289,11 @@ call (below) and run only through the action gate (`aps/gate.py`):
   signed commitments, or its own signed agreement) and asks the gate with
   `Needs("book", scope="book", approval=True, amount_chf=total)`. An extra whose commitment's
   `valid_until` has passed, or ends before the booked night, is refused (`the commitment for
-  <item> has expired: ask the hotel again`). With an agreement the
+  <item> has expired: ask the hotel again`). Each commitment (known by its envelope signature) is
+  redeemed in one booking only: a second use is refused (`a commitment was already used for
+  another booking: ask the hotel again`), and so is the same one twice in one call. The arrival
+  date the agent's LLM picks for `valid_until` is ignored when past or beyond 365 days and never
+  lies after the session context's `date`. With an agreement the
   call must name the agreement's `room_type`, `date` and a room with its `rate`, and carry no
   `extras` (refusals: `the agreement is for a <room> room, not <x>` / `... for the night of
   <date>, not <x>` / `... for the rate ..., not ...` / `an agreement fixes what is included:
@@ -638,7 +642,9 @@ Endpoints of every node (all answers are signed envelopes). Every endpoint below
 `GET /agent/card` makes the agent think (an LLM call on the business's account), so when the
 deployment sets `AGENT_WEB_KEY` (`aps/agent_key.py`; `scripts/run_all.py` makes one per run)
 it answers HTTP 401 unless the request carries the key in `X-Agent-Web-Key`. The marketplace
-and Tuttie send it; tools over MCP and `counter_offer` are not affected.
+and Tuttie send it; tools over MCP and `counter_offer` are not affected. Tuttie sends it only to gold or blue nodes:
+it holds no agent conversation with a grey node. `question` and session `message` are at most
+2000 characters, `peer` and `purpose` 200, `context` 8000 bytes as JSON (else HTTP 422).
 
 | Endpoint | Payload of the answer |
 | --- | --- |
@@ -659,10 +665,16 @@ sessions run in parallel without mixing. Endpoints of every node (answers are si
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `POST /agent/sessions` `{peer, purpose, context}` | `{session_id, agent, purpose}` |
+| `POST /agent/sessions` `{peer, purpose, context}` | `{session_id, session_token, agent, purpose}`; HTTP 429 when every session slot is busy |
 | `POST /agent/sessions/{id}/messages` `{message}` | `{session_id, turn, answer, commitment}`; the agent sees the session's history |
 | `GET /agent/sessions/{id}` | the whole session: `{session_id, owner, peer, purpose, status, context, state, turns: [{author, kind, content, at}]}` |
 | `POST /agent/sessions/{id}/close` | `{session_id, status: "closed"}`; later messages get HTTP 409 |
+
+Every call on a session after the open must send the opener's `session_token` in the
+`X-Session-Token` header (HTTP 403 otherwise, 404 for an unknown id). A close waits for a
+reply being written. A session takes at most 100 turns (then 409); a node keeps at most 200
+open sessions (when full, it closes the least recently used idle one) and the 50 most recently
+closed ones. Tuttie closes its session when a negotiation ends.
 
 `context` is what the opening agent chose to share. Every item an agent holds has a
 visibility (`code/sessions/context.py`): `public` (may go into a posting), `negotiation` (may
