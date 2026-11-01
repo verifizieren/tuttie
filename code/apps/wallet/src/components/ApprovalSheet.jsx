@@ -14,7 +14,7 @@
 // and Tuttie pays that charge without asking again.
 import { useEffect, useRef, useState } from "react";
 import { decide } from "../lib/api.js";
-import { doneLabel, failureOf, recordedDecision, sendingLabel, tapAccepted } from "../lib/approval.js";
+import { doneLabel, failureOf, finishesOn, recordedDecision, sendingLabel, tapAccepted } from "../lib/approval.js";
 import { SealList, SealMarks } from "./Seals.jsx";
 
 const SCAN_MS = 1100;   // how long the face scan runs before an approval is sent
@@ -127,9 +127,10 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
   }, []);
 
   // The server's decision arrived on the event stream while the sheet still waits for the answer
-  // to its call (which may never come): finish with what the server recorded.
+  // to its call (which may never come), or after that call timed out or came back as no longer
+  // waiting: finish with the mark of what the server recorded.
   useEffect(() => {
-    if (recorded && stage === "sending") finish(recorded);
+    if (finishesOn(recorded, stage, decision)) finish(recorded);
   }, [recorded, stage]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // When this sheet came on screen and when a finger last came down on it (lib/approval.js tapAccepted).
@@ -183,7 +184,9 @@ export default function ApprovalSheet({ approval, onGone, note = "", recorded = 
       setError(failure.message);
       setStage(failure.gone ? "gone" : "ask");
       busy.current = failure.gone;  // retry only while the approval still waits
-      if (!failure.gone) onFinished?.(approval.id, false);  // still waiting: shown as the server's approval again
+      // Still waiting: shown as the server's approval again. After a timeout the server may have
+      // decided anyway, so the sheet stays until its own retry or the stream says how it ended.
+      if (!failure.gone && !e?.timeout) onFinished?.(approval.id, false);
     }
   }
 

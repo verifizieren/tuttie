@@ -49,3 +49,8 @@ export function tapAccepted({ detail, shownAt, downAt }) {
   return downAt != null && downAt - shownAt >= ARM_MS;
 }
 
+/** Whether the decision the server streamed (`recorded`) finishes the sheet now: only once the
+ *  user decided here (`decision`) and the call was sent, also when it then timed out (back to
+ *  "ask") or came back as no longer waiting ("gone"); the server's record decides the mark. */
+export const finishesOn = (recorded, stage, decision) =>
+  Boolean(recorded && decision && ["sending", "ask", "gone"].includes(stage));
