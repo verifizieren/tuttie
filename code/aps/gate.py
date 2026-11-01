@@ -69,7 +69,6 @@ TRUSTED_TIERS = {"gold", "blue"}
 # older approval is refused: used approvals live in memory, so after a node restart an old one
 # would otherwise book again.
 APPROVAL_MAX_AGE_S = 900
-START_SLACK_S = 5  # stamps are whole seconds; a call signed just as the node started still counts
 
 
 @dataclass(frozen=True)
@@ -135,12 +134,13 @@ class ActionGate:
         self.paid_with_mandate: dict[str, float] = {}  # mandate id -> CHF paid with it
 
     def made_before_start(self, timestamp: str, now: datetime) -> bool:
-        """Whether `timestamp` is from before this gate started (with START_SLACK_S for the
-        second-truncated stamps). A clock before the start (tests) never counts."""
+        """Whether `timestamp` is from before this gate started (stamps are whole seconds).
+        A clock before the start (tests) never counts."""
         stamped = parse_timestamp(timestamp)
         if stamped is None or now < self.started_at:
             return False
-        return stamped < self.started_at - timedelta(seconds=START_SLACK_S)
+        # Stamps are whole seconds: anything from an earlier second than the start is refused.
+        return stamped < self.started_at.replace(microsecond=0)
 
     async def check_action(self, call: dict, needs: Needs, now: datetime | None = None) -> Verdict:
         """Run every check for this call; never raises for bad input, refuses instead."""
