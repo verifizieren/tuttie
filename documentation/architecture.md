@@ -8,7 +8,7 @@ can work in parallel without stepping on each other. Contracts live in
 
 ```
             presentation site (apps/presentation)        owner view (apps/owner)
-                         | scroll into demo                      | edits agent presence
+                         | clicker drives the wallet             | edits agent presence
                          v                                       v
   phone: wallet (apps/wallet) + voice (code/voice)        business nodes (code/node)
                          |                                  ^  signed offers, A2A,
@@ -36,8 +36,8 @@ can work in parallel without stepping on each other. Contracts live in
 | Wallet app (phone) | `code/apps/wallet/` (React + Vite, PWA) | #2 | done, connected: card stack, Tuttie's face (eyes driven by its presence), voice mode, text fallback, the run under the eyes (posting, offers, bargaining), swipe deck of hotel cards, approval sheet with Face ID-style confirmation, booking card, history of conversations | `POST /chat`, `GET /events` (SSE), approvals API, conversations API, voice token |
 | Voice agent | `code/voice/` | #2, #3 | done, live: self-hosted LiveKit (signaling proxied by the assistant at `/rtc`, media TCP 4042 / UDP 4043, TURN relay coturn on TCP 4044 for phones), ElevenLabs speech-to-text and voice, `voice/agent.py` passes what the user says to Tuttie and speaks the answers | `POST /voice/say`, `GET /voice/events`, `POST /voice/token` |
 | Owner view | `code/apps/owner/` (React + Vite) | #5 | done: one page per business (rooms, extras, private negotiation limits, agent); edits are a draft, reviewed and deployed as a new numbered version the node uses at once | `GET /owner/overview`, `GET /owner/versions`, `POST /owner/deploy` on the node (`node/owner.py`), behind `OWNER_TOKEN` |
-| Presentation site and QR | `code/apps/presentation/` | #1, #6 | not built yet (only its README) | links into the wallet |
-| Demo | `code/demo/` | #3, #2 | not built yet (only its README); `scripts/demo_headless.py` runs the full flow in one process | drives the user's agent and the apps |
+| Presentation site and QR | `code/apps/presentation/` (static HTML, CSS, ES modules, no build) | #1, #6 | built: keynote deck served by the assistant at `/presentation/`, one clicker; beats 0-8 (Anna's guesthouse, the cheap listing, Tuttie's eyes, the live demo, 2000 website → 2033 signature, optional owner view, closing line and QR); in beat 4 the phone frame shows the real wallet (`/wallet/` in an iframe) and `demo.js` drives it with input and timing only (tap, type the request, swipe, approve); `media/fallback.webm`, a recording of a real run, plays in the same phone if the live wallet fails (V); presenter view (N) with spoken lines, cues and timer | frames `/wallet/` and `/owner/` (same origin), `POST /reset` for a fresh demo conversation |
+| Demo | `code/demo/` | #3, #2 | not built yet (only its README); the stage demo runs from the presentation (`apps/presentation/demo.js`, input and timing only) and `scripts/demo_headless.py` runs the full flow in one process | drives the user's agent and the apps |
 | Shared UI pieces | `code/apps/shared/` | — | brand stylesheet, seal badges | — |
 | Pitch, storyline, tech check, numbers | `assets/`, `documentation/` | #1, #3, #4, #7 | team | — |
 
@@ -47,15 +47,18 @@ can work in parallel without stepping on each other. Contracts live in
   wallet by feeding the storyline's input into the same backend the user would use
   (e.g. the user's lines instead of live speech) and lets the real flow run. Any feature
   the demo shows must exist in the app for real use; demo-only switches are limited to
-  input and timing (e.g. `?demo=<script>` on the wallet), never to separate screens.
+  input and timing (e.g. `?demo=<storyline>` on the wallet), never to separate screens.
+  The presentation's `demo.js` follows the same rule: it taps, types and swipes in the real
+  wallet inside the deck's phone frame and never draws UI or invents a result.
 
 - **Signing stays in `code/aps/`.** No other folder creates or checks signatures by hand.
 - **Prices never come from an LLM.** They come from node configs and signed messages.
 - **The demo calls the real components**; it never fakes verification
   (`documentation/concept.md`).
 - **Apps:** the wallet is a React app (Vite) in `code/apps/wallet/`; its build (`dist/`) is
-  served by the assistant at `/wallet/` and `run.sh` builds it. The other apps are static
-  pages (HTML + vanilla JS) served at `/<app>/`. Brand and seal badges are shared in
+  served by the assistant at `/wallet/` and `run.sh` builds it; the owner view is built the same
+  way and served at `/owner/`. The presentation is a static page (HTML, CSS, ES modules, no
+  build) served from disk at `/presentation/`. Brand and seal badges are shared in
   `apps/shared/`.
 - **Ports** (team server allows 4000-4049): registry 4000, nodes 4001-4009, marketplace 4010,
   weather and trains services 4011-4012, assistant and apps 4040, wallet dev server 4041,
