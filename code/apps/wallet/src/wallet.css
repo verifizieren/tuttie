@@ -266,7 +266,10 @@ body { position: fixed; inset: 0; background: #000; user-select: none; -webkit-t
 .rating { padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 650; color: #08080b;
           background: rgba(255, 255, 255, .92); }
 .swipe-name { position: absolute; left: 16px; right: 16px; bottom: 88px; z-index: 2; font-size: 22px; font-weight: 700;
-              letter-spacing: -.01em; line-height: 1.15; pointer-events: none; }
+              letter-spacing: -.01em; line-height: 1.15; pointer-events: none;
+              /* a long name stays on two lines, so it never covers the seals or the photo */
+              display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+              overflow: hidden; overflow-wrap: anywhere; unicode-bidi: plaintext; }
 .swipe-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; padding: 0 16px; display: flex;
               align-items: center; justify-content: space-between; gap: 10px; }
 .feature-icons { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
