@@ -234,3 +234,18 @@ test('normal hotel cards keep every field', () => {
                                                     detail: { phase: 'cards', cards: [card] } });
   assert.deepEqual(s.cards[0], card);
 });
+
+test('an agreement after the cards never puts a non-number price on a card', () => {
+  const card = i => ({ node_id: `ch.h${i}`, name: `Hotel ${i}`, trust_tier: 'gold', price_chf: 150 + i, agreed_chf: 140 + i,
+                       rating: { score: 4.5 }, features: [], photos: [] });
+  let s = applyEvent(startTurn(EMPTY, 'hotel'), { step: 1, kind: 'marketplace', status: 'verified', summary: '', seals: [],
+                                                  detail: { phase: 'cards', cards: [card(1), card(2)] } });
+  for (const price of [{ x: 1 }, 'free', null, NaN]) {
+    const next = applyEvent(s, { step: 2, kind: 'a2a', status: 'verified', node_id: 'ch.h2', node_name: 'Hotel 2', summary: '', seals: [],
+                                 detail: { payload: { type: 'agreement', price_chf: price } } });
+    assert.equal(next.cards.find(c => c.node_id === 'ch.h2').agreed_chf, 142, String(price));
+  }
+  const good = applyEvent(s, { step: 2, kind: 'a2a', status: 'verified', node_id: 'ch.h2', node_name: 'Hotel 2', summary: '', seals: [],
+                               detail: { payload: { type: 'agreement', price_chf: 128 } } });
+  assert.equal(good.cards.find(c => c.node_id === 'ch.h2').agreed_chf, 128);
+});
