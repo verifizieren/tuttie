@@ -16,6 +16,7 @@ can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 
 import inspect
 import json
+import os
 import math
 import re
 from dataclasses import dataclass
@@ -361,6 +362,11 @@ def offered_room(offer: dict) -> str | None:
     if isinstance(item, str) and " room" in item:
         return item.split(" room", 1)[0].strip() or None
     return None
+
+
+# Words a private item may hold that every hotel may hear (the stay itself, the dog, the guest).
+PUBLIC_WORDS = frozenset({"basel", "sbb", "luna", "hotel", "rhine"})
+GUEST_FIRST_NAME = os.environ.get("GUEST_NAME", "Alex Muster").split()[0]
 
 
 def finite_price(value, free_ok: bool = False) -> bool:
@@ -719,10 +725,33 @@ class Toolbox:
                     amounts |= {int(n) for n in re.findall(r"CHF\s*(\d+)", str(item.get("what", "")))}
         return amounts
 
+    def private_terms(self) -> set[str]:
+        """Private places and people from the user's context (lower case): the phone's location,
+        "with <name>" in private calendar entries, senders of private messages other than the
+        user, a "<city> →" in a private mail subject. A question to a business must not name them."""
+        terms: set[str] = set()
+        me = GUEST_FIRST_NAME.lower()
+        for items in self.user.data.values():
+            for item in items if isinstance(items, list) else []:
+                if not isinstance(item, dict) or item.get("visibility") != "private":
+                    continue
+                if isinstance(item.get("where"), str):
+                    terms.add(item["where"].split(",")[0].strip().lower())
+                text = " ".join(str(item.get(k, "")) for k in ("what", "subject", "text"))
+                terms |= {m.lower() for m in re.findall(r"\bwith ([A-Z][a-z]+)", text)}
+                terms |= {m.lower() for m in re.findall(r"\b([A-Z][a-z]+) →", text)}
+                if isinstance(item.get("from"), str) and item["from"].isalpha() and item["from"].lower() != me:
+                    terms.add(item["from"].lower())
+        return {t for t in terms if t and t not in PUBLIC_WORDS}
+
     async def ask_agent(self, node_id: str, question: str) -> dict:
         """Ask a node's own agent (A2A); a commitment in the reply is kept for booking.
 
         A question that names the private budget is not sent: code checks it, not the prompt."""
+        named = [t for t in self.private_terms() if re.search(rf"\b{re.escape(t)}\b", question, re.IGNORECASE)]
+        if named:
+            return {"error": f"not sent: the question names private context ({', '.join(sorted(named))}); "
+                             "ask without it (say only what the hotel needs: time, guests, pets)"}
         if any(re.search(rf"(?<![\d.]){n}(?!\d)", question) for n in self.private_amounts()):
             return {"error": "not sent: the question names the user's private budget; ask without it"}
         # Only the posted night (public: it is in the signed request) so the hotel's commitment
