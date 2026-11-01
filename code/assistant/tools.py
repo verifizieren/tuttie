@@ -668,6 +668,8 @@ class Toolbox:
         self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                       {"approval_id": approval["id"], "amount_chf": amount, "offer_mandate": offer, "terms": terms})
         decision = await self.approvals.wait(approval["id"])
+        if decision is None:  # the approval was dropped (e.g. a new demo started): nothing is approved
+            return {"declined": True, "reason": "the approval is no longer open"}
         step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                              " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
         if decision["decision"] != "approved":
@@ -707,8 +709,10 @@ class Toolbox:
         return answer
 
     async def mandate_offer(self, node_id: str) -> dict | None:
-        """A mandate to offer with a booking: for the hotel's small charge (e.g. the city tax), if any."""
-        small = [c for c in await self.load_charges(node_id) if c["price_chf"] <= AUTO_PAY_LIMIT_CHF]
+        """A mandate to offer with a booking: for the hotel's small charge (e.g. the city tax), if any.
+
+        Only for a charge above CHF 0: a mandate is for a positive amount (aps/mandate.py)."""
+        small = [c for c in await self.load_charges(node_id) if 0 < c["price_chf"] <= AUTO_PAY_LIMIT_CHF]
         if not small:
             return None
         charge = small[0]
@@ -750,6 +754,8 @@ class Toolbox:
             self.bus.emit("approval", "pending", f"Waiting for your phone. {summary}", record, verdict["seals"],
                           {"approval_id": approval["id"], "amount_chf": amount})
             decision = await self.approvals.wait(approval["id"])
+            if decision is None:  # the approval was dropped (e.g. a new demo started): nothing is approved
+                return {"declined": True, "reason": "the approval is no longer open"}
             step = self.bus.emit("approval", decision["decision"], f"You {decision['decision']} CHF {amount:g} on your phone"
                                  " (signed with your key)", record, verdict["seals"], {"decision": decision})["step"]
             if decision["decision"] != "approved":
