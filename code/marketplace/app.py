@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 
 from apidocs import api_docs
 from aps.keys import load_public_key
+from hosting import service_host
 from marketplace.market import Market, MarketError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -47,7 +48,8 @@ def create_app(http: httpx.AsyncClient | None = None) -> FastAPI:
     @app.exception_handler(MarketError)
     async def refused(_: HttpRequest, error: MarketError) -> JSONResponse:
         """Every refusal says why, so the sender's agent can show or fix it."""
-        return JSONResponse({"refused": True, "reason": error.reason}, status_code=error.status)
+        headers = {"Retry-After": str(error.retry_after)} if error.retry_after else None
+        return JSONResponse({"refused": True, "reason": error.reason}, status_code=error.status, headers=headers)
 
     @app.post("/postings", status_code=201)
     async def post_request(envelope: dict) -> dict:
@@ -72,4 +74,4 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host=service_host(), port=PORT)

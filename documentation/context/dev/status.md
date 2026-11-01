@@ -10,6 +10,11 @@ Last updated: 2026-11-01 (round 6 overnight fixes on `overnight/integration`, no
 
 ## Done
 
+- **Red team round 7, exposure and gate** (branch `fix/r7-gate`):
+  - Internal services (registry, marketplace, nodes, weather/trains) listen on `SERVICE_HOST` (`code/hosting.py`, default `0.0.0.0`, unchanged); Tuttie on 4040 stays public. To close the public ports (the demo keys are public, so a reachable node takes forged approvals): add `SERVICE_HOST=127.0.0.1` to `code/.env`, then `systemctl --user restart tuttie` (run_all.py passes it to every service). The MCP Host-header check is off explicitly, so `http://localhost:<port>/mcp/` works either way.
+  - The marketplace takes at most 120 postings per requester a minute (429 + Retry-After; all wallet users share Tuttie's id) and keeps the newest 500; Tuttie turns a busy, unreachable or non-JSON market into a calm tool error.
+  - The action gate refuses an approval whose signed `decided_at` is over 900 s old or in the future (after a node restart an old approval no longer books again).
+  - `registry_lookup` (negotiation/hotel.py) looks up only node-id-shaped ids and returns only dict records; `../search` gave a 500 on `/tools/counter_offer` and made the gate raise.
 - **Round 6 (overnight)** (branches `fix/r6-trust`, `fix/r6-approval-sheet`, `fix/r6-voice`,
   `overnight/harden`, merged for testing on `overnight/integration`, not on main, not deployed):
   - Trust: a verified hotel's signed agent card and `get_policies` profile are type-checked and
