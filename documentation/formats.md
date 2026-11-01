@@ -31,7 +31,11 @@ Implementation: `aps/canonical.py`.
 ```
 
 Each seal signature = issuer's key over canonical
-`{"node_id", "uid", "public_key", "capabilities", "issuer", "tier"}`.
+`{"node_id", "name", "kind", "endpoint", "uid", "public_key", "capabilities", "issuer", "tier"}`
+(changed 1 Nov 2026: `name`, `kind` and `endpoint` were added, so a sealed record can no longer
+be renamed, relabelled as a user agent or pointed at another host; all records were re-signed).
+`tags` and `delegation` are not sealed (the delegation carries the user's own signature).
+`scripts/issue_seals.py` refuses a `node_id` equal to an authority's issuer id.
 
 `uid` is the Swiss business identification number, `CHE-ddd.ddd.ddd` with a mod-11 check
 digit (eCH-0097, `aps/uid.py`), or `null` for nodes without one. It is always signed, so it
@@ -71,7 +75,9 @@ replays. Envelopes kept on purpose (commitments redeemed at `book`) are checked 
   highest tier among its seals; a node with no seals at all is `grey` (unsigned).
 - Licensed capabilities (listed under an authority's `licenses`, e.g.
   `licensed_legal_ch` for `bar-association-ch`) are granted only with a valid seal
-  from that authority. `can_take_payment` needs tier blue or higher.
+  from that authority. Only an authority's seal on someone else's record counts: a node
+  whose `node_id` equals an authority id and self-seals stays grey, with no licence and
+  no vouched `uid`. `can_take_payment` needs tier blue or higher.
 - A seal from an authority with `"vouches_for_uid": true` (the commercial register) is
   valid only if the record has a valid `uid`. The verdict's `uid` is set only through such
   a seal; any other `uid` in a record is just a claim.
@@ -225,7 +231,8 @@ signed by the `user` key:
 ```
 
 A delegation is valid only for the agent id and key in its own registry record, until
-`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`, `book`).
+`expires_at`, and only for its scopes (`ask_agents`, `negotiate`, `post_requests`, `book`; `scopes` must be
+a list, a string never verifies).
 `book` lets the agent call the book action for the user (checked by the action gate); each
 booking still needs the user's signed approval for its exact amount (below). Paying is not a
 scope. The
@@ -442,8 +449,9 @@ The business can verify the requester itself from `request` (seals, signature, d
 A node checks before its agent thinks: the event must be a valid `PostingCreated` and
 `offer_url` exactly `<MARKETPLACE_URL>/postings/<request_id>/offers` (default
 `http://localhost:4010`, any loopback name counts) or the answer is 422; `request` must be
-signed by `requester_id`, a registered user agent with gold or blue seals, at most 5 minutes
-old and for this `request_id`, or the answer is 403.
+signed by `requester_id`, a registered user agent with gold or blue seals and a valid user
+delegation with the `post_requests` scope, at most 5 minutes old and for this `request_id`,
+or the answer is 403.
 Its answer, e.g. `{"interested": true, "next_tool": "make_offer"}` (plain or as the payload
 of a signed envelope), is recorded but advisory; only a signed offer counts.
 
@@ -631,7 +639,7 @@ and Tuttie send it; tools over MCP and `counter_offer` are not affected.
 
 | Endpoint | Payload of the answer |
 | --- | --- |
-| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}`; the marketplace reads it to check the subscription |
+| `GET /agent/card` | `{node_id, business, profile, persona (without boundaries), tools {name: {status, endpoint, description}}, wakes_on, invoke}`; the marketplace reads it to check the subscription, from the sealed `endpoint`, and refuses a card signed more than 300 s ago |
 | `POST /agent` `{question, context}` | A2A reply `{answer, commitment}` (see above) |
 | `POST /agent/invoke` with the event itself as body | `{woken_by, interested, reason, next_tool, next_tool_available}`, or `{woken_by, ignored: true, reason}` for events the agent does not subscribe to. If interested in a `posting.created` with `next_tool: make_offer`, the node then sends a signed `Offer` to the posting's `offer_url` in the background |
 
