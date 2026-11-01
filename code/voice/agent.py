@@ -90,6 +90,11 @@ def francs(match: re.Match) -> str:
 LINK = re.compile(r"\[([^\[\]\n]*)\]\(([^()\n]*)\)")
 NOTE = re.compile(r"\[([^\[\]\n]{0,60})\]")
 CITATION = re.compile(r"\d+(?:\s*,\s*\d+)*")
+# A bracketed number that is a price, not a citation: with a thousands separator ("[1,280]"), or
+# right after a currency ("CHF [128]") or before one ("[90] CHF"). Decimals are no citation anyway.
+THOUSANDS = re.compile(r"[0-9]{1,3}(?:[,'’][0-9]{3})+")
+CURRENCY_BEFORE = re.compile(r"(?:\b(?:CHF|francs?|EUR|USD|GBP|Fr\.)|[€$£])[ \t]*$", re.IGNORECASE)
+CURRENCY_AFTER = re.compile(r"[ \t]*(?:(?:CHF|francs?|EUR|USD|GBP)\b|[€$£])", re.IGNORECASE)
 LABEL = re.compile(r"confirmed|verified|signed|sources?", re.IGNORECASE)
 # Node ids have one shape (data/nodes/*.json): ch.<area>.<name>, e.g. ch.basel.hotel-rheinblick or
 # ch.legal.advisor; hosts and dotted words (de.sbb.ch, en.wikipedia.org, ok.so.basically) stay.
@@ -138,7 +143,10 @@ def link(match: re.Match) -> str:
 def note(match: re.Match) -> str:
     """A bracketed note: dropped if it says nothing, else its words without the brackets."""
     inner = re.sub(r"^[\s,;]+|[\s,;]+$", "", ID.sub("", match.group(1)))
-    if (not inner or CITATION.fullmatch(inner) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
+    price = THOUSANDS.fullmatch(inner) or (re.fullmatch(r"[0-9]+", inner) and (
+        CURRENCY_BEFORE.search(match.string, max(0, match.start() - 12), match.start())
+        or CURRENCY_AFTER.match(match.string, match.end())))
+    if (not inner or (CITATION.fullmatch(inner) and not price) or LABEL.fullmatch(inner) or NODE_ID.fullmatch(inner)
             or REF.fullmatch(inner) or inner.lower().startswith("ignored:")):
         return GONE
     glued = match.start() > 0 and match.string[match.start() - 1].isalnum()
