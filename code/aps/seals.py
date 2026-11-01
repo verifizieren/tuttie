@@ -5,6 +5,10 @@ with the claimed tier and the signature verifies. A seal whose issuer is the nod
 itself is a self-signed grey seal. A node without any seal is unsigned and also grey
 (untrusted, but it claims nothing false). Any claimed seal that fails makes the node broken.
 
+A seal binds everything a user or another agent relies on: the node's id, display name,
+kind (business, user-agent, service), endpoint, Swiss business number (UID), public key and
+capabilities. Changing any of them after sealing breaks every seal of the record.
+
 Only an authority's seal carries authority power (licences, UID vouching), and never on a
 record whose node_id is itself an authority id: a grey node called "bar-association-ch"
 self-sealing its record stays grey and gets no licence.
@@ -26,13 +30,17 @@ PAYMENT_CAPABILITIES = {"can_take_payment"}
 
 
 def seal_body(record: dict, issuer: str, tier: str) -> dict:
-    """The fields a seal signs: who the node is (id, UID, key), what it may do, plus issuer and tier.
+    """The fields a seal signs: who the node is (id, name, kind, endpoint, UID, key), what it
+    may do, plus issuer and tier.
 
     "uid" is None for nodes without a UID; it is always signed, so it cannot be added,
-    changed or removed after sealing.
+    changed or removed after sealing. The same holds for a missing name, kind or endpoint.
     """
     return {
         "node_id": record["node_id"],
+        "name": record.get("name"),
+        "kind": record.get("kind"),
+        "endpoint": record.get("endpoint"),
         "uid": record.get("uid"),
         "public_key": record["public_key"],
         "capabilities": record["capabilities"],

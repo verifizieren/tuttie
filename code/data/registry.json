@@ -40,7 +40,7 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "KxP6DC2SKRClKyAuSbNAtSyJWQucC/Oc7r2FUICmybne0VMfGuKJPrSVdPopQ/uZwhqtBF4oQSBA0sSdf4pPCg=="
+        "signature": "7L1LKAUa7NJtPTOjwrYErcjle52wCMmLqWHEZg7bWdn5vfqtxGpMvAjqHtBPFZV7XSdu4utdKd2sTzUbD0aqDQ=="
       }
     ]
   },
@@ -68,7 +68,7 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "rMfu6O9LnD5FCF3KlFsnQrT/zuPkaE/jLvcvqVeQuL4OfoKe7SL52z8RnRCFCQxxY2dm3USQ5bfreu3N+hNjDw=="
+        "signature": "NCJYpqFNzKYrb2U9UDPGxuXvA+hcf3N8Q/3CEm4Ile9i/10MByP55xMlUQwp5qsM2OdLr+JbYdRxDCsWg4KeBg=="
       }
     ]
   },
@@ -95,12 +95,12 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "v1ByA6UROdqc4GDu41H7uBds1qHF/K1ytcXXRm6ZlZWbAloUwZ5eQ4CmHBtepn/tRSTdovsYJ5bJvLYWU33rCA=="
+        "signature": "MVeJerhWTyZN8hZeNDMwhWBa9Gu/26dpLn9uAxuHGbdN3cAeADOHzfnlY8tSt+0o/TDYKqNN6+mm5wW9S1v3DA=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "kU0isTeCwmCXHyaJ8aUZptt6WbMmJhWpfjYBVwLvvjly0I14WmOq9a5DeKJj1vv2J9G6aS6eyUvNr39pzHlnAA=="
+        "signature": "afWopPqvPh3wkhsXVuWeSglDg9ar94dFbbnYwhR406UzRS44b8uCXJbfVdfZDddPsf9fIvGxu/tXfhzYD80qCw=="
       }
     ]
   },
@@ -125,7 +125,7 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "SXMKtoFAZ+LGLIIbcdAbvwrAcnl1esl4EbXl/5as82p1jVh56Niu4GTPzCvCWupdrFTn5sRih6XsVwTVzxKUBw=="
+        "signature": "V5m3pPLusmeLRU5fx2rnt9X+UWco1wBIOXkbeWYbPJMZ9NS+fl2mmYflHwYyAjyHZSgbjFvWQWnP5HPbJ/4yAg=="
       }
     ]
   },
@@ -151,12 +151,12 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "PNmHEiDhxU3cHks2D7MYjxmLE1KpcoeVS88u5hH02+2qMaJfEDnvqerW1QaojKyYOvAEN4Cpv8SGwzDykxSCDA=="
+        "signature": "M28xBydxSfX3KmrTpYovk8NvYeoCk7LPKzC57V9AbyF4pNTM3DI88ZJordFWl1LSP8Evs37CuGAMyOjrqb+/Ag=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "bh5lIZ7N9n1dgZ6u99wWxDcqoXIO99Tg1TLOVn93myov1aILdz0WSiGUGpjT6gwPee54XODTnbR2fl5um5SCBA=="
+        "signature": "1uJYu9QycQ/46yGW1chApX1AoxS1J9xosR/VweHgfPOOfMb68/FRgS6H1UWgC6qmTTe8Rz3y3d3q70p0QD8FBQ=="
       }
     ]
   },
@@ -180,7 +180,7 @@
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "1lZVYzBNdTU0V6nZFyVUajPzVnKg5uOKjHaMtnYfGAUaMzluquKDzOVokA9SL2M6uoC6u52udcNMwLvylij5CA=="
+        "signature": "DsU7mW//t/jnzLIIKs9fKqj7sN9aouquNSXjssCwDlrtLp4PTo+xww7mal109VUEP8i/Nqa24sXAh98T5UWWBw=="
       }
     ]
   },
@@ -204,12 +204,12 @@
       {
         "issuer": "bar-association-ch",
         "tier": "gold",
-        "signature": "Ya6kPcSLBws7PlkCh5N9QTVJGFFaqxgRbUfkBviBNn34jQ74PEZjCOH6h7Pz30GoGVMO40ZThsAEx67yIcHBDQ=="
+        "signature": "CJZtif7lFsjE4y9stSsNi3ru1pyMbyRthctNfrPLACQi/Cb/++IlUfuHhhRg2JKZ/rYToUe1se8ZTlSXVnJBDw=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "KtUAxLTMmB3KXXKovGeE58OppS3XJw6XkYRazFzEmA8sQbxRz0nSvCzyauTLph9RkrIL4VJc778N8MFezC0xAA=="
+        "signature": "dbH8c+jJO7Sz4ucdddyCoIiNMYOLosmDe3PZgZHHczr9/s18ilrBDt4nLDQ15IWXPfGIIyashRh+BdY4HkSFDw=="
       }
     ]
   },
@@ -233,7 +233,7 @@
       {
         "issuer": "ch.legal.advisor",
         "tier": "grey",
-        "signature": "p7ult18Dhq6rkS4nzjL5kE1qWlevV1Dk4djg/NXWpho5nVkzpYdV0+mxrOXfGfgS51WwnXGEXznHL/C6tEtMAw=="
+        "signature": "o6eL7Wuw96FuTsO7tXhhxm6nOlkHzPWrXFRAAQ52I8Socb0abGDWg6bhzzzRDFpxyP+CA3BIqbIYKf/+X5kYCA=="
       }
     ]
   },
@@ -258,12 +258,12 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "dQ68qPmdmzZxLY5jCVyUqdW8Zwq+6CVxxm6WGcN83m6wLm6/5fHUnkIbQqYvtj/D5NmvCevi6Gq91XJY3t48CQ=="
+        "signature": "wswraMgqDr/a++MkOPZUUhf1dKdjKUtrdmneJsU8xT/oOte0w05u6hupCW8hlrKoqK/0hRG7jJywPiiOKPrzDg=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "Px3xq7BRdL6r6EAn1LOCnuOkfnY8R8TXRrIQz3t292jMvATwiR+xfYH+bhh8Z0vxuyHc7EA3ho1Yz72GewbZDQ=="
+        "signature": "+fvYApqqTekMtZ3RL0oXbqBFB6Gj75W2xJsvRbtjh6QvrGB7bif54bhBhMOLKuGknIGUvurqaJ8wROHaOMB7AA=="
       }
     ]
   },
@@ -287,12 +287,12 @@
       {
         "issuer": "handelsregister-bs",
         "tier": "gold",
-        "signature": "CZCrtDggL/2nxkicbRuqz9bDf/nC07tk8Z+/Xk7cHNPtXxynlpk3Ukw90rY+07KRDL45dQBI0iKU6319/mEIAA=="
+        "signature": "gI41InF6W5mLwQC42bmAKyZugbSmMvUgbRdYprVmvEyScPpFzTGk/hMqUotp3R1HBcYc5ZBV7zsLb+2FIq7YCg=="
       },
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "BvBT9oSKEcAM4ja4Lnzj8sL8UOcVn3IGq8wRL9BWGiWVYfLNAODXe3e2YK4lp8Vq+upLo+zDGqX1kAZm7cy1AQ=="
+        "signature": "lY+bOVSitNctvgp3TgLQp1WAAjfcLJWULARnLy+CAmWk/SLS4vEaBTaqiqj4/yPxXLbHZ4zgTlc6c9fWSsuoCQ=="
       }
     ]
   },
@@ -315,7 +315,7 @@
       {
         "issuer": "adobe",
         "tier": "blue",
-        "signature": "6iZS9GSa08sftbWra2neBOOfqo7lZrVwFYrUccBzCo2LT6aXCgqWj6L+WxN0g0lMSWHtmIBhSZTig/D/QsQWBA=="
+        "signature": "kpOE3Ye9Zhs2x6E3g9yTERcqvabfoxOs5AMZsoA/rBC7Zmb6fsTNpgd/kFCsguNPH5ftl4sHimTQsrXft1fqDg=="
       }
     ],
     "delegation": {
@@ -327,9 +327,9 @@
         "negotiate",
         "post_requests"
       ],
-      "issued_at": "2026-10-31T13:10:55Z",
-      "expires_at": "2027-10-31T13:10:55Z",
-      "signature": "d3B1fG9YKqassiWuqQmxR7+mA67ncYIajG4nKH51JDzpNjov33+ay7w3ScfLQGzqB6uJG/gmOBVEvMSSXDSgCw=="
+      "issued_at": "2026-11-01T00:22:34Z",
+      "expires_at": "2027-11-01T00:22:34Z",
+      "signature": "usRSShlIyALKQzPTOVqxRmmezifQcgTJSu9pyuZGj6KfuZEC1N96X60jlqekJwZk0assgwT8bYXaWZdGN1TTDw=="
     }
   }
 ]
