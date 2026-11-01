@@ -719,7 +719,8 @@ class Toolbox:
             if agreement is None:
                 # The user chose it anyway: booking does not need a deal, only the phone's approval.
                 return {"error": f"no signed agreement with {node_id}: book it without use_agreement, with "
-                                 "date and room_type from call_tool get_availability (cheapest fitting rate); "
+                                 "date (the posted night) and room_type from call_tool get_availability (cheapest "
+                                 "fitting rate), after ask_agent for one commitment for the special needs; "
                                  "do not ask the user"}
             deal = agreement["payload"]
             posted = self.market.last_request["constraints"]["date"] if self.market.last_request else None
