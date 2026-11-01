@@ -63,8 +63,13 @@ export default function App() {
   // went; the wallet stops waiting for it even if no event about it arrives.
   const [goneApproval, setGoneApproval] = useState(null);
   const approval = agent.approval && agent.approval.id !== goneApproval ? agent.approval : null;
-  const approvalId = approval?.id;
-  const dropApproval = useCallback(() => setGoneApproval(approvalId), [approvalId]);
+  // A decided approval stays on screen until its sheet has shown the final mark (the Face ID
+  // checkmark or the X) and slid away, even though the server already stopped waiting for it.
+  const [finishing, setFinishing] = useState(null);
+  const sheetApproval = approval || finishing;
+  const approvalId = sheetApproval?.id;
+  const dropApproval = useCallback(() => { setGoneApproval(approvalId); setFinishing(null); }, [approvalId]);
+  const sheetDone = useCallback(() => setFinishing(null), []);
   const [showHistory, setShowHistory] = useState(false);
   // The past chat open in the history (null = the list), why it could not be continued, and
   // whether it is being restored.
@@ -266,7 +271,8 @@ export default function App() {
             onOpen={id => setHistoryChat({ id, error: "", resuming: false })}
             onResume={() => resumeChat(history.find(e => e.id === historyChat.id), "voice")} />
         </Boundary>}
-        <ApprovalSheet key={approvalId} approval={approval} onGone={dropApproval} note={notice} />
+        <ApprovalSheet key={approvalId} approval={sheetApproval} onGone={dropApproval} note={notice}
+                       onDecide={setFinishing} onFinished={sheetDone} />
       </AgentCard>
       <Dock onHistory={openHistory} onNewChat={newChat} onKeyboard={startTyping}
             muted={muted || quiet} onMute={quiet ? () => setQuiet(false) : toggleMute} />

@@ -85,11 +85,11 @@ NODE_ID = re.compile(r"[a-z]{2}(?:\.[a-z0-9-]+){2,}")          # ch.basel.hotel-
 ID = re.compile(r",?\s*(?:(?:receipt|booking)(?:\s+id)?\s*)?\b(?:BK|RC)-[0-9A-F]{6}\b", re.IGNORECASE)
 URL = re.compile(r"\s*(?:https?://|www\.)\S*\s*", re.IGNORECASE)
 GONE = "\x00"   # where a note was taken out: the spaces around it are tidied there only
-IGNORED = re.compile(r"(?<![ \t])[ \t]*\bignored:.*$", re.IGNORECASE | re.MULTILINE)  # "Ignored: <business>" to the line's end
+IGNORED_LINE = re.compile(r"^[ \t*_#>-]*ignored:", re.IGNORECASE)  # a line about a business Tuttie ignored
 # 24-hour times (two-digit hour) not already said in 12 hours or meant as a duration; a
 # trailing "hrs"/"Uhr" is part of the time: "18:00", "00:52", "14:00 hrs" yes; "8:30 pm",
 # "1:30 hours", "18:00:30" no.
-CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)\b(?:[ \t]?(?:hrs?|uhr)\b)?"
+CLOCK = re.compile(r"(?<![:\d])\b([01]\d|2[0-3]):([0-5]\d)(?:[ \t]*(?:hrs?|uhr)\b)?\b"
                    r"(?!:\d|\s*(?:[ap]\.?m\b|noon|midnight|h\b|hours?\b|min))", re.IGNORECASE)
 
 
@@ -111,22 +111,31 @@ def note(match: re.Match) -> str:
     return (" " if glued else "") + inner
 
 
-def without_notes(text: str) -> str:
-    """Links and bracketed notes cleaned (see above), "Ignored: ..." parts dropped, and the
-    spaces tidied only where something was taken out. Same rules as the wallet's withoutNotes."""
-    text = LINK.sub(link, text)
+def without_notes(raw: str) -> str:
+    """Links and bracketed notes cleaned (see above), lines starting with "Ignored:" dropped, and
+    the spaces tidied only where something was taken out. Same rules as the wallet's
+    withoutNotes. A non-empty answer never cleans to nothing: then its words stay, unbracketed."""
+    text = LINK.sub(link, raw)
     for _ in range(3):  # nested brackets: "[[3]]" leaves "[]" after one pass
         text = NOTE.sub(note, text)
-    text = re.sub(r"[ \t]?\x00+(?=[.,;:!?]|$)", "", text, flags=re.MULTILINE)
-    text = re.sub(r"^\x00+[ \t]?", "", text, flags=re.MULTILINE)
-    text = re.sub(r"[ \t]?\x00+[ \t]?", " ", text)
-    lines = [(line, IGNORED.sub("", line)) for line in text.split("\n")]
-    # A line left with only a bullet or bold marks ("- ", "**") was all "Ignored: ...": dropped.
-    return "\n".join(cut for line, cut in lines if cut.strip(" \t-*_#>") or not line.strip())
+    text = re.sub(r"\x00(?:[ \t]*\x00)+", GONE, text)       # notes in a row count as one
+    text = re.sub(r"[ \t]?\x00(?=[.,;:!?)\]'\"’]|$)", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\x00[ \t]?", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[ \t]?\x00[ \t]?", " ", text)
+    text = "\n".join(line for line in text.splitlines() if not IGNORED_LINE.match(line))
+    if not text.strip() and raw.strip():
+        return raw.replace("[", "").replace("]", "")
+    return text
+
+
+DURATION_WORDS = re.compile(r"(?:^|\s)(?:takes|take|took|lasts|for|in|about|around|approx\.?)\s+$", re.IGNORECASE)
 
 
 def clock(match: re.Match) -> str:
-    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight"."""
+    """A 24-hour time as it is said: "18:00" is "6 pm", "00:52" is "12:52 am", "00:00" is "midnight".
+    After "takes", "for", "in" ... it is a length of time ("takes 01:15 hrs") and stays."""
+    if DURATION_WORDS.search(match.string[max(0, match.start() - 12):match.start()]):
+        return match.group(0)
     hour, minute = int(match.group(1)), int(match.group(2))
     if minute == 0 and hour in (0, 12):
         return "midnight" if hour == 0 else "noon"
@@ -138,6 +147,7 @@ def spoken(answer: str) -> str:
     """An answer as it should sound: amounts in francs, temperatures in degrees, times as said
     (6 pm), no bracketed notes, no markdown, no emoji."""
     text = without_notes(answer)
+    text = re.sub(r"[ \t]?\b(?:BK|RC)-[0-9A-F]{6}\b", "", text)  # ids are never spoken: the wallet shows them
     text = CLOCK.sub(clock, text)
     text = re.sub(r"\bCHF\s?(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s?CHF\b", francs, text)
     text = re.sub(r"\bCHF\b", "francs", text)

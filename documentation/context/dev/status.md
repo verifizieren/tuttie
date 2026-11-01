@@ -599,6 +599,10 @@ Why things are the way they are, so nobody has to rediscover them:
 - **Answer mood:** Tuttie ends every answer with "Mood: <mood>" (`MOODS` in
   `assistant/agent.py`); `split_mood` strips it and the answer event carries `detail.mood`. The
   wallet shows it on the face (`MOOD` in `lib/activity.js`), so small talk has expressions too.
+- **Face ID glyph in the approval sheet** (`ApprovalSheet.jsx` `FaceId`, `wallet.css`): rounded
+  corner brackets around a simple face (eyes, L-shaped nose, smile) like the iPhone's; while
+  scanning the face turns a little and the brackets pulse; on approval the face fades and a
+  checkmark is drawn inside the brackets as the glyph turns green. A decline keeps the grey X.
 - **Answers are written to be heard** (`assistant/agent.py`): one to three short sentences, no
   lists, markdown, emoji or square brackets, no ids or codes (node ids, booking ids, receipt
   numbers: the wallet shows them), numbers as people say them ("CHF 128", "6 pm", "14
@@ -610,9 +614,11 @@ Why things are the way they are, so nobody has to rediscover them:
   its words without the brackets, so a fee or "cancelled" is never hidden. Shared cases:
   `code/tests/fixtures/answer_notes.json`. The voice says two-digit 24-hour times as "6 pm",
   "12:52 am", "midnight", "noon" (also "14:00 hrs" / "18:00 Uhr") and leaves "8:30 pm",
-  durations ("1:30 hours") and "18:00:30" alone. Only the "Ignored: ..." part of a line is
-  dropped (never the whole answer); citation links never read out a URL; spaces are tidied only
-  where a note was removed. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
+  durations ("1:30 hours") and "18:00:30" alone. Only whole lines starting with "Ignored:" are
+  dropped, and a non-empty answer never cleans to nothing (its words stay, unbracketed); a time
+  after "takes"/"for"/"in" is a duration and stays; booking and receipt ids are never spoken;
+  citation links never read out a URL; spaces are tidied only where a note was removed. Both
+  sides are tested against the same "screen" column of the fixture. Reason: "18:00" was read as "1800"; "[confirmed]" / "[receipt RC-...]"
   showed up. Found and checked by a bug hunter and two attacker rounds.
 - **The assistant always asks the hotel's agent before booking**; otherwise it skipped A2A
   and booked without the dog fee.

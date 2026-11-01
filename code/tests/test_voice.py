@@ -14,7 +14,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")  # the app builds an LLM client;
 from assistant import voice  # noqa: E402
 from assistant.app import SESSION_COOKIE, app  # noqa: E402
 from assistant.events import EventBus  # noqa: E402
-from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for, voice_on  # noqa: E402
+from voice.agent import UPDATES, filler_kind, meaningful, spoken, update_for, voice_on, without_notes  # noqa: E402
 
 
 def configure(monkeypatch):
@@ -219,3 +219,6 @@ def test_answer_notes_shared_with_the_wallet():
     cases = json.loads((Path(__file__).parent / "fixtures" / "answer_notes.json").read_text())
     for case in cases:
         assert spoken(case["in"]) == case["spoken"], case["in"]
+        # The same "screen" column the wallet's cleanAnswer is tested against (activity.test.js):
+        # the voice and the screen clean notes with the same rules.
+        assert without_notes(case["in"]).strip() == case["screen"], case["in"]
