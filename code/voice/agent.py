@@ -224,13 +224,15 @@ def pick_ack(event: dict) -> str | None:
 
 
 def update_for(event: dict, said: set[str]) -> str | None:
-    """The short line to speak for a timeline event, once per turn, or None."""
-    detail = event.get("detail") or {}
-    key = "approval" if event["kind"] == "approval" and event["status"] == "pending" else None
-    if key is None or key in said:
+    """The short line to speak for a timeline event, once per approval (a booking and then the
+    city tax in one turn are two prompts), or None."""
+    if event["kind"] != "approval" or event["status"] != "pending":
+        return None
+    key = f"approval:{(event.get('detail') or {}).get('approval_id') or ''}"
+    if key in said:
         return None
     said.add(key)
-    return UPDATES[key]
+    return UPDATES["approval"]
 
 
 class Tuttie(Agent):
