@@ -13,12 +13,14 @@
 /* The page the pitch's QR code opens (issues #1, #6): the numbers, the concept, the business
    case, then an Apple-style scroll into a demo of the wallet that plays by itself.
    Phone first, light and calm like the wallet's light design: page #f2f2f7, white panels with
-   hairline borders, dark text, the brand accent kept (apps/shared/tuttie.css for fonts). The demo
+   hairline borders, dark text, accents blue, purple and pink only, nothing in italic, no eyebrow
+   labels above headings (apps/shared/tuttie.css for fonts). The demo
    mock reuses the wallet's own look (apps/wallet/src/wallet.css) at its native size, scaled down. */
 :root {
   --bg: #f2f2f7; --panel: #fff; --panel2: #fff; --line: #e4e4ea; --line2: #d7d7df; --soft: #ececf1;
   --text: #17171d; --muted: #5a5967; --dim: #8a8996;
-  --accent: #d97757; --accent-text: #b9552f; --peach: #c65f39;
+  --accent: #7a5af8; --accent-text: #6a4ae6; --purple: #7a5af8; --pink: #e5489b;
+  --tint-blue: #eaf1fd; --tint-purple: #f1edfe; --tint-pink: #fdeaf4;
   --gold: #c9941a; --blue: #2f6fe0; --grey: #8e8e9a; --red: #e0393e; --green: #1f9d57;
   --shadow: 0 1px 2px rgba(23,23,29,.04), 0 8px 24px rgba(23,23,29,.06);
   --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -30,8 +32,8 @@ html { background: var(--bg); -webkit-text-size-adjust: 100%; }
 body { margin: 0; color: var(--text); background: var(--bg); font-family: Inter, -apple-system, system-ui, sans-serif;
        -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 a { color: inherit; }
+em, i, cite, address, dfn, var { font-style: normal; }
 .wrap { max-width: 520px; margin: 0 auto; padding: 0 var(--gut); }
-.kicker { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
 .src { font-size: 11px; color: var(--dim); line-height: 1.4; }
 
 /* Reveal on scroll: a soft rise, once. */
@@ -51,13 +53,13 @@ a { color: inherit; }
 
 /* ---------- Hero: the Tuttie card, asleep, then awake ---------- */
 .hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 80px 0 40px; position: relative;
-        background: radial-gradient(600px 420px at 50% 30%, rgba(217,119,87,.10), transparent 70%); }
+        background: radial-gradient(600px 420px at 50% 30%, rgba(122,90,248,.10), transparent 70%); }
 .tcard { position: relative; width: 100%; aspect-ratio: 1.586; border-radius: 22px; background: #fff; overflow: hidden;
          box-shadow: 0 0 0 1px rgba(23,23,29,.07), 0 2px 6px rgba(23,23,29,.05), 0 30px 70px rgba(23,23,29,.14); }
 .tcard canvas { position: absolute; left: 0; top: 50%; width: 100%; aspect-ratio: 2 / 1; transform: translateY(-50%) scale(.92); display: block; }
 .tcard .lbl { position: absolute; top: 16px; left: 20px; font-size: 13px; font-weight: 600; color: rgba(23,23,29,.38); }
 .hero h1 { margin: 34px 0 12px; font-size: clamp(38px, 11vw, 52px); line-height: 1.02; font-weight: 800; letter-spacing: -.035em; }
-.hero h1 em { font-style: normal; color: var(--peach); }
+.hero h1 em { font-style: normal; color: var(--purple); }
 .hero p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
 .cue { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
        display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
@@ -74,7 +76,7 @@ a { color: inherit; }
 .fig.past { opacity: 0; transform: translateY(-46px); }
 .fig .big { font-size: clamp(88px, 30vw, 150px); line-height: .9; font-weight: 800; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .fig .big small { font-size: .42em; letter-spacing: -.03em; color: var(--muted); font-weight: 700; margin-left: .06em; }
-.fig .big.accent { color: var(--peach); }
+.fig .big.accent { color: var(--pink); }
 .fig p { margin: 18px 0 10px; font-size: 21px; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; }
 .fig p span { color: var(--muted); font-weight: 500; }
 .viz { margin: 0 0 26px; height: 96px; display: flex; align-items: flex-end; }
@@ -101,7 +103,7 @@ section.block { padding: 90px 0; }
 .three { display: grid; gap: 4px; font-size: clamp(30px, 9vw, 40px); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
 .three span { color: #c9c8d1; transition: color .6s; }
 .three span.in { color: var(--text); }
-.three .one { margin-top: 10px; color: var(--peach) !important; }
+.three .one { margin-top: 10px; color: var(--purple) !important; }
 .lead { margin: 26px 0 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
 .lead b { color: var(--text); font-weight: 600; }
 
@@ -110,7 +112,7 @@ section.block { padding: 90px 0; }
 .step::before { content: ""; position: absolute; left: 16px; top: 34px; bottom: 0; width: 1px; background: var(--line2); }
 .step:last-child::before { display: none; }
 .step .n { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 15px; font-weight: 700;
-           color: var(--accent-text); background: rgba(217,119,87,.13); }
+           color: var(--accent-text); background: var(--tint-purple); }
 .step b { display: block; font-size: 17px; font-weight: 650; margin-top: 6px; }
 .step span { display: block; margin-top: 4px; font-size: 15px; line-height: 1.45; color: var(--muted); }
 
@@ -127,7 +129,7 @@ section.block { padding: 90px 0; }
 /* ---------- Business case ---------- */
 .vs { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .vs div { padding: 16px; border-radius: 18px; background: var(--panel2); border: 1px solid var(--line); box-shadow: var(--shadow); }
-.vs div.anna { border-color: rgba(201,148,26,.5); background: linear-gradient(180deg, rgba(232,183,70,.12), transparent 70%), var(--panel2); }
+.vs div.anna { border-color: rgba(122,90,248,.45); background: var(--tint-purple); }
 .vs b { display: block; font-size: 40px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
 .vs span { display: block; margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--muted); }
 .vs em { display: block; font-style: normal; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
@@ -145,7 +147,7 @@ section.block { padding: 90px 0; }
 .barrow .lost { color: var(--red); }
 .model { margin-top: 18px; display: grid; gap: 10px; }
 .model > div { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line); box-shadow: var(--shadow); }
-.model svg { width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: rgba(217,119,87,.13); stroke: var(--accent-text); fill: none;
+.model svg { width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: var(--tint-purple); stroke: var(--accent-text); fill: none;
              stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .model b { display: block; font-size: 15px; font-weight: 650; }
 .model span { display: block; margin-top: 3px; font-size: 14px; line-height: 1.4; color: var(--muted); }
@@ -205,7 +207,7 @@ section.block { padding: 90px 0; }
 .s-open .agent { top: var(--top); height: calc(844px - var(--top) - var(--bottom) - var(--dock)); border-radius: 32px; }
 .s-open .agent canvas { top: 42%; transform: translateY(-50%) scale(1); }
 .s-busy .agent canvas { top: 12%; transform: translateY(-50%) scale(.42); }
-.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1.5px rgba(217,119,87,.55); }
+.edge { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s var(--ease); box-shadow: inset 0 0 0 1.5px rgba(122,90,248,.55); }
 .s-voice .edge { opacity: 1; animation: listen 3s ease-in-out infinite; }
 @keyframes listen { 50% { opacity: .45; } }
 .grab { position: absolute; top: 10px; left: 50%; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: rgba(23,23,29,.22); opacity: 0; transition: opacity .3s; }
@@ -229,7 +231,7 @@ section.block { padding: 90px 0; }
 .bubble { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45; }
 .bubble.user { align-self: flex-end; background: var(--soft); border-bottom-right-radius: 6px; min-height: 42px; }
 .bubble.tuttie { align-self: stretch; max-width: none; padding: 14px 16px; font-size: 16px; line-height: 1.5;
-                 background: linear-gradient(180deg, rgba(217,119,87,.11), rgba(217,119,87,.05)); border: 1px solid rgba(217,119,87,.3); border-bottom-left-radius: 6px; }
+                 background: var(--tint-purple); border: 1px solid rgba(122,90,248,.28); border-bottom-left-radius: 6px; }
 .hide { display: none !important; }
 .fadein { animation: rise .45s var(--ease) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
@@ -331,7 +333,9 @@ section.block { padding: 90px 0; }
 .call { position: absolute; left: 16px; right: 16px; z-index: 7; padding: 16px 18px; border-radius: 20px; background: rgba(23,23,29,.95); color: #f4f3f8;
         box-shadow: 0 16px 40px rgba(23,23,29,.35); opacity: 0; transform: translateY(10px) scale(.98); transition: opacity .45s var(--ease), transform .55s var(--ease); }
 .call.show { opacity: 1; transform: none; }
-.call small { display: block; font-family: var(--mono); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: #f0a585; margin-bottom: 4px; }
+.call .ci { float: left; width: 26px; height: 26px; margin: 2px 12px 0 0; fill: none; stroke: #b9a8ff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.call span { clear: none; }
+.call small { display: block; font-family: var(--mono); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: #b9a8ff; margin-bottom: 4px; }
 .call b { display: block; font-size: 22px; font-weight: 650; line-height: 1.3; }
 .call span { display: block; font-size: 18px; line-height: 1.35; color: #b4b3c0; margin-top: 2px; }
 .call.red { background: #1f1011; color: #f4f3f8; border: 1px solid rgba(255,107,107,.55); }
@@ -344,11 +348,11 @@ section.block { padding: 90px 0; }
 .call.red.gone { opacity: 0; transform: scale(.9) translateY(-6px); filter: blur(6px); transition: opacity .8s, transform .8s, filter .8s; }
 
 /* ---------- Close ---------- */
-.close { padding: 110px 0 60px; text-align: center; background: radial-gradient(600px 400px at 50% 38%, rgba(217,119,87,.10), transparent 70%); }
+.close { padding: 110px 0 60px; text-align: center; }
 .close h2 { margin: 0; font-size: clamp(32px, 9.5vw, 44px); line-height: 1.08; font-weight: 800; letter-spacing: -.035em; }
 .close h2 span { color: var(--muted); }
 .close .year { margin: 34px 0 0; font-size: 19px; line-height: 1.5; color: var(--muted); }
-.close .year b { color: var(--peach); font-weight: 650; }
+.close .year b { color: var(--purple); font-weight: 650; }
 .go { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 40px 0 0; padding: 18px; border-radius: 18px; font-size: 18px; font-weight: 650;
       text-decoration: none; color: #fff; background: var(--text); }
 .go:active { transform: scale(.98); }
@@ -421,7 +425,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 .ccount { padding: 0 6px; border-radius: 8px; font-size: 11px; background: var(--soft); }
 .chev { margin-left: auto; }
 .bubble.tuttie p { margin: 0; }
-.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: breathe 1s ease-in-out infinite; }
+.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--text); animation: breathe 1s ease-in-out infinite; }
 .dock { justify-content: space-around; }
 .steps { list-style: none; }
 /* Replay: on the phone itself, never over the caption or its progress bars. */
@@ -433,7 +437,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 
 .chips { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
 .chips span { padding: 7px 13px; border-radius: 16px; font-size: 14px; font-weight: 500; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); }
-.chips span:last-child { color: var(--accent-text); border-color: rgba(217,119,87,.45); }
+.chips span:last-child { color: var(--accent-text); border-color: rgba(122,90,248,.45); }
 .step { grid-template-columns: 34px 1fr; align-items: center; padding-bottom: 18px; }
 .step::before { top: 34px; }
 .step b { margin-top: 0; }
@@ -494,7 +498,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
   <div class="pin">
     <div class="ticks" id="ticks"></div>
     <div class="fig">
-      <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--peach)"><use href="#shop"/></svg></div>
+      <div class="viz shops"><svg class="no"><use href="#shop"/></svg><svg class="no"><use href="#shop"/></svg><svg style="color:var(--purple)"><use href="#shop"/></svg></div>
       <div class="big"><span class="count" data-to="2">0</span><small>in 3</small></div>
       <p>small Swiss firms have no website.</p>
       <div class="src">localsearch &amp; HSLU, 2025</div>
@@ -523,7 +527,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 <!-- ============ The idea ============ -->
 <section class="block turn">
   <div class="wrap">
-    <div class="kicker rv">The idea</div>
     <h2 class="rv">We turned the web around.</h2>
     <div class="three" id="three">
       <span>It searches.</span><span>It checks.</span><span>It bargains.</span><span class="one">You tap.</span>
@@ -549,7 +552,6 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 <!-- ============ Business case ============ -->
 <section class="block" style="padding-top:20px">
   <div class="wrap">
-    <div class="kicker rv">For businesses</div>
     <h2 class="rv biz-h">Small wins on fit,<br>not ad budget.</h2>
     <div class="vs rv">
       <div class="anna"><b>7</b><span>rooms · Anna's guesthouse</span></div>
@@ -576,7 +578,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
 <!-- ============ Demo: scroll into the phone ============ -->
 <section class="demo" id="demo" aria-label="Demo">
   <div class="pin">
-    <div class="intro" id="intro"><div class="kicker">One example</div><h2>Book a room.<br>Watch.</h2></div>
+    <div class="intro" id="intro"><h2>Book a room.<br>Watch.</h2></div>
     <div class="cap" id="cap">
       <div class="bars" id="bars"></div>
       <h3 id="capT">&nbsp;</h3>
@@ -631,11 +633,11 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
             <div class="faceid"><svg class="fglyph" id="fglyph" viewBox="0 0 60 60"><g class="fframe"><path d="M4 18V10a6 6 0 0 1 6-6h8M42 4h8a6 6 0 0 1 6 6v8M56 42v8a6 6 0 0 1-6 6h-8M18 56h-8a6 6 0 0 1-6-6v-8"/></g><g class="fface"><path d="M21 22v5M39 22v5M30 22v11h-2.5M22 40q8 6 16 0"/></g><path class="fcheck" d="M19 31l7.5 7.5L41.5 23"/></svg><span id="fidText">Face ID</span></div>
           </div>
 
-          <div class="call" id="cBudget" style="top:96px"><small>Behind the screen</small><b>Budget CHF 160 is never sent</b></div>
-          <div class="call red" id="cForged" style="top:330px"><small>Behind the screen</small><b>Forged seal · refused</b>
+          <div class="call" id="cBudget" style="top:96px"><svg class="ci" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg><b>Budget CHF 160 is never sent</b></div>
+          <div class="call red" id="cForged" style="top:330px"><b>Forged seal · refused</b>
             <div class="fake"><span class="x">✕</span><b>"Super quiet!!!" Basel Cheap Hotels</b><em>CHF 99</em></div></div>
-          <div class="call" id="cBargain" style="top:330px"><small>Behind the screen</small><b>Both limits stay private</b><span>Compared in code, never by AI.</span></div>
-          <div class="call" id="cSigned" style="top:96px"><small>Behind the screen · your key</small><b>Signed for exactly CHF 128</b></div>
+          <div class="call" id="cBargain" style="top:330px"><svg class="ci" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg><b>Both limits stay private</b><span>Compared in code, never by AI.</span></div>
+          <div class="call" id="cSigned" style="top:96px"><svg class="ci" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5M14 9l2 2"/></svg><b>Signed for exactly CHF 128</b></div>
           <button class="replay" id="replay" type="button">↻ Replay</button>
         </div>
       </div>
