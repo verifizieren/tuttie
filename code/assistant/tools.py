@@ -16,6 +16,7 @@ can be traced to the signed reply behind it (Tuttie's answers do not cite them).
 
 import inspect
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date as Date, datetime
@@ -339,6 +340,22 @@ def summarize(tool: str, payload: dict) -> str:
 
 # Keys of book's result that Tuttie sets itself; a hotel's signed confirmation never fills them.
 TUTTIE_KEYS = frozenset({"node_id", "source_step", "note", "charges_paid", "open_charges", "mismatch"})
+
+
+def finite_price(value) -> bool:
+    """A real price: a finite number above zero, not a bool (signed hotel data may hold anything,
+    and math on a 400-digit integer raises OverflowError)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value) and value > 0
+    except OverflowError:
+        return False
+
+
+def chf(value) -> str:
+    """An amount for the timeline ("128", "12.5"), or "?" when it is not a real number."""
+    return f"{value:g}" if finite_price(value) or value == 0 else "?"
 
 
 def listed(value) -> str:
@@ -693,7 +710,7 @@ class Toolbox:
         summary = f"Q: {question}  A: {reply.get('answer', '')}"
         if commitment := reply.get("commitment"):
             self.commitments.setdefault(node_id, []).append(result.envelope)
-            summary += f"  Commitment: {commitment['item']}, CHF {commitment['price_chf']:g}"
+            summary += f"  Commitment: {commitment['item']}, CHF {chf(commitment['price_chf'])}"
         step = self.emit_verified("a2a", summary, result)
         return {"node_id": node_id, "trust_tier": result.verdict["tier"], "source_step": step, **reply}
 
@@ -737,6 +754,8 @@ class Toolbox:
             if deal.get("rate") is not None:
                 terms = booking_terms(booked_room, booked_date, deal["rate"], deal["includes"], deal["offer_id"])
             amount = deal["price_chf"]
+            if not finite_price(amount):
+                return {"error": f"the signed agreement with {record['name']} has no usable price"}
             summary = f"Book {record['name']}: {describe_deal(deal, booked_date)} = CHF {amount:g} (negotiated)"
             return await self._approve_and_book(record, verdict, booked_date, booked_room, guest_name, [], amount,
                                                 summary, agreement, terms)
@@ -755,6 +774,9 @@ class Toolbox:
             return {"error": f"unknown extras {missing}; signed commitments available: {list(offered)}"}
 
         chosen = [offered[item] for item in extras or []]
+        prices = [room.get("price_chf"), *(env["payload"]["commitment"].get("price_chf") for env in chosen)]
+        if not all(finite_price(price) for price in prices):
+            return {"error": f"{record['name']}'s signed prices are not usable numbers; do not book it"}
         amount = room["price_chf"] + sum(env["payload"]["commitment"]["price_chf"] for env in chosen)
         parts = [f"{room_type} CHF {room['price_chf']:g} ({room['rate']})"]
         parts += [f"{env['payload']['commitment']['item']} CHF {env['payload']['commitment']['price_chf']:g}"
@@ -802,7 +824,7 @@ class Toolbox:
         if confirmation.get("status") == "confirmed":
             total = confirmation.get("total_chf")
             text = f"book: confirmed {confirmation.get('booking_id')}, CHF " + (
-                f"{total:g}" if isinstance(total, (int, float)) and not isinstance(total, bool) else "?")
+                chf(total))
             if confirmation.get("rate"):
                 text += f", {confirmation.get('room_type')} ({confirmation['rate']})"
             if confirmation.get("mismatch"):
@@ -886,7 +908,7 @@ class Toolbox:
             return result
         receipt = result.payload
         if receipt.get("status") == "paid":
-            text = f"pay: {purpose} CHF {receipt['amount_chf']:g} paid {how} (checked: {', '.join(receipt['checked'])})"
+            text = f"pay: {purpose} CHF {chf(receipt.get('amount_chf'))} paid {how} (checked: {', '.join(receipt['checked'])})"
         else:
             text = f"pay refused by {record['name']}: {receipt.get('reason')}"
         step = self.emit_verified("payment", text, result)
