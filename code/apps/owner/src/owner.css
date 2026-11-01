@@ -1,7 +1,20 @@
-/* Owner view: one calm column on black, like the wallet. Brand colours and fonts come from
-   apps/shared/tuttie.css. No cards, glows or sidebars: a title, a few blocks of lines. */
+/* Owner view: one calm column, light like the wallet. Fonts come from apps/shared/tuttie.css;
+   this file overrides the shared (dark) colour tokens with the wallet's light palette.
+   No cards, glows or sidebars: a title, a few blocks of lines. */
+:root {
+  --bg: #f2f2f7; --panel: #ffffff; --panel2: #f6f6f9; --line: #e4e4ea; --line2: #d6d6de;
+  --text: #17171d; --ink: var(--text); --muted: #5a5967; --dim: #8b8a97;
+  --accent: #2f6fe0; --accent-soft: #eaf1fd; --accent-text: #2f6fe0;
+  --purple: #7a5af8; --pink: #e5489b;
+  --gold: #7a5af8; --gold-bg: rgba(122, 90, 248, .08); --gold-line: rgba(122, 90, 248, .45);
+  --blue: #2f6fe0; --blue-bg: rgba(47, 111, 224, .08); --blue-line: rgba(47, 111, 224, .45);
+  --grey: #77767f; --grey-bg: rgba(119, 118, 127, .08); --grey-line: rgba(119, 118, 127, .4);
+  --red: #d93b3b; --red-bg: rgba(217, 59, 59, .08); --red-line: rgba(217, 59, 59, .4);
+  --green: #1f9d5c;
+  color-scheme: light;
+}
 
-body { background: #000; min-height: 100vh; }
+body { background: var(--bg); min-height: 100vh; }
 h1, h2, p { margin: 0; }
 .muted { color: var(--muted); }
 .mono { font-family: var(--mono); font-size: 12px; }
@@ -63,7 +76,7 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
 .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: var(--muted); }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch i { position: relative; width: 38px; height: 22px; border-radius: 999px; background: var(--line2); transition: background .2s; flex: none; }
-.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s var(--ease); }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); transition: transform .2s var(--ease); }
 .switch input:checked + i { background: var(--accent); }
 .switch input:checked + i::after { transform: translateX(16px); }
 .switch input:focus-visible + i { outline: 2px solid var(--accent-text); outline-offset: 2px; }
@@ -75,10 +88,12 @@ input[type=number]::-webkit-inner-spin-button { display: none; }
   padding: 12px 16px; border-radius: 16px; background: var(--panel2); border: 1px solid var(--line2); font-size: 14px;
 }
 .deploy-actions { display: flex; gap: 8px; flex: none; }
+.deploy-bar { background: var(--panel); border-color: var(--line); box-shadow: 0 10px 30px rgba(23, 23, 40, .12); }
 .deploy-bar button, .dialog button { padding: 8px 16px; border-radius: 999px; }
 
-.backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .7); }
-.dialog { width: 100%; max-width: 480px; max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line2); border-radius: 20px; padding: 24px; }
+.backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 24px; background: rgba(23, 23, 40, .32); }
+.dialog { width: 100%; max-width: 480px; max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 24px;
+          box-shadow: 0 20px 50px rgba(23, 23, 40, .18); }
 .dialog h2 { font-size: 20px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .refused { color: var(--red); font-size: 14px; }
