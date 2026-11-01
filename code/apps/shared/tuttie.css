@@ -1,16 +1,19 @@
 /* Tuttie brand: colours and fonts shared by all apps.
-   Taken from the team's design example: dark, Inter, terracotta accent. */
+   Black and white with blue, purple and pink accents; Inter, JetBrains Mono for numbers. */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
 :root {
   --bg: #08080b; --panel: #111117; --panel2: #16161e; --line: #23232d; --line2: #2e2e3b;
   --text: #ecebf4; --ink: var(--text); --muted: #8d8c9e; --dim: #5d5c6d;
-  --accent: #d97757; --accent-soft: rgba(217, 119, 87, .16); --accent-text: #ffb596;
-  --gold: #e8b746; --gold-bg: rgba(232, 183, 70, .08); --gold-line: rgba(232, 183, 70, .45);
+  --accent: #2f6fe0; --accent-soft: rgba(47, 111, 224, .18); --accent-text: #8fb0ff;
+  --purple: #7a5af8; --pink: #e5489b;
+  --purple-tint: rgba(122, 90, 248, .12); --pink-tint: rgba(229, 72, 155, .12);
+  /* The top seal tier (the commercial register) is drawn in purple, the next tier in blue. */
+  --gold: #b38bff; --gold-bg: rgba(140, 90, 248, .10); --gold-line: rgba(140, 90, 248, .5);
   --blue: #8fb0ff; --blue-bg: rgba(91, 141, 255, .08); --blue-line: rgba(91, 141, 255, .45);
   --grey: #a3a3b0; --grey-bg: rgba(139, 139, 152, .08); --grey-line: rgba(139, 139, 152, .45);
   --red: #ff8a8a; --red-bg: rgba(255, 95, 95, .08); --red-line: rgba(255, 95, 95, .45);
-  --green: #34c77b; --amber: #ffb547;
+  --green: #34c77b;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   --ease: cubic-bezier(.22, 1, .36, 1);
 }
@@ -19,7 +22,8 @@
 body {
   margin: 0; color: var(--text); -webkit-font-smoothing: antialiased;
   font-family: Inter, -apple-system, system-ui, sans-serif;
-  background: radial-gradient(900px 600px at 50% 40%, rgba(217, 119, 87, .10), transparent 65%), var(--bg);
+  background: var(--bg);
 }
-button { font: inherit; font-weight: 600; color: #fff; border: 0; border-radius: 10px; padding: 10px 18px; background: var(--accent); cursor: pointer; }
+button { font: inherit; font-weight: 600; color: #fff; border: 0; border-radius: 999px; padding: 10px 18px; background: var(--accent); cursor: pointer; }
+em, i, cite, address { font-style: normal; }
 button:disabled { opacity: .5; cursor: default; }
