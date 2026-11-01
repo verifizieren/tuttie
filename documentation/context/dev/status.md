@@ -31,7 +31,7 @@ Last updated: 2026-11-01 (light design for wallet, QR page and pitch deck; decks
   35,727 Swiss cyber reports (H1 2025) instead of "2 in 3 have no website"; the +539 % has its baseline (2024 vs 2025 holidays,
   bars to scale, replacing the illustrative curve); a new "Under the hood" block says what is
   signed (seals, offers and agreements, delegation, approval, mandate, prices from signed data);
-  the agency bar is set against Tuttie's fixed fee per booking (amount not set yet); "fakes never
+  the agency bar is set against Tuttie's 5 % commission per signed booking (CHF 6.75 on 135); "fakes never
   reach you" became "forged seals"; 7 vs 220 says why the small one won; a callout marks the
   read context as demo data. Details: `code/apps/presentation/README.md`.
 - **Light design (1 Nov)**: the wallet takes the `feature/tuttie-wallet-design` look (white Tuttie

@@ -186,7 +186,7 @@ section.block { padding: 90px 0; }
 .bar .keep { background: var(--green); }
 .bar .fee { background: var(--red); opacity: .85; }
 .bill.in .bar .keep.a { width: 83.5%; } .bill.in .bar .fee.a { width: 16.5%; }
-.bill.in .bar .keep.b { width: 97%; } .bill.in .bar .fee.b { width: 3%; background: var(--muted); }
+.bill.in .bar .keep.b { width: 95%; } .bill.in .bar .fee.b { width: 5%; background: var(--muted); }  /* 5 % fee, to scale */
 .barrow strong { font-weight: 700; font-variant-numeric: tabular-nums; }
 .barrow .lost { color: var(--red); }
 .model { margin-top: 18px; display: grid; gap: 10px; }
@@ -640,9 +640,9 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; heig
       <h4>One night, CHF 135</h4>
       <div class="barrow"><span>Agency</span><strong class="lost">− CHF 20–24</strong>
         <div class="bar"><i class="keep a"></i><i class="fee a"></i></div></div>
-      <div class="barrow"><span>Tuttie</span><strong>− a fixed fee</strong>
+      <div class="barrow"><span>Tuttie</span><strong>− CHF 6.75</strong>
         <div class="bar"><i class="keep b"></i><i class="fee b"></i></div></div>
-      <p class="src" style="margin:12px 0 0">Agencies: typically 15–18% commission. Tuttie: a fixed fee per signed booking, not a share of the price (amount not set yet). Anna is a demo persona.</p>
+      <p class="src" style="margin:12px 0 0">Agencies: typically 15–18% commission. Tuttie: 5% per signed booking. Anna is a demo persona.</p>
     </div>
 
     <div class="model">
