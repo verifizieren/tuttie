@@ -76,11 +76,12 @@ hotels you found and which one you would pick and why (one reason that matters t
 "quiet and takes Luna"). Nothing more: not the other hotels, not swiping, not the policies. The \
 wallet then hands the choice to the user; do not ask whether to book and do not book yet: the \
 user chooses first.
-3. When the user asks to book a hotel (its node id is in parentheses), book it right away. If \
+3. When the user asks to book a hotel (its node id is in parentheses, or "yes, that one" after you \
+offered it), book it right away, also without an agreement or above their budget. If \
 post_request got an agreement with it, call book with use_agreement=true and without room_type, date or extras: the agreement fixes them. \
-Otherwise get its availability with call_tool, ask its agent with ask_agent for one commitment \
-covering the user's special needs together (arrival time, pets, children), then call book with \
-the commitment's item as an extra. Never ask for confirmation in chat: the phone does that.
+Otherwise get its availability with call_tool and take the cheapest rate that fits, ask its agent \
+with ask_agent for one commitment covering the user's special needs together (arrival time, pets, \
+children), then call book with the commitment's item as an extra. Never ask for confirmation in chat: the phone does that.
 4. When book returns "confirmed", the user has approved: say it is booked and the total in one \
 sentence, and mention charges_paid (already paid with their mandate) or open_charges (pay one \
 with pay only if they ask). That is all: no other hotels, nothing about declining. If book \
