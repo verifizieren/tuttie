@@ -1,13 +1,30 @@
 // Talks to the business's node (code/node/owner.py: /owner/overview and /owner/deploy).
 // The owner view shows one business. Which node: `?node=<url>` in the page address, else
 // VITE_NODE_URL, else the Gästehaus am Rhein's node (port 4009) on the host serving this page.
+// `?node=` is used only for this page's own host or localhost (any port): the owner token is
+// sent to that node, so a link must not be able to point it at someone else's server.
 
 const DEFAULT_NODE_PORT = 4009;
 const TOKEN_KEY = "tuttie_owner_token";
+const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
+
+/** The `?node=` address if it is an http(s) URL on this page's host or localhost, else null. */
+function trustedNodeParam() {
+  const value = new URLSearchParams(location.search).get("node");
+  if (!value) return null;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (!["http:", "https:"].includes(url.protocol)) return null;
+  if (url.hostname !== location.hostname && !LOCAL_HOSTS.includes(url.hostname)) return null;
+  return `${url.origin}${url.pathname}`;
+}
 
 export function nodeUrl() {
-  const fromAddress = new URLSearchParams(location.search).get("node");
-  const url = fromAddress || import.meta.env.VITE_NODE_URL
+  const url = trustedNodeParam() || import.meta.env?.VITE_NODE_URL
     || `${location.protocol}//${location.hostname}:${DEFAULT_NODE_PORT}`;
   return url.replace(/\/$/, "");
 }
