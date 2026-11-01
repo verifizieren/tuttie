@@ -38,11 +38,24 @@ phone.style.left = `${PHONE.x}px`;
 phone.style.top = `${PHONE.y}px`;
 phone.style.transform = `scale(${PHONE.scale})`;
 
-// The deck lives next to the wallet (/presentation/ and /wallet/); ?wallet= points elsewhere.
-wallet.src = params.get("wallet") || "/wallet/";
+/** A URL from the query string, accepted only on this origin (no javascript:, no other sites):
+ *  the framed pages share the wallet's cookie, so a foreign or script URL would be an XSS hole. */
+export function sameOrigin(value, fallback) {
+  if (!value) return fallback;
+  try {
+    const url = new URL(value, location.href);
+    return url.origin === location.origin ? url.href : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// The deck lives next to the wallet (/presentation/ and /wallet/); ?wallet= may point to another
+// path on the same origin, for layout checks.
+wallet.src = sameOrigin(params.get("wallet"), "/wallet/");
 const owner = document.getElementById("owner");   // gone when the owner beat is switched off
 if (owner) {
-  owner.src = params.get("ownerview") || "/owner/";
+  owner.src = sameOrigin(params.get("ownerview"), "/owner/");
   owner.addEventListener("load", () => { forwardKeys(owner); keepFocus(); });
 }
 
