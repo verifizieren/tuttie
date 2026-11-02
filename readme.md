@@ -122,6 +122,7 @@ BaselHack 2026, Adobe challenge.
 - **Stan:** research
 - **Sebastian:** pitch
 - **Thomas:** pitch
+- **Handan:** project management/ pitch
 
 ## License
 
