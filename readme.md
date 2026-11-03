@@ -116,13 +116,13 @@ To keep everything running on a server, use the systemd user service in `deploy/
 
 BaselHack 2026, Adobe challenge.
 
-- **Max:** dev
+- **Max:** dev / project management
 - **Chris:** dev
 - **Jonas:** research
 - **Stan:** research
 - **Sebastian:** pitch
 - **Thomas:** pitch
-- **Handan:** project management/ pitch
+- **Handan:** project management / pitch
 
 ## License
 
