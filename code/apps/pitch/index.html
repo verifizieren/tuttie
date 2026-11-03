@@ -726,8 +726,14 @@ html #try .try-row .qr { margin-top: 0; }
 .at-gather #cam { opacity:1; transform:translate3d(380px, 0, 0) scale(1); transition:transform .7s var(--cam) .4s, opacity .2s ease .4s; }
 .at-gather #shadow { opacity:.8; transform:translateX(380px); transition:transform .7s var(--cam) .4s, opacity .4s ease .6s; }
 .at-gather #market { transform:translateX(-430px); transition:opacity .45s ease, transform .7s var(--cam) .4s; }
-/* While "check 'em out" plays: an empty stage */
-#stage.voice-blank > * { opacity: 0 !important; transition: opacity .35s ease !important; }
+/* #5 -> #6: Tuttie's card leaves the drawing for the middle of the stage, smiles and talks along with
+   "check 'em out"; everything else stays as on slide 5. */
+#talker { position: absolute; left: 0; top: 0; width: 356px; height: 224px; border-radius: 22px; background: #fff;
+          box-shadow: 0 18px 44px rgba(23,23,40,.12), 0 0 0 1.5px rgba(122,90,248,.28);
+          transform-origin: 0 0; opacity: 0; pointer-events: none; z-index: 20; }
+#talker canvas { position: absolute; left: 0; top: 50%; width: 356px; height: 178px; transform: translateY(-50%); display: block; }
+#stage.voice-talk #talker { opacity: 1; }
+#stage.voice-talk #rmPitch .rm-card { opacity: 0 !important; transition: none !important; }
 </style>
 </head>
 <body>
@@ -883,6 +889,7 @@ html #try .try-row .qr { margin-top: 0; }
 
 
   <div id="hud"><span id="clock">0:00</span> / 3:00<i></i></div>
+  <div id="talker" aria-hidden="true"><canvas id="talkFace" width="456" height="228"></canvas></div>
   <div id="notes"></div>
 </div>
 
@@ -1073,6 +1080,7 @@ const $ = s => document.querySelector(s);
 const stage = $("#stage");
 const face = new TuttieFace($("#face"));
 const tryFace = new TuttieFace($("#tryFace"));  // the last slide: Tuttie next to the QR code
+const talkFace = new TuttieFace($("#talkFace"));  // #5 -> #6: the drawing's card, talking in the middle
 let cur = -1, timers = [];
 const startedAt = {};
 const later = (fn, ms) => timers.push(setTimeout(fn, ms));
@@ -1219,22 +1227,67 @@ function ripple(el, fx = .5, fy = .5) {
 }
 function land() { const f = $("#float"); f.classList.remove("land"); void f.offsetWidth; f.classList.add("land"); }
 
+// ---------- #5 -> #6: the drawing's Tuttie card talks in the middle of the stage ----------
+const talk = (() => {
+  const el = $("#talker"), W = 356, H = 224, GROW = 1.3, MOVE_MS = 700;
+  let raf = 0, env = null, base = 1;
+  // The line's loudness envelope (decoded once, never routed through Web Audio, so playback is untouched).
+  fetch("audio/check-em-out.mp3").then(r => r.arrayBuffer())
+    .then(b => new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100).decodeAudioData(b))
+    .then(buf => {
+      const d = buf.getChannelData(0), step = Math.round(buf.sampleRate / 50), out = [];
+      for (let k = 0; k < d.length; k += step) { let m = 0; for (let j = k; j < Math.min(d.length, k + step); j++) m = Math.max(m, Math.abs(d[j])); out.push(m); }
+      const peak = Math.max(...out) || 1; env = out.map(v => v / peak);
+    }).catch(() => { env = null; });
+  const place = (x, y, sc) => { el.style.transform = `translate(${x}px, ${y}px) scale(${sc})`; };
+  const centre = sc => place(960 - W * sc / 2, 540 - H * sc / 2, sc);
+  function start(say) {
+    // Start where the card sits in the drawing (stage pixels), then glide to the middle.
+    const card = $("#rmPitch .rm-cbg").getBoundingClientRect(), st = stage.getBoundingClientRect(), s = st.width / 1920;
+    const w = card.width / s; base = w / W * GROW;
+    el.style.transition = "none"; place((card.left - st.left) / s, (card.top - st.top) / s, w / W);
+    stage.classList.add("voice-talk"); void el.offsetWidth;
+    talkFace.hold = true; talkFace.wake("happiness", 300); talkFace.lookAt(0, 0, 1);
+    el.style.transition = `transform ${MOVE_MS}ms cubic-bezier(.22, 1, .36, 1)`; centre(base);
+    raf = setTimeout(() => {
+      el.style.transition = "none";
+      const clip = sfx.clip("checkEmOut"), t0 = performance.now();
+      say();
+      // Talking: each syllable pops the card up a little and squashes the eyes, like a mouth would move.
+      const eyes = $("#talkFace"); let lv = 0;
+      const beat = () => {
+        const t = clip && !clip.paused ? clip.currentTime : (performance.now() - t0) / 1000 * 1.2;
+        const raw = env ? (env[Math.floor(t * 50)] || 0) : Math.abs(Math.sin(t * 9)) * .7;
+        lv = raw > lv ? raw : lv * .82;  // fast attack, soft decay
+        const sc = base * (1 + .2 * lv);
+        place(960 - W * sc / 2, 540 - H * sc / 2 - 14 * lv, sc);
+        eyes.style.transform = `translateY(-50%) scale(${1 + .06 * lv}, ${1 - .2 * lv})`;
+        raf = requestAnimationFrame(beat);
+      };
+      raf = requestAnimationFrame(beat);
+    }, MOVE_MS);
+  }
+  function stop() { clearTimeout(raf); cancelAnimationFrame(raf); raf = 0; stage.classList.remove("voice-talk"); talkFace.hold = false; $("#talkFace").style.transform = ""; }
+  return { start, stop };
+})();
+
 // ---------- Steps ----------
 let voicePending = false;
 function go(i, fromAuto = false, afterVoice = false) {
   i = Math.max(0, Math.min(STEPS.length - 1, i));
-  // #5 -> #6: "check 'em out" (1.2x) plays over an empty stage first; slide #6 and all its animations start when it ends.
+  // #5 -> #6: Tuttie's card from the drawing grows a little and moves to the middle (slide 5 stays as it is),
+  // then says "check 'em out" (1.2x) with a happy face, pulsing with the line. Slide #6 starts when it ends.
   // A second press during the line skips straight to the slide.
   if (i === 6 && cur === 5 && !afterVoice) {
     if (!voicePending) {
       voicePending = true;
-      const next = () => { if (voicePending && cur === 5) { voicePending = false; go(6, fromAuto, true); } };
-      stage.classList.add("voice-blank");
-      sfx.play("checkEmOut", { rate: 1.2, onEnd: next });
-      setTimeout(next, 3600);  // never wait longer than the line
+      const next = () => { if (voicePending && cur === 5) { voicePending = false; talk.stop(); go(6, fromAuto, true); } };
+      talk.start(() => sfx.play("checkEmOut", { rate: 1.2, onEnd: next }));
+      setTimeout(next, 4400);  // never wait longer than the move and the line
       return;
     }
   }
+  talk.stop();
   voicePending = false;
   const fwd = i === cur + 1 || (fromAuto && i > cur);
   timers.forEach(clearTimeout); timers = [];
@@ -1315,7 +1368,7 @@ const sfx = (() => {
   }
   function stopClips() { Object.values(clips).forEach(a => { try { a.pause(); } catch (e) {} }); }
   return {
-    play, stopClips,
+    play, stopClips, clip: name => clips[name],
     // A short, solid click like a hardware button.
     press() { tone(1900, 0, .045, "triangle", .18, .5); tone(170, 0, .07, "sine", .25, .6); },
     // A cute rising three-note chirp: Tuttie is awake.
@@ -1327,7 +1380,7 @@ const sfx = (() => {
 function fit() {
   const s = Math.min(innerWidth / 1920, innerHeight / 1080);
   stage.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
-  face.resize(s); tryFace.resize(s);
+  face.resize(s); tryFace.resize(s); talkFace.resize(s);
 }
 addEventListener("resize", fit); fit();
 addEventListener("keydown", e => {
